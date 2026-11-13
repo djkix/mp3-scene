@@ -1,4 +1,6 @@
 import hashlib
+import hmac
+import re
 import secrets
 import threading
 from pathlib import Path
@@ -10,6 +12,8 @@ from fastapi import HTTPException
 SESSION_TTL = 30 * 86400
 DAY = 86400
 COOKIE = "session"
+CAST_TTL = 12 * 3600
+_CAST_SKEW = 5 * 60
 
 _hasher = PasswordHasher()
 # argon2 réserve ~64 Mio par calcul et /api/login est public : au plus 4 calculs simultanés, les autres attendent
@@ -149,3 +153,20 @@ def safe_path(root: Path, *parts: str) -> Path:
     if not p.is_relative_to(root) or not p.exists():
         raise HTTPException(404, "Fichier introuvable.")
     return p
+
+
+def sign_track(secret: str, track_id: int, exp: int) -> str:
+    """Signature HMAC-SHA256 (hex) d'une URL de cast ; préfixe « cast: » pour ne servir qu'à cet usage."""
+    return hmac.new(secret.encode(), f"cast:{track_id}:{exp}".encode(), hashlib.sha256).hexdigest()
+
+
+def check_track_sig(secret: str, track_id: int, exp, sig, now: float) -> bool:
+    """Vrai si `sig` signe (track_id, exp) et que `exp` (brut, entier Unix) n'est ni passé ni trop lointain."""
+    if not isinstance(exp, (int, str)) or not isinstance(sig, str):
+        return False
+    if not re.fullmatch(r"[0-9]{1,12}", str(exp)) or not re.fullmatch(r"[0-9a-f]{64}", sig):
+        return False
+    exp = int(exp)
+    if not now <= exp <= now + CAST_TTL + _CAST_SKEW:
+        return False
+    return hmac.compare_digest(sign_track(secret, track_id, exp), sig)

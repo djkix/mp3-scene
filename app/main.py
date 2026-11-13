@@ -80,4 +80,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     for module in (routes_auth, routes_admin, routes_library, routes_media):
         app.include_router(module.router)
+    app.include_router(routes_media.cast_router)  # hors /api/ : sans session, URL signée
     return app
