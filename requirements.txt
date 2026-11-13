@@ -1,0 +1,4 @@
+fastapi
+uvicorn[standard]
+mutagen
+argon2-cffi
