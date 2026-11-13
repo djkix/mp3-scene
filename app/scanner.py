@@ -50,10 +50,7 @@ def _files(entries, prefix="", disc=1):
         if name is None:
             skipped += 1
             continue
-        try:
-            st = e.stat(follow_symlinks=False).st_size
-        except OSError:  # fichier disparu entre le listage et le stat
-            continue
+        st = e.stat(follow_symlinks=False).st_size  # OSError : la release entière est ignorée par l'appelant
         size += st
         ext = os.path.splitext(name)[1].lower()
         if ext == ".mp3":
@@ -68,6 +65,14 @@ def _name(rel):
 
 
 def scan_structure(conn, root: Path, now: float) -> dict:
+    try:
+        return _scan_structure(conn, root, now)
+    except BaseException:
+        conn.rollback()
+        raise
+
+
+def _scan_structure(conn, root, now):
     root_b = os.fsencode(root)
     try:
         top = _list(root_b)
@@ -148,35 +153,30 @@ def scan_structure(conn, root: Path, now: float) -> dict:
         except OSError:  # dossier illisible : ignoré, ses releases connues sont conservées
             mark_tree(rel)
             continue
-        tracks, size, nfo, n = _files(entries)
-        skipped += n
-        others, discs = [], []
-        for e in entries:
-            if not e.is_dir(follow_symlinks=False):
-                continue
-            name = _decode(e)
-            if name is None:
-                skipped += 1
-                continue
-            m = DISC_RE.match(name)
-            sub = None
-            if m:
-                try:
-                    sub = _list(e.path)
-                except OSError:
-                    pass
-            if sub is None:
-                others.append((e, name))
-                continue
-            t, s, _, n = _files(sub, name + "/", int(m.group(2)))
-            if t:
-                discs.append((t, s))
-                skipped += n  # sinon compté quand le dossier sera parcouru
-            else:
-                others.append((e, name))
-        for t, s in discs:
-            tracks += t
-            size += s
+        try:
+            tracks, size, nfo, n_skip = _files(entries)
+            others = []
+            for e in entries:
+                if not e.is_dir(follow_symlinks=False):
+                    continue
+                name = _decode(e)
+                if name is None:
+                    n_skip += 1
+                    continue
+                m = DISC_RE.match(name)
+                t = None
+                if m:
+                    t, s, _, n = _files(_list(e.path), name + "/", int(m.group(2)))
+                if t:
+                    tracks += t
+                    size += s
+                    n_skip += n  # sinon compté quand le dossier sera parcouru
+                else:
+                    others.append((e, name))
+        except OSError:  # disque ou fichier illisible : release ignorée pour ce scan, rien n'est modifié
+            mark_tree(rel)
+            continue
+        skipped += n_skip
         if tracks:
             save(rel, mtime, tracks, size, nfo)
         for e, name in others:
@@ -184,17 +184,26 @@ def scan_structure(conn, root: Path, now: float) -> dict:
 
     gone = [p for p in known if p not in seen]
     gone_names = Counter(_name(p) for p in gone)
-    new_by_name = defaultdict(list)
-    for p in new:
-        new_by_name[_name(p)].append(p)
-    found = len(seen) + len(new)
+    # candidats au déplacement : toute release présente (vue ou nouvelle), pas seulement les nouvelles de ce
+    # scan, pour qu'une ligne provisoire validée par un scan interrompu soit encore fusionnée au suivant
+    present = {p: known[p][0] for p in seen}
+    present.update(new)
+    by_name = defaultdict(list)
+    for p in present:
+        by_name[_name(p)].append(p)
+    found = len(present)
     moved = removed = 0
     for p in gone:
         rid = known[p][0]
-        cands = new_by_name[_name(p)]
+        cands = by_name[_name(p)]
         if gone_names[_name(p)] == 1 and len(cands) == 1:
             dest = cands[0]
-            dup = new.pop(dest)
+            dup = present[dest]
+            new.pop(dest, None)
+            conn.execute("UPDATE OR IGNORE favorites SET item_id=? WHERE kind='release' AND item_id=?", (rid, dup))
+            conn.execute("DELETE FROM favorites WHERE kind='release' AND item_id=?", (dup,))
+            conn.execute("DELETE FROM favorites WHERE kind='track' AND item_id IN"
+                         " (SELECT id FROM tracks WHERE release_id=?)", (dup,))
             conn.execute("DELETE FROM tracks WHERE release_id=?", (dup,))
             conn.execute("DELETE FROM releases WHERE id=?", (dup,))
             conn.execute("UPDATE releases SET path=?, parent=?, category=? WHERE id=?",

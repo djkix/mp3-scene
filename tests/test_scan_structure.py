@@ -4,6 +4,7 @@ import sys
 
 import pytest
 
+import app.scanner as sc
 from app.scanner import ScanError, _storable, scan_structure
 
 
@@ -13,6 +14,27 @@ def mk(music, rel, files):
     for f in files:
         (d / f).write_bytes(b"x")
     return d
+
+
+def failing_list(monkeypatch, list_fails=(), stat_fails=()):
+    """Remplace scanner._list : listage en échec pour les dossiers `list_fails`, stat en échec pour `stat_fails`."""
+    real = sc._list
+
+    class Entry:
+        def __init__(self, e):
+            self._e, self.name, self.path = e, e.name, e.path
+            self.is_file, self.is_dir = e.is_file, e.is_dir
+
+        def stat(self, **kw):
+            if self.name in stat_fails:
+                raise OSError("EIO")
+            return self._e.stat(**kw)
+
+    def fake(path):
+        if os.path.basename(path) in list_fails:
+            raise OSError("EIO")
+        return [Entry(e) for e in real(path)]
+    monkeypatch.setattr(sc, "_list", fake)
 
 
 def add_user(conn):
@@ -90,12 +112,54 @@ def test_moved_release_keeps_identity_and_favorites(conn, music):
     mk(music, "S/A/Art-One-WEB-2015-GRP", ["01-a.mp3"]); scan_structure(conn, music, now=1.0)
     rid = conn.execute("SELECT id FROM releases").fetchone()[0]
     conn.execute("INSERT INTO users(id,username,password_hash,role) VALUES(1,'u','x','user')")
-    conn.execute("INSERT INTO favorites VALUES(1,'release',?,1)", (rid,)); conn.commit()
+    conn.execute("INSERT INTO favorites VALUES(1,'release',?,1)", (rid,))
+    tid = conn.execute("SELECT id FROM tracks").fetchone()[0]
+    conn.execute("UPDATE tracks SET tags_read=1, title='T'"); conn.commit()
     (music / "T").mkdir(); (music / "S/A/Art-One-WEB-2015-GRP").rename(music / "T/Art-One-WEB-2015-GRP")
     stats = scan_structure(conn, music, now=2.0)
-    assert (stats["moved"], stats["removed"]) == (1, 0)
+    assert (stats["found"], stats["added"], stats["moved"], stats["removed"]) == (1, 0, 1, 0)
     assert conn.execute("SELECT id, path, category FROM releases").fetchone()[:] == (rid, "T/Art-One-WEB-2015-GRP", "T")
     assert conn.execute("SELECT count(*) FROM favorites").fetchone()[0] == 1
+    assert [t[:] for t in conn.execute("SELECT id, release_id, title, tags_read FROM tracks")] == [(tid, rid, "T", 1)]
+
+
+def test_interrupted_move_scan_keeps_identity_on_rescan(conn, music, monkeypatch):
+    mk(music, "S/A/Art-One-WEB-2015-GRP", ["01-a.mp3"]); mk(music, "S/Keep-WEB-2015-GRP", ["01-a.mp3"])
+    scan_structure(conn, music, now=1.0)
+    rid = conn.execute("SELECT id FROM releases WHERE name LIKE 'Art%'").fetchone()[0]
+    add_user(conn); conn.execute("INSERT INTO favorites VALUES(1,'release',?,1)", (rid,)); conn.commit()
+    (music / "T").mkdir(); (music / "S/A/Art-One-WEB-2015-GRP").rename(music / "T/Art-One-WEB-2015-GRP")
+    monkeypatch.setattr(sc, "BATCH", 1)   # la release provisionnelle est validée pendant le parcours
+    real_name = sc._name
+    monkeypatch.setattr(sc, "_name", lambda p: (_ for _ in ()).throw(KeyboardInterrupt()))  # coupure en phase finale
+    with pytest.raises(KeyboardInterrupt):
+        scan_structure(conn, music, now=2.0)
+    monkeypatch.setattr(sc, "_name", real_name)
+    stats = scan_structure(conn, music, now=3.0)
+    assert (stats["found"], stats["moved"], stats["removed"]) == (2, 1, 0)
+    assert conn.execute("SELECT id FROM releases WHERE path='T/Art-One-WEB-2015-GRP'").fetchone()[0] == rid
+    assert conn.execute("SELECT count(*) FROM releases").fetchone()[0] == 2
+    assert [f[0] for f in conn.execute("SELECT item_id FROM favorites")] == [rid]
+
+
+@pytest.mark.parametrize("fail", [{"list_fails": {b"CD1"}}, {"stat_fails": {b"02-b.mp3"}}])
+def test_unreadable_disc_or_file_changes_nothing(conn, music, monkeypatch, fail):
+    d = mk(music, "S/VA-Big-WEB-2015-GRP", ["02-b.mp3"]); mk(music, "S/VA-Big-WEB-2015-GRP/CD1", ["01-a.mp3"])
+    mk(music, "S/Keep-WEB-2015-GRP", ["01-a.mp3"])
+    scan_structure(conn, music, now=1.0)
+    rid = conn.execute("SELECT id FROM releases WHERE name LIKE 'VA%'").fetchone()[0]
+    add_user(conn)
+    conn.execute("INSERT INTO favorites VALUES(1,'release',?,1)", (rid,))
+    conn.execute("INSERT INTO favorites SELECT 1,'track',id,1 FROM tracks WHERE release_id=?", (rid,))
+    conn.execute("UPDATE releases SET tags_done=1"); conn.commit()
+    before = [t[:] for t in conn.execute("SELECT * FROM tracks ORDER BY id")]
+    (d / "x.jpg").write_bytes(b"x"); os.utime(d, (99.0, 99.0))   # mtime changé : la release est relistée
+    failing_list(monkeypatch, **fail)
+    stats = scan_structure(conn, music, now=2.0)
+    assert (stats["found"], stats["removed"]) == (2, 0)
+    assert [t[:] for t in conn.execute("SELECT * FROM tracks ORDER BY id")] == before
+    assert conn.execute("SELECT count(*) FROM favorites").fetchone()[0] == 3
+    assert conn.execute("SELECT tags_done FROM releases WHERE id=?", (rid,)).fetchone()[0] == 1
 
 
 def test_removed_release_drops_favorites(conn, music):
