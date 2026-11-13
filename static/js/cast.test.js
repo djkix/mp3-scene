@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Queue } from './queue.js';
 import { castOrder, sameOrder, batches, repeatKey, itemMap, urlsStale, URL_MAX_AGE,
-  castWindow, windowValid, receiverRepeat, isLastOfWindow, afterWindow, URL_REFRESH_AGE } from './castqueue.js';
+  castWindow, windowValid, receiverRepeat, isLastOfWindow, afterWindow, URL_REFRESH_AGE,
+  windowFinished } from './castqueue.js';
 
 const T = (n) => Array.from({ length: n }, (_, i) => ({ id: 100 + i }));
 
@@ -153,4 +154,21 @@ test('urlsStale avec seuil de rafraîchissement (6 h)', () => {
   assert.equal(URL_REFRESH_AGE, 6 * 3600 * 1000);
   assert.equal(urlsStale(now - URL_REFRESH_AGE - 1, now, URL_REFRESH_AGE), true);
   assert.equal(urlsStale(now - URL_REFRESH_AGE + 1, now, URL_REFRESH_AGE), false);
+});
+
+test('windowFinished : fin naturelle de fenêtre, quel que soit l\'ordre des événements', () => {
+  const base = { alive: true, idle: true, finished: true, atWindowEnd: true, pending: false, done: false };
+  assert.equal(windowFinished(base), true);                                       // IDLE/FINISHED, média vivant
+  assert.equal(windowFinished({ ...base, alive: false, idle: false }), true);     // session média terminée + FINISHED
+  assert.equal(windowFinished({ ...base, alive: false }), true);
+  for (const finished of [false]) {                                               // CANCELLED, INTERRUPTED, ERROR
+    assert.equal(windowFinished({ ...base, alive: false, finished }), false);
+    assert.equal(windowFinished({ ...base, finished }), false);
+  }
+  assert.equal(windowFinished({ ...base, idle: false }), false);                  // vivant mais pas IDLE
+  assert.equal(windowFinished({ ...base, atWindowEnd: false }), false);           // pas sur la dernière piste
+  assert.equal(windowFinished({ ...base, alive: false, atWindowEnd: false }), false);
+  assert.equal(windowFinished({ ...base, pending: true }), false);                // chargement en cours
+  assert.equal(windowFinished({ ...base, done: true }), false);                   // déjà déclenché (a puis b)
+  assert.equal(windowFinished({ ...base, alive: false, done: true }), false);
 });

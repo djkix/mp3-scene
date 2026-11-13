@@ -56,7 +56,16 @@ export const receiverRepeat = (repeat, whole) => (repeat === 'all' && !whole ? '
 
 export const isLastOfWindow = (items, queueIndex) => items.length > 0 && items.at(-1).queueIndex === queueIndex;
 
+// La fenêtre s'est-elle terminée d'elle-même ? Deux ordres possibles côté SDK : un état IDLE/FINISHED
+// (média vivant), ou la fin de la session média (`alive` faux ; en RepeatMode OFF la session média se termine
+// avec la file) dont le dernier idleReason est FINISHED. Arrêt, vidage, déconnexion : `media` est déjà remis à
+// null par l'émetteur, l'écouteur n'arrive pas jusqu'ici. `done` : une seule fois par fenêtre.
+export const windowFinished = ({ alive, idle, finished, atWindowEnd, pending, done }) =>
+  !!finished && (!alive || !!idle) && !!atWindowEnd && !pending && !done;
+
 // Index de file de la piste qui suit la fenêtre (null : fin de file sans répétition).
+// Après une reprise de session (adopt) en aléatoire, l'ordre local a été re-tiré au chargement de la page :
+// la fenêtre suivante peut alors rejouer ou sauter des pistes.
 export function afterWindow(queue, items) {
   const p = queue.order.indexOf(items.at(-1)?.queueIndex);
   if (p < 0) return null;

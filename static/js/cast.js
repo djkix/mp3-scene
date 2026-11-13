@@ -4,7 +4,7 @@
 // Le lecteur (player.js) ne connaît que l'objet `backend` ci-dessous : aucune référence au SDK hors de ce fichier.
 import { api } from './api.js';
 import {
-  castWindow, windowValid, receiverRepeat, isLastOfWindow, afterWindow,
+  castWindow, windowValid, receiverRepeat, isLastOfWindow, afterWindow, windowFinished,
   batches, itemMap, urlsStale, URL_REFRESH_AGE,
 } from './castqueue.js';
 
@@ -157,17 +157,22 @@ function setup(player) {
     if (!m || m === media) return;
     media = m;
     m.addUpdateListener((alive) => {
-      if (m !== media) return;
-      if (!alive) { media = null; return player.refresh(); }
-      if (loaded && !loaded.map) loaded.map = itemMap(loaded.items, m.items?.map((x) => x.itemId));
-      // fin de la dernière piste d’une fenêtre : l'émetteur charge la suivante (ou reboucle si « toute la file »)
-      if (m.playerState === M.PlayerState.IDLE && m.idleReason === M.IdleReason.FINISHED && loaded && !loaded.whole
-        && !pending && isLastOfWindow(loaded.items, player.queue.index)) {
-        const next = afterWindow(player.queue, loaded.items);
-        loaded = null; // une seule fois
+      if (m !== media) return; // arrêt, vidage, déconnexion ou nouveau chargement : plus notre média
+      // Fin de la dernière piste d'une fenêtre : l'émetteur charge la suivante (ou reboucle si « toute la file »).
+      // Évaluée avant `!alive` : en RepeatMode OFF, le dernier état peut arriver avec la fin de la session média.
+      const w = loaded;
+      if (w && !w.whole && windowFinished({
+        alive, idle: m.playerState === M.PlayerState.IDLE, finished: m.idleReason === M.IdleReason.FINISHED,
+        atWindowEnd: isLastOfWindow(w.items, player.queue.index), pending, done: w.done,
+      })) {
+        w.done = true; // (a) puis (b) : une seule fois
+        const next = afterWindow(player.queue, w.items);
+        if (!alive) media = null;
         if (next != null) { player.queue.index = next; lastTime = 0; reload({ play: true, pos: 0 }); }
         return player.refresh();
       }
+      if (!alive) { media = null; return player.refresh(); }
+      if (loaded && !loaded.map) loaded.map = itemMap(loaded.items, m.items?.map((x) => x.itemId));
       const i = remoteIndex();
       if (i == null) return player.refresh();
       if (i !== expect && waiting()) return; // ancien état encore en vol : ignoré
