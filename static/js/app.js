@@ -93,3 +93,4 @@ initCast(player);
 addEventListener('hashchange', route);
 if (!location.hash) location.hash = '#/';
 else route();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {}); // coquille hors ligne : facultatif

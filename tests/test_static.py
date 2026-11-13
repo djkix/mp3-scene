@@ -9,3 +9,36 @@ def test_static_shell(client):
 def test_api_still_protected_and_unknown_404(client):
     assert client.get("/api/me").status_code == 401
     assert client.get("/nimportequoi").status_code == 404
+
+
+def test_manifest_and_sw_headers(client):
+    r = client.get("/manifest.webmanifest")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("application/manifest+json")
+    r = client.get("/sw.js")
+    assert r.status_code == 200 and r.headers["cache-control"] == "no-cache"
+    assert "javascript" in r.headers["content-type"]
+
+
+def test_sw_precache_matches_static_js():
+    import re
+    from pathlib import Path
+    static = Path(__file__).resolve().parent.parent / "static"
+    listed = set(re.findall(r"'(/[^']*)'", re.search(r"PRECACHE = \[(.*?)\]", (static / "sw.js").read_text(), re.S).group(1)))
+    for path in listed:
+        assert path == "/" or (static / path.lstrip("/")).is_file(), path
+    on_disk = {"/" + p.relative_to(static).as_posix() for p in (static / "js").rglob("*.js") if not p.name.endswith(".test.js")}
+    assert on_disk <= listed, on_disk - listed
+
+
+def test_public_url_warning(settings, caplog):
+    from fastapi.testclient import TestClient
+    from app.main import create_app
+    settings.public_url = ""
+    with caplog.at_level("WARNING", logger="uvicorn.error"), TestClient(create_app(settings)):
+        pass
+    assert "PUBLIC_URL" in caplog.text
+    caplog.clear()
+    settings.public_url = "https://mp3.test"
+    with caplog.at_level("WARNING", logger="uvicorn.error"), TestClient(create_app(settings)):
+        pass
+    assert "PUBLIC_URL" not in caplog.text

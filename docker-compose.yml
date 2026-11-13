@@ -1,0 +1,31 @@
+services:
+  mp3-scene:
+    build: .
+    # image: mp3-scene            # alternative si l'image est construite ailleurs
+    container_name: mp3-scene
+    restart: unless-stopped
+    environment:
+      SECRET_KEY: ${SECRET_KEY:?renseignez SECRET_KEY dans .env}
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?renseignez ADMIN_PASSWORD dans .env}
+      PUBLIC_URL: https://mp3.exemple.fr   # adresse publique HTTPS, sans slash final (URL envoyées au Chromecast)
+      TZ: Europe/Paris                     # n'affecte que les journaux du serveur
+    ports:
+      # Le port ne doit être joignable QUE par le reverse proxy : l'appli fait confiance à son X-Forwarded-For.
+      # Proxy sur la même machine : laisser 127.0.0.1. Proxy sur une autre machine : remplacer par l'adresse LAN
+      # de cette machine ("192.168.1.20:8000:8000") et filtrer l'accès au pare-feu. Proxy dans un réseau Docker :
+      # supprimer `ports` et rattacher les deux conteneurs au même réseau (le proxy joint mp3-scene:8000).
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - music:/music:ro        # lecture seule côté conteneur
+      - ./data:/data           # base SQLite : à sauvegarder
+
+volumes:
+  music:
+    driver: local
+    driver_opts:
+      type: nfs
+      # lecture seule aussi côté montage ; « soft » : un NAS en panne donne des erreurs d'E/S gérées par
+      # l'appli au lieu de bloquer indéfiniment les threads
+      o: "addr=<IP_NAS>,ro,nfsvers=4,soft,timeo=150,retrans=3"
+      device: ":/volume1/Releases"   # chemin de l'export NFS sur le NAS

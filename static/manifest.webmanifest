@@ -1,0 +1,19 @@
+{
+  "id": "/",
+  "name": "Mp3 Scene",
+  "short_name": "Mp3 Scene",
+  "description": "Bibliothèque de releases MP3 auto-hébergée",
+  "lang": "fr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "categories": ["music"],
+  "theme_color": "#fafaf8",
+  "background_color": "#fafaf8",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

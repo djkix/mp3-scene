@@ -1,3 +1,5 @@
+import logging
+import mimetypes
 import time
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -14,6 +16,8 @@ from .scanner import Runner
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 PUBLIC_API = ("/api/login", "/api/health")
+log = logging.getLogger("uvicorn.error")
+mimetypes.add_type("application/manifest+json", ".webmanifest")  # absent de la table de certaines plateformes
 
 
 class NoCacheStatic(StaticFiles):
@@ -44,6 +48,9 @@ def _bootstrap_admin(settings: Settings) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if not app.state.settings.public_url.startswith("http"):
+        log.warning("PUBLIC_URL est vide ou invalide (attendu : https://mp3.exemple.fr) : les URL envoyées au "
+                    "Chromecast seraient relatives et le cast ne fonctionnera pas.")
     db.init(app.state.settings.data_dir)
     _bootstrap_admin(app.state.settings)
     app.state.runner.resume()
