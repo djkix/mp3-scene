@@ -26,4 +26,40 @@ export function itemMap(items, itemIds) {
 }
 
 export const URL_MAX_AGE = 11 * 3600 * 1000; // URL signées valables 12 h : renouvelées après 11 h
-export const urlsStale = (fetchedAt, now) => fetchedAt == null || now - fetchedAt > URL_MAX_AGE;
+export const URL_REFRESH_AGE = 6 * 3600 * 1000; // rechargement complet : URL neuves au-delà de 6 h (le récepteur
+                                                // enchaîne seul une fenêtre de 100 pistes, soit plusieurs heures)
+export const urlsStale = (fetchedAt, now, maxAge = URL_MAX_AGE) => fetchedAt == null || now - fetchedAt > maxAge;
+
+// --- Fenêtre : jamais plus de WINDOW éléments par chargement (limite de 64 Ko des messages Cast) ----
+export const WINDOW = 100;
+
+// File entière si elle tient (départ sur la courante, prev et répétition gérés par le récepteur), sinon
+// les WINDOW pistes de l'ordre effectif à partir de la courante (start = 0).
+export function castWindow(queue, size = WINDOW) {
+  const { items, start } = castOrder(queue);
+  if (items.length <= size) return { items, start, whole: true };
+  return { items: items.slice(start, start + size), start: 0, whole: false };
+}
+
+// La fenêtre chargée est-elle toujours une tranche de l'ordre effectif contenant la piste courante ?
+export function windowValid(queue, loaded) {
+  if (!loaded?.items?.length) return false;
+  const o = castOrder(queue).items;
+  if (loaded.whole) return sameOrder(o, loaded.items);
+  const k = o.findIndex((x) => x.queueIndex === loaded.items[0].queueIndex);
+  return k >= 0 && sameOrder(o.slice(k, k + loaded.items.length), loaded.items)
+    && loaded.items.some((x) => x.queueIndex === queue.index);
+}
+
+// Répétition demandée au récepteur : « toute la file » seulement s'il a toute la file, sinon l'émetteur reboucle.
+export const receiverRepeat = (repeat, whole) => (repeat === 'all' && !whole ? 'OFF' : repeatKey(repeat));
+
+export const isLastOfWindow = (items, queueIndex) => items.length > 0 && items.at(-1).queueIndex === queueIndex;
+
+// Index de file de la piste qui suit la fenêtre (null : fin de file sans répétition).
+export function afterWindow(queue, items) {
+  const p = queue.order.indexOf(items.at(-1)?.queueIndex);
+  if (p < 0) return null;
+  if (p + 1 < queue.order.length) return queue.order[p + 1];
+  return queue.repeat === 'all' ? queue.order[0] : null;
+}

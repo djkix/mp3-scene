@@ -163,7 +163,7 @@ function clear() {
   player.queue.clear();
   load(false);
   save();
-  if (ui) openPanel(false);
+  if (ui) { openPanel(false); ui.qbtn.focus(); }
 }
 
 // Déconnexion / vue de connexion : un autre utilisateur ne doit pas hériter de la file.
@@ -298,7 +298,7 @@ function update() {
     ui.play.textContent = on ? '⏸︎' : '▶︎';
     label(ui.play, on ? 'Pause' : 'Lecture');
     ui.cast.textContent = backend ? `Diffusion sur ${backend.name}` : '';
-    if (backend) ui.vol.value = backend.volume();
+    if (backend && !ui.vol.matches(':focus, :active')) ui.vol.value = backend.volume(); // pas pendant un réglage
     ui.shuffle.setAttribute('aria-pressed', q.shuffle);
     const [glyph, text] = REPEAT[q.repeat];
     ui.repeat.textContent = glyph;

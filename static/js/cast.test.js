@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Queue } from './queue.js';
-import { castOrder, sameOrder, batches, repeatKey, itemMap, urlsStale, URL_MAX_AGE } from './castqueue.js';
+import { castOrder, sameOrder, batches, repeatKey, itemMap, urlsStale, URL_MAX_AGE,
+  castWindow, windowValid, receiverRepeat, isLastOfWindow, afterWindow, URL_REFRESH_AGE } from './castqueue.js';
 
 const T = (n) => Array.from({ length: n }, (_, i) => ({ id: 100 + i }));
 
@@ -67,4 +68,89 @@ test('urlsStale : plus de 11 h', () => {
   assert.equal(urlsStale(now - URL_MAX_AGE + 1, now), false);
   assert.equal(urlsStale(now - URL_MAX_AGE - 1, now), true);
   assert.equal(urlsStale(null, now), true); // jamais demandées
+});
+
+// --- Fenêtre de 100 pistes au plus (décision du contrôleur) ----------------------------------------
+
+const qi = (items) => items.map((x) => x.queueIndex);
+
+test('castWindow : file plus courte que la fenêtre -> toute la file, départ sur la courante', () => {
+  const q = new Queue(); q.replace(T(5), 3);
+  assert.deepEqual(castWindow(q, 100), { items: castOrder(q).items, start: 3, whole: true });
+});
+
+test('castWindow : début, milieu, fin de file', () => {
+  const q = new Queue(); q.replace(T(250), 0);
+  let w = castWindow(q, 100);
+  assert.deepEqual([w.start, w.whole, w.items.length, w.items[0].queueIndex, w.items[99].queueIndex], [0, false, 100, 0, 99]);
+  q.jump(120); w = castWindow(q, 100);
+  assert.deepEqual([w.start, w.items.length, w.items[0].queueIndex, w.items[99].queueIndex], [0, 100, 120, 219]);
+  q.jump(200); w = castWindow(q, 100);
+  assert.deepEqual([w.start, w.items.length, w.items[0].queueIndex, w.items.at(-1).queueIndex], [0, 50, 200, 249]);
+});
+
+test('castWindow : ordre mélangé, fenêtre = suite de l\'ordre effectif depuis la courante', () => {
+  const q = new Queue({ random: () => 0.42 }); q.replace(T(150), 7); q.shuffle = true;
+  q.next(); q.next();
+  const w = castWindow(q, 100), p = q.order.indexOf(q.index);
+  assert.deepEqual(qi(w.items), q.order.slice(p, p + 100));
+  assert.equal(w.items[w.start].queueIndex, q.index);
+  for (const x of w.items) assert.equal(x.trackId, q.tracks[x.queueIndex].id);
+});
+
+test('castWindow : file vide', () => {
+  assert.deepEqual(castWindow(new Queue(), 100), { items: [], start: -1, whole: true });
+});
+
+test('itemMap dans une fenêtre', () => {
+  const q = new Queue(); q.replace(T(250), 120);
+  const w = castWindow(q, 100);
+  const m = itemMap(w.items, w.items.map((_, k) => 1000 + k));
+  assert.equal(m.get(1000), 120);
+  assert.equal(m.get(1099), 219);
+});
+
+test('windowValid : avance dans la fenêtre, ajout en fin, changement d\'ordre', () => {
+  const q = new Queue(); q.replace(T(250), 10);
+  const w = castWindow(q, 100);
+  q.next(); q.next();
+  assert.equal(windowValid(q, w), true);  // le récepteur avance dans la fenêtre : rien à recharger
+  q.append([{ id: 9999 }]);
+  assert.equal(windowValid(q, w), true);  // ajout après la fenêtre : la fenêtre suivante le prendra
+  q.remove(50);
+  assert.equal(windowValid(q, w), false); // retrait dans la fenêtre
+  const s = new Queue(); s.replace(T(5), 1);
+  const ws = castWindow(s, 100);
+  assert.equal(windowValid(s, ws), true);
+  s.append([{ id: 9999 }]);
+  assert.equal(windowValid(s, ws), false); // file entière envoyée : tout ajout la recharge
+  assert.equal(windowValid(s, null), false);
+});
+
+test('receiverRepeat : ALL seulement si toute la file tient dans la fenêtre', () => {
+  assert.equal(receiverRepeat('all', true), 'ALL');
+  assert.equal(receiverRepeat('all', false), 'OFF');
+  assert.equal(receiverRepeat('one', false), 'SINGLE');
+  assert.equal(receiverRepeat('off', true), 'OFF');
+});
+
+test('isLastOfWindow / afterWindow', () => {
+  const q = new Queue(); q.replace(T(250), 120);
+  const w = castWindow(q, 100);
+  assert.equal(isLastOfWindow(w.items, 219), true);
+  assert.equal(isLastOfWindow(w.items, 218), false);
+  assert.equal(isLastOfWindow([], 0), false);
+  assert.equal(afterWindow(q, w.items), 220);
+  q.jump(200);
+  const end = castWindow(q, 100);
+  assert.equal(afterWindow(q, end.items), null);   // fin de file, sans répétition
+  q.repeat = 'all';
+  assert.equal(afterWindow(q, end.items), 0);      // répétition de la file : on reboucle
+});
+
+test('urlsStale avec seuil de rafraîchissement (6 h)', () => {
+  const now = 1_000_000_000_000;
+  assert.equal(URL_REFRESH_AGE, 6 * 3600 * 1000);
+  assert.equal(urlsStale(now - URL_REFRESH_AGE - 1, now, URL_REFRESH_AGE), true);
+  assert.equal(urlsStale(now - URL_REFRESH_AGE + 1, now, URL_REFRESH_AGE), false);
 });

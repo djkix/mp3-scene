@@ -1,8 +1,12 @@
 // Chromecast (SDK Cast « CAF » côté émetteur, récepteur multimédia par défaut de Google).
-// Toute la file est transmise au récepteur, qui l'enchaîne seul (téléphone verrouillé, onglet en veille).
+// La file est transmise au récepteur, qui l'enchaîne seul (téléphone verrouillé, onglet en veille), par
+// fenêtres de 100 pistes au plus : à la fin d'une fenêtre, l'émetteur (si la page vit encore) charge la suivante.
 // Le lecteur (player.js) ne connaît que l'objet `backend` ci-dessous : aucune référence au SDK hors de ce fichier.
 import { api } from './api.js';
-import { castOrder, sameOrder, batches, repeatKey, itemMap, urlsStale } from './castqueue.js';
+import {
+  castWindow, windowValid, receiverRepeat, isLastOfWindow, afterWindow,
+  batches, itemMap, urlsStale, URL_REFRESH_AGE,
+} from './castqueue.js';
 
 const title = (t) => t.title || t.filename;
 
@@ -24,16 +28,23 @@ function setup(player) {
 
   let session = null;   // CastSession en cours
   let media = null;     // chrome.cast.media.Media de notre file
-  let loaded = null;    // { items: [{trackId, queueIndex}], map: Map itemId -> index | null, repeat }
+  let loaded = null;    // { items: [{trackId, queueIndex}], whole, map: Map itemId -> index | null, rkey }
   let lastTime = 0;     // dernière position connue du récepteur (reprise locale en fin de session)
   let expect = null;    // index de file demandé au récepteur et pas encore confirmé
+  let expectUntil = 0;  // une fois la commande partie, `expect` ne vaut que quelques secondes
+  let pending = false;  // rechargement programmé ou en cours : `expect` tient jusqu'à son terme
   let timer = null, pendingOpts = {}, gen = 0;
   const urls = new Map(); // id de piste (chaîne) -> URL signée
-  let fetchedAt = null;   // date de la plus ancienne URL de `urls`
+  // date de la plus ancienne URL de `urls` ; undefined : session reprise, âge inconnu (les commandes simples
+  // n'imposent pas de rechargement, le prochain rechargement complet redemande des URL)
+  let fetchedAt = null;
 
   const remotePlaying = () => !!media && rp.isMediaLoaded
     && (rp.playerState === M.PlayerState.PLAYING || rp.playerState === M.PlayerState.BUFFERING);
-  const fresh = () => !urlsStale(fetchedAt, Date.now());
+  const fresh = () => fetchedAt === undefined || !urlsStale(fetchedAt, Date.now());
+  const expectFor = (i, ms = 5000) => { expect = i; expectUntil = Date.now() + ms; };
+  // un changement demandé n'est pas encore confirmé : les états du récepteur sur l'ancienne piste sont ignorés
+  const waiting = () => expect != null && (pending || Date.now() < expectUntil);
 
   // Index de file de l'élément joué par le récepteur : table des itemId, sinon customData de la piste.
   function remoteIndex() {
@@ -45,7 +56,7 @@ function setup(player) {
   }
 
   async function signedUrls(ids) {
-    if (urlsStale(fetchedAt, Date.now())) { urls.clear(); fetchedAt = null; }
+    if (urlsStale(fetchedAt, Date.now(), URL_REFRESH_AGE)) { urls.clear(); fetchedAt = null; }
     const missing = [...new Set(ids.map(String))].filter((id) => !urls.has(id));
     for (const b of batches(missing)) {
       const at = Date.now();
@@ -69,28 +80,30 @@ function setup(player) {
     return item;
   }
 
-  // (Re)charge toute la file sur le récepteur, à la piste courante.
-  // ponytail: file entière en une requête ; une très longue file peut dépasser la taille de message Cast
-  // (64 Ko) -> « Diffusion impossible ». Passer à un chargement partiel + queueInsertItems si cela arrive.
+  // (Re)charge sur le récepteur la fenêtre qui commence à la piste courante (ou toute la file si elle tient).
   async function reload({ play, pos }) {
     clearTimeout(timer);
     timer = null;
     const s = session, g = ++gen, q = player.queue;
     if (!s) return;
     if (!q.current()) return stopMedia();
+    pending = true;
+    expect = q.index;
     try {
-      let { items } = castOrder(q);
+      let { items, whole } = castWindow(q);
       await signedUrls(items.map((x) => x.trackId));
       if (g !== gen || s !== session) return; // remplacé par un chargement plus récent
       items = items.filter((x) => urls.has(String(x.trackId))); // pistes disparues de la base : ignorées
       if (!items.length) throw new Error('aucune URL');
       const start = Math.max(0, items.findIndex((x) => x.queueIndex === q.index));
       expect = items[start].queueIndex;
+      const rkey = receiverRepeat(q.repeat, whole);
       const qItems = items.map((x) => queueItem(q.tracks[x.queueIndex], x.queueIndex));
       const data = new M.QueueData();
       data.items = qItems;
       data.startIndex = start;
-      data.repeatMode = M.RepeatMode[repeatKey(q.repeat)];
+      data.startTime = pos || 0;
+      data.repeatMode = M.RepeatMode[rkey];
       const req = new M.LoadRequest(qItems[start].media);
       req.queueData = data;
       req.autoplay = !!play;
@@ -99,13 +112,16 @@ function setup(player) {
       const err = await s.loadMedia(req);
       if (err) throw err;
       if (g !== gen || s !== session) return;
-      loaded = { items, map: null, repeat: q.repeat };
+      loaded = { items, whole, map: null, rkey };
+      pending = false;
+      expectFor(expect);
       watch(s.getMediaSession());
     } catch (e) {
       if (g !== gen || s !== session) return;
-      expect = null;
-      loaded = null;
+      // le récepteur ne doit pas continuer l'ancienne file pendant que l'interface affiche la nouvelle
+      stopMedia();
       if (e?.status !== 401) player.flash('Diffusion impossible.'); // 401 : api() a déjà redirigé vers la connexion
+      return;
     }
     player.refresh();
   }
@@ -114,6 +130,7 @@ function setup(player) {
   function schedule(opts) {
     pendingOpts = { ...pendingOpts, ...opts };
     expect = player.queue.index; // d'ici le rechargement, l'état de l'ancienne file ne doit pas déplacer l'index
+    pending = true;
     clearTimeout(timer);
     timer = setTimeout(() => {
       const { play, pos } = pendingOpts;
@@ -129,7 +146,8 @@ function setup(player) {
     gen++;
     loaded = null;
     expect = null;
-    if (rp.isMediaLoaded) rc.stop(); // la session reste ouverte
+    pending = false;
+    if (media || rp.isMediaLoaded) rc.stop(); // la session reste ouverte
     media = null;
     player.refresh();
   }
@@ -142,9 +160,18 @@ function setup(player) {
       if (m !== media) return;
       if (!alive) { media = null; return player.refresh(); }
       if (loaded && !loaded.map) loaded.map = itemMap(loaded.items, m.items?.map((x) => x.itemId));
+      // fin de la dernière piste d’une fenêtre : l'émetteur charge la suivante (ou reboucle si « toute la file »)
+      if (m.playerState === M.PlayerState.IDLE && m.idleReason === M.IdleReason.FINISHED && loaded && !loaded.whole
+        && !pending && isLastOfWindow(loaded.items, player.queue.index)) {
+        const next = afterWindow(player.queue, loaded.items);
+        loaded = null; // une seule fois
+        if (next != null) { player.queue.index = next; lastTime = 0; reload({ play: true, pos: 0 }); }
+        return player.refresh();
+      }
       const i = remoteIndex();
       if (i == null) return player.refresh();
-      if (expect != null) { if (i !== expect) return; expect = null; } // ancien état encore en vol : ignoré
+      if (i !== expect && waiting()) return; // ancien état encore en vol : ignoré
+      expect = null;
       if (i !== player.queue.index) { player.queue.index = i; lastTime = 0; }
       player.refresh();
     });
@@ -155,13 +182,16 @@ function setup(player) {
     const c = m?.media?.customData, q = player.queue;
     if (!c || !Number.isInteger(c.q) || q.tracks[c.q]?.id !== c.t) return false;
     const items = (m.items || []).map((x) => ({ trackId: x.media?.customData?.t, queueIndex: x.media?.customData?.q }));
-    const whole = items.length === q.tracks.length && new Set(items.map((x) => x.queueIndex)).size === items.length
+    const ok = items.length > 0 && new Set(items.map((x) => x.queueIndex)).size === items.length
       && items.every((x) => q.tracks[x.queueIndex]?.id === x.trackId);
+    const whole = ok && items.length === q.tracks.length;
     if (whole) q.order = items.map((x) => x.queueIndex); // ordre du récepteur (l'aléatoire est re-tiré au chargement)
-    // liste incomplète : on suppose l'ordre local ; les changements de piste suivent quand même via customData
-    loaded = { items: whole ? items : castOrder(q).items, map: whole ? itemMap(items, m.items.map((x) => x.itemId)) : null,
-      repeat: q.repeat };
-    fetchedAt = null; // âge des URL inconnu : renouvelées au prochain rechargement
+    // liste illisible : on suppose la fenêtre locale ; les changements de piste suivent quand même via customData
+    const w = ok ? { items, whole } : castWindow(q);
+    loaded = { items: w.items, whole: w.whole, map: ok ? itemMap(items, m.items.map((x) => x.itemId)) : null,
+      rkey: receiverRepeat(q.repeat, w.whole) };
+    urls.clear();
+    fetchedAt = undefined; // âge inconnu : pas de rechargement pour une simple commande
     q.index = c.q;
     lastTime = rp.currentTime || 0;
     watch(m);
@@ -180,8 +210,9 @@ function setup(player) {
       if (!q.current()) return stopMedia();
       lastTime = pos || 0;
       const id = [...(loaded?.map || [])].find(([, i]) => i === q.index)?.[0];
-      if (play && media && id != null && fresh() && sameOrder(castOrder(q).items, loaded.items)) {
-        expect = q.index;
+      // hors de la fenêtre (id inconnu) : rechargement d'une fenêtre qui commence à cette piste
+      if (play && media && id != null && fresh() && windowValid(q, loaded)) {
+        expectFor(q.index);
         media.queueJumpToItem(id, () => {}, () => { expect = null; schedule({ play: true }); });
       } else schedule({ play, pos: lastTime });
     },
@@ -189,10 +220,11 @@ function setup(player) {
     sync() {
       const q = player.queue;
       if (!q.current()) return stopMedia();
-      if (!loaded || !fresh() || !sameOrder(castOrder(q).items, loaded.items)) return schedule({});
-      if (loaded.repeat !== q.repeat && media) {
-        loaded.repeat = q.repeat;
-        media.queueSetRepeatMode(M.RepeatMode[repeatKey(q.repeat)], () => {}, () => schedule({}));
+      if (!loaded || !fresh() || !windowValid(q, loaded)) return schedule({});
+      const rkey = receiverRepeat(q.repeat, loaded.whole);
+      if (rkey !== loaded.rkey && media) { // en place : la lecture n'est pas interrompue
+        loaded.rkey = rkey;
+        media.queueSetRepeatMode(M.RepeatMode[rkey], () => {}, () => schedule({}));
       }
     },
     toggle() {
@@ -217,7 +249,7 @@ function setup(player) {
   function start(s, resumed) {
     if (s === session) return;
     session = s;
-    media = null; loaded = null; expect = null;
+    media = null; loaded = null; expect = null; pending = false;
     backend.name = s.getCastDevice()?.friendlyName || 'Chromecast';
     const local = player.attach(backend); // l'<audio> local se tait
     lastTime = local.position;
@@ -227,7 +259,7 @@ function setup(player) {
 
   function end() {
     if (!session) return;
-    session = null; media = null; loaded = null; expect = null;
+    session = null; media = null; loaded = null; expect = null; pending = false;
     clearTimeout(timer);
     gen++;
     player.detach(backend, lastTime); // reprise locale, en pause
@@ -243,7 +275,7 @@ function setup(player) {
   rc.addEventListener(F.RemotePlayerEventType.ANY_CHANGE, (e) => {
     if (!session) return;
     if (e.field === 'currentTime') {
-      if (media && rp.isConnected && rp.isMediaLoaded && expect == null) lastTime = rp.currentTime;
+      if (media && rp.isConnected && rp.isMediaLoaded && !waiting()) lastTime = rp.currentTime;
       return player.tick();
     }
     player.refresh();
