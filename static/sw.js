@@ -1,6 +1,6 @@
 // Service worker classique (non module). Ne met en cache que la coquille de l'interface :
 // jamais l'audio, jamais l'API, jamais le SDK Cast (autre origine).
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = 'mp3-scene-' + VERSION;
 const PRECACHE = [
   '/',
@@ -53,7 +53,7 @@ self.addEventListener('fetch', (event) => {
       || req.headers.has('range')) return; // pas de respondWith : le navigateur traite la requête seul
   event.respondWith(
     fetch(req).then((res) => {
-      if (res.ok && res.status === 200) {
+      if (res.status === 200) {
         const copy = res.clone();
         caches.open(CACHE).then((cache) => cache.put(req, copy));
       }

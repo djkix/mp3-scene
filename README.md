@@ -7,6 +7,7 @@ La musique n'est jamais modifiée : le partage est monté en lecture seule, l'ap
 ## Prérequis
 
 - Une machine avec Docker et Docker Compose v2, **distincte du NAS**, qui monte le partage en NFS.
+- Le **client NFS** installé sur la machine Docker : `sudo apt install nfs-common` (Debian/Ubuntu) ou `sudo dnf install nfs-utils` (Fedora/RHEL). Sans lui, `docker compose up` échoue avec `mount: ... bad option; for several filesystems (e.g. nfs, cifs) you might need a /sbin/mount.<type> helper program`.
 - Un NAS qui exporte le dossier des releases en NFS (v4).
 - Un reverse proxy HTTPS (domaine + certificat valide) devant l'appli.
 
@@ -32,15 +33,17 @@ s'appliquent à l'UID 1000. Un dossier illisible est ignoré par le scan.
 git clone <URL_DU_DEPOT> mp3-scene && cd mp3-scene
 cp .env.example .env
 python3 -c "import secrets; print(secrets.token_urlsafe(48))"   # à coller dans SECRET_KEY
-nano .env                                                       # SECRET_KEY, ADMIN_USER, ADMIN_PASSWORD
+nano .env                                                       # SECRET_KEY, ADMIN_USER, ADMIN_PASSWORD (à remplir)
 mkdir -p data && sudo chown 1000:1000 data                      # sinon Docker crée data/ en root et l'appli ne peut pas écrire
 ```
+
+Dans `.env`, `SECRET_KEY` et `ADMIN_PASSWORD` sont volontairement vides : `docker compose` refuse de démarrer tant que `SECRET_KEY` n'est pas renseignée, et sans `ADMIN_PASSWORD` (au moins 8 caractères) le premier démarrage n'a aucun compte et l'écrit dans les journaux. Le mot de passe reste en clair dans `.env` et dans l'environnement du conteneur jusqu'à ce que vous le retiriez (voir Sécurité).
 
 Éditer `docker-compose.yml` :
 
 - `PUBLIC_URL` : l'adresse publique HTTPS du site, sans slash final (`https://mp3.exemple.fr`). Elle sert aux URL envoyées au Chromecast ; si elle est vide ou ne commence pas par `http`, le démarrage écrit un avertissement dans les journaux et le cast ne fonctionnera pas.
 - `<IP_NAS>` et `device` (chemin de montage NFS du NAS) dans le volume `music`.
-- `ports` : par défaut `127.0.0.1:8000:8000` (reverse proxy sur la même machine). Si le proxy est sur une autre machine, mettre l'adresse LAN de la machine Docker et filtrer au pare-feu ; ne jamais publier ce port sur Internet ni sur tout le réseau (voir plus bas).
+- `ports` : par défaut `127.0.0.1:8000:8000` (reverse proxy sur la même machine). Si le proxy est sur une autre machine, mettre l'adresse LAN de la machine Docker et filtrer au pare-feu ; ne jamais publier ce port sur Internet ni sur tout le réseau (voir plus bas). Attention : les ports publiés par Docker contournent en général les règles ufw/firewalld ; l'adresse de liaison est la vraie protection, surtout si vous liez une adresse LAN au lieu de `127.0.0.1`.
 
 ```bash
 docker compose up -d --build
@@ -49,6 +52,8 @@ docker compose ps                     # l'état doit passer à « healthy »
 ```
 
 Le compte administrateur est créé au premier démarrage, uniquement s'il n'existe encore aucun utilisateur.
+Si vous changez plus tard `<IP_NAS>` ou le chemin de l'export dans `docker-compose.yml`, le volume nommé existant garde l'ancienne définition : `docker compose down`, puis `docker volume ls` (repérer `<dossier du projet>_music`, soit `mp3-scene_music` si le dépôt est cloné dans `mp3-scene`), `docker volume rm mp3-scene_music`, puis `docker compose up -d`.
+
 Vérifier que la bibliothèque est bien en lecture seule : `docker compose exec mp3-scene touch /music/x` doit échouer.
 
 ## Reverse proxy
@@ -113,13 +118,13 @@ La coquille de l'interface est mise en cache pour démarrer vite ; la musique et
 - Uniquement dans **Chrome ou Edge** sur Android et ordinateur. Impossible depuis un iPhone (limite de la plateforme) : le bouton est masqué ailleurs.
 - Le Chromecast doit pouvoir joindre `PUBLIC_URL` en **HTTPS avec un certificat valide**, sans barrière d'accès au niveau du proxy.
 - Les liens envoyés au Chromecast sont valables **12 heures**.
-- Une file très longue peut ne pas se charger sur le récepteur.
+- La file est envoyée au Chromecast par fenêtres d'au plus 100 pistes. Au-delà, la fenêtre suivante n'est envoyée que tant que la page ou l'appli reste ouverte sur le téléphone.
 
 ## Sécurité
 
 - Session par cookie valable 30 jours, prolongée à l'usage.
 - 5 échecs de connexion pour un même identifiant ou une même adresse IP : blocage 15 minutes.
-- Changer le mot de passe administrateur après la première connexion ; `ADMIN_PASSWORD` n'est lu qu'à la création du premier compte, vous pouvez ensuite le retirer de `.env`.
+- Changer le mot de passe administrateur après la première connexion ; `ADMIN_PASSWORD` n'est lu qu'à la création du premier compte, retirez-le de `.env` après le premier démarrage (le compose n'en a plus besoin ; d'ici là il est en clair dans `.env` et dans l'environnement du conteneur), puis `docker compose up -d`.
 - Changer `SECRET_KEY` invalide toutes les sessions et tous les liens de cast en cours.
 - `.env` contient des secrets : il est ignoré par git, ne le publiez pas.
 
@@ -138,7 +143,7 @@ git pull && docker compose up -d --build
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/pytest -q                       # tests Python
-node --test static/js/                    # tests JavaScript (Node 20+)
+node --test static/js/                    # tests JavaScript (exécutés avec Node v26.12.1)
 python3 scripts/make_demo_library.py /tmp/demo-music     # fausse bibliothèque
 MUSIC_ROOT=/tmp/demo-music DATA_DIR=/tmp/demo-data SECRET_KEY=dev ADMIN_USER=admin ADMIN_PASSWORD=adminadmin \
   PUBLIC_URL=http://localhost:8000 .venv/bin/uvicorn --factory app.main:create_app --port 8000

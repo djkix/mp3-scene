@@ -43,3 +43,8 @@ if __name__ == "__main__":
     png(OUT / "icon-192.png", 192, .62)
     png(OUT / "icon-512.png", 512, .62)
     png(OUT / "apple-touch-icon.png", 180, .62)
+    png(OUT / "favicon-32.png", 32, .8)
+    # favicon.ico : en-tête ICO + une entrée 32x32 contenant le PNG tel quel
+    data = (OUT / "favicon-32.png").read_bytes()
+    (OUT / "favicon-32.png").unlink()
+    (OUT.parent / "favicon.ico").write_bytes(struct.pack("<HHH", 0, 1, 1) + struct.pack("<BBBBHHII", 32, 32, 0, 0, 1, 32, len(data), 22) + data)

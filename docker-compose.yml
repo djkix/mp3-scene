@@ -1,13 +1,12 @@
 services:
   mp3-scene:
     build: .
-    # image: mp3-scene            # alternative si l'image est construite ailleurs
     container_name: mp3-scene
     restart: unless-stopped
     environment:
       SECRET_KEY: ${SECRET_KEY:?renseignez SECRET_KEY dans .env}
       ADMIN_USER: ${ADMIN_USER:-admin}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?renseignez ADMIN_PASSWORD dans .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}   # inutile une fois le compte créé
       PUBLIC_URL: https://mp3.exemple.fr   # adresse publique HTTPS, sans slash final (URL envoyées au Chromecast)
       TZ: Europe/Paris                     # n'affecte que les journaux du serveur
     ports:

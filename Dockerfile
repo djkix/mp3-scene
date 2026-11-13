@@ -27,6 +27,6 @@ VOLUME /data
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
 
-# Pas de --proxy-headers : l'appli lit elle-même le DERNIER élément de X-Forwarded-For (anti-force brute)
-# et doit voir l'adresse réelle du pair TCP dans les autres cas.
-CMD ["uvicorn", "--factory", "app.main:create_app", "--host", "0.0.0.0", "--port", "8000"]
+# --no-proxy-headers explicite : uvicorn ne réécrit pas l'adresse du client. L'appli lit elle-même le DERNIER
+# élément de X-Forwarded-For (anti-force brute) et doit voir le pair TCP réel dans les autres cas.
+CMD ["uvicorn", "--factory", "app.main:create_app", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers"]

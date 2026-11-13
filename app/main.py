@@ -29,11 +29,13 @@ class NoCacheStatic(StaticFiles):
 
 
 def _bootstrap_admin(settings: Settings) -> None:
-    if not (settings.admin_user and settings.admin_password):
-        return
     conn = db.connect(settings.data_dir)
     try:
         if conn.execute("SELECT 1 FROM users LIMIT 1").fetchone() is None:
+            if not (settings.admin_user and settings.admin_password):
+                log.warning("Aucun utilisateur et ADMIN_USER / ADMIN_PASSWORD non renseignés : impossible de se "
+                            "connecter. Renseignez-les dans .env puis relancez le conteneur.")
+                return
             username = settings.admin_user.strip()
             if err := security.username_error(username):
                 raise RuntimeError(f"ADMIN_USER invalide : {err}")
@@ -48,7 +50,7 @@ def _bootstrap_admin(settings: Settings) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if not app.state.settings.public_url.startswith("http"):
+    if not app.state.settings.public_url.startswith(("http://", "https://")):
         log.warning("PUBLIC_URL est vide ou invalide (attendu : https://mp3.exemple.fr) : les URL envoyées au "
                     "Chromecast seraient relatives et le cast ne fonctionnera pas.")
     db.init(app.state.settings.data_dir)

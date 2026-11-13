@@ -38,7 +38,25 @@ def test_public_url_warning(settings, caplog):
         pass
     assert "PUBLIC_URL" in caplog.text
     caplog.clear()
+    settings.public_url = "httpfoo"
+    with caplog.at_level("WARNING", logger="uvicorn.error"), TestClient(create_app(settings)):
+        pass
+    assert "PUBLIC_URL" in caplog.text
+    caplog.clear()
     settings.public_url = "https://mp3.test"
     with caplog.at_level("WARNING", logger="uvicorn.error"), TestClient(create_app(settings)):
         pass
     assert "PUBLIC_URL" not in caplog.text
+
+
+def test_no_admin_warning_when_no_user_and_no_credentials(settings, caplog):
+    from fastapi.testclient import TestClient
+    from app.main import create_app
+    with caplog.at_level("WARNING", logger="uvicorn.error"), TestClient(create_app(settings)):
+        pass
+    assert "ADMIN_PASSWORD" in caplog.text
+
+
+def test_favicon_ico(client):
+    r = client.get("/favicon.ico")
+    assert r.status_code == 200 and r.content[:4] == b"\x00\x00\x01\x00"
