@@ -4,7 +4,7 @@ import sys
 
 import pytest
 
-from app.scanner import ScanError, scan_structure
+from app.scanner import ScanError, _storable, scan_structure
 
 
 def mk(music, rel, files):
@@ -47,7 +47,7 @@ def test_unchanged_rescan_keeps_sub_release_of_skipped_parent(conn, music):
     scan_structure(conn, music, now=1.0)
     ids = {r[0] for r in conn.execute("SELECT id FROM releases")}
     stats = scan_structure(conn, music, now=2.0)
-    assert stats == {"found": 2, "added": 0, "moved": 0, "removed": 0}
+    assert stats == {"found": 2, "added": 0, "moved": 0, "removed": 0, "skipped": 0}
     assert {r[0] for r in conn.execute("SELECT id FROM releases")} == ids
 
 
@@ -138,9 +138,27 @@ def test_unreadable_dir_is_skipped_and_keeps_known_releases(conn, music):
     assert conn.execute("SELECT count(*) FROM releases").fetchone()[0] == 3
 
 
+def test_storable_rejects_non_utf8_names():
+    assert _storable("Art-Café-WEB-2015-GRP")
+    assert not _storable(os.fsdecode(b"caf\xe9"))
+
+
+def test_unstorable_names_are_skipped_any_platform(conn, music, monkeypatch):
+    # même scénario que ci-dessous, « BAD » simulant un nom non UTF-8 là où le FS les refuse
+    monkeypatch.setattr("app.scanner._storable", lambda name: "BAD" not in name)
+    mk(music, "S/Art-Good-WEB-2015-GRP", ["01-a.mp3", "02-BAD.mp3"])
+    mk(music, "S/Art-BAD-WEB-2015-GRP", ["01-a.mp3"])
+    stats = scan_structure(conn, music, now=1.0)
+    assert (stats["found"], stats["skipped"]) == (1, 2)
+    assert [t[0] for t in conn.execute("SELECT relpath FROM tracks")] == ["01-a.mp3"]
+
+
 @pytest.mark.skipif(sys.platform == "darwin", reason="APFS refuse les noms non UTF-8")
-def test_non_utf8_names_do_not_crash(conn, music):            # Review Focus 1
-    d = os.fsencode(music) + b"/S/Art-Caf\xe9-WEB-2015-GRP"; os.makedirs(d); open(d + b"/01-caf\xe9.mp3", "wb").close()
-    assert scan_structure(conn, music, now=1.0)["found"] == 1
-    t = conn.execute("SELECT r.path, t.relpath FROM tracks t JOIN releases r ON r.id=t.release_id").fetchone()
-    assert os.path.exists(os.fsencode(music / t["path"] / t["relpath"]))
+def test_non_utf8_names_are_skipped(conn, music):            # Review Focus 1
+    good = mk(music, "S/Art-Good-WEB-2015-GRP", ["01-a.mp3"])
+    open(os.fsencode(good) + b"/02-caf\xe9.mp3", "wb").close()
+    bad = os.fsencode(music) + b"/S/Art-Caf\xe9-WEB-2015-GRP"; os.makedirs(bad); open(bad + b"/01-a.mp3", "wb").close()
+    stats = scan_structure(conn, music, now=1.0)
+    assert (stats["found"], stats["skipped"]) == (1, 2)
+    assert [t[0] for t in conn.execute("SELECT relpath FROM tracks")] == ["01-a.mp3"]
+    assert [r[0] for r in conn.execute("SELECT name FROM releases")] == ["Art-Good-WEB-2015-GRP"]

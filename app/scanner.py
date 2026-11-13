@@ -1,5 +1,6 @@
 """Scan de la bibliothèque (lecture seule) : phase structure, dossiers → releases et pistes."""
 import bisect
+import logging
 import os
 import re
 from collections import Counter, defaultdict
@@ -9,6 +10,7 @@ from app.naming import parse_release_name
 
 DISC_RE = re.compile(r"^(cd|disc|disk)[ _-]?(\d+)$", re.IGNORECASE)
 BATCH = 500
+log = logging.getLogger(__name__)
 
 
 class ScanError(Exception):
@@ -20,23 +22,45 @@ def _list(path: bytes) -> list:
         return list(it)
 
 
+def _storable(name: str) -> bool:
+    """Faux si le nom décodé contient des octets non UTF-8 (surrogateescape), que sqlite refuse."""
+    try:
+        name.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
+def _decode(e):
+    """Nom décodé de l'entrée, ou None (avec un avertissement) s'il n'est pas stockable."""
+    name = os.fsdecode(e.name)
+    if _storable(name):
+        return name
+    log.warning("nom non UTF-8 ignoré, à renommer sur le NAS : %s", e.path.decode("utf-8", "backslashreplace"))
+    return None
+
+
 def _files(entries, prefix="", disc=1):
-    """Fichiers directs : ([(relpath, disc, taille)] des .mp3, taille totale, présence d'un .nfo)."""
-    tracks, size, nfo = [], 0, False
+    """Fichiers directs : ([(relpath, disc, taille)] des .mp3, taille totale, présence d'un .nfo, ignorés)."""
+    tracks, size, nfo, skipped = [], 0, False, 0
     for e in entries:
         if not e.is_file(follow_symlinks=False):
+            continue
+        name = _decode(e)
+        if name is None:
+            skipped += 1
             continue
         try:
             st = e.stat(follow_symlinks=False).st_size
         except OSError:  # fichier disparu entre le listage et le stat
             continue
         size += st
-        ext = os.path.splitext(e.name)[1].lower()
-        if ext == b".mp3":
-            tracks.append((prefix + os.fsdecode(e.name), disc, st))
-        elif ext == b".nfo":
+        ext = os.path.splitext(name)[1].lower()
+        if ext == ".mp3":
+            tracks.append((prefix + name, disc, st))
+        elif ext == ".nfo":
             nfo = True
-    return tracks, size, nfo
+    return tracks, size, nfo, skipped
 
 
 def _name(rel):
@@ -109,10 +133,14 @@ def scan_structure(conn, root: Path, now: float) -> dict:
         else:
             stack.append((e.path, rel, mtime))
 
-    stack = []
+    stack, skipped = [], 0
     for e in top:
         if e.is_dir(follow_symlinks=False):
-            push(stack, e, os.fsdecode(e.name))
+            name = _decode(e)
+            if name is None:
+                skipped += 1
+            else:
+                push(stack, e, name)
     while stack:
         path, rel, mtime = stack.pop()
         try:
@@ -120,12 +148,16 @@ def scan_structure(conn, root: Path, now: float) -> dict:
         except OSError:  # dossier illisible : ignoré, ses releases connues sont conservées
             mark_tree(rel)
             continue
-        tracks, size, nfo = _files(entries)
+        tracks, size, nfo, n = _files(entries)
+        skipped += n
         others, discs = [], []
         for e in entries:
             if not e.is_dir(follow_symlinks=False):
                 continue
-            name = os.fsdecode(e.name)
+            name = _decode(e)
+            if name is None:
+                skipped += 1
+                continue
             m = DISC_RE.match(name)
             sub = None
             if m:
@@ -136,9 +168,10 @@ def scan_structure(conn, root: Path, now: float) -> dict:
             if sub is None:
                 others.append((e, name))
                 continue
-            t, s, _ = _files(sub, name + "/", int(m.group(2)))
+            t, s, _, n = _files(sub, name + "/", int(m.group(2)))
             if t:
                 discs.append((t, s))
+                skipped += n  # sinon compté quand le dossier sera parcouru
             else:
                 others.append((e, name))
         for t, s in discs:
@@ -185,4 +218,4 @@ def scan_structure(conn, root: Path, now: float) -> dict:
                      [(f, f.rpartition("/")[0]) for f in folders])
     conn.execute("UPDATE scan_state SET first_scan_done=1 WHERE id=1")
     conn.commit()
-    return {"found": found, "added": len(new), "moved": moved, "removed": removed}
+    return {"found": found, "added": len(new), "moved": moved, "removed": removed, "skipped": skipped}
