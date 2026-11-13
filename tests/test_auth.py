@@ -134,9 +134,25 @@ def test_success_resets_username_not_ip(client):
     xff = {"X-Forwarded-For": "198.51.100.9", "X-CSRF": "1"}
     for _ in range(4):
         assert _login(client, "admin", "bad", headers=xff).status_code == 401
-    assert _login(client, "admin", "adminpass", headers=xff).status_code == 200   # 5e essai pour l'IP
+    assert _login(client, "admin", "adminpass", headers=xff).status_code == 200   # non compté pour l'IP
+    assert _login(client, "admin", "bad", headers=xff).status_code == 401         # 5e échec de l'IP
     assert _login(client, "admin", "adminpass", headers=xff).status_code == 429
     assert _login(client, "admin", "adminpass").status_code == 200                # clé identifiant remise à zéro
+
+
+def test_successful_logins_do_not_consume_ip_budget(client):
+    for _ in range(10):
+        assert _login(client, "admin", "adminpass").status_code == 200
+
+
+def test_limiter_forgive():
+    lim = security.LoginLimiter()
+    for i in range(4):
+        assert lim.attempt(("ip",), float(i))
+    assert lim.attempt(("ip",), 4.0) and lim.blocked("ip", 4.0)
+    lim.forgive("ip")                                   # le 5e essai a réussi : blocage levé, 4 échecs restent
+    assert not lim.blocked("ip", 4.0)
+    assert lim.attempt(("ip",), 5.0) and not lim.attempt(("ip",), 6.0)
 
 
 def test_password_hashing_works():

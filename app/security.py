@@ -111,18 +111,25 @@ class LoginLimiter:
         False si l'une est bloquée : rien n'est alors compté ni prolongé."""
         with self._lock:
             # ponytail: purge O(n) à chaque essai ; n est borné par le nombre d'essais sur 15 min
-            self._tries = {k: v for k, v in self._tries.items() if v[-1] > now - self.WINDOW}
+            self._tries = {k: v for k, v in self._tries.items() if v and v[-1] > now - self.WINDOW}
             self._until = {k: t for k, t in self._until.items() if t > now}
             if any(k in self._until for k in keys):
                 return False
             for k in keys:
                 tries = [t for t in self._tries.get(k, []) if t > now - self.WINDOW] + [now]
+                self._tries[k] = tries
                 if len(tries) >= self.MAX_TRIES:
                     self._until[k] = now + self.WINDOW
-                    self._tries.pop(k, None)
-                else:
-                    self._tries[k] = tries
             return True
+
+    def forgive(self, key: str) -> None:
+        """Retire un essai réservé (connexion réussie) sans effacer les échecs précédents."""
+        with self._lock:
+            tries = self._tries.get(key)
+            if tries:
+                tries.pop()
+                if len(tries) < self.MAX_TRIES:
+                    self._until.pop(key, None)
 
     def reset(self, key: str) -> None:
         with self._lock:

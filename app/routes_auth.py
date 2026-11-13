@@ -39,7 +39,9 @@ def login(body: Login, request: Request, response: Response, conn=Depends(get_co
     ok = security.verify_password(row["password_hash"] if row else security.DUMMY_HASH, body.password)
     if row is None or not ok:
         raise HTTPException(401, "Identifiant ou mot de passe incorrect.")
-    limiter.reset(keys[0])  # jamais la clé IP : un compte valide ne doit pas remettre à zéro le compteur d'une IP
+    limiter.reset(keys[0])
+    # IP : on retire seulement l'essai de cette requête ; ses échecs passés comptent toujours
+    limiter.forgive(keys[1])
     old = request.cookies.get(security.COOKIE)
     if old:
         security.drop_session(conn, old)
