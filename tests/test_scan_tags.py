@@ -1,4 +1,9 @@
+import builtins
+import io
+import sqlite3
 import threading
+
+import pytest
 
 import app.scanner as sc
 from app.scanner import Runner, scan_structure, scan_tags
@@ -89,16 +94,15 @@ def test_runner_refuses_concurrent_scan(settings, music, monkeypatch):
     assert entered.wait(5)
     assert r.start() is False
     release_.set()
-    r._thread.join(5)
-    assert not r._thread.is_alive()
+    r._thread.join(5); assert not r._thread.is_alive()
 
 
 def test_runner_error_then_success(settings, conn, music, make_mp3):
     r = Runner(settings)
-    assert r.start() is True; r._thread.join(5)
+    assert r.start() is True; r._thread.join(5); assert not r._thread.is_alive()
     s = r.status(conn); assert s["status"] == "error" and s["error"] and s["finished_at"]
     release(music, make_mp3, ("01-a.mp3", {}))
-    assert r.start() is True; r._thread.join(5)
+    assert r.start() is True; r._thread.join(5); assert not r._thread.is_alive()
     s = r.status(conn)
     assert (s["status"], s["releases_found"], s["tracks_pending"], s["error"]) == ("idle", 1, 0, None)
     assert s["finished_at"] >= s["started_at"] > 0
@@ -128,7 +132,7 @@ def test_resume_resets_stale_status_and_reads_pending_tags(settings, conn, music
     conn.execute("UPDATE scan_state SET status='structure'"); conn.commit()
     r = Runner(settings)
     r.resume()
-    r._thread.join(5)
+    r._thread.join(5); assert not r._thread.is_alive()
     s = r.status(conn)
     assert (s["status"], s["tracks_pending"]) == ("idle", 0)
     assert conn.execute("SELECT title FROM tracks").fetchone()[0] == "Alpha"
@@ -140,3 +144,46 @@ def test_resume_without_pending_only_resets(settings, conn):
     r.resume()
     assert r._thread is None
     assert r.status(conn)["status"] == "idle"
+
+
+@pytest.mark.parametrize("fail_after", [0, 1, 2, 3, 4])  # 1 : mutagen renvoie None ; sinon ValueError(contexte OSError)
+def test_read_error_after_open_stays_pending(conn, music, make_mp3, monkeypatch, fail_after):
+    d = release(music, make_mp3, ("01-a.mp3", dict(title="Alpha")))
+    scan_structure(conn, music, now=1.0)
+    real_open = builtins.open
+
+    class Flaky(io.BytesIO):
+        n = 0
+
+        def read(self, *a):
+            self.n += 1
+            if self.n > fail_after:
+                raise OSError(5, "EIO")
+            return super().read(*a)
+
+    def fake_open(path, *a, **k):
+        if str(path) == str(d / "01-a.mp3"):
+            with real_open(path, "rb") as f:
+                return Flaky(f.read())
+        return real_open(path, *a, **k)
+    monkeypatch.setattr(builtins, "open", fake_open)
+    assert scan_tags(conn, music) == 0
+    assert conn.execute("SELECT tags_read FROM tracks").fetchone()[0] == 0
+
+
+def test_no_write_lock_held_while_reading_files(settings, conn, music, make_mp3, monkeypatch):
+    release(music, make_mp3, ("01-a.mp3", {}), ("02-b.mp3", {}))
+    scan_structure(conn, music, now=1.0)
+    other = sqlite3.connect(settings.data_dir / "mp3scene.db", timeout=0)
+    real, errors = sc._read_tags, []
+
+    def reading(path):
+        try:
+            other.execute("UPDATE scan_state SET error='x' WHERE id=1"); other.commit()
+        except sqlite3.OperationalError as e:
+            errors.append(e)
+        return real(path)
+    monkeypatch.setattr(sc, "_read_tags", reading)
+    assert scan_tags(conn, music) == 2
+    other.close()
+    assert errors == []

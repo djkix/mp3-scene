@@ -1,5 +1,6 @@
 """Scan de la bibliothèque (lecture seule) : phase structure (dossiers → releases et pistes), puis phase tags."""
 import bisect
+import errno
 import logging
 import os
 import re
@@ -106,7 +107,9 @@ def _scan_structure(conn, root, now):
     ordered = sorted(known)
     first = not conn.execute("SELECT first_scan_done FROM scan_state WHERE id=1").fetchone()[0]
     seen, new = set(), {}  # new : chemin → id
-    saved = 0
+    # aucune écriture pendant le parcours NFS : les releases trouvées sont mises en attente puis écrites
+    # par lots de BATCH dans une transaction courte, pour ne pas bloquer les autres écrivains (connexions…)
+    pending = []
 
     def mark_tree(rel):
         """Marque « vues » la release `rel` et toutes les releases connues en dessous."""
@@ -115,8 +118,12 @@ def _scan_structure(conn, root, now):
         # '0' suit '/' : l'intervalle couvre exactement les chemins préfixés par rel + '/'
         seen.update(ordered[bisect.bisect_left(ordered, rel + "/"):bisect.bisect_left(ordered, rel + "0")])
 
-    def save(rel, mtime, tracks, size, nfo):
-        nonlocal saved
+    def flush():
+        for args in pending:
+            write(*args)
+        pending.clear()
+
+    def write(rel, mtime, tracks, size, nfo):
         if rel in known:
             rid = known[rel][0]
             seen.add(rel)
@@ -140,9 +147,6 @@ def _scan_structure(conn, root, now):
             new[rel] = rid
         conn.executemany("INSERT INTO tracks(release_id, relpath, disc, size) VALUES (?,?,?,?)",
                          [(rid, *t) for t in tracks])
-        saved += 1
-        if saved % BATCH == 0:
-            conn.commit()
 
     def push(stack, e, rel):
         """Empile un sous-dossier à lister, sauf release connue au mtime inchangé (marquée vue, non listée)."""
@@ -199,10 +203,14 @@ def _scan_structure(conn, root, now):
             continue
         skipped += n_skip
         if tracks:
-            save(rel, mtime, tracks, size, nfo)
+            pending.append((rel, mtime, tracks, size, nfo))
+            if len(pending) >= BATCH:
+                flush()
+                conn.commit()
         for e, name in others:
             push(stack, e, f"{rel}/{name}")
 
+    flush()  # la suite ne touche plus au disque : une seule transaction courte jusqu'au commit final
     gone = [p for p in known if p not in seen]
     gone_names = Counter(_name(p) for p in gone)
     # candidats au déplacement : toute release présente (vue ou nouvelle), pas seulement les nouvelles de ce
@@ -254,19 +262,45 @@ def _first(tags, key):
     return v or None
 
 
+class _Watched:
+    """Fichier dont la première erreur d'E/S levée par read/seek est retenue (mutagen les avale ou les enveloppe)."""
+
+    def __init__(self, f):
+        self._f, self.error = f, None
+
+    def __getattr__(self, name):
+        return getattr(self._f, name)
+
+    def _call(self, name, *a):
+        try:
+            return getattr(self._f, name)(*a)
+        except OSError as e:
+            if e.errno != errno.EINVAL:  # EINVAL : seek avant le début d'un fichier tronqué, pas une panne d'E/S
+                self.error = self.error or e
+            raise
+
+    def read(self, *a):
+        return self._call("read", *a)
+
+    def seek(self, *a):
+        return self._call("seek", *a)
+
+    def tell(self):
+        return self._call("tell")
+
+
 def _read_tags(path):
     """(titre, artiste, genre, durée, débit) du fichier, champs None s'il n'est pas lisible comme MP3.
 
     Lève OSError si le fichier ne peut pas être lu (absent, NFS indisponible) : la piste reste à lire."""
-    with open(path, "rb") as f:  # lecture seule : mutagen ne reçoit qu'un fichier ouvert en 'rb'
+    with open(path, "rb") as raw:  # lecture seule : mutagen ne reçoit qu'un fichier ouvert en 'rb'
+        f = _Watched(raw)
         try:
             m = mutagen.File(f, easy=True)
-        except mutagen.MutagenError as e:
-            if isinstance(e.__context__, OSError):  # mutagen enveloppe les erreurs d'E/S
-                raise e.__context__
-            m = None
         except Exception:  # fichier corrompu : mutagen peut lever à peu près n'importe quoi
             m = None
+        if f.error is not None:  # erreur d'E/S, quoi que mutagen en ait fait (avalée, enveloppée…)
+            raise f.error
     if m is None:
         return None, None, None, None, None
     info = getattr(m, "info", None)
@@ -305,20 +339,21 @@ def _scan_tags(conn, root, should_stop):
         if not rows:
             break
         last = rows[-1]["id"]
+        done = []  # lot lu entièrement avant d'écrire : pas de verrou d'écriture pendant les lectures NFS
         for t in rows:
             try:
-                fields = _read_tags(Path(root, t["path"], t["relpath"]))
+                done.append((*_read_tags(Path(root, t["path"], t["relpath"])), t["id"]))
             except OSError as e:
                 log.warning("piste illisible, relue au prochain scan : %s/%s (%s)", t["path"], t["relpath"], e)
-                continue
-            conn.execute("UPDATE tracks SET title=?, artist=?, genre=?, duration=?, bitrate=?, tags_read=1"
-                         " WHERE id=?", (*fields, t["id"]))
-            read += 1
+        conn.executemany("UPDATE tracks SET title=?, artist=?, genre=?, duration=?, bitrate=?, tags_read=1"
+                         " WHERE id=?", done)
+        read += len(done)
         _aggregate(conn, {t["release_id"] for t in rows})
         conn.commit()
-    # releases sans piste en attente mais pas agrégées (ex. piste supprimée par la phase structure)
-    _aggregate(conn, [r[0] for r in conn.execute("SELECT id FROM releases WHERE tags_done=0")])
-    conn.commit()
+    if not should_stop():
+        # releases sans piste en attente mais pas agrégées (ex. piste supprimée par la phase structure)
+        _aggregate(conn, [r[0] for r in conn.execute("SELECT id FROM releases WHERE tags_done=0")])
+        conn.commit()
     return read
 
 
@@ -384,10 +419,13 @@ class Runner:
         except Exception as e:
             log.exception("échec du scan")
             if conn is not None:
-                conn.rollback()
-                conn.execute("UPDATE scan_state SET status='error', finished_at=?, error=? WHERE id=1",
-                             (time.time(), str(e) or type(e).__name__))
-                conn.commit()
+                try:
+                    conn.rollback()
+                    conn.execute("UPDATE scan_state SET status='error', finished_at=?, error=? WHERE id=1",
+                                 (time.time(), str(e) or type(e).__name__))
+                    conn.commit()
+                except Exception:
+                    log.exception("impossible d'enregistrer l'échec du scan")
         finally:
             if conn is not None:
                 conn.close()

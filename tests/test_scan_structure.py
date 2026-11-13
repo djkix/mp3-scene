@@ -1,4 +1,5 @@
 import os
+import sqlite3
 import shutil
 import sys
 
@@ -270,3 +271,22 @@ def test_non_utf8_names_are_skipped(conn, music):            # Review Focus 1
     assert (stats["found"], stats["skipped"]) == (1, 2)
     assert [t[0] for t in conn.execute("SELECT relpath FROM tracks")] == ["01-a.mp3"]
     assert [r[0] for r in conn.execute("SELECT name FROM releases")] == ["Art-Good-WEB-2015-GRP"]
+
+
+def test_no_write_lock_held_while_listing(settings, conn, music, monkeypatch):
+    for i in range(3):
+        mk(music, f"S/Art-R{i}-WEB-2015-GRP", ["01-a.mp3"])
+    other = sqlite3.connect(settings.data_dir / "mp3scene.db", timeout=0)
+    real, errors = sc._list, []
+
+    def listing(path):
+        try:
+            other.execute("UPDATE scan_state SET error='x' WHERE id=1"); other.commit()
+        except sqlite3.OperationalError as e:
+            errors.append(e)
+        return real(path)
+    monkeypatch.setattr(sc, "_list", listing)
+    assert scan_structure(conn, music, now=1.0)["found"] == 3
+    other.close()
+    assert errors == []
+    assert conn.execute("SELECT count(*) FROM tracks").fetchone()[0] == 3
