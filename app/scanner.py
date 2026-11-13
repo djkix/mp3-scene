@@ -64,6 +64,20 @@ def _name(rel):
     return rel.rpartition("/")[2]
 
 
+def _drop(conn, loser, survivor=None):
+    """Supprime la release `loser` ; ses favoris passent à `survivor` (pistes appariées par relpath)."""
+    if survivor is not None:
+        conn.execute("UPDATE OR IGNORE favorites SET item_id=? WHERE kind='release' AND item_id=?", (survivor, loser))
+        pairs = conn.execute("SELECT s.id, l.id FROM tracks l JOIN tracks s ON s.relpath=l.relpath AND s.release_id=?"
+                             " WHERE l.release_id=?", (survivor, loser)).fetchall()
+        conn.executemany("UPDATE OR IGNORE favorites SET item_id=? WHERE kind='track' AND item_id=?", pairs)
+    conn.execute("DELETE FROM favorites WHERE kind='release' AND item_id=?", (loser,))
+    conn.execute("DELETE FROM favorites WHERE kind='track' AND item_id IN"
+                 " (SELECT id FROM tracks WHERE release_id=?)", (loser,))
+    conn.execute("DELETE FROM tracks WHERE release_id=?", (loser,))
+    conn.execute("DELETE FROM releases WHERE id=?", (loser,))
+
+
 def scan_structure(conn, root: Path, now: float) -> dict:
     try:
         return _scan_structure(conn, root, now)
@@ -199,22 +213,19 @@ def _scan_structure(conn, root, now):
         if gone_names[_name(p)] == 1 and len(cands) == 1:
             dest = cands[0]
             dup = present[dest]
+            if dest in seen and conn.execute("SELECT tags_done FROM releases WHERE id=?", (dup,)).fetchone()[0]:
+                # homonyme déjà indexé et tags lus : c'est une autre release, elle survit telle quelle
+                _drop(conn, rid, dup)
+                removed += 1
+                continue
+            # vrai déplacement (ou ligne provisoire d'un scan interrompu) : l'ancienne ligne survit
             new.pop(dest, None)
-            conn.execute("UPDATE OR IGNORE favorites SET item_id=? WHERE kind='release' AND item_id=?", (rid, dup))
-            conn.execute("DELETE FROM favorites WHERE kind='release' AND item_id=?", (dup,))
-            conn.execute("DELETE FROM favorites WHERE kind='track' AND item_id IN"
-                         " (SELECT id FROM tracks WHERE release_id=?)", (dup,))
-            conn.execute("DELETE FROM tracks WHERE release_id=?", (dup,))
-            conn.execute("DELETE FROM releases WHERE id=?", (dup,))
+            _drop(conn, dup, rid)
             conn.execute("UPDATE releases SET path=?, parent=?, category=? WHERE id=?",
                          (dest, dest.rpartition("/")[0], dest.split("/", 1)[0], rid))
             moved += 1
         else:
-            conn.execute("DELETE FROM favorites WHERE kind='release' AND item_id=?", (rid,))
-            conn.execute("DELETE FROM favorites WHERE kind='track' AND item_id IN"
-                         " (SELECT id FROM tracks WHERE release_id=?)", (rid,))
-            conn.execute("DELETE FROM tracks WHERE release_id=?", (rid,))
-            conn.execute("DELETE FROM releases WHERE id=?", (rid,))
+            _drop(conn, rid)
             removed += 1
 
     folders = set()

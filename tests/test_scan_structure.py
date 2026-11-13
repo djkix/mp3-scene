@@ -142,6 +142,50 @@ def test_interrupted_move_scan_keeps_identity_on_rescan(conn, music, monkeypatch
     assert [f[0] for f in conn.execute("SELECT item_id FROM favorites")] == [rid]
 
 
+def two_same_named(conn, music, singles_tags_done):
+    """Albums/X et Singles/X indexés, chacun avec un favori release et piste d'un utilisateur différent."""
+    mk(music, "Albums/Art-X-WEB-2015-GRP", ["01-a.mp3"]); mk(music, "Singles/Art-X-WEB-2015-GRP", ["01-a.mp3"])
+    scan_structure(conn, music, now=1.0)
+    ids = {}
+    for user, cat in ((1, "Albums"), (2, "Singles")):
+        rid = conn.execute("SELECT id FROM releases WHERE category=?", (cat,)).fetchone()[0]
+        tid = conn.execute("SELECT id FROM tracks WHERE release_id=?", (rid,)).fetchone()[0]
+        read = cat == "Albums" or singles_tags_done
+        conn.execute("UPDATE releases SET tags_done=? WHERE id=?", (read, rid))
+        conn.execute("UPDATE tracks SET tags_read=?, title=? WHERE id=?", (read, cat if read else None, tid))
+        conn.execute("INSERT INTO users(id,username,password_hash,role) VALUES(?,?,'x','user')", (user, f"u{user}"))
+        conn.execute("INSERT INTO favorites VALUES(?,'release',?,1)", (user, rid))
+        conn.execute("INSERT INTO favorites VALUES(?,'track',?,1)", (user, tid))
+        ids[cat] = rid, tid
+    conn.commit()
+    shutil.rmtree(music / "Albums")
+    return ids
+
+
+def test_deleted_duplicate_merges_into_indexed_survivor(conn, music):
+    ids = two_same_named(conn, music, singles_tags_done=1)
+    stats = scan_structure(conn, music, now=2.0)
+    # Singles/X n'a pas bougé : Albums/X est supprimé, ses favoris rejoignent Singles/X
+    assert (stats["found"], stats["moved"], stats["removed"]) == (1, 0, 1)
+    sid, stid = ids["Singles"]
+    assert conn.execute("SELECT id, path FROM releases").fetchall()[0][:] == (sid, "Singles/Art-X-WEB-2015-GRP")
+    assert [t[:] for t in conn.execute("SELECT id, title, tags_read FROM tracks")] == [(stid, "Singles", 1)]
+    assert {f[:] for f in conn.execute("SELECT user_id, kind, item_id FROM favorites")} == \
+        {(1, "release", sid), (1, "track", stid), (2, "release", sid), (2, "track", stid)}
+
+
+def test_deleted_duplicate_survives_over_unread_on_disk_row(conn, music):
+    ids = two_same_named(conn, music, singles_tags_done=0)
+    stats = scan_structure(conn, music, now=2.0)
+    # Singles/X sans tags lus (ex. ligne provisoire) : Albums/X garde son identité au chemin présent
+    assert (stats["found"], stats["moved"], stats["removed"]) == (1, 1, 0)
+    aid, atid = ids["Albums"]
+    assert conn.execute("SELECT id, path FROM releases").fetchall()[0][:] == (aid, "Singles/Art-X-WEB-2015-GRP")
+    assert [t[:] for t in conn.execute("SELECT id, title, tags_read FROM tracks")] == [(atid, "Albums", 1)]
+    assert {f[:] for f in conn.execute("SELECT user_id, kind, item_id FROM favorites")} == \
+        {(1, "release", aid), (1, "track", atid), (2, "release", aid), (2, "track", atid)}
+
+
 @pytest.mark.parametrize("fail", [{"list_fails": {b"CD1"}}, {"stat_fails": {b"02-b.mp3"}}])
 def test_unreadable_disc_or_file_changes_nothing(conn, music, monkeypatch, fail):
     d = mk(music, "S/VA-Big-WEB-2015-GRP", ["02-b.mp3"]); mk(music, "S/VA-Big-WEB-2015-GRP/CD1", ["01-a.mp3"])
