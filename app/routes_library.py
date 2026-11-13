@@ -3,7 +3,7 @@ import time
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
-from .deps import current_user, get_conn
+from .deps import MAX_INT, Id, current_user, get_conn
 from .security import safe_path
 
 router = APIRouter(dependencies=[Depends(current_user)])
@@ -52,8 +52,9 @@ def _page(conn, cols, source, where, params, order, uid, offset, limit, build):
 
 
 @router.get("/api/releases")
-def list_releases(q: str = "", category: str | None = None, genre: str | None = None, year: int | None = None,
-                  favorites: int = Query(0, ge=0, le=1), offset: int = Query(0, ge=0), limit: int = Query(50, ge=1),
+def list_releases(q: str = "", category: str | None = None, genre: str | None = None,
+                  year: int | None = Query(None, ge=0, le=MAX_INT), favorites: int = Query(0, ge=0, le=1),
+                  offset: int = Query(0, ge=0, le=MAX_INT), limit: int = Query(50, ge=1, le=MAX_INT),
                   user=Depends(current_user), conn=Depends(get_conn)):
     conds, params = [], []
     if match := _fts_query(q):
@@ -79,7 +80,7 @@ def filters(conn=Depends(get_conn)):
 
 
 @router.get("/api/folders")
-def folders(path: str = "", offset: int = Query(0, ge=0), limit: int = Query(50, ge=1),
+def folders(path: str = "", offset: int = Query(0, ge=0, le=MAX_INT), limit: int = Query(50, ge=1, le=MAX_INT),
             user=Depends(current_user), conn=Depends(get_conn)):
     if path and conn.execute("SELECT 1 FROM folders WHERE path=?", (path,)).fetchone() is None:
         raise HTTPException(404, "Dossier introuvable.")
@@ -100,7 +101,7 @@ def _release_row(conn, uid, rid):
 
 
 @router.get("/api/releases/{rid}")
-def release_detail(rid: int, user=Depends(current_user), conn=Depends(get_conn)):
+def release_detail(rid: Id, user=Depends(current_user), conn=Depends(get_conn)):
     d = _release(_release_row(conn, user["id"], rid))
     d["tracks"] = [_track(r) for r in conn.execute(
         f"SELECT {TRACK_COLS} FROM {TRACK_FROM} WHERE t.release_id=? ORDER BY t.disc, t.relpath",
@@ -109,7 +110,7 @@ def release_detail(rid: int, user=Depends(current_user), conn=Depends(get_conn))
 
 
 @router.get("/api/releases/{rid}/nfo")
-def release_nfo(rid: int, request: Request, conn=Depends(get_conn)):
+def release_nfo(rid: Id, request: Request, conn=Depends(get_conn)):
     settings = request.app.state.settings
     row = conn.execute("SELECT path FROM releases WHERE id=?", (rid,)).fetchone()
     if row is None:
@@ -125,7 +126,7 @@ def release_nfo(rid: int, request: Request, conn=Depends(get_conn)):
 
 
 @router.get("/api/favorites/tracks")
-def favorite_tracks(offset: int = Query(0, ge=0), limit: int = Query(50, ge=1),
+def favorite_tracks(offset: int = Query(0, ge=0, le=MAX_INT), limit: int = Query(50, ge=1, le=MAX_INT),
                     user=Depends(current_user), conn=Depends(get_conn)):
     return _page(conn, TRACK_COLS, TRACK_FROM, "WHERE f.item_id IS NOT NULL", [],
                  "f.created_at DESC, t.id DESC", user["id"], offset, limit, _track)
@@ -138,7 +139,7 @@ def _check_item(conn, kind, item_id):
 
 
 @router.put("/api/favorites/{kind}/{item_id}", status_code=204)
-def add_favorite(kind: str, item_id: int, user=Depends(current_user), conn=Depends(get_conn)):
+def add_favorite(kind: str, item_id: Id, user=Depends(current_user), conn=Depends(get_conn)):
     _check_item(conn, kind, item_id)
     conn.execute("INSERT OR IGNORE INTO favorites(user_id, kind, item_id, created_at) VALUES (?,?,?,?)",
                  (user["id"], kind, item_id, time.time()))
@@ -146,7 +147,7 @@ def add_favorite(kind: str, item_id: int, user=Depends(current_user), conn=Depen
 
 
 @router.delete("/api/favorites/{kind}/{item_id}", status_code=204)
-def remove_favorite(kind: str, item_id: int, user=Depends(current_user), conn=Depends(get_conn)):
+def remove_favorite(kind: str, item_id: Id, user=Depends(current_user), conn=Depends(get_conn)):
     if kind not in ("release", "track"):
         raise HTTPException(404, "Élément introuvable.")
     conn.execute("DELETE FROM favorites WHERE user_id=? AND kind=? AND item_id=?", (user["id"], kind, item_id))

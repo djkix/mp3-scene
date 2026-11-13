@@ -137,3 +137,26 @@ def test_safe_path(tmp_path):
     assert _code(lambda: safe_path(root, "/etc/passwd")) == 404
     assert _code(lambda: safe_path(root, "link", "s.txt")) == 404
     assert _code(lambda: safe_path(root, "d", "absent")) == 404
+
+
+@pytest.mark.parametrize("n", [2**63, 2**64, 0])
+@pytest.mark.parametrize("method,url,code", [
+    ("get", "/api/releases?year={n}", None), ("get", "/api/releases?offset={n}", None),
+    ("get", "/api/releases?limit={n}", None), ("get", "/api/folders?offset={n}", None),
+    ("get", "/api/favorites/tracks?offset={n}", None),
+    ("get", "/api/releases/{n}", 422), ("get", "/api/releases/{n}/nfo", 422), ("get", "/api/releases/{n}/zip", 422),
+    ("get", "/api/tracks/{n}/stream", 422), ("put", "/api/favorites/release/{n}", 422),
+    ("delete", "/api/favorites/track/{n}", 422), ("post", "/api/cast/urls", 422),
+    ("patch", "/api/admin/users/{n}", 422), ("delete", "/api/admin/users/{n}", 422),
+    ("get", "/cast/{n}?exp={exp}&sig=00", 403), ("get", "/cast/{n}?exp={exp}&sig={sig}", 404)])
+def test_out_of_range_integers_never_500(admin_client, library, method, url, code, n):
+    import time
+    from app.security import sign_track
+    if code is None:   # entier de requête : 0 est valide, seuls les grands sont refusés
+        if n == 0:
+            return
+        code = 422
+    exp = int(time.time()) + 60
+    url = url.format(n=n, exp=exp, sig=sign_track("test", n, exp))
+    kw = {"json": {"track_ids": [n]}} if method == "post" else {"json": {"role": "user"}} if method == "patch" else {}
+    assert admin_client.request(method.upper(), url, **kw).status_code == code, url

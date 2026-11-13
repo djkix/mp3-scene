@@ -310,3 +310,33 @@ def test_scan_endpoints(app, admin_client):
     app.state.runner.start = lambda: False
     r = admin_client.post("/api/admin/scan")
     assert r.status_code == 409 and r.json()["detail"]
+
+
+def test_bruteforce_ip_xff_on_two_header_lines(client):
+    # le proxy ajoute une seconde ligne X-Forwarded-For : seule sa valeur (la dernière) compte
+    for i in range(5):
+        h = [("X-Forwarded-For", f"10.9.9.{i}"), ("X-Forwarded-For", "203.0.113.7"), ("X-CSRF", "1")]
+        assert _login(client, f"inconnu{i}", "bad", headers=h).status_code == 401
+    h = [("X-Forwarded-For", "10.9.9.99"), ("X-Forwarded-For", "203.0.113.7"), ("X-CSRF", "1")]
+    assert _login(client, "admin", "adminpass", headers=h).status_code == 429
+    assert _login(client, "admin", "adminpass").status_code == 200
+
+
+def test_password_hashed_outside_write_transaction(admin_client, settings, monkeypatch):
+    import sqlite3
+    other = sqlite3.connect(settings.data_dir / "mp3scene.db", timeout=0, check_same_thread=False)
+    real, errors = security.hash_password, []
+
+    def hashing(pw):
+        try:
+            other.execute("UPDATE scan_state SET error='x' WHERE id=1"); other.commit()
+        except sqlite3.OperationalError as e:
+            errors.append(e)
+        return real(pw)
+    monkeypatch.setattr(security, "hash_password", hashing)
+    assert admin_client.post("/api/admin/users", json={"username": "bob", "password": "12345678", "role": "admin"}).status_code == 201
+    assert admin_client.patch(f"/api/admin/users/{_uid(admin_client, 'bob')}",
+                              json={"role": "user", "password": "87654321"}).status_code == 204
+    assert admin_client.post("/api/me/password", json={"current": "adminpass", "new": "nouveaumdp"}).status_code == 204
+    other.close()
+    assert errors == []

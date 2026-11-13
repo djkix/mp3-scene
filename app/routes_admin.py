@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from . import security
-from .deps import get_conn, require_admin
+from .deps import Id, get_conn, require_admin
 
 router = APIRouter(prefix="/api/admin", dependencies=[Depends(require_admin)])
 
@@ -57,24 +57,26 @@ def create_user(body: NewUser, conn=Depends(get_conn)):
 
 
 @router.patch("/users/{user_id}", status_code=204)
-def update_user(user_id: int, body: UserPatch, conn=Depends(get_conn)):
+def update_user(user_id: Id, body: UserPatch, conn=Depends(get_conn)):
     _get_user(conn, user_id)
+    pw_hash = None
     if body.password is not None:
         _check(security.password_error(body.password))
+        pw_hash = security.hash_password(body.password)  # avant toute écriture : le hachage dure ~100 ms
     if body.role == "user":
         cur = conn.execute(f"UPDATE users SET role = 'user' WHERE id = ? AND {NOT_LAST_ADMIN}", (user_id,))
         if cur.rowcount == 0:
             raise HTTPException(409, "Impossible de rétrograder le dernier administrateur.")
     elif body.role == "admin":
         conn.execute("UPDATE users SET role = 'admin' WHERE id = ?", (user_id,))
-    if body.password is not None:
-        conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (security.hash_password(body.password), user_id))
+    if pw_hash is not None:
+        conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (pw_hash, user_id))
         security.drop_sessions(conn, user_id)  # valide aussi la transaction
     conn.commit()
 
 
 @router.delete("/users/{user_id}", status_code=204)
-def delete_user(user_id: int, conn=Depends(get_conn)):
+def delete_user(user_id: Id, conn=Depends(get_conn)):
     _get_user(conn, user_id)
     cur = conn.execute(f"DELETE FROM users WHERE id = ? AND {NOT_LAST_ADMIN}", (user_id,))
     conn.commit()

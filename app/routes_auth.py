@@ -21,9 +21,10 @@ class PasswordChange(BaseModel):
 
 def client_ip(request: Request) -> str:
     # un seul proxy de confiance, qui ajoute l'adresse réelle en DERNIER ; les entrées précédentes viennent du client
-    last = request.headers.get("x-forwarded-for", "").split(",")[-1].strip()
-    if last:
-        return last
+    # plusieurs lignes possibles : un proxy qui ajoute sa propre ligne laisse celle du client en premier
+    parts = [p.strip() for p in ",".join(request.headers.getlist("x-forwarded-for")).split(",") if p.strip()]
+    if parts:
+        return parts[-1]
     return request.client.host if request.client else ""
 
 

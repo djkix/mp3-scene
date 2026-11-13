@@ -48,6 +48,16 @@ def _bootstrap_admin(settings: Settings) -> None:
         conn.close()
 
 
+def _setup_logging() -> None:
+    """Journaux de l'appli (logger « app », dont le scan) avec horodatage, sans toucher à ceux d'uvicorn."""
+    logger = logging.getLogger("app")
+    logger.setLevel(logging.INFO)
+    if not logger.handlers:  # create_app peut être appelé plusieurs fois (tests)
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+        logger.addHandler(handler)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if not app.state.settings.public_url.startswith(("http://", "https://")):
@@ -69,6 +79,7 @@ def _with_conn(settings: Settings, fn, *args):
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
+    _setup_logging()
     app = FastAPI(title="Mp3 Scene", lifespan=lifespan, dependencies=[Depends(csrf)],
                   docs_url=None, redoc_url=None, openapi_url=None)
     app.state.settings = settings or config.load()
@@ -92,6 +103,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if (user["renewed"] and "set-cookie" not in response.headers
                 and await run_in_threadpool(_with_conn, settings, security.session_exists, token)):
             security.set_session_cookie(response, token)
+        return response
+
+    @app.middleware("http")  # déclaré en dernier : enveloppe tout, y compris les 401 et les fichiers statiques
+    async def nosniff(request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
         return response
 
     @app.get("/api/health")

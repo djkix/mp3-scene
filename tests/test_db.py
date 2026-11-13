@@ -34,3 +34,32 @@ def test_config_requires_secret_key(monkeypatch):
     monkeypatch.delenv("SECRET_KEY", raising=False)
     with pytest.raises(RuntimeError):
         config.load()
+
+
+def test_schema_version_stamped_and_checked(settings):
+    import pytest
+    from app import db
+    db.init(settings.data_dir)
+    c = db.connect(settings.data_dir)
+    assert c.execute("PRAGMA user_version").fetchone()[0] == 1
+    c.execute("INSERT INTO users(username, password_hash, role) VALUES ('u','x','user')"); c.commit()
+    c.execute("PRAGMA user_version = 0"); c.commit()            # base existante non marquée : traitée comme v1
+    db.init(settings.data_dir)
+    assert c.execute("PRAGMA user_version").fetchone()[0] == 1
+    assert c.execute("SELECT count(*) FROM users").fetchone()[0] == 1
+    c.execute("PRAGMA user_version = 2"); c.commit()            # base d'une version plus récente de l'appli
+    with pytest.raises(RuntimeError, match="version"):
+        db.init(settings.data_dir)
+    assert c.execute("PRAGMA user_version").fetchone()[0] == 2
+    c.close()
+
+
+def test_config_rejects_short_secret_key(monkeypatch):
+    import pytest
+    from app import config
+    monkeypatch.setenv("SECRET_KEY", "k" * 31)
+    with pytest.raises(RuntimeError) as e:
+        config.load()
+    assert "SECRET_KEY" in str(e.value) and "32" in str(e.value) and "k" * 31 not in str(e.value)
+    monkeypatch.setenv("SECRET_KEY", "k" * 32)
+    assert config.load().secret_key == "k" * 32

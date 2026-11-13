@@ -1,6 +1,13 @@
-from fastapi import Depends, HTTPException, Request
+from typing import Annotated
+
+from fastapi import Depends, HTTPException, Path, Request
+
 
 from . import db
+
+# plus grand entier SQLite : au-delà, sqlite3 lève OverflowError (500) ; FastAPI répond 422 avant
+MAX_INT = 2**63 - 1
+Id = Annotated[int, Path(ge=1, le=MAX_INT)]
 
 
 def get_conn(request: Request):

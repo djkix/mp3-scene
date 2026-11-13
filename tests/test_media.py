@@ -212,3 +212,23 @@ def test_nothing_written_under_music(user_client, client, conn, settings, tid): 
     assert user_client.post("/api/cast/urls", json={"track_ids": [tid]}).status_code == 200
     assert snapshot(root) == before
     assert not list(Path(settings.data_dir).glob("*.zip"))
+
+
+def test_zip_keeps_non_utf8_name_under_safe_name(tmp_path):
+    from app.routes_media import _zip_stream
+    f = tmp_path / "a.sfv"
+    f.write_bytes(b"data")
+    data = b"".join(_zip_stream("Rel", [("ok.sfv", f), (os.fsdecode(b"caf\xe9.sfv"), f)]))
+    z = zipfile.ZipFile(io.BytesIO(data))
+    assert z.testzip() is None
+    assert z.namelist() == ["Rel/ok.sfv", "Rel/caf�.sfv"]
+    assert z.read("Rel/caf�.sfv") == b"data"
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="pas de FIFO sur cette plateforme")
+def test_fifo_is_404_and_skipped_by_zip(user_client, conn, settings, library):
+    os.mkfifo(settings.music_root / A / "pipe.mp3")
+    tid = add_track(conn, A, "pipe.mp3")
+    assert user_client.get(f"/api/tracks/{tid}/stream").status_code == 404
+    names = zipfile.ZipFile(io.BytesIO(user_client.get(f"/api/releases/{release(conn, A)['id']}/zip").content)).namelist()
+    assert len(names) == 3 and not any("pipe" in n for n in names)

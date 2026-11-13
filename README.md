@@ -13,7 +13,7 @@ La musique n'est jamais modifiée : le partage est monté en lecture seule, l'ap
 
 ## Côté NAS : export NFS en lecture seule
 
-Sur Synology (DSM) :
+Sur Synology (DSM) — les chemins de menus ci-dessous sont écrits de mémoire et peuvent varier selon la version de DSM :
 
 1. Panneau de configuration → Services de fichiers → NFS : activer NFS, version maximale NFSv4.1 (ou 4).
 2. Panneau de configuration → Dossier partagé → sélectionner le dossier des releases → Modifier → onglet **Autorisations NFS** → Créer.
@@ -23,7 +23,11 @@ Sur Synology (DSM) :
 L'appli tourne dans le conteneur sous l'UID/GID **1000:1000** (modifiables à la construction : `--build-arg UID=… --build-arg GID=…`).
 Cet utilisateur doit pouvoir **lire** tous les dossiers et fichiers de l'export. Avec `all_squash`, c'est le compte
 vers lequel le NAS ramène tout le monde qui compte, pas l'UID 1000 ; sans squash, les permissions Unix du NAS
-s'appliquent à l'UID 1000. Un dossier illisible est ignoré par le scan.
+s'appliquent à l'UID 1000. Un dossier illisible est ignoré par le scan, signalé dans les journaux et par un
+avertissement sur la page Administration (voir « Première connexion et premier scan »).
+
+Les dossiers système de Synology (`#recycle`, `@eaDir`) présents sous l'export apparaissent comme des catégories :
+pour les exclure, exportez un sous-dossier propre qui ne contient que les releases.
 
 ## Installation
 
@@ -32,7 +36,7 @@ s'appliquent à l'UID 1000. Un dossier illisible est ignoré par le scan.
 ```bash
 git clone <URL_DU_DEPOT> mp3-scene && cd mp3-scene
 cp .env.example .env
-python3 -c "import secrets; print(secrets.token_urlsafe(48))"   # à coller dans SECRET_KEY
+python3 -c "import secrets; print(secrets.token_urlsafe(48))"   # à coller dans SECRET_KEY (32 caractères minimum)
 nano .env                                                       # SECRET_KEY, ADMIN_USER, ADMIN_PASSWORD (à remplir)
 mkdir -p data && sudo chown 1000:1000 data                      # sinon Docker crée data/ en root et l'appli ne peut pas écrire
 ```
@@ -41,13 +45,13 @@ Dans `.env`, `SECRET_KEY` et `ADMIN_PASSWORD` sont volontairement vides : `docke
 
 Éditer `docker-compose.yml` :
 
-- `PUBLIC_URL` : l'adresse publique HTTPS du site, sans slash final (`https://mp3.exemple.fr`). Elle sert aux URL envoyées au Chromecast ; si elle est vide ou ne commence pas par `http`, le démarrage écrit un avertissement dans les journaux et le cast ne fonctionnera pas.
+- `PUBLIC_URL` : l'adresse publique HTTPS du site, sans slash final (`https://mp3.exemple.fr`). Elle sert aux URL envoyées au Chromecast ; si elle est vide ou ne commence pas par `http://` ou `https://`, le démarrage écrit un avertissement dans les journaux et le cast ne fonctionnera pas.
 - `<IP_NAS>` et `device` (chemin de montage NFS du NAS) dans le volume `music`.
 - `ports` : par défaut `127.0.0.1:8000:8000` (reverse proxy sur la même machine). Si le proxy est sur une autre machine, mettre l'adresse LAN de la machine Docker et filtrer au pare-feu ; ne jamais publier ce port sur Internet ni sur tout le réseau (voir plus bas). Attention : les ports publiés par Docker contournent en général les règles ufw/firewalld ; l'adresse de liaison est la vraie protection, surtout si vous liez une adresse LAN au lieu de `127.0.0.1`.
 
 ```bash
 docker compose up -d --build
-docker compose logs -f mp3-scene      # démarrage, avertissements
+docker compose logs -t -f mp3-scene   # démarrage, avertissements, progression du scan (horodatés)
 docker compose ps                     # l'état doit passer à « healthy »
 ```
 
@@ -100,11 +104,13 @@ Synology DSM (Panneau de configuration → Portail de connexion → Avancé → 
 
 1. Ouvrir `https://mp3.exemple.fr`, se connecter avec `ADMIN_USER` / `ADMIN_PASSWORD`, puis **changer le mot de passe** (page Compte).
 2. Page **Administration → Lancer le scan**. Le scan est **manuel** : il n'y a pas de scan planifié, relancez-le quand la collection change.
-3. La phase « structure » (détection des releases) est rapide : les releases deviennent visibles et lisibles au fur et à mesure.
-4. La phase « tags » (lecture des durées, genres, artistes ID3) peut durer **plusieurs heures** sur 100 000 releases et plus en NFS. Le filtre par genre et les durées se complètent progressivement ; un redémarrage du conteneur ne perd pas le travail déjà fait, et un second scan sans changement ne relit aucun tag.
-5. Les fichiers ou dossiers dont le nom n'est pas de l'UTF-8 valide sont **ignorés** (SQLite ne peut pas les stocker). Ils sont signalés dans les journaux :
-   `docker compose logs mp3-scene | grep "non UTF-8"`. Corriger en renommant sur le NAS, puis relancer un scan.
-6. Un scan lancé alors que le montage NFS est tombé ne retire rien de l'index.
+3. La phase « structure » (détection des releases) parcourt tous les dossiers : sur une très grande bibliothèque en NFS, elle peut elle aussi être longue. Le compteur « Releases trouvées » progresse et les releases apparaissent par lots dans la liste, mais la vue par dossiers ne se remplit qu'à la fin de cette phase. Si le conteneur est arrêté pendant cette phase, la page Administration l'indique : relancez le scan.
+4. La phase « tags » (lecture des durées, genres, artistes ID3) peut durer **plusieurs heures** sur 100 000 releases et plus en NFS. Pendant toute cette phase (donc parfois des heures au premier scan), le bouton « Lancer le scan » reste désactivé et aucun nouveau scan n'est possible. Le filtre par genre et les durées se complètent progressivement ; un redémarrage du conteneur ne perd pas le travail déjà fait, et un second scan sans changement ne relit aucun tag.
+5. Suivre un scan : `docker compose logs -t -f mp3-scene` (début du scan, fin de chaque phase avec ses chiffres, erreurs).
+6. Si le scan a ignoré quelque chose, il se termine normalement mais la page Administration affiche un **avertissement** (par ex. « 3 dossier(s) illisible(s) et 2 nom(s) non UTF-8 ignorés — voir les journaux ») et les journaux donnent les chemins :
+   - `dossier illisible ignoré` : l'appli n'a pas le droit de lire ce dossier ; vérifier les permissions NFS et le squash sur le NAS (voir plus haut). Les releases déjà indexées dessous sont conservées.
+   - `nom non UTF-8 ignoré` : nom de fichier ou de dossier qui n'est pas de l'UTF-8 valide (SQLite ne peut pas le stocker) ; le renommer sur le NAS, puis relancer un scan.
+7. Un scan lancé alors que le montage NFS est tombé, ou sur une racine qui ne contient aucune des releases déjà indexées (mauvais export, dossiers système seuls), échoue sans rien retirer de l'index.
 
 ## Installer l'application (PWA)
 
@@ -123,7 +129,7 @@ La coquille de l'interface est mise en cache pour démarrer vite ; la musique et
 ## Sécurité
 
 - Session par cookie valable 30 jours, prolongée à l'usage.
-- 5 échecs de connexion pour un même identifiant ou une même adresse IP : blocage 15 minutes.
+- 5 échecs de connexion pour un même identifiant ou une même adresse IP : blocage 15 minutes. Conséquence : quiconque connaît un identifiant peut tenir ce compte bloqué, 15 minutes à la fois, en ratant 5 connexions. Choisissez un `ADMIN_USER` peu devinable (pas `admin`) et gardez un second compte administrateur.
 - Changer le mot de passe administrateur après la première connexion ; `ADMIN_PASSWORD` n'est lu qu'à la création du premier compte, retirez-le de `.env` après le premier démarrage (le compose n'en a plus besoin ; d'ici là il est en clair dans `.env` et dans l'environnement du conteneur), puis `docker compose up -d`.
 - Changer `SECRET_KEY` invalide toutes les sessions et tous les liens de cast en cours.
 - `.env` contient des secrets : il est ignoré par git, ne le publiez pas.
@@ -132,11 +138,17 @@ La coquille de l'interface est mise en cache pour démarrer vite ; la musique et
 
 Sauvegardez uniquement `./data` (base SQLite : comptes, favoris, index). Sans elle, il faut refaire un scan complet et les comptes et favoris sont perdus ; la musique n'est pas touchée. Pour une copie cohérente : `docker compose stop mp3-scene`, copier `data/`, `docker compose start mp3-scene`.
 
+Vider réellement l'index (le scan refuse de retirer toutes les releases d'un coup) : `docker compose stop mp3-scene`, supprimer `data/mp3scene.db*`, `docker compose start mp3-scene`, puis relancer un scan. **Tout** est perdu : index, comptes (l'administrateur est recréé depuis `ADMIN_USER` / `ADMIN_PASSWORD`, à remettre dans `.env`) et favoris de tous les utilisateurs.
+
+Une base créée par une version plus récente de l'appli est refusée au démarrage (message dans les journaux) : revenir à cette version, ou restaurer une sauvegarde de `data/`.
+
 ## Mise à jour
 
 ```bash
 git pull && docker compose up -d --build
 ```
+
+Les dépendances Python sont figées (`==`) dans `requirements.txt` et `requirements-dev.txt` : une reconstruction installe exactement les versions testées. Pour les mettre à jour délibérément : changer les versions dans ces fichiers, `.venv/bin/pip install -r requirements-dev.txt`, lancer les tests (voir Développement), puis reconstruire l'image.
 
 ## Développement
 
@@ -145,7 +157,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/pytest -q                       # tests Python
 node --test static/js/                    # tests JavaScript (exécutés avec Node v26.12.1)
 python3 scripts/make_demo_library.py /tmp/demo-music     # fausse bibliothèque
-MUSIC_ROOT=/tmp/demo-music DATA_DIR=/tmp/demo-data SECRET_KEY=dev ADMIN_USER=admin ADMIN_PASSWORD=adminadmin \
+MUSIC_ROOT=/tmp/demo-music DATA_DIR=/tmp/demo-data SECRET_KEY=dev-dev-dev-dev-dev-dev-dev-dev-32 ADMIN_USER=admin ADMIN_PASSWORD=adminadmin \
   PUBLIC_URL=http://localhost:8000 .venv/bin/uvicorn --factory app.main:create_app --port 8000
 python3 scripts/make_icons.py             # régénère les icônes PWA (bibliothèque standard seule)
 ```

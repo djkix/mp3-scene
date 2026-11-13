@@ -118,7 +118,8 @@ export function render(container) {
       scanBtn.disabled = scanning;
       const rows = [['État', PHASES[s.status] || s.status], ['Releases trouvées', s.releases_found],
         ['Pistes restant à lire', s.tracks_pending], ['Début', fmtTime(s.started_at)], ['Fin', fmtTime(s.finished_at)]];
-      if (s.error) rows.push(['Erreur', s.error]);
+      // hors état « error », le message est un avertissement (dossiers ignorés, scan interrompu)
+      if (s.error) rows.push([s.status === 'error' ? 'Erreur' : 'Avertissement', s.error]);
       scanOut.replaceChildren(...rows.map(([k, v]) => [el('dt', {}, k), el('dd', {}, String(v ?? '—'))]).flat());
       if (scanning) pollTimer = setTimeout(refreshScan, pending ? 1000 : 3000);
     } catch (err) {

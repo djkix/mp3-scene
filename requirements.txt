@@ -1,4 +1,6 @@
-fastapi
-uvicorn[standard]
-mutagen
-argon2-cffi
+# versions figées (celles des tests) ; mise à jour délibérée : voir README, « Mise à jour »
+fastapi==0.162.7
+starlette==1.10.0
+uvicorn[standard]==0.54.0
+mutagen==1.48.1
+argon2-cffi==25.1.0

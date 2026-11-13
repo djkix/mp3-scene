@@ -2,6 +2,7 @@ import sqlite3
 from pathlib import Path
 
 SCHEMA = Path(__file__).with_name("schema.sql")
+VERSION = 1  # PRAGMA user_version ; à incrémenter avec une migration si le schéma change
 
 
 def init(data_dir: Path) -> None:
@@ -9,9 +10,16 @@ def init(data_dir: Path) -> None:
     data_dir.mkdir(parents=True, exist_ok=True)
     conn = connect(data_dir)
     try:
+        found = conn.execute("PRAGMA user_version").fetchone()[0]
+        if found > VERSION:
+            raise RuntimeError(f"La base {data_dir / 'mp3scene.db'} est en version {found}, plus récente que celle "
+                               f"de cette application ({VERSION}) : mettez l'application à jour ou restaurez une "
+                               "sauvegarde de data/.")
         conn.execute("PRAGMA journal_mode=WAL")  # persistant dans le fichier
+        # base neuve, ou existante non marquée (0) : le schéma actuel est la version 1
         conn.executescript(SCHEMA.read_text(encoding="utf-8"))
         conn.execute("INSERT OR IGNORE INTO scan_state(id) VALUES (1)")
+        conn.execute(f"PRAGMA user_version = {VERSION}")
         conn.commit()
     finally:
         conn.close()

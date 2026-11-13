@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from . import db
-from .deps import current_user, get_conn
+from .deps import MAX_INT, Id, current_user, get_conn
 from .security import CAST_TTL, check_track_sig, safe_path, sign_track
 
 router = APIRouter(dependencies=[Depends(current_user)])
@@ -36,12 +36,12 @@ def _track_file(request: Request, conn, track_id: int, download: bool = False, h
     path = safe_path(request.app.state.settings.music_root, row["path"], row["relpath"])
     try:
         st = os.stat(path)
+        if not stat.S_ISREG(st.st_mode):  # avant open() : ouvrir une FIFO bloquerait le thread
+            raise OSError
         with open(path, "rb"):  # lecture seule : vérifie que le fichier s'ouvre (NFS indisponible, droits)
             pass
     except OSError:
         raise HTTPException(404, "Fichier introuvable.") from None
-    if not stat.S_ISREG(st.st_mode):
-        raise HTTPException(404, "Fichier introuvable.")
     headers = dict(headers or {})
     if download:
         headers["Content-Disposition"] = _disposition(row["relpath"].rsplit("/", 1)[-1])
@@ -49,7 +49,7 @@ def _track_file(request: Request, conn, track_id: int, download: bool = False, h
 
 
 @router.get("/api/tracks/{track_id}/stream")
-def stream(track_id: int, request: Request, download: bool = False, conn=Depends(get_conn)):
+def stream(track_id: Id, request: Request, download: bool = False, conn=Depends(get_conn)):
     return _track_file(request, conn, track_id, download)
 
 
@@ -95,8 +95,10 @@ def _zip_stream(name, files):
     sink = _Sink()
     with zipfile.ZipFile(sink, "w", zipfile.ZIP_STORED, allowZip64=True) as zf:
         for rel, p in files:
+            # nom non UTF-8 (surrogateescape) : zipfile ne peut pas l'écrire, il est gardé sous un nom sûr
+            arcname = f"{name}/{os.fsencode(rel).decode('utf-8', 'replace')}"
             try:
-                info = zipfile.ZipInfo.from_file(p, f"{name}/{rel}", strict_timestamps=False)
+                info = zipfile.ZipInfo.from_file(p, arcname, strict_timestamps=False)
                 src = open(p, "rb")  # lecture seule
             except OSError:
                 continue  # fichier illisible au moment de l'archive : sauté
@@ -110,7 +112,7 @@ def _zip_stream(name, files):
 
 
 @router.get("/api/releases/{rid}/zip")
-def release_zip(rid: int, request: Request, conn=Depends(get_conn)):
+def release_zip(rid: Id, request: Request, conn=Depends(get_conn)):
     row = conn.execute("SELECT path, name FROM releases WHERE id=?", (rid,)).fetchone()
     if row is None:
         raise HTTPException(404, "Release introuvable.")
@@ -122,7 +124,7 @@ def release_zip(rid: int, request: Request, conn=Depends(get_conn)):
 
 
 class CastRequest(BaseModel):
-    track_ids: Annotated[list[int], Field(min_length=1, max_length=500)]
+    track_ids: Annotated[list[Annotated[int, Field(ge=1, le=MAX_INT)]], Field(min_length=1, max_length=500)]
 
 
 @router.post("/api/cast/urls")
@@ -141,6 +143,8 @@ def cast(track_id: int, request: Request, exp: str = "", sig: str = ""):
     settings = request.app.state.settings
     if not check_track_sig(settings.secret_key, track_id, exp, sig, time.time()):
         raise HTTPException(403, "Lien de diffusion invalide ou expiré.")
+    if not 1 <= track_id <= MAX_INT:  # hors bornes SQLite : vérifié après la signature, comme toute piste inconnue
+        raise HTTPException(404, "Piste introuvable.")
     conn = db.connect(settings.data_dir)
     try:
         return _track_file(request, conn, track_id, headers={

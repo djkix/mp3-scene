@@ -135,6 +135,7 @@ def test_resume_resets_stale_status_and_reads_pending_tags(settings, conn, music
     r._thread.join(5); assert not r._thread.is_alive()
     s = r.status(conn)
     assert (s["status"], s["tracks_pending"]) == ("idle", 0)
+    assert s["error"] == "scan interrompu pendant l'analyse des dossiers — à relancer"   # survit à la reprise des tags
     assert conn.execute("SELECT title FROM tracks").fetchone()[0] == "Alpha"
 
 
@@ -187,3 +188,37 @@ def test_no_write_lock_held_while_reading_files(settings, conn, music, make_mp3,
     assert scan_tags(conn, music) == 2
     other.close()
     assert errors == []
+
+
+def test_resume_after_kill_in_structure_leaves_hint(settings, conn):
+    conn.execute("UPDATE scan_state SET status='structure'"); conn.commit()
+    r = Runner(settings)
+    r.resume()
+    assert r._thread is None
+    s = r.status(conn)
+    assert (s["status"], s["error"]) == ("idle", "scan interrompu pendant l'analyse des dossiers — à relancer")
+
+
+def test_runner_stores_warning_but_stays_idle_and_logs(settings, conn, music, make_mp3, monkeypatch, caplog):
+    release(music, make_mp3, ("01-a.mp3", {}))
+    (music / "S/Locked").mkdir(); (music / "S/BAD").mkdir()
+    monkeypatch.setattr(sc, "_storable", lambda name: "BAD" not in name)
+    real = sc._list
+
+    def listing(path):
+        if path.endswith(b"/Locked"):
+            raise OSError("EIO")
+        return real(path)
+    monkeypatch.setattr(sc, "_list", listing)
+    r = Runner(settings)
+    with caplog.at_level("INFO", logger="app.scanner"):
+        assert r.start() is True; r._thread.join(5); assert not r._thread.is_alive()
+    s = r.status(conn)
+    assert (s["status"], s["releases_found"]) == ("idle", 1)
+    assert s["error"] == "1 dossier(s) illisible(s) et 1 nom(s) non UTF-8 ignorés — voir les journaux"
+    assert "scan lancé" in caplog.text and "phase structure terminée" in caplog.text
+    assert "'unreadable': 1" in caplog.text and "phase tags terminée : 1 piste(s)" in caplog.text
+    # un scan propre efface l'avertissement
+    monkeypatch.setattr(sc, "_list", real); monkeypatch.setattr(sc, "_storable", lambda name: True)
+    assert r.start() is True; r._thread.join(5)
+    assert r.status(conn)["error"] is None

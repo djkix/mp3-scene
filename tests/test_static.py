@@ -60,3 +60,18 @@ def test_no_admin_warning_when_no_user_and_no_credentials(settings, caplog):
 def test_favicon_ico(client):
     r = client.get("/favicon.ico")
     assert r.status_code == 200 and r.content[:4] == b"\x00\x00\x01\x00"
+
+
+def test_nosniff_on_every_response(client):
+    for url in ["/api/health", "/api/me", "/", "/app.css", "/js/app.js", "/cast/1?exp=1&sig=00"]:
+        assert client.get(url).headers.get("x-content-type-options") == "nosniff", url
+
+
+def test_app_logger_configured_once(settings):
+    import logging
+    from app.main import create_app
+    create_app(settings)
+    create_app(settings)
+    lg = logging.getLogger("app")
+    assert lg.level == logging.INFO and len(lg.handlers) == 1
+    assert lg.handlers[0].formatter._fmt == "%(asctime)s %(levelname)s %(name)s: %(message)s"

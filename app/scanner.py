@@ -39,12 +39,17 @@ def _storable(name: str) -> bool:
     return True
 
 
+def _shown(path: bytes) -> str:
+    """Chemin affichable dans les journaux, même s'il n'est pas de l'UTF-8 valide."""
+    return path.decode("utf-8", "backslashreplace")
+
+
 def _decode(e):
     """Nom décodé de l'entrée, ou None (avec un avertissement) s'il n'est pas stockable."""
     name = os.fsdecode(e.name)
     if _storable(name):
         return name
-    log.warning("nom non UTF-8 ignoré, à renommer sur le NAS : %s", e.path.decode("utf-8", "backslashreplace"))
+    log.warning("nom non UTF-8 ignoré, à renommer sur le NAS : %s", _shown(e.path))
     return None
 
 
@@ -104,12 +109,25 @@ def _scan_structure(conn, root, now):
         raise ScanError(f"bibliothèque vide : {root}")
 
     known = {r["path"]: (r["id"], r["mtime"]) for r in conn.execute("SELECT id, path, mtime FROM releases")}
+    known_names = {p.rpartition("/")[2] for p in known}
     ordered = sorted(known)
     first = not conn.execute("SELECT first_scan_done FROM scan_state WHERE id=1").fetchone()[0]
     seen, new = set(), {}  # new : chemin → id
     # aucune écriture pendant le parcours NFS : les releases trouvées sont mises en attente puis écrites
     # par lots de BATCH dans une transaction courte, pour ne pas bloquer les autres écrivains (connexions…)
     pending = []
+    unreadable = 0
+    retrieved = False  # une release connue retrouvée, au même endroit ou déplacée (même nom)
+
+    def trusted():
+        """Faux tant qu'aucune release connue n'est retrouvée : rien n'est validé (montage incorrect ?)."""
+        return not known or seen or retrieved
+
+    def unreadable_dir(path, rel, e):
+        nonlocal unreadable
+        unreadable += 1
+        log.warning("dossier illisible ignoré : %s (%s)", _shown(path), e)
+        mark_tree(rel)
 
     def mark_tree(rel):
         """Marque « vues » la release `rel` et toutes les releases connues en dessous."""
@@ -155,8 +173,8 @@ def _scan_structure(conn, root, now):
         # le mtime des sous-dossiers disque si le cas se présente.
         try:
             mtime = e.stat(follow_symlinks=False).st_mtime
-        except OSError:
-            mark_tree(rel)
+        except OSError as err:
+            unreadable_dir(e.path, rel, err)
             return
         if rel in known and known[rel][1] == mtime:
             mark_tree(rel)
@@ -175,8 +193,8 @@ def _scan_structure(conn, root, now):
         path, rel, mtime = stack.pop()
         try:
             entries = _list(path)
-        except OSError:  # dossier illisible : ignoré, ses releases connues sont conservées
-            mark_tree(rel)
+        except OSError as err:  # dossier illisible : ignoré, ses releases connues sont conservées
+            unreadable_dir(path, rel, err)
             continue
         try:
             tracks, size, nfo, n_skip = _files(entries)
@@ -198,18 +216,23 @@ def _scan_structure(conn, root, now):
                     n_skip += n  # sinon compté quand le dossier sera parcouru
                 else:
                     others.append((e, name))
-        except OSError:  # disque ou fichier illisible : release ignorée pour ce scan, rien n'est modifié
-            mark_tree(rel)
+        except OSError as err:  # disque ou fichier illisible : release ignorée pour ce scan, rien n'est modifié
+            unreadable_dir(path, rel, err)
             continue
         skipped += n_skip
         if tracks:
             pending.append((rel, mtime, tracks, size, nfo))
-            if len(pending) >= BATCH:
+            retrieved = retrieved or rel in known or rel.rpartition("/")[2] in known_names
+            if len(pending) >= BATCH and trusted():
                 flush()
+                # progression visible pendant la phase structure, dans la même transaction courte
+                conn.execute("UPDATE scan_state SET releases_found=? WHERE id=1", (len(seen) + len(new),))
                 conn.commit()
         for e, name in others:
             push(stack, e, f"{rel}/{name}")
 
+    if not trusted():  # rien n'a été validé : le rollback de scan_structure laisse l'index intact
+        raise ScanError("aucune release connue retrouvée sous la racine — montage incorrect ? rien n'a été supprimé")
     flush()  # la suite ne touche plus au disque : une seule transaction courte jusqu'au commit final
     gone = [p for p in known if p not in seen]
     gone_names = Counter(_name(p) for p in gone)
@@ -253,7 +276,18 @@ def _scan_structure(conn, root, now):
                      [(f, f.rpartition("/")[0]) for f in folders])
     conn.execute("UPDATE scan_state SET first_scan_done=1 WHERE id=1")
     conn.commit()
-    return {"found": found, "added": len(new), "moved": moved, "removed": removed, "skipped": skipped}
+    return {"found": found, "added": len(new), "moved": moved, "removed": removed, "skipped": skipped,
+            "unreadable": unreadable}
+
+
+def notice(stats: dict) -> str | None:
+    """Avertissement court pour scan_state.error quand le scan a ignoré des dossiers ou des noms, sinon None."""
+    parts = []
+    if stats.get("unreadable"):
+        parts.append(f"{stats['unreadable']} dossier(s) illisible(s)")
+    if stats.get("skipped"):
+        parts.append(f"{stats['skipped']} nom(s) non UTF-8")
+    return f"{' et '.join(parts)} ignorés — voir les journaux" if parts else None
 
 
 def _first(tags, key):
@@ -357,6 +391,9 @@ def _scan_tags(conn, root, should_stop):
     return read
 
 
+INTERRUPTED = "scan interrompu pendant l'analyse des dossiers — à relancer"
+
+
 class Runner:
     """Lance les scans dans un thread démon, un seul à la fois, et tient scan_state à jour."""
 
@@ -373,7 +410,8 @@ class Runner:
         """Au démarrage : efface un statut laissé par un arrêt brutal, reprend la lecture des tags en attente."""
         conn = db.connect(self.settings.data_dir)
         try:
-            conn.execute("UPDATE scan_state SET status='idle' WHERE status IN ('structure','tags')")
+            conn.execute("UPDATE scan_state SET status='idle', error=? WHERE status='structure'", (INTERRUPTED,))
+            conn.execute("UPDATE scan_state SET status='idle' WHERE status='tags'")
             conn.commit()
             pending = conn.execute("SELECT 1 FROM tracks WHERE tags_read=0 LIMIT 1").fetchone()
         finally:
@@ -406,15 +444,21 @@ class Runner:
         try:
             conn = db.connect(self.settings.data_dir)
             root = self.settings.music_root
-            conn.execute("UPDATE scan_state SET status=?, started_at=?, finished_at=NULL, error=NULL WHERE id=1",
+            log.info("scan lancé : %s", "dossiers puis tags" if structure else "reprise de la lecture des tags")
+            # reprise des tags seule : l'avertissement du scan précédent (ou l'interruption) reste affiché
+            conn.execute("UPDATE scan_state SET status=?, started_at=?, finished_at=NULL"
+                         + (", error=NULL" if structure else "") + " WHERE id=1",
                          ("structure" if structure else "tags", time.time()))
             conn.commit()
             if structure:
-                found = scan_structure(conn, root, time.time())["found"]
-                conn.execute("UPDATE scan_state SET status='tags', releases_found=? WHERE id=1", (found,))
+                stats = scan_structure(conn, root, time.time())
+                log.info("phase structure terminée : %s", stats)
+                conn.execute("UPDATE scan_state SET status='tags', releases_found=?, error=? WHERE id=1",
+                             (stats["found"], notice(stats)))  # avertissement sans passer en erreur
                 conn.commit()
-            scan_tags(conn, root, self._stop.is_set)
-            conn.execute("UPDATE scan_state SET status='idle', finished_at=?, error=NULL WHERE id=1", (time.time(),))
+            read = scan_tags(conn, root, self._stop.is_set)
+            log.info("phase tags terminée : %d piste(s) lue(s)", read)
+            conn.execute("UPDATE scan_state SET status='idle', finished_at=? WHERE id=1", (time.time(),))
             conn.commit()
         except Exception as e:
             log.exception("échec du scan")

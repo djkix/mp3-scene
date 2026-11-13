@@ -70,7 +70,7 @@ def test_unchanged_rescan_keeps_sub_release_of_skipped_parent(conn, music):
     scan_structure(conn, music, now=1.0)
     ids = {r[0] for r in conn.execute("SELECT id FROM releases")}
     stats = scan_structure(conn, music, now=2.0)
-    assert stats == {"found": 2, "added": 0, "moved": 0, "removed": 0, "skipped": 0}
+    assert stats == {"found": 2, "added": 0, "moved": 0, "removed": 0, "skipped": 0, "unreadable": 0}
     assert {r[0] for r in conn.execute("SELECT id FROM releases")} == ids
 
 
@@ -290,3 +290,49 @@ def test_no_write_lock_held_while_listing(settings, conn, music, monkeypatch):
     other.close()
     assert errors == []
     assert conn.execute("SELECT count(*) FROM tracks").fetchone()[0] == 3
+
+
+def test_unreadable_dirs_are_counted_and_logged(conn, music, monkeypatch, caplog):
+    mk(music, "S/Keep-WEB-2015-GRP", ["01-a.mp3"])
+    mk(music, "S/Locked-WEB-2015-GRP", ["01-a.mp3"])
+    mk(music, "S/Nostat-WEB-2015-GRP", ["01-a.mp3"])
+    mk(music, "S/Disc-WEB-2015-GRP", ["01-a.mp3"]); mk(music, "S/Disc-WEB-2015-GRP/CD1", ["01-b.mp3"])
+    failing_list(monkeypatch, list_fails={b"Locked-WEB-2015-GRP", b"CD1"}, stat_fails={b"Nostat-WEB-2015-GRP"})
+    with caplog.at_level("WARNING", logger="app.scanner"):
+        stats = scan_structure(conn, music, now=1.0)
+    assert (stats["found"], stats["unreadable"]) == (1, 3)
+    assert caplog.text.count("dossier illisible ignoré") == 3
+    assert all(n in caplog.text for n in ("Locked-WEB-2015-GRP", "Nostat-WEB-2015-GRP", "Disc-WEB-2015-GRP"))
+
+
+def test_no_known_release_found_changes_nothing(conn, music, monkeypatch):
+    mk(music, "S/Art-One-WEB-2015-GRP", ["01-a.mp3"]); mk(music, "S/Art-Two-WEB-2015-GRP", ["01-a.mp3"])
+    scan_structure(conn, music, now=1.0)
+    rid = conn.execute("SELECT id FROM releases").fetchone()[0]
+    add_user(conn); conn.execute("INSERT INTO favorites VALUES(1,'release',?,1)", (rid,)); conn.commit()
+    before = [r[:] for r in conn.execute("SELECT * FROM releases ORDER BY id")]
+    shutil.rmtree(music / "S")   # racine lisible mais fausse : autre export, dossiers système
+    mk(music, "@eaDir/thumbs", ["x.jpg"])
+    mk(music, "Other/New-One-WEB-2016-GRP", ["01-a.mp3"]); mk(music, "Other/New-Two-WEB-2016-GRP", ["01-a.mp3"])
+    monkeypatch.setattr(sc, "BATCH", 1)   # les nouvelles releases ne doivent pas être validées pendant le parcours
+    with pytest.raises(ScanError, match="aucune release connue retrouvée"):
+        scan_structure(conn, music, now=2.0)
+    assert [r[:] for r in conn.execute("SELECT * FROM releases ORDER BY id")] == before
+    assert conn.execute("SELECT count(*) FROM tracks").fetchone()[0] == 2
+    assert conn.execute("SELECT count(*) FROM favorites").fetchone()[0] == 1
+
+
+def test_releases_found_updated_at_each_batch(settings, conn, music, monkeypatch):
+    for i in range(3):
+        mk(music, f"S/Art-R{i}-WEB-2015-GRP", ["01-a.mp3"])
+    monkeypatch.setattr(sc, "BATCH", 1)
+    other = sqlite3.connect(settings.data_dir / "mp3scene.db", timeout=0)
+    real, counts = sc._list, []
+
+    def listing(path):
+        counts.append(other.execute("SELECT releases_found FROM scan_state").fetchone()[0])
+        return real(path)
+    monkeypatch.setattr(sc, "_list", listing)
+    scan_structure(conn, music, now=1.0)
+    other.close()
+    assert counts == [0, 0, 0, 1, 2]
