@@ -81,7 +81,7 @@ def test_tags_resumable(conn, music, make_mp3, monkeypatch):
     assert conn.execute("SELECT count(*) FROM tracks WHERE tags_read=0").fetchone()[0] == 0
 
 
-def test_runner_refuses_concurrent_scan(settings, music, monkeypatch):
+def test_runner_refuses_concurrent_scan(settings, conn, music, monkeypatch):  # conn : db.init
     entered, release_ = threading.Event(), threading.Event()
 
     def blocked(conn, root, now):

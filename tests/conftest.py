@@ -16,6 +16,7 @@ def settings(tmp_path):
 
 @pytest.fixture
 def conn(settings):
+    db.init(settings.data_dir)
     c = db.connect(settings.data_dir)
     yield c
     c.close()

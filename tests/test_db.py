@@ -10,12 +10,12 @@ def test_schema_and_fts(conn):
 
 def test_connect_is_idempotent(settings):
     from app import db
-    db.connect(settings.data_dir).close(); db.connect(settings.data_dir).close()
+    db.init(settings.data_dir); db.init(settings.data_dir)
 
 
-def test_connect_creates_data_dir(tmp_path):
+def test_init_creates_data_dir(tmp_path):
     from app import db
-    db.connect(tmp_path / "neuf" / "data").close()
+    db.init(tmp_path / "neuf" / "data")
     assert (tmp_path / "neuf" / "data" / "mp3scene.db").is_file()
 
 

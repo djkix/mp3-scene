@@ -20,9 +20,10 @@ class PasswordChange(BaseModel):
 
 
 def client_ip(request: Request) -> str:
-    xff = request.headers.get("x-forwarded-for")
-    if xff:
-        return xff.split(",")[0].strip()
+    # un seul proxy de confiance, qui ajoute l'adresse réelle en DERNIER ; les entrées précédentes viennent du client
+    last = request.headers.get("x-forwarded-for", "").split(",")[-1].strip()
+    if last:
+        return last
     return request.client.host if request.client else ""
 
 
@@ -32,15 +33,13 @@ def login(body: Login, request: Request, response: Response, conn=Depends(get_co
     username = body.username.strip()
     keys = (f"u:{username}", f"ip:{client_ip(request)}")
     now = time.time()
-    if any(limiter.blocked(k, now) for k in keys):
+    if not limiter.attempt(keys, now):
         raise HTTPException(429, "Trop de tentatives échouées, réessayez dans 15 minutes.")
     row = conn.execute("SELECT id, username, role, password_hash FROM users WHERE username = ?", (username,)).fetchone()
     ok = security.verify_password(row["password_hash"] if row else security.DUMMY_HASH, body.password)
     if row is None or not ok:
-        for k in keys:
-            limiter.fail(k, now)
         raise HTTPException(401, "Identifiant ou mot de passe incorrect.")
-    limiter.reset(keys[0])  # jamais la clé IP : un compte valide ne doit pas lever le blocage d'une IP
+    limiter.reset(keys[0])  # jamais la clé IP : un compte valide ne doit pas remettre à zéro le compteur d'une IP
     old = request.cookies.get(security.COOKIE)
     if old:
         security.drop_session(conn, old)
@@ -64,8 +63,8 @@ def change_password(body: PasswordChange, request: Request, conn=Depends(get_con
     h = conn.execute("SELECT password_hash FROM users WHERE id = ?", (user["id"],)).fetchone()[0]
     if not security.verify_password(h, body.current):
         raise HTTPException(400, "Le mot de passe actuel est incorrect.")
-    if len(body.new) < 8:
-        raise HTTPException(400, "Le nouveau mot de passe doit contenir au moins 8 caractères.")
+    if err := security.password_error(body.new):
+        raise HTTPException(400, err)
     conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (security.hash_password(body.new), user["id"]))
     conn.commit()
     security.drop_sessions(conn, user["id"], keep=request.cookies[security.COOKIE])

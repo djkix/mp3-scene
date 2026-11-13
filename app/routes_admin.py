@@ -25,9 +25,9 @@ class UserPatch(BaseModel):
     role: Role | None = None
 
 
-def _check_password(pw: str) -> None:
-    if len(pw) < 8:
-        raise HTTPException(400, "Le mot de passe doit contenir au moins 8 caractères.")
+def _check(err: str | None) -> None:
+    if err:
+        raise HTTPException(400, err)
 
 
 def _get_user(conn, user_id: int):
@@ -45,9 +45,8 @@ def list_users(conn=Depends(get_conn)):
 @router.post("/users", status_code=201)
 def create_user(body: NewUser, conn=Depends(get_conn)):
     username = body.username.strip()
-    if not 1 <= len(username) <= 64:
-        raise HTTPException(400, "Le nom d'utilisateur doit contenir entre 1 et 64 caractères.")
-    _check_password(body.password)
+    _check(security.username_error(username))
+    _check(security.password_error(body.password))
     try:
         cur = conn.execute("INSERT INTO users(username, password_hash, role) VALUES (?,?,?)",
                            (username, security.hash_password(body.password), body.role))
@@ -61,7 +60,7 @@ def create_user(body: NewUser, conn=Depends(get_conn)):
 def update_user(user_id: int, body: UserPatch, conn=Depends(get_conn)):
     _get_user(conn, user_id)
     if body.password is not None:
-        _check_password(body.password)
+        _check(security.password_error(body.password))
     if body.role == "user":
         cur = conn.execute(f"UPDATE users SET role = 'user' WHERE id = ? AND {NOT_LAST_ADMIN}", (user_id,))
         if cur.rowcount == 0:

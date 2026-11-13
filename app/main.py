@@ -19,8 +19,13 @@ def _bootstrap_admin(settings: Settings) -> None:
     conn = db.connect(settings.data_dir)
     try:
         if conn.execute("SELECT 1 FROM users LIMIT 1").fetchone() is None:
+            username = settings.admin_user.strip()
+            if err := security.username_error(username):
+                raise RuntimeError(f"ADMIN_USER invalide : {err}")
+            if err := security.password_error(settings.admin_password):
+                raise RuntimeError(f"ADMIN_PASSWORD invalide : {err}")
             conn.execute("INSERT INTO users(username, password_hash, role) VALUES (?,?,'admin')",
-                         (settings.admin_user.strip(), security.hash_password(settings.admin_password)))
+                         (username, security.hash_password(settings.admin_password)))
             conn.commit()
     finally:
         conn.close()
@@ -28,16 +33,17 @@ def _bootstrap_admin(settings: Settings) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    db.init(app.state.settings.data_dir)
     _bootstrap_admin(app.state.settings)
     app.state.runner.resume()
     yield
     app.state.runner.stop()
 
 
-def _session_valid(settings: Settings, token: str) -> bool:
+def _with_conn(settings: Settings, fn, *args):
     conn = db.connect(settings.data_dir)
     try:
-        return security.session_user(conn, token, time.time()) is not None
+        return fn(conn, *args, time.time())
     finally:
         conn.close()
 
@@ -55,12 +61,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         path = request.scope["path"]
         if not path.startswith("/api/") or path in PUBLIC_API:
             return await call_next(request)
+        settings = app.state.settings
         token = request.cookies.get(security.COOKIE)
-        if not token or not await run_in_threadpool(_session_valid, app.state.settings, token):
+        user = token and await run_in_threadpool(_with_conn, settings, security.session_user, token)
+        if not user:
             return JSONResponse({"detail": "Authentification requise."}, status_code=401)
+        request.state.user = user  # lu par deps.current_user, sans seconde requête
         response = await call_next(request)
-        if "set-cookie" not in response.headers:
-            security.set_session_cookie(response, token)  # 30 jours glissants côté navigateur aussi
+        # échéance repoussée : le cookie glisse aussi, sauf si le traitement a posé un cookie ou invalidé la session
+        if (user["renewed"] and "set-cookie" not in response.headers
+                and await run_in_threadpool(_with_conn, settings, security.session_exists, token)):
+            security.set_session_cookie(response, token)
         return response
 
     @app.get("/api/health")

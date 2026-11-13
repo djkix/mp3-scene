@@ -77,44 +77,103 @@ def test_bruteforce_lockout(client):
     assert _login(client, "admin", "adminpass").status_code == 429
 
 
-def test_bruteforce_lockout_by_ip(client):
-    xff = {"X-Forwarded-For": "203.0.113.7, 10.0.0.1", "X-CSRF": "1"}
+def test_bruteforce_ip_is_last_xff_entry(client):
+    # le proxy de confiance ajoute l'adresse réelle en dernier ; la première entrée est choisie par le client
     for i in range(5):
-        assert _login(client, f"inconnu{i}", "bad", headers=xff).status_code == 401
-    assert _login(client, "admin", "adminpass", headers=xff).status_code == 429
+        h = {"X-Forwarded-For": f"10.9.9.{i}, 203.0.113.7", "X-CSRF": "1"}
+        assert _login(client, f"inconnu{i}", "bad", headers=h).status_code == 401
+    h = {"X-Forwarded-For": "10.9.9.99, 203.0.113.7", "X-CSRF": "1"}
+    assert _login(client, "admin", "adminpass", headers=h).status_code == 429
     assert _login(client, "admin", "adminpass").status_code == 200   # autre IP, compte non bloqué
+
+
+def test_forged_xff_cannot_lock_out_another_ip(client):
+    for i in range(5):
+        h = {"X-Forwarded-For": f"198.51.100.1, 203.0.113.{i}", "X-CSRF": "1"}
+        assert _login(client, f"inconnu{i}", "bad", headers=h).status_code == 401
+    h = {"X-Forwarded-For": "198.51.100.1", "X-CSRF": "1"}
+    assert _login(client, "admin", "adminpass", headers=h).status_code == 200
 
 
 def test_login_limiter():
     lim = security.LoginLimiter()
-    for i in range(4):
-        lim.fail("k", 1000.0 + i)
-    assert not lim.blocked("k", 1004.0)
-    lim.fail("k", 1004.0)
-    assert lim.blocked("k", 1004.0) and lim.blocked("k", 1004.0 + 899)
-    assert not lim.blocked("k", 1004.0 + 901)
-    # des échecs espacés de plus de 15 min ne s'additionnent pas
-    for i in range(10):
-        lim.fail("lent", 5000.0 + i * 1000)
-    assert not lim.blocked("lent", 5000.0 + 9 * 1000)
-    lim.fail("r", 0.0)
-    lim.reset("r")
-    for i in range(4):
-        lim.fail("r", 1.0)
-    assert not lim.blocked("r", 1.0)
+    assert [lim.attempt(("k",), 1000.0 + i) for i in range(7)] == [True] * 5 + [False] * 2
+    assert lim.blocked("k", 1004.0 + 899)
+    assert not lim.blocked("k", 1004.0 + 901)            # un essai bloqué ne prolonge pas le blocage
+    assert lim.attempt(("k",), 1004.0 + 901)
+    # des essais espacés de plus de 15 min ne s'additionnent pas
+    assert all(lim.attempt(("lent",), 5000.0 + i * 1000) for i in range(10))
+    # une clé bloquée refuse l'essai sans le compter pour l'autre clé
+    for _ in range(5):
+        lim.attempt(("ip",), 0.0)
+    assert not lim.attempt(("u", "ip"), 1.0)
+    assert "u" not in lim._tries
+    lim.reset("ip")
+    assert lim.attempt(("u", "ip"), 2.0)
     # les entrées périmées sont purgées
-    lim.fail("autre", 1_000_000.0)
-    assert set(lim._fails) | set(lim._until) == {"autre"}
+    lim.attempt(("autre",), 1_000_000.0)
+    assert set(lim._tries) | set(lim._until) == {"autre"}
+
+
+def test_login_limiter_concurrent():
+    import threading
+    lim, barrier, results = security.LoginLimiter(), threading.Barrier(20), []
+
+    def go():
+        barrier.wait()
+        results.append(lim.attempt(("u:x", "ip:y"), 1000.0))
+    threads = [threading.Thread(target=go) for _ in range(20)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert results.count(True) == 5
 
 
 def test_success_resets_username_not_ip(client):
     xff = {"X-Forwarded-For": "198.51.100.9", "X-CSRF": "1"}
     for _ in range(4):
         assert _login(client, "admin", "bad", headers=xff).status_code == 401
-    assert _login(client, "admin", "adminpass", headers=xff).status_code == 200
-    assert _login(client, "autre", "bad", headers=xff).status_code == 401      # 5e échec pour l'IP
+    assert _login(client, "admin", "adminpass", headers=xff).status_code == 200   # 5e essai pour l'IP
     assert _login(client, "admin", "adminpass", headers=xff).status_code == 429
-    assert _login(client, "admin", "adminpass").status_code == 200
+    assert _login(client, "admin", "adminpass").status_code == 200                # clé identifiant remise à zéro
+
+
+def test_password_hashing_works():
+    h = security.hash_password("motdepasse")
+    assert security.verify_password(h, "motdepasse") and not security.verify_password(h, "autre")
+    assert not security.verify_password("pas-un-hash", "motdepasse")
+
+
+def test_bootstrap_rejects_invalid_admin(settings):
+    settings.music_root.mkdir()
+    settings.admin_user, settings.admin_password = "admin", "court"
+    import pytest
+    with pytest.raises(RuntimeError) as e:
+        with TestClient(create_app(settings)):
+            pass
+    assert "ADMIN_PASSWORD" in str(e.value) and "court" not in str(e.value)
+    settings.admin_user, settings.admin_password = " ", "assezlong"
+    with pytest.raises(RuntimeError, match="ADMIN_USER"):
+        with TestClient(create_app(settings)):
+            pass
+
+
+def test_cookie_refreshed_only_when_extended(app, admin_client, settings):
+    r = admin_client.get("/api/me")
+    assert r.status_code == 200 and "set-cookie" not in r.headers
+    conn = db.connect(settings.data_dir)
+    conn.execute("UPDATE sessions SET expires_at = ?", (time.time() + 10 * 86400,))
+    conn.commit()
+    r = admin_client.get("/api/me")
+    assert "max-age=2592000" in r.headers["set-cookie"].lower()
+    # session prolongée puis invalidée par le traitement : le jeton mort n'est pas renvoyé
+    uid = _uid(admin_client, "admin")
+    conn.execute("UPDATE sessions SET expires_at = ?", (time.time() + 10 * 86400,))
+    conn.commit()
+    conn.close()
+    r = admin_client.patch(f"/api/admin/users/{uid}", json={"password": "nouveaumdp"})
+    assert r.status_code == 204 and "set-cookie" not in r.headers
 
 
 def test_session_sliding_expiry(conn):
@@ -122,9 +181,10 @@ def test_session_sliding_expiry(conn):
     token = security.create_session(conn, 1, 0.0)
     h = conn.execute("SELECT token_hash, expires_at FROM sessions").fetchone()
     assert h["token_hash"] != token and h["expires_at"] == 30 * 86400
-    assert security.session_user(conn, token, 3600.0)["username"] == "u"
+    u = security.session_user(conn, token, 3600.0)
+    assert u["username"] == "u" and not u["renewed"]
     assert conn.execute("SELECT expires_at FROM sessions").fetchone()[0] == 30 * 86400   # moins d'un jour : inchangé
-    assert security.session_user(conn, token, 2 * 86400.0)["username"] == "u"
+    assert security.session_user(conn, token, 2 * 86400.0)["renewed"]
     assert conn.execute("SELECT expires_at FROM sessions").fetchone()[0] == 32 * 86400
     assert security.session_user(conn, token, 63 * 86400.0) is None
     assert security.session_user(conn, "inconnu", 0.0) is None

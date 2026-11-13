@@ -1,8 +1,6 @@
-import time
-
 from fastapi import Depends, HTTPException, Request
 
-from . import db, security
+from . import db
 
 
 def get_conn(request: Request):
@@ -13,9 +11,9 @@ def get_conn(request: Request):
         conn.close()
 
 
-def current_user(request: Request, conn=Depends(get_conn)):
-    token = request.cookies.get(security.COOKIE)
-    user = security.session_user(conn, token, time.time()) if token else None
+def current_user(request: Request):
+    """Utilisateur posé par le middleware de session (toute route protégée est sous /api/)."""
+    user = getattr(request.state, "user", None)
     if user is None:
         raise HTTPException(401, "Authentification requise.")
     return user
