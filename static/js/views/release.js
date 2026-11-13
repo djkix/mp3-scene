@@ -1,7 +1,8 @@
-import { api, fmtDuration, fmtSize } from '../api.js';
+import { api, fmtDuration } from '../api.js';
 import { el } from '../dom.js';
 import { player } from '../player.js';
 import { favButton } from './releases.js';
+import { infoRows } from './release-info.js';
 
 const emit = (name, detail) => document.dispatchEvent(new CustomEvent(name, { detail }));
 
@@ -18,21 +19,17 @@ export function render(container, params) {
   }).catch((err) => {
     if (dead) return;
     container.replaceChildren(el('p', { class: 'status', role: 'alert' },
-      err.status === 404 ? 'Release introuvable. ' : err.message + ' ',
+      err.status === 404 || err.status === 422 ? 'Release introuvable. ' : err.message + ' ',
       el('a', { href: '#/' }, 'Retour à la liste')));
   });
   return () => { dead = true; };
 }
 
 function header(rel) {
-  const info = [['Artiste', rel.artist], ['Titre', rel.title], ['Source', rel.source], ['Année', rel.year],
-    ['Groupe', rel.grp], ['Catégorie', rel.category], ['Genre', rel.genre],
-    ['Taille', rel.size == null ? null : fmtSize(rel.size)],
-    ['Durée', rel.duration == null ? null : fmtDuration(rel.duration)]].filter(([, v]) => v != null && v !== '');
   const play = () => player.playTracks(rel.tracks, 0);
   return el('header', { class: 'detail-head' },
     el('h1', { class: 'detail-name' }, rel.name),
-    el('dl', { class: 'detail-info' }, info.map(([k, v]) => [el('dt', {}, k), el('dd', {}, String(v))])),
+    el('dl', { class: 'detail-info' }, infoRows(rel, el)),
     el('div', { class: 'detail-actions' },
       el('button', { type: 'button', class: 'primary', disabled: !rel.tracks.length, onclick: play }, 'Lire'),
       el('button', { type: 'button', onclick: () => emit('queue-release', { releaseId: rel.id }) }, 'Ajouter à la file'),
