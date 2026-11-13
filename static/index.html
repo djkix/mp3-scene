@@ -22,5 +22,8 @@
   <main id="view"></main>
   <footer id="player" hidden></footer>
   <script type="module" src="/js/app.js"></script>
+  <!-- SDK Cast : en defer après app.js (même file d'exécution), donc après la définition de __onGCastApiAvailable.
+       Échec de chargement (Firefox, Safari, hors ligne, bloqueur) : sans effet, le bouton n'apparaît pas. -->
+  <script defer src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
 </body>
 </html>

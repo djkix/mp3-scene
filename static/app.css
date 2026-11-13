@@ -69,7 +69,9 @@ a.icon:hover { background: var(--hover); }
 /* Lecteur */
 #player { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--bg); border-top: 1px solid var(--line);
   padding-bottom: env(safe-area-inset-bottom); }
-#player:empty, #player.is-empty { display: none; } /* pas de bordure sans lecteur */
+#player:empty, #player.is-empty:not(.has-msg) { display: none; } /* pas de bordure sans lecteur */
+#player.is-empty { border-top: 0; } /* file vide avec message : seul le message est visible */
+#player.is-empty > :not(.pl-msg) { display: none; }
 .pl-bar { display: flex; align-items: center; gap: 4px 8px; height: 64px; padding: 0 12px; }
 .pl-info { flex: 0 1 260px; min-width: 0; display: flex; flex-direction: column; }
 #player .pl-title { border: 0; padding: 0; background: none; text-align: left; font-weight: 600; cursor: default;
@@ -88,6 +90,12 @@ a.icon:hover { background: var(--hover); }
   background: var(--fg); color: var(--bg); font-size: 12px; }
 .pl-msg:empty { display: none; }
 #cast-slot:empty { display: none; }
+#cast-slot { display: inline-flex; }
+google-cast-launcher { display: inline-block; width: 32px; height: 32px; padding: 5px; cursor: pointer; border-radius: 3px;
+  --disconnected-color: var(--fg); --connected-color: var(--accent-text); }
+google-cast-launcher:hover { background: var(--hover); }
+.pl-cast { color: var(--accent-text); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pl-cast:empty { display: none; }
 
 .pl-queue { position: absolute; bottom: 100%; right: 0; width: min(440px, 100%); max-height: min(60vh, 520px);
   display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-bottom: 0;

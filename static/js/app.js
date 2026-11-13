@@ -8,6 +8,7 @@ import * as favorites from './views/favorites.js';
 import * as account from './views/account.js';
 import * as admin from './views/admin.js';
 import { initPlayer, player } from './player.js';
+import { initCast } from './cast.js';
 
 
 // Table des routes : premier segment du hash -> vue. Ajouter une vue = ajouter une ligne.
@@ -88,6 +89,7 @@ $('search').addEventListener('input', (e) => {
 });
 
 initPlayer($('player'));
+initCast(player);
 addEventListener('hashchange', route);
 if (!location.hash) location.hash = '#/';
 else route();

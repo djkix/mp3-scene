@@ -1,5 +1,6 @@
 // Lecteur persistant (pied de page) : élément <audio> unique, file, panneau de file, persistance, Media Session.
-// Toutes les commandes passent par les méthodes de `player` : la tâche 11 (cast) les redirige vers le Chromecast.
+// Toutes les commandes passent par les méthodes de `player`. Pendant un cast, `backend` (fourni par cast.js via
+// attach/detach) remplace l'<audio> local pour le transport et l'état lu (lecture, position, durée, volume).
 import { api, fmtDuration } from './api.js';
 import { el } from './dom.js';
 import { Queue } from './queue.js';
@@ -13,6 +14,7 @@ const mobile = matchMedia('(max-width: 699px)');
 export const player = {
   queue: new Queue(), audio, events: new EventTarget(),
   playTracks, toggle, next, prev, seek, setVolume, jump, remove, clear, reset,
+  attach, detach, refresh, tick, flash,
 };
 
 let ui = null;            // éléments du pied de page, créés par initPlayer
@@ -22,6 +24,11 @@ let wantPlay = false;     // intention de lecture (pour enchaîner après une er
 let failures = 0;         // erreurs consécutives : on s'arrête après un tour complet de la file
 let dragging = false;     // l'utilisateur déplace la barre de progression
 let msgTimer, playReq = 0;
+let releases = Promise.resolve(); // réponses play-release / queue-release appliquées dans l'ordre des clics
+let backend = null;       // null : <audio> local ; sinon le récepteur Cast (cast.js)
+
+const playing = () => (backend ? !backend.paused() : !audio.paused);
+const position = () => (backend ? backend.time() : pendingPos ?? audio.currentTime ?? 0);
 
 const title = (t) => t.title || t.filename;
 
@@ -30,7 +37,7 @@ function save() {
   try {
     if (!player.queue.current()) return localStorage.removeItem(KEY);
     localStorage.setItem(KEY, JSON.stringify({
-      queue: player.queue, volume: audio.volume, position: pendingPos ?? audio.currentTime ?? 0,
+      queue: player.queue, volume: audio.volume, position: position(),
     }));
   } catch { /* navigation privée, quota */ }
 }
@@ -40,8 +47,35 @@ function restore() {
   try { s = JSON.parse(localStorage.getItem(KEY)); } catch { /* absent ou corrompu */ }
   if (!s || typeof s !== 'object') return;
   player.queue = Queue.fromJSON(s.queue);
-  if (Number.isFinite(s.volume)) setVolume(s.volume);
   if (player.queue.current()) load(false, Number.isFinite(s.position) && s.position > 0 ? s.position : null);
+  if (Number.isFinite(s.volume)) setVolume(s.volume); // après load : la sauvegarde qu'il déclenche garde la position
+}
+
+// --- Bascule vers / depuis le cast ---------------------------------------------------------------
+// attach : l'<audio> local se tait ; renvoie l'état local pour que le récepteur reprenne au même point.
+function attach(b) {
+  const state = { playing: playing(), position: position() };
+  backend = b;
+  wantPlay = false;
+  stopAudio();
+  update();
+  return state;
+}
+
+// detach : retour en local sur la même piste, à la position donnée, toujours en pause.
+function detach(b, pos) {
+  if (backend !== b) return;
+  backend = null;
+  load(false, pos > 0 ? pos : null);
+  if (ui) ui.vol.value = audio.volume;
+  save();
+}
+
+// Le récepteur a changé d'état (piste, lecture, volume) : affichage, Media Session, sauvegarde.
+function refresh() {
+  metadata(player.queue.current());
+  update();
+  save();
 }
 
 // --- Transport -----------------------------------------------------------------------------------
@@ -61,6 +95,7 @@ function stopAudio() {
 // Charge la piste courante de la file (et seulement elle).
 function load(play, pos = null) {
   const t = player.queue.current();
+  if (backend) { metadata(t); backend.load(play, pos); return update(); }
   pendingPos = pos;
   wantPlay = play && !!t;
   if (!t) { stopAudio(); metadata(null); return update(); }
@@ -82,27 +117,31 @@ function playTracks(tracks, startIndex = 0) {
 function toggle() {
   const t = player.queue.current();
   if (!t) return;
+  if (backend) return backend.toggle();
   if (loadedId !== t.id || audio.error) return load(true); // piste en erreur : nouvel essai
   if (audio.paused) { wantPlay = true; start(); } else { wantPlay = false; audio.pause(); }
 }
 
 function next() {
-  if (player.queue.next({ auto: false })) { load(!audio.paused || wantPlay); save(); }
+  if (player.queue.next({ auto: false })) { load(playing() || wantPlay); save(); }
 }
 
 function prev() {
-  if (audio.currentTime > 3) return seek(0); // après 3 s : retour au début de la piste
-  if (player.queue.prev()) { load(!audio.paused || wantPlay); save(); } else seek(0);
+  if (position() > 3) return player.seek(0); // après 3 s : retour au début de la piste
+  if (player.queue.prev()) { load(playing() || wantPlay); save(); } else player.seek(0);
 }
 
 function seek(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) return;
-  if (audio.readyState >= 1) audio.currentTime = seconds; else pendingPos = seconds;
+  if (backend) backend.seek(seconds);
+  else if (audio.readyState >= 1) audio.currentTime = seconds; else pendingPos = seconds;
   tick();
 }
 
 function setVolume(v) {
-  audio.volume = Math.min(1, Math.max(0, Number(v) || 0)); // ignoré par iOS : rien n'en dépend
+  v = Math.min(1, Math.max(0, Number(v) || 0));
+  if (backend) return backend.setVolume(v);
+  audio.volume = v; // ignoré par iOS : rien n'en dépend
   save();
 }
 
@@ -116,7 +155,7 @@ function jump(i) {
 function remove(i) {
   const wasCurrent = i === player.queue.index;
   player.queue.remove(i);
-  if (wasCurrent) load(!audio.paused); else update();
+  if (wasCurrent) load(playing()); else { backend?.sync(); update(); }
   save();
 }
 
@@ -124,10 +163,13 @@ function clear() {
   player.queue.clear();
   load(false);
   save();
+  if (ui) openPanel(false);
 }
 
 // Déconnexion / vue de connexion : un autre utilisateur ne doit pas hériter de la file.
 function reset() {
+  const b = backend;
+  if (b) { backend = null; b.end(); } // déconnexion : ce navigateur ne pilote plus le récepteur
   player.queue.clear();
   load(false);
   try { localStorage.removeItem(KEY); } catch { /* idem */ }
@@ -181,17 +223,17 @@ function metadata(t) {
 }
 
 function positionState() {
-  const d = audio.duration;
+  const d = backend ? backend.duration() : audio.duration;
   if (!ms?.setPositionState || !Number.isFinite(d) || d <= 0) return; // NaN / Infinity lèvent une exception
   try {
-    ms.setPositionState({ duration: d, playbackRate: audio.playbackRate || 1, position: Math.min(audio.currentTime, d) });
+    ms.setPositionState({ duration: d, playbackRate: (!backend && audio.playbackRate) || 1, position: Math.min(position(), d) });
   } catch { /* valeurs refusées */ }
 }
 
 if (ms) {
   const actions = {
-    play: () => audio.paused && player.toggle(),
-    pause: () => !audio.paused && player.toggle(),
+    play: () => !playing() && player.toggle(),
+    pause: () => playing() && player.toggle(),
     previoustrack: () => player.prev(),
     nexttrack: () => player.next(),
     seekto: (d) => player.seek(d.seekTime),
@@ -203,7 +245,7 @@ if (ms) {
 
 // --- Interface -----------------------------------------------------------------------------------
 const REPEAT = {
-  off: ['↻︎', 'Répétition désactivée'],
+  off: ['⇥', 'Répétition désactivée'], // forme distincte de « toute la file », pas seulement la couleur
   all: ['↻︎', 'Répéter toute la file'],
   one: ['↻︎¹', 'Répéter la piste'],
 };
@@ -220,14 +262,15 @@ function label(btn, text) {
 function flash(text) {
   if (!ui) return;
   ui.msg.textContent = text;
+  ui.footer.classList.add('has-msg'); // visible même lecteur masqué (file vide)
   clearTimeout(msgTimer);
-  msgTimer = setTimeout(() => { ui.msg.textContent = ''; }, 4000);
+  msgTimer = setTimeout(() => { ui.msg.textContent = ''; ui.footer.classList.remove('has-msg'); }, 4000);
 }
 
 function busy(on) { ui?.play.setAttribute('aria-busy', on); }
 
 function duration() {
-  const d = audio.duration;
+  const d = backend ? backend.duration() : audio.duration;
   return Number.isFinite(d) && d > 0 ? d : player.queue.current()?.duration || 0;
 }
 
@@ -237,14 +280,14 @@ function tick() {
   ui.seek.max = d || 0;
   ui.total.textContent = fmtDuration(d);
   if (dragging) return;
-  const pos = pendingPos ?? audio.currentTime;
+  const pos = position();
   ui.seek.value = pos;
   ui.elapsed.textContent = fmtDuration(pos);
 }
 
 function update() {
-  const q = player.queue, t = q.current(), playing = !audio.paused;
-  if (ms) ms.playbackState = t ? (playing ? 'playing' : 'paused') : 'none';
+  const q = player.queue, t = q.current(), on = playing();
+  if (ms) ms.playbackState = t ? (on ? 'playing' : 'paused') : 'none';
   positionState();
   if (ui) {
     ui.footer.classList.toggle('is-empty', !t);
@@ -252,8 +295,10 @@ function update() {
     ui.title.title = ui.title.textContent;
     ui.rel.textContent = t?.release_name || '';
     ui.rel.href = t ? `#/release/${encodeURIComponent(t.release_id)}` : '#/';
-    ui.play.textContent = playing ? '⏸︎' : '▶︎';
-    label(ui.play, playing ? 'Pause' : 'Lecture');
+    ui.play.textContent = on ? '⏸︎' : '▶︎';
+    label(ui.play, on ? 'Pause' : 'Lecture');
+    ui.cast.textContent = backend ? `Diffusion sur ${backend.name}` : '';
+    if (backend) ui.vol.value = backend.volume();
     ui.shuffle.setAttribute('aria-pressed', q.shuffle);
     const [glyph, text] = REPEAT[q.repeat];
     ui.repeat.textContent = glyph;
@@ -262,11 +307,14 @@ function update() {
     if (!ui.panel.hidden) renderPanel();
     tick();
   }
-  player.events.dispatchEvent(new CustomEvent('change', { detail: { track: t, playing, queue: q } }));
+  player.events.dispatchEvent(new CustomEvent('change', { detail: { track: t, playing: on, queue: q } }));
 }
 
 function renderPanel() {
   const q = player.queue;
+  // ligne qui a le focus (lecture ou retrait) : on le rend à la même ligne après reconstruction
+  const a = document.activeElement, row = ui.list.contains(a) ? [...ui.list.children].indexOf(a.closest('li')) : -1;
+  const sel = a?.classList?.contains('pl-q-remove') ? '.pl-q-remove' : '.pl-q-track';
   ui.count.textContent = `${q.tracks.length} piste${q.tracks.length > 1 ? 's' : ''}`;
   ui.list.replaceChildren(...q.tracks.map((t, i) => el('li', { class: i === q.index ? 'current' : null },
     el('button', { type: 'button', class: 'pl-q-track', 'aria-current': i === q.index ? 'true' : null,
@@ -275,6 +323,7 @@ function renderPanel() {
     el('span', { class: 'pl-q-rel' }, [t.artist, t.release_name].filter(Boolean).join(' · '))),
     el('span', { class: 'pl-time' }, fmtDuration(t.duration)),
     iconBtn('pl-q-remove', '×', 'Retirer de la file', () => player.remove(i)))));
+  if (row >= 0) ui.list.children[Math.min(row, ui.list.children.length - 1)]?.querySelector(sel)?.focus();
 }
 
 function openPanel(open) {
@@ -295,10 +344,12 @@ export function initPlayer(footer) {
   ui.title = el('button', { type: 'button', class: 'pl-title', 'aria-expanded': 'false',
     onclick: () => { if (mobile.matches) expand(!footer.classList.contains('expanded')); } });
   ui.rel = el('a', { class: 'pl-rel', href: '#/' });
+  ui.cast = el('span', { class: 'pl-cast' }); // « Diffusion sur <appareil> » (textContent : nom non fiable)
   ui.play = iconBtn('pl-play', '▶︎', 'Lecture', () => player.toggle());
-  ui.shuffle = iconBtn('pl-shuffle', '⇄', 'Aléatoire', () => { q().shuffle = !q().shuffle; update(); save(); });
+  ui.shuffle = iconBtn('pl-shuffle', '⇄', 'Aléatoire', () => { q().shuffle = !q().shuffle; backend?.sync(); update(); save(); });
   ui.repeat = iconBtn('pl-repeat', '↻︎', '', () => {
     q().repeat = { off: 'all', all: 'one', one: 'off' }[q().repeat];
+    backend?.sync();
     update();
     save();
   });
@@ -322,7 +373,7 @@ export function initPlayer(footer) {
     ui.list);
 
   footer.replaceChildren(ui.panel, ui.msg, el('div', { class: 'pl-bar' },
-    el('div', { class: 'pl-info' }, ui.title, ui.rel),
+    el('div', { class: 'pl-info' }, ui.title, ui.rel, ui.cast),
     iconBtn('pl-prev', '⏮︎', 'Précédent', () => player.prev()),
     ui.play,
     iconBtn('pl-next', '⏭︎', 'Suivant', () => player.next()),
@@ -339,30 +390,37 @@ export function initPlayer(footer) {
     player.toggle();
   });
 
-  document.addEventListener('play-release', async (e) => {
+  // Requête lancée tout de suite, réponse appliquée dans l'ordre des clics : une lecture en retard
+  // n'écrase pas les pistes ajoutées après elle.
+  const release = (id, apply) => {
+    const req = api(`/releases/${encodeURIComponent(id)}`);
+    req.catch(() => {}); // erreur traitée dans la chaîne : pas de rejet « non géré » en attendant son tour
+    releases = releases.then(() => req).then(apply)
+      .catch((err) => { if (err.status !== 401) flash(err.message); });
+  };
+
+  document.addEventListener('play-release', (e) => {
     const { releaseId, startTrackId } = e.detail || {};
-    const req = ++playReq; // seul le dernier clic compte
-    try {
-      const r = await api(`/releases/${encodeURIComponent(releaseId)}`);
+    const req = ++playReq; // seul le dernier clic « lire » compte
+    release(releaseId, (r) => {
       if (req !== playReq || !r.tracks.length) return;
       player.playTracks(r.tracks, Math.max(0, r.tracks.findIndex((t) => t.id === startTrackId)));
-    } catch (err) { if (err.status !== 401) flash(err.message); }
+    });
   });
 
-  document.addEventListener('queue-release', async (e) => {
-    try {
-      const r = await api(`/releases/${encodeURIComponent(e.detail?.releaseId)}`);
+  document.addEventListener('queue-release', (e) => {
+    release(e.detail?.releaseId, (r) => {
       if (!r.tracks.length) return;
       const wasEmpty = !q().current();
       q().append(r.tracks);
-      if (wasEmpty) { failures = 0; load(true); } else update(); // ajout à une file non vide : n'interrompt jamais
+      if (wasEmpty) { failures = 0; load(true); } else { backend?.sync(); update(); } // ajout : n'interrompt jamais
       save();
       flash(`Ajouté à la file : ${r.tracks.length} piste${r.tracks.length > 1 ? 's' : ''}.`);
-    } catch (err) { if (err.status !== 401) flash(err.message); }
+    });
   });
 
   // Sauvegarde : toutes les 5 s en lecture, et quand la page passe en arrière-plan ou se ferme.
-  setInterval(() => { if (!audio.paused) save(); }, 5000);
+  setInterval(() => { if (playing()) save(); }, 5000);
   addEventListener('pagehide', save);
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
 
