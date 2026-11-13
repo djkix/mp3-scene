@@ -1,15 +1,22 @@
-"""Scan de la bibliothèque (lecture seule) : phase structure, dossiers → releases et pistes."""
+"""Scan de la bibliothèque (lecture seule) : phase structure (dossiers → releases et pistes), puis phase tags."""
 import bisect
 import logging
 import os
 import re
+import threading
+import time
 from collections import Counter, defaultdict
 from pathlib import Path
+from typing import Callable
 
+import mutagen
+
+from app import db
 from app.naming import parse_release_name
 
 DISC_RE = re.compile(r"^(cd|disc|disk)[ _-]?(\d+)$", re.IGNORECASE)
 BATCH = 500
+TAG_BATCH = 200
 log = logging.getLogger(__name__)
 
 
@@ -239,3 +246,148 @@ def _scan_structure(conn, root, now):
     conn.execute("UPDATE scan_state SET first_scan_done=1 WHERE id=1")
     conn.commit()
     return {"found": found, "added": len(new), "moved": moved, "removed": removed, "skipped": skipped}
+
+
+def _first(tags, key):
+    """Première valeur du tag, sans espaces autour ; vide → None."""
+    v = (tags.get(key) or [""])[0].strip() if tags else ""
+    return v or None
+
+
+def _read_tags(path):
+    """(titre, artiste, genre, durée, débit) du fichier, champs None s'il n'est pas lisible comme MP3.
+
+    Lève OSError si le fichier ne peut pas être lu (absent, NFS indisponible) : la piste reste à lire."""
+    with open(path, "rb") as f:  # lecture seule : mutagen ne reçoit qu'un fichier ouvert en 'rb'
+        try:
+            m = mutagen.File(f, easy=True)
+        except mutagen.MutagenError as e:
+            if isinstance(e.__context__, OSError):  # mutagen enveloppe les erreurs d'E/S
+                raise e.__context__
+            m = None
+        except Exception:  # fichier corrompu : mutagen peut lever à peu près n'importe quoi
+            m = None
+    if m is None:
+        return None, None, None, None, None
+    info = getattr(m, "info", None)
+    return (_first(m.tags, "title"), _first(m.tags, "artist"), _first(m.tags, "genre"),
+            getattr(info, "length", None), getattr(info, "bitrate", None))
+
+
+def _aggregate(conn, rids):
+    """Agrège les releases de `rids` dont toutes les pistes sont lues : genre, durée, artiste commun."""
+    for rid in rids:
+        if conn.execute("SELECT 1 FROM tracks WHERE release_id=? AND tags_read=0 LIMIT 1", (rid,)).fetchone():
+            continue
+        conn.execute(
+            "UPDATE releases SET tags_done=1,"
+            " genre=(SELECT genre FROM tracks WHERE release_id=:r ORDER BY disc, relpath LIMIT 1),"
+            " duration=(SELECT sum(duration) FROM tracks WHERE release_id=:r),"
+            " tag_artist=(SELECT CASE WHEN count(DISTINCT artist)=1 AND count(artist)=count(*) THEN max(artist) END"
+            "  FROM tracks WHERE release_id=:r) WHERE id=:r", {"r": rid})
+
+
+def scan_tags(conn, root: Path, should_stop: Callable[[], bool] = lambda: False) -> int:
+    """Lit les tags des pistes en attente par lots de TAG_BATCH ; renvoie le nombre de pistes lues."""
+    try:
+        return _scan_tags(conn, root, should_stop)
+    except BaseException:
+        conn.rollback()
+        raise
+
+
+def _scan_tags(conn, root, should_stop):
+    read, last = 0, 0  # `last` : chaque piste est tentée au plus une fois par appel (fichiers illisibles)
+    while not should_stop():
+        rows = conn.execute(
+            "SELECT t.id, t.release_id, r.path, t.relpath FROM tracks t JOIN releases r ON r.id=t.release_id"
+            " WHERE t.tags_read=0 AND t.id>? ORDER BY t.id LIMIT ?", (last, TAG_BATCH)).fetchall()
+        if not rows:
+            break
+        last = rows[-1]["id"]
+        for t in rows:
+            try:
+                fields = _read_tags(Path(root, t["path"], t["relpath"]))
+            except OSError as e:
+                log.warning("piste illisible, relue au prochain scan : %s/%s (%s)", t["path"], t["relpath"], e)
+                continue
+            conn.execute("UPDATE tracks SET title=?, artist=?, genre=?, duration=?, bitrate=?, tags_read=1"
+                         " WHERE id=?", (*fields, t["id"]))
+            read += 1
+        _aggregate(conn, {t["release_id"] for t in rows})
+        conn.commit()
+    # releases sans piste en attente mais pas agrégées (ex. piste supprimée par la phase structure)
+    _aggregate(conn, [r[0] for r in conn.execute("SELECT id FROM releases WHERE tags_done=0")])
+    conn.commit()
+    return read
+
+
+class Runner:
+    """Lance les scans dans un thread démon, un seul à la fois, et tient scan_state à jour."""
+
+    def __init__(self, settings):
+        self.settings = settings
+        self._lock = threading.Lock()
+        self._stop = threading.Event()
+        self._thread = None
+
+    def start(self) -> bool:
+        return self._launch(structure=True)
+
+    def resume(self) -> None:
+        """Au démarrage : efface un statut laissé par un arrêt brutal, reprend la lecture des tags en attente."""
+        conn = db.connect(self.settings.data_dir)
+        try:
+            conn.execute("UPDATE scan_state SET status='idle' WHERE status IN ('structure','tags')")
+            conn.commit()
+            pending = conn.execute("SELECT 1 FROM tracks WHERE tags_read=0 LIMIT 1").fetchone()
+        finally:
+            conn.close()
+        if pending:
+            self._launch(structure=False)
+
+    def stop(self) -> None:
+        self._stop.set()
+        t = self._thread
+        if t is not None:
+            t.join()
+
+    def status(self, conn) -> dict:
+        s = dict(conn.execute("SELECT * FROM scan_state WHERE id=1").fetchone())
+        s["tracks_pending"] = conn.execute("SELECT count(*) FROM tracks WHERE tags_read=0").fetchone()[0]
+        return s
+
+    def _launch(self, structure):
+        with self._lock:
+            if self._thread is not None and self._thread.is_alive():
+                return False
+            self._stop.clear()
+            self._thread = threading.Thread(target=self._run, args=(structure,), daemon=True, name="scan")
+            self._thread.start()
+        return True
+
+    def _run(self, structure):
+        conn = None
+        try:
+            conn = db.connect(self.settings.data_dir)
+            root = self.settings.music_root
+            conn.execute("UPDATE scan_state SET status=?, started_at=?, finished_at=NULL, error=NULL WHERE id=1",
+                         ("structure" if structure else "tags", time.time()))
+            conn.commit()
+            if structure:
+                found = scan_structure(conn, root, time.time())["found"]
+                conn.execute("UPDATE scan_state SET status='tags', releases_found=? WHERE id=1", (found,))
+                conn.commit()
+            scan_tags(conn, root, self._stop.is_set)
+            conn.execute("UPDATE scan_state SET status='idle', finished_at=?, error=NULL WHERE id=1", (time.time(),))
+            conn.commit()
+        except Exception as e:
+            log.exception("échec du scan")
+            if conn is not None:
+                conn.rollback()
+                conn.execute("UPDATE scan_state SET status='error', finished_at=?, error=? WHERE id=1",
+                             (time.time(), str(e) or type(e).__name__))
+                conn.commit()
+        finally:
+            if conn is not None:
+                conn.close()

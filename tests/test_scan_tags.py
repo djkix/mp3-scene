@@ -1,0 +1,142 @@
+import threading
+
+import app.scanner as sc
+from app.scanner import Runner, scan_structure, scan_tags
+
+
+def release(music, make_mp3, *tracks):
+    d = music / "S/Art-One-WEB-2015-GRP"
+    d.mkdir(parents=True)
+    for name, kw in tracks:
+        make_mp3(d / name, **kw)
+    return d
+
+
+def test_tags_read_and_release_aggregates(conn, music, make_mp3):
+    release(music, make_mp3, ("01-a.mp3", dict(title="Alpha", artist="Art", genre="House")),
+            ("02-b.mp3", dict(title="Beta", artist="Art", genre="Techno")))
+    scan_structure(conn, music, now=1.0)
+    assert scan_tags(conn, music) == 2
+    t = conn.execute("SELECT title, artist, bitrate, duration FROM tracks ORDER BY relpath").fetchone()
+    assert (t["title"], t["artist"], t["bitrate"]) == ("Alpha", "Art", 128000) and 0.9 < t["duration"] < 1.2
+    r = conn.execute("SELECT genre, tag_artist, tags_done, duration FROM releases").fetchone()
+    assert (r["genre"], r["tag_artist"], r["tags_done"]) == ("House", "Art", 1) and r["duration"] > 1.8
+
+
+def test_mixed_artists_leave_tag_artist_null(conn, music, make_mp3):
+    release(music, make_mp3, ("01-a.mp3", dict(artist="One")), ("02-b.mp3", dict(artist="Two")))
+    scan_structure(conn, music, now=1.0)
+    assert scan_tags(conn, music) == 2
+    r = conn.execute("SELECT tag_artist, tags_done FROM releases").fetchone()
+    assert (r["tag_artist"], r["tags_done"]) == (None, 1)
+
+
+def test_blank_tags_become_null(conn, music, make_mp3):
+    release(music, make_mp3, ("01-a.mp3", dict(title="  ", artist=" Art ")))
+    scan_structure(conn, music, now=1.0)
+    scan_tags(conn, music)
+    t = conn.execute("SELECT title, artist, genre FROM tracks").fetchone()
+    assert (t["title"], t["artist"], t["genre"]) == (None, "Art", None)
+
+
+def test_broken_files_are_marked_and_skipped(conn, music, make_mp3):
+    d = release(music, make_mp3, ("03-notags.mp3", {}))
+    (d / "01-empty.mp3").write_bytes(b""); (d / "02-junk.mp3").write_bytes(b"not an mp3" * 50)
+    scan_structure(conn, music, now=1.0)
+    assert scan_tags(conn, music) == 3
+    assert conn.execute("SELECT count(*) FROM tracks WHERE tags_read=1").fetchone()[0] == 3
+    assert conn.execute("SELECT tags_done FROM releases").fetchone()[0] == 1
+    assert scan_tags(conn, music) == 0
+
+
+def test_missing_file_stays_pending(conn, music, make_mp3):
+    d = release(music, make_mp3, ("01-a.mp3", {}), ("02-b.mp3", {}))
+    scan_structure(conn, music, now=1.0)
+    (d / "02-b.mp3").unlink()  # NFS indisponible ou fichier disparu depuis la phase structure
+    assert scan_tags(conn, music) == 1
+    assert [r[0] for r in conn.execute("SELECT tags_read FROM tracks ORDER BY relpath")] == [1, 0]
+    assert conn.execute("SELECT tags_done FROM releases").fetchone()[0] == 0
+    make_mp3(d / "02-b.mp3")
+    assert scan_tags(conn, music) == 1
+    assert conn.execute("SELECT tags_done FROM releases").fetchone()[0] == 1
+
+
+def test_tags_resumable(conn, music, make_mp3, monkeypatch):
+    release(music, make_mp3, *[(f"0{i}-x.mp3", {}) for i in range(3)])
+    scan_structure(conn, music, now=1.0)
+    monkeypatch.setattr(sc, "TAG_BATCH", 1)
+    calls = []
+
+    def stop_after_first_batch():
+        calls.append(1)
+        return len(calls) > 1
+    first = scan_tags(conn, music, should_stop=stop_after_first_batch)
+    assert 0 < first < 3
+    assert first + scan_tags(conn, music) == 3
+    assert conn.execute("SELECT count(*) FROM tracks WHERE tags_read=0").fetchone()[0] == 0
+
+
+def test_runner_refuses_concurrent_scan(settings, music, monkeypatch):
+    entered, release_ = threading.Event(), threading.Event()
+
+    def blocked(conn, root, now):
+        entered.set()
+        release_.wait(5)
+        return {"found": 0}
+    monkeypatch.setattr(sc, "scan_structure", blocked)
+    r = Runner(settings)
+    assert r.start() is True
+    assert entered.wait(5)
+    assert r.start() is False
+    release_.set()
+    r._thread.join(5)
+    assert not r._thread.is_alive()
+
+
+def test_runner_error_then_success(settings, conn, music, make_mp3):
+    r = Runner(settings)
+    assert r.start() is True; r._thread.join(5)
+    s = r.status(conn); assert s["status"] == "error" and s["error"] and s["finished_at"]
+    release(music, make_mp3, ("01-a.mp3", {}))
+    assert r.start() is True; r._thread.join(5)
+    s = r.status(conn)
+    assert (s["status"], s["releases_found"], s["tracks_pending"], s["error"]) == ("idle", 1, 0, None)
+    assert s["finished_at"] >= s["started_at"] > 0
+
+
+def test_runner_stop_interrupts_tags(settings, conn, music, monkeypatch):
+    entered = threading.Event()
+
+    def slow_tags(conn, root, should_stop=lambda: False):
+        entered.set()
+        while not should_stop():
+            r._stop.wait(5)
+        return 0
+    monkeypatch.setattr(sc, "scan_structure", lambda conn, root, now: {"found": 0})
+    monkeypatch.setattr(sc, "scan_tags", slow_tags)
+    r = Runner(settings)
+    assert r.start() is True
+    assert entered.wait(5)
+    r.stop()
+    assert not r._thread.is_alive()
+    assert r.status(conn)["status"] == "idle"
+
+
+def test_resume_resets_stale_status_and_reads_pending_tags(settings, conn, music, make_mp3):
+    release(music, make_mp3, ("01-a.mp3", dict(title="Alpha")))
+    scan_structure(conn, music, now=1.0)
+    conn.execute("UPDATE scan_state SET status='structure'"); conn.commit()
+    r = Runner(settings)
+    r.resume()
+    r._thread.join(5)
+    s = r.status(conn)
+    assert (s["status"], s["tracks_pending"]) == ("idle", 0)
+    assert conn.execute("SELECT title FROM tracks").fetchone()[0] == "Alpha"
+
+
+def test_resume_without_pending_only_resets(settings, conn):
+    conn.execute("UPDATE scan_state SET status='tags'"); conn.commit()
+    r = Runner(settings)
+    r.resume()
+    assert r._thread is None
+    assert r.status(conn)["status"] == "idle"
