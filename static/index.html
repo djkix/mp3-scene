@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Mp3 Scene</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <header id="topbar" hidden>
+    <a class="brand" href="#/">Mp3 Scene</a>
+    <input id="search" type="search" placeholder="Rechercher une release…" aria-label="Rechercher" autocomplete="off">
+    <nav id="nav" aria-label="Navigation principale">
+      <a href="#/" data-route="">Derniers</a>
+      <a href="#/folders" data-route="folders">Dossiers</a>
+      <a href="#/favorites" data-route="favorites">Favoris</a>
+      <a href="#/account" data-route="account">Compte</a>
+      <a href="#/admin" data-route="admin" id="nav-admin" hidden>Admin</a>
+    </nav>
+  </header>
+  <main id="view"></main>
+  <footer id="player" hidden></footer>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

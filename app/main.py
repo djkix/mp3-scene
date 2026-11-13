@@ -1,8 +1,10 @@
 import time
+from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
 from . import config, db, routes_admin, routes_auth, routes_library, routes_media, security
@@ -10,7 +12,16 @@ from .config import Settings
 from .deps import csrf
 from .scanner import Runner
 
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 PUBLIC_API = ("/api/login", "/api/health")
+
+
+class NoCacheStatic(StaticFiles):
+    # revalidation (ETag) à chaque chargement : un redéploiement est pris en compte tout de suite
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
 
 
 def _bootstrap_admin(settings: Settings) -> None:
@@ -81,4 +92,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     for module in (routes_auth, routes_admin, routes_library, routes_media):
         app.include_router(module.router)
     app.include_router(routes_media.cast_router)  # hors /api/ : sans session, URL signée
+    app.mount("/", NoCacheStatic(directory=STATIC_DIR, html=True), name="static")  # après les routeurs
     return app
