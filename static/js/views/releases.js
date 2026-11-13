@@ -6,7 +6,7 @@ const emit = (name, detail) => document.dispatchEvent(new CustomEvent(name, { de
 const plural = (n, one, many) => `${n} ${n > 1 ? many : one}`;
 const HEART = ['♡︎', '♥︎'];
 
-function favButton(rel) {
+export function favButton(rel, kind = 'release') {
   const btn = el('button', { type: 'button', class: 'icon fav' });
   const paint = () => {
     btn.textContent = HEART[+rel.favorite];
@@ -19,7 +19,7 @@ function favButton(rel) {
     rel.favorite = !rel.favorite; // optimiste
     paint();
     try {
-      await api(`/favorites/release/${rel.id}`, { method: rel.favorite ? 'PUT' : 'DELETE' });
+      await api(`/favorites/${kind}/${rel.id}`, { method: rel.favorite ? 'PUT' : 'DELETE' });
     } catch {
       rel.favorite = !rel.favorite; // retour arrière
       paint();
@@ -86,6 +86,7 @@ export function releaseList(container, fetchPage, { empty = 'Aucun résultat' } 
 }
 
 let filtersCache = null;
+export const invalidateFilters = () => { filtersCache = null; }; // après un scan : nouveaux genres/années/catégories
 const loadFilters = () => (filtersCache ??= api('/filters').catch((e) => { filtersCache = null; throw e; }));
 
 function select(label, all, name, values, current, onChange) {

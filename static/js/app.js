@@ -3,10 +3,12 @@ import { el } from './dom.js';
 import * as login from './views/login.js';
 import * as releases from './views/releases.js';
 import * as folders from './views/folders.js';
+import * as release from './views/release.js';
+import * as favorites from './views/favorites.js';
+import * as account from './views/account.js';
+import * as admin from './views/admin.js';
 import { initPlayer, player } from './player.js';
 
-// Vues de la tâche 10 : remplacer la ligne correspondante par `import * as x` + `x`
-const soon = { render: (c) => c.replaceChildren(el('p', { class: 'status' }, 'Bientôt disponible')) };
 
 // Table des routes : premier segment du hash -> vue. Ajouter une vue = ajouter une ligne.
 const ROUTES = {
@@ -14,10 +16,10 @@ const ROUTES = {
   '': releases,
   search: releases,
   folders,
-  release: soon,
-  favorites: soon,
-  account: soon,
-  admin: soon,
+  release,
+  favorites,
+  account,
+  admin,
 };
 
 const $ = (id) => document.getElementById(id);
