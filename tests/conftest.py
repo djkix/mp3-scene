@@ -81,3 +81,27 @@ def user_client(app, settings):
     c.commit()
     c.close()
     return _client(app, ("user", "userpass1"))
+
+
+@pytest.fixture
+def library(app, settings, make_mp3):
+    """3 releases sur disque, scannées (structure + tags) dans la base de l'application."""
+    from app.scanner import scan_structure, scan_tags
+    root = settings.music_root
+    a = root / "Singles/A/A-Trak--Ibanez-(SP983)-WEB-2015-WUS"
+    b = root / "Singles/B/Bicep-Glue-(NT123)-WEB-2017-PWT"
+    v = root / "Albums/VA-Big_Mix-2CD-2003-GRP"
+    for d in (a, b, v / "CD1", v / "CD2"):
+        d.mkdir(parents=True)
+    make_mp3(a / "01-a-trak--ibanez.mp3", title="Ibanez", artist="A-Trak", genre="House")
+    make_mp3(a / "02-a-trak--ibanez_(dub).mp3", title="Ibanez Dub", artist="A-Trak", genre="House")
+    (a / "a-trak--ibanez.nfo").write_bytes(b"ASCII \xdb\xdb art")
+    make_mp3(b / "01-bicep-glue.mp3", title="Glue", artist="Bicep", genre="Techno")
+    make_mp3(v / "CD1/01-one.mp3", title="One", artist="X")
+    make_mp3(v / "CD2/01-two.mp3", title="Two", artist="Y")
+    c = db.connect(settings.data_dir)
+    try:
+        scan_structure(c, root, now=1000.0)
+        scan_tags(c, root)
+    finally:
+        c.close()

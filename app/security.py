@@ -1,9 +1,11 @@
 import hashlib
 import secrets
 import threading
+from pathlib import Path
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
+from fastapi import HTTPException
 
 SESSION_TTL = 30 * 86400
 DAY = 86400
@@ -135,3 +137,15 @@ class LoginLimiter:
         with self._lock:
             self._tries.pop(key, None)
             self._until.pop(key, None)
+
+
+def safe_path(root: Path, *parts: str) -> Path:
+    """Chemin résolu (liens symboliques suivis) sous `root` et existant ; sinon 404."""
+    root = root.resolve()
+    try:
+        p = root.joinpath(*parts).resolve()
+    except (OSError, ValueError):
+        raise HTTPException(404, "Fichier introuvable.") from None
+    if not p.is_relative_to(root) or not p.exists():
+        raise HTTPException(404, "Fichier introuvable.")
+    return p
