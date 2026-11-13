@@ -5,7 +5,9 @@ SCHEMA = Path(__file__).with_name("schema.sql")
 
 
 def connect(data_dir: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(data_dir / "mp3scene.db")
+    data_dir.mkdir(parents=True, exist_ok=True)
+    # une connexion par requête, utilisée séquentiellement mais depuis plusieurs threads du pool FastAPI
+    conn = sqlite3.connect(data_dir / "mp3scene.db", check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")

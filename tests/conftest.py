@@ -1,6 +1,8 @@
 import pytest
 
-from app import db
+from fastapi.testclient import TestClient
+
+from app import db, security
 from app.config import Settings
 
 
@@ -40,3 +42,41 @@ def make_mp3():
             id3.save(path)
         return path
     return make
+
+
+@pytest.fixture
+def app(settings):
+    from app.main import create_app
+    settings.music_root.mkdir()
+    settings.admin_user, settings.admin_password = "admin", "adminpass"
+    a = create_app(settings)
+    with TestClient(a):  # exécute le lifespan (admin initial, runner.resume) une seule fois
+        yield a
+
+
+def _client(app, login=None):
+    c = TestClient(app, base_url="https://testserver", headers={"X-CSRF": "1"})
+    if login:
+        r = c.post("/api/login", json={"username": login[0], "password": login[1]})
+        assert r.status_code == 200
+    return c
+
+
+@pytest.fixture
+def client(app):
+    return _client(app)
+
+
+@pytest.fixture
+def admin_client(app):
+    return _client(app, ("admin", "adminpass"))
+
+
+@pytest.fixture
+def user_client(app, settings):
+    c = db.connect(settings.data_dir)
+    c.execute("INSERT INTO users(username, password_hash, role) VALUES ('user', ?, 'user')",
+              (security.hash_password("userpass1"),))
+    c.commit()
+    c.close()
+    return _client(app, ("user", "userpass1"))
