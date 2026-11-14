@@ -2,16 +2,17 @@ import { api, session } from '../api.js';
 import { el } from '../dom.js';
 import { invalidateFilters } from './releases.js';
 import { versionInfo } from '../version.js';
+import { t, locale } from '../i18n.js';
 
-const ROLES = [['user', 'Utilisateur'], ['admin', 'Administrateur']];
-const PHASES = { idle: 'Au repos', structure: 'Analyse des dossiers…', tags: 'Lecture des tags…', error: 'Erreur' };
-const fmtTime = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR') : '—');
+const ROLES = [['user', t('Utilisateur')], ['admin', t('Administrateur')]];
+const PHASES = { idle: t('Au repos'), structure: t('Analyse des dossiers…'), tags: t('Lecture des tags…'), error: t('Erreur') };
+const fmtTime = (ts) => (ts ? new Date(ts * 1000).toLocaleString(locale) : '—');
 const roleSelect = (value, props = {}) => el('select', props,
   ROLES.map(([v, l]) => el('option', { value: v, selected: v === value }, l)));
 
 export function render(container) {
   if (session.user?.role !== 'admin') {
-    container.replaceChildren(el('p', { class: 'status', role: 'alert' }, 'Accès réservé aux administrateurs'));
+    container.replaceChildren(el('p', { class: 'status', role: 'alert' }, t('Accès réservé aux administrateurs')));
     return;
   }
   let dead = false, pollTimer = null, lastStatus = null;
@@ -36,9 +37,9 @@ export function render(container) {
 
   function userRow(u) {
     const msg = el('span', { class: 'form-error row-msg', role: 'status' });
-    const sel = roleSelect(u.role, { 'aria-label': `Rôle de ${u.username}`, onchange: async () => {
+    const sel = roleSelect(u.role, { 'aria-label': t('Rôle de {0}', u.username), onchange: async () => {
       const ok = await act(msg, () => api(`/admin/users/${u.id}`, { method: 'PATCH', body: { role: sel.value } }),
-        `Rôle de ${u.username} modifié.`);
+        t('Rôle de {0} modifié.', u.username));
       if (!ok) { sel.value = u.role; return; }
       if (u.username === session.user?.username) { // rôle propre modifié : lien Admin et accès à rafraîchir
         try { session.user = await api('/me'); } catch { return; }
@@ -46,20 +47,20 @@ export function render(container) {
       }
     } });
     const pw = el('input', { type: 'password', autocomplete: 'new-password', required: true,
-      'aria-label': `Nouveau mot de passe de ${u.username}` });
+      'aria-label': t('Nouveau mot de passe de {0}', u.username) });
     const resetBtn = el('button', { type: 'button', onclick: () => { resetBtn.hidden = true; resetForm.hidden = false; pw.focus(); } },
-      'Réinitialiser le mot de passe');
+      t('Réinitialiser le mot de passe'));
     const resetForm = el('form', { class: 'inline', hidden: true, onsubmit: async (e) => {
       e.preventDefault();
       await act(msg, () => api(`/admin/users/${u.id}`, { method: 'PATCH', body: { password: pw.value } }),
-        `Mot de passe de ${u.username} réinitialisé.`); // en cas d'échec le formulaire reste ouvert
-    } }, pw, el('button', { type: 'submit' }, 'Valider'),
-    el('button', { type: 'button', onclick: () => { resetForm.hidden = true; resetBtn.hidden = false; resetBtn.focus(); } }, 'Annuler'));
+        t('Mot de passe de {0} réinitialisé.', u.username)); // en cas d'échec le formulaire reste ouvert
+    } }, pw, el('button', { type: 'submit' }, t('Valider')),
+    el('button', { type: 'button', onclick: () => { resetForm.hidden = true; resetBtn.hidden = false; resetBtn.focus(); } }, t('Annuler')));
     const del = el('button', { type: 'button', onclick: () => {
-      if (confirm(`Supprimer l'utilisateur « ${u.username} » ?`)) {
-        act(msg, () => api(`/admin/users/${u.id}`, { method: 'DELETE' }), `Utilisateur ${u.username} supprimé.`);
+      if (confirm(t("Supprimer l'utilisateur « {0} » ?", u.username))) {
+        act(msg, () => api(`/admin/users/${u.id}`, { method: 'DELETE' }), t('Utilisateur {0} supprimé.', u.username));
       }
-    } }, 'Supprimer');
+    } }, t('Supprimer'));
     return el('tr', {}, el('th', { scope: 'row' }, u.username), el('td', {}, sel),
       el('td', {}, el('div', { class: 'actions' }, resetBtn, resetForm, del), msg));
   }
@@ -80,10 +81,10 @@ export function render(container) {
   const createForm = el('form', { class: 'inline-form', onsubmit: async (e) => {
     e.preventDefault();
     const ok = await act(createMsg, () => api('/admin/users', { method: 'POST', body: { username: nu.value, password: np.value, role: nr.value } }),
-      'Utilisateur créé.');
+      t('Utilisateur créé.'));
     if (ok && alive()) nu.value = np.value = '';
-  } }, el('label', {}, 'Identifiant', nu), el('label', {}, 'Mot de passe', np), el('label', {}, 'Rôle', nr),
-  el('button', { type: 'submit', class: 'primary' }, 'Créer'));
+  } }, el('label', {}, t('Identifiant'), nu), el('label', {}, t('Mot de passe'), np), el('label', {}, t('Rôle'), nr),
+  el('button', { type: 'submit', class: 'primary' }, t('Créer')));
 
   // --- Scan ---
   // Le statut n'est écrit que par le thread du scan, après la réponse 202 : une lecture immédiate peut encore dire « idle ».
@@ -97,7 +98,7 @@ export function render(container) {
       await api('/admin/scan', { method: 'POST' });
     } catch (err) {
       if (err.status !== 409) { if (alive()) scanMsg.textContent = err.message; return; }
-      scanMsg.textContent = 'Un scan est déjà en cours';
+      scanMsg.textContent = t('Un scan est déjà en cours');
     }
     if (dead) return;
     scanning = true;
@@ -105,7 +106,7 @@ export function render(container) {
     scanBtn.disabled = true;
     invalidateFilters();
     refreshScan();
-  } }, 'Lancer le scan');
+  } }, t('Lancer le scan'));
 
   async function refreshScan() {
     clearTimeout(pollTimer);
@@ -117,10 +118,10 @@ export function render(container) {
       if (running) scanning = true;
       else if (scanning && !pending) { scanning = false; invalidateFilters(); } // scan terminé
       scanBtn.disabled = scanning;
-      const rows = [['État', PHASES[s.status] || s.status], ['Releases trouvées', s.releases_found],
-        ['Pistes restant à lire', s.tracks_pending], ['Début', fmtTime(s.started_at)], ['Fin', fmtTime(s.finished_at)]];
+      const rows = [[t('État'), PHASES[s.status] || s.status], [t('Releases trouvées'), s.releases_found],
+        [t('Pistes restant à lire'), s.tracks_pending], [t('Début'), fmtTime(s.started_at)], [t('Fin'), fmtTime(s.finished_at)]];
       // hors état « error », le message est un avertissement (dossiers ignorés, scan interrompu)
-      if (s.error) rows.push([s.status === 'error' ? 'Erreur' : 'Avertissement', s.error]);
+      if (s.error) rows.push([s.status === 'error' ? t('Erreur') : t('Avertissement'), s.error]);
       scanOut.replaceChildren(...rows.map(([k, v]) => [el('dt', {}, k), el('dd', {}, String(v ?? '—'))]).flat());
       if (scanning) pollTimer = setTimeout(refreshScan, pending ? 1000 : 3000);
     } catch (err) {
@@ -129,26 +130,26 @@ export function render(container) {
   }
 
   // --- Version ---
-  const verOut = el('p', { role: 'status' }, 'Vérification…');
+  const verOut = el('p', { role: 'status' }, t('Vérification…'));
   versionInfo().then((v) => {
     if (dead) return;
-    const state = v.update ? ` — nouvelle version ${v.latest} disponible : dans Dockge, cliquez sur « Mettre à jour ».`
-      : v.latest ? ' — à jour.' : ' — impossible de vérifier la dernière version.';
-    verOut.replaceChildren(`Version installée : ${v.version}`, state,
-      v.update && el('a', { href: v.url, target: '_blank', rel: 'noopener' }, ' Voir les nouveautés'));
+    const state = v.update ? t(' — nouvelle version {0} disponible : dans Dockge, cliquez sur « Mettre à jour ».', v.latest)
+      : v.latest ? t(' — à jour.') : t(' — impossible de vérifier la dernière version.');
+    verOut.replaceChildren(t('Version installée : {0}', v.version), state,
+      v.update && el('a', { href: v.url, target: '_blank', rel: 'noopener' }, ' ' + t('Voir les nouveautés')));
   }).catch((err) => { if (!dead) verOut.textContent = err.message; });
 
   const th = (t) => el('th', { scope: 'col' }, t);
   container.replaceChildren(el('div', { class: 'page' },
-    el('h1', {}, 'Administration'),
-    el('h2', {}, 'Utilisateurs'),
+    el('h1', {}, t('Administration')),
+    el('h2', {}, t('Utilisateurs')),
     el('div', { class: 'table-wrap' }, el('table', { class: 'users' },
-      el('thead', {}, el('tr', {}, th('Identifiant'), th('Rôle'), th('Actions'))), tbody)), listMsg,
-    el('h3', {}, 'Créer un utilisateur'), createForm, createMsg,
-    el('h2', {}, 'Scan de la bibliothèque'),
-    el('p', { class: 'hint' }, 'Le genre et la durée apparaissent au fur et à mesure de la lecture des tags.'),
+      el('thead', {}, el('tr', {}, th(t('Identifiant')), th(t('Rôle')), th(t('Actions')))), tbody)), listMsg,
+    el('h3', {}, t('Créer un utilisateur')), createForm, createMsg,
+    el('h2', {}, t('Scan de la bibliothèque')),
+    el('p', { class: 'hint' }, t('Le genre et la durée apparaissent au fur et à mesure de la lecture des tags.')),
     scanBtn, scanOut, scanMsg,
-    el('h2', {}, 'Version'), verOut));
+    el('h2', {}, t('Version')), verOut));
   loadUsers();
   refreshScan();
   return () => { dead = true; clearTimeout(pollTimer); };

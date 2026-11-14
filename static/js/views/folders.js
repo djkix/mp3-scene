@@ -1,19 +1,20 @@
 import { api, ApiError } from '../api.js';
+import { t } from '../i18n.js';
 import { el, encodePath } from '../dom.js';
 import { releaseList } from './releases.js';
 
 export function render(container, params) {
   const path = params.rest || '';
   let dead = false, disposeList = null;
-  const crumbs = [el('a', { href: '#/folders' }, 'Dossiers')];
+  const crumbs = [el('a', { href: '#/folders' }, t('Dossiers'))];
   let acc = '';
   for (const seg of path ? path.split('/') : []) {
     acc = acc ? acc + '/' + seg : seg;
     crumbs.push(' › ', el('a', { href: '#/folders/' + encodePath(acc) }, seg));
   }
   const page = (offset, tri = '') => api(`/folders?path=${encodeURIComponent(path)}&offset=${offset}&limit=50${tri}`);
-  container.replaceChildren(el('nav', { class: 'crumbs', 'aria-label': "Fil d'Ariane" }, ...crumbs),
-    el('p', { class: 'status' }, 'Chargement…'));
+  container.replaceChildren(el('nav', { class: 'crumbs', 'aria-label': t("Fil d'Ariane") }, ...crumbs),
+    el('p', { class: 'status' }, t('Chargement…')));
 
   let first = null;
   page(0).then((data) => {
@@ -27,11 +28,11 @@ export function render(container, params) {
       const d = first || await page(offset, tri); // première page déjà reçue avec les sous-dossiers
       first = null;
       return d.releases;
-    }, { empty: data.folders.length ? '' : 'Dossier vide.', sort: ['name', 'asc'] });
+    }, { empty: data.folders.length ? '' : t('Dossier vide.'), sort: ['name', 'asc'] });
   }).catch((err) => {
     if (dead) return;
     container.lastChild.textContent = err instanceof ApiError && err.status === 404
-      ? 'Dossier introuvable.' : err.message;
+      ? t('Dossier introuvable.') : err.message;
   });
   return () => { dead = true; disposeList?.(); };
 }

@@ -1,3 +1,5 @@
+import { t, locale } from './i18n.js';
+
 export class ApiError extends Error {
   constructor(status, message) {
     super(message);
@@ -19,17 +21,17 @@ export async function api(path, { method = 'GET', body } = {}) {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new ApiError(0, 'Serveur injoignable.');
+    throw new ApiError(0, t('Serveur injoignable.'));
   }
   if (res.status === 401 && path !== '/login') {
     session.user = null;
     location.hash = '#/login';
   }
   if (!res.ok) {
-    let message = 'Erreur ' + res.status;
+    let message = t('Erreur {0}', res.status);
     try {
       const d = (await res.json()).detail;
-      if (typeof d === 'string') message = d;
+      if (typeof d === 'string') message = t(d); // messages du serveur (français) : traduits s'ils figurent au dictionnaire
     } catch { /* corps non JSON */ }
     throw new ApiError(res.status, message);
   }
@@ -38,10 +40,10 @@ export async function api(path, { method = 'GET', body } = {}) {
 
 export function fmtSize(bytes) {
   if (bytes == null) return '';
-  const units = ['o', 'Ko', 'Mo', 'Go', 'To'];
+  const units = locale === 'fr-FR' ? ['o', 'Ko', 'Mo', 'Go', 'To'] : ['B', 'KB', 'MB', 'GB', 'TB'];
   let i = 0;
   while (bytes >= 1024 && i < units.length - 1) { bytes /= 1024; i++; }
-  return (i === 0 ? String(bytes) : bytes.toFixed(bytes < 10 ? 1 : 0).replace('.', ',')) + ' ' + units[i];
+  return (i === 0 ? String(bytes) : bytes.toFixed(bytes < 10 ? 1 : 0).replace('.', locale === 'fr-FR' ? ',' : '.')) + ' ' + units[i];
 }
 
 export function fmtDate(ts) {

@@ -1,4 +1,5 @@
 import { api, fmtDuration } from '../api.js';
+import { t } from '../i18n.js';
 import { el } from '../dom.js';
 import { player } from '../player.js';
 import { favButton } from './releases.js';
@@ -9,7 +10,7 @@ const emit = (name, detail) => document.dispatchEvent(new CustomEvent(name, { de
 export function render(container, params) {
   const id = params.rest;
   let dead = false;
-  container.replaceChildren(el('p', { class: 'status', role: 'status' }, 'Chargement…'));
+  container.replaceChildren(el('p', { class: 'status', role: 'status' }, t('Chargement…')));
 
   // adresse par nom ; un identifiant numérique (anciens liens, favoris du navigateur) reste accepté
   api(/^\d+$/.test(id) ? `/releases/${id}` : `/release-by-name?name=${encodeURIComponent(id)}`).then((rel) => {
@@ -20,8 +21,8 @@ export function render(container, params) {
   }).catch((err) => {
     if (dead) return;
     container.replaceChildren(el('p', { class: 'status', role: 'alert' },
-      err.status === 404 || err.status === 422 ? 'Release introuvable. ' : err.message + ' ',
-      el('a', { href: '#/' }, 'Retour à la liste')));
+      err.status === 404 || err.status === 422 ? t('Release introuvable.') + ' ' : err.message + ' ',
+      el('a', { href: '#/' }, t('Retour à la liste'))));
   });
   return () => { dead = true; };
 }
@@ -32,38 +33,38 @@ function header(rel) {
     el('h1', { class: 'detail-name' }, rel.name),
     el('dl', { class: 'detail-info' }, infoRows(rel, el)),
     el('div', { class: 'detail-actions' },
-      el('button', { type: 'button', class: 'primary', disabled: !rel.tracks.length, onclick: play }, 'Lire'),
-      el('button', { type: 'button', onclick: () => emit('queue-release', { releaseId: rel.id }) }, 'Ajouter à la file'),
+      el('button', { type: 'button', class: 'primary', disabled: !rel.tracks.length, onclick: play }, t('Lire')),
+      el('button', { type: 'button', onclick: () => emit('queue-release', { releaseId: rel.id }) }, t('Ajouter à la file')),
       favButton(rel),
-      el('a', { class: 'btn', href: `/api/releases/${rel.id}/zip`, download: '' }, 'Télécharger (zip)')));
+      el('a', { class: 'btn', href: `/api/releases/${rel.id}/zip`, download: '' }, t('Télécharger (zip)'))));
 }
 
 function trackTable(rel) {
-  if (!rel.tracks.length) return el('p', { class: 'status' }, 'Aucune piste.');
+  if (!rel.tracks.length) return el('p', { class: 'status' }, t('Aucune piste.'));
   const rows = [];
   let disc = null;
-  rel.tracks.forEach((t, i) => {
-    if (rel.tracks.some((x) => x.disc !== rel.tracks[0].disc) && t.disc !== disc) {
-      rows.push(el('tr', { class: 'disc' }, el('th', { scope: 'rowgroup', colspan: 6 }, `CD ${t.disc}`)));
+  rel.tracks.forEach((tk, i) => {
+    if (rel.tracks.some((x) => x.disc !== rel.tracks[0].disc) && tk.disc !== disc) {
+      rows.push(el('tr', { class: 'disc' }, el('th', { scope: 'rowgroup', colspan: 6 }, `CD ${tk.disc}`)));
     }
-    disc = t.disc;
-    const label = t.title ? (t.artist ? `${t.title} — ${t.artist}` : t.title) : t.filename;
+    disc = tk.disc;
+    const label = tk.title ? (tk.artist ? `${tk.title} — ${tk.artist}` : tk.title) : tk.filename;
     rows.push(el('tr', { class: 'trk', tabIndex: 0,
       onclick: (e) => { if (!e.target.closest('button, a')) player.playTracks(rel.tracks, i); },
       onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) player.playTracks(rel.tracks, i); } },
     el('td', { class: 'num' }, String(i + 1)),
     el('td', { class: 'trk-title' }, label),
-    el('td', { class: 'num' }, t.duration == null ? '—' : fmtDuration(t.duration)),
-    el('td', { class: 'num col-bitrate' }, t.bitrate == null ? '—' : `${Math.round(t.bitrate / 1000)} kbit/s`),
-    el('td', {}, favButton(t, 'track')),
-    el('td', {}, el('a', { class: 'icon', href: `/api/tracks/${t.id}/stream?download=1`, download: '',
-      title: 'Télécharger la piste', 'aria-label': `Télécharger ${t.filename}` }, '⤓'))));
+    el('td', { class: 'num' }, tk.duration == null ? '—' : fmtDuration(tk.duration)),
+    el('td', { class: 'num col-bitrate' }, tk.bitrate == null ? '—' : `${Math.round(tk.bitrate / 1000)} kbit/s`),
+    el('td', {}, favButton(tk, 'track')),
+    el('td', {}, el('a', { class: 'icon', href: `/api/tracks/${tk.id}/stream?download=1`, download: '',
+      title: t('Télécharger la piste'), 'aria-label': t('Télécharger {0}', tk.filename) }, '⤓'))));
   });
   const th = (txt, cls) => el('th', { scope: 'col', class: cls }, txt);
   return el('div', { class: 'table-wrap' }, el('table', { class: 'tracks' },
-    el('thead', {}, el('tr', {}, th('N°'), th('Titre'), th('Durée'), th('Débit', 'col-bitrate'),
-      el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, 'Favori')),
-      el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, 'Télécharger')))),
+    el('thead', {}, el('tr', {}, th(t('N°')), th(t('Titre')), th(t('Durée')), th(t('Débit'), 'col-bitrate'),
+      el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, t('Favori'))),
+      el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, t('Télécharger'))))),
     el('tbody', {}, rows)));
 }
 

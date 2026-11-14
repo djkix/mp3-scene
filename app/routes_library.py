@@ -158,6 +158,28 @@ def favorite_tracks(offset: int = Query(0, ge=0, le=MAX_INT), limit: int = Query
                  "f.created_at DESC, t.id DESC", user["id"], offset, limit, _track)
 
 
+@router.get("/api/history")
+def history(offset: int = Query(0, ge=0, le=MAX_INT), limit: int = Query(50, ge=1, le=MAX_INT),
+            user=Depends(current_user), conn=Depends(get_conn)):
+    # ponytail: l'historique grossit sans limite (quelques octets par écoute) ; purger par ancienneté si besoin
+    return _page(conn, TRACK_COLS + ", p.played_at", "plays p JOIN " + TRACK_FROM,
+                 "WHERE p.track_id=t.id AND p.user_id=?", [user["id"]], "p.played_at DESC, p.rowid DESC",
+                 user["id"], offset, limit, _track)
+
+
+@router.post("/api/history/{track_id}", status_code=204)
+def add_play(track_id: Id, user=Depends(current_user), conn=Depends(get_conn)):
+    _check_item(conn, "track", track_id)
+    conn.execute("INSERT INTO plays(user_id, track_id, played_at) VALUES (?,?,?)", (user["id"], track_id, time.time()))
+    conn.commit()
+
+
+@router.delete("/api/history", status_code=204)
+def clear_history(user=Depends(current_user), conn=Depends(get_conn)):
+    conn.execute("DELETE FROM plays WHERE user_id=?", (user["id"],))
+    conn.commit()
+
+
 def _check_item(conn, kind, item_id):
     table = {"release": "releases", "track": "tracks"}.get(kind)
     if table is None or conn.execute(f"SELECT 1 FROM {table} WHERE id=?", (item_id,)).fetchone() is None:

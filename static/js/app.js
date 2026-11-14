@@ -1,4 +1,5 @@
 import { api, session } from './api.js';
+import { t, lang } from './i18n.js';
 import { el } from './dom.js';
 import * as login from './views/login.js';
 import * as releases from './views/releases.js';
@@ -25,6 +26,15 @@ const ROUTES = {
 };
 
 const $ = (id) => document.getElementById(id);
+
+// index.html reste en français ; on traduit au démarrage.
+document.documentElement.lang = lang;
+if (lang !== 'fr') {
+  $('search').placeholder = t('Rechercher une release…');
+  $('search').setAttribute('aria-label', t('Rechercher'));
+  $('nav').setAttribute('aria-label', t('Navigation principale'));
+  $('nav').querySelectorAll('a').forEach((a) => { a.textContent = t(a.textContent); });
+}
 const view = $('view');
 let dispose = null, navId = 0;
 
@@ -56,7 +66,7 @@ async function route() {
       // 401 : api() a déjà redirigé vers #/login ; sinon (serveur injoignable, 5xx) message et nouvel essai
       if (err.status !== 401 && id === navId) {
         view.replaceChildren(el('p', { class: 'status', role: 'alert' }, err.message + ' ',
-          el('button', { type: 'button', onclick: route }, 'Réessayer')));
+          el('button', { type: 'button', onclick: route }, t('Réessayer'))));
       }
       return;
     }
@@ -70,8 +80,8 @@ async function route() {
   if (!isAdmin) $('update').hidden = true;
   else versionInfo().then((v) => { // bandeau réservé aux administrateurs : eux seuls peuvent mettre à jour
     if (!v.update || session.user?.role !== 'admin') return;
-    $('update').replaceChildren(`Nouvelle version ${v.latest} disponible (installée : ${v.version}). `,
-      el('a', { href: v.url, target: '_blank', rel: 'noopener' }, 'Voir les nouveautés'));
+    $('update').replaceChildren(t('Nouvelle version {0} disponible (installée : {1}). ', v.latest, v.version),
+      el('a', { href: v.url, target: '_blank', rel: 'noopener' }, t('Voir les nouveautés')));
     $('update').hidden = false;
   }).catch(() => {});
   document.querySelectorAll('#nav a').forEach((a) =>
@@ -82,7 +92,7 @@ async function route() {
   view.scrollTop = 0;
   window.scrollTo(0, 0);
   if (!mod) {
-    view.replaceChildren(el('p', { class: 'status' }, 'Page introuvable.'));
+    view.replaceChildren(el('p', { class: 'status' }, t('Page introuvable.')));
     return;
   }
   dispose = mod.render(view, params) || null;

@@ -4,7 +4,7 @@
 
 **Collection de releases MP3 « scene » — bibliothèque · lecteur web · Chromecast · PWA**
 
-[![Version](https://img.shields.io/badge/version-1.3.0-purple?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.4.0-purple?style=for-the-badge)](CHANGELOG.md)
 [![Stack](https://img.shields.io/badge/stack-FastAPI_·_SQLite_·_JavaScript_pur-blue?style=for-the-badge)](#stack-technique)
 [![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
 
@@ -53,8 +53,8 @@ Tout est déduit des dossiers et des fichiers, sans rien saisir.
 | **Derniers** | Releases par date d'ajout, filtres catégorie, genre et année, recherche plein texte |
 | **Dossiers** | Navigation dans l'arborescence du NAS |
 | **Fiche** | Pistes, durées, débit, NFO, téléchargement en zip |
-| **Favoris** | Releases et pistes favorites, par compte |
-| **Compte** | Changement de mot de passe |
+| **Favoris** | Releases et pistes favorites, **historique d'écoute**, par compte |
+| **Compte** | Changement de mot de passe, langue (français ou anglais) |
 | **Admin** | Utilisateurs, scan de la bibliothèque, version installée |
 
 | Déduit automatiquement | D'où ça vient |
@@ -85,6 +85,7 @@ Tout est déduit des dossiers et des fichiers, sans rien saisir.
 - **Bureau** : barre en trois colonnes, tableau large
 - **Téléphone** : onglets en bas, à portée de pouce ; lecteur réduit, puis **plein écran** au toucher du titre ; cibles de 44 px
 - Thème clair ou sombre selon le système
+- Interface en **français ou en anglais**, selon le navigateur ou au choix sur la page Compte
 
 ### 📺 Chromecast
 - Envoi de la file au Chromecast depuis Chrome ou Edge (Android et ordinateur)
@@ -367,12 +368,12 @@ git tag v1.2.0 && git push origin v1.2.0
 
 - Pas de pochettes ni de forme d'onde.
 - Pas d'écoute hors ligne.
-- Pas de playlists, d'historique d'écoute ni de reprise entre appareils.
+- Pas de playlists ni de reprise entre appareils.
 - Pas d'AirPlay dédié, de Sonos ni de DLNA (le Bluetooth est géré par le téléphone).
 - Pas de transcodage : les MP3 sont servis tels quels.
 - Scan manuel uniquement, pas de scan planifié.
 - Pas d'édition de tags, de vérification SFV, ni de suppression ou déplacement de fichiers.
-- Interface en français uniquement.
+- Interface en français et en anglais uniquement ; la page « hors ligne » reste en français.
 - Cast : Chrome/Edge uniquement, pas depuis un iPhone.
 
 ---
@@ -380,6 +381,11 @@ git tag v1.2.0 && git push origin v1.2.0
 ## Historique des versions
 
 Le détail est dans le [journal des modifications](CHANGELOG.md).
+
+### 1.4.0 — 14 novembre 2026
+
+**Historique d'écoute et interface en anglais.** Historique par compte dans un onglet de la page Favoris ;
+interface en français ou en anglais selon le navigateur, au choix sur la page Compte.
 
 ### 1.3.0 — 14 novembre 2026
 

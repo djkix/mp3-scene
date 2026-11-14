@@ -2,6 +2,7 @@
 // Toutes les commandes passent par les méthodes de `player`. Pendant un cast, `backend` (fourni par cast.js via
 // attach/detach) remplace l'<audio> local pour le transport et l'état lu (lecture, position, durée, volume).
 import { api, fmtDuration } from './api.js';
+import { t as tr } from './i18n.js';
 import { el } from './dom.js';
 import { Queue } from './queue.js';
 
@@ -84,7 +85,7 @@ function refresh() {
 // --- Transport -----------------------------------------------------------------------------------
 function start() {
   audio.play().catch((e) => { // l'état affiché vient des événements de <audio>, pas de cette promesse
-    if (e.name === 'NotAllowedError') flash('Lecture bloquée par le navigateur : appuyez sur lecture.');
+    if (e.name === 'NotAllowedError') flash(tr('Lecture bloquée par le navigateur : appuyez sur lecture.'));
   });
 }
 
@@ -199,10 +200,10 @@ audio.addEventListener('error', async () => {
   if (loadedId !== failedId) return; // une autre piste a été chargée entre-temps
   failures++;
   if (failures >= player.queue.tracks.length || !player.queue.next({ auto: false })) {
-    flash('Lecture impossible.');
+    flash(tr('Lecture impossible.'));
     return update();
   }
-  flash('Lecture impossible, piste suivante.');
+  flash(tr('Lecture impossible, piste suivante.'));
   load(wantPlay);
   save();
 });
@@ -253,9 +254,9 @@ if (ms) {
 
 // --- Interface -----------------------------------------------------------------------------------
 const REPEAT = {
-  off: ['⇥', 'Répétition désactivée'], // forme distincte de « toute la file », pas seulement la couleur
-  all: ['↻︎', 'Répéter toute la file'],
-  one: ['↻︎¹', 'Répéter la piste'],
+  off: ['⇥', tr('Répétition désactivée')], // forme distincte de « toute la file », pas seulement la couleur
+  all: ['↻︎', tr('Répéter toute la file')],
+  one: ['↻︎¹', tr('Répéter la piste')],
 };
 
 function iconBtn(cls, glyph, label, onclick) {
@@ -291,7 +292,7 @@ function tick() {
   const pos = position();
   ui.seek.value = pos;
   ui.elapsed.textContent = fmtDuration(pos);
-  ui.seek.setAttribute('aria-valuetext', `${fmtDuration(pos)} sur ${fmtDuration(d)}`);
+  ui.seek.setAttribute('aria-valuetext', tr('{0} sur {1}', fmtDuration(pos), fmtDuration(d)));
   ui.footer.style.setProperty('--p', d ? Math.min(1, pos / d) : 0); // filet de progression du lecteur réduit (mobile)
 }
 
@@ -300,11 +301,18 @@ function volUI() {
   const v = volume();
   if (!ui.vol.matches(':focus, :active')) ui.vol.value = v; // pas pendant un réglage
   ui.volbtn.setAttribute('aria-pressed', v === 0);
-  label(ui.volbtn, v === 0 ? 'Rétablir le son' : 'Couper le son');
+  label(ui.volbtn, v === 0 ? tr('Rétablir le son') : tr('Couper le son'));
 }
+
+let logged = null; // dernière piste inscrite à l'historique d'écoute
 
 function update() {
   const q = player.queue, t = q.current(), on = playing();
+  if (t && on && t.id !== logged) { // une fois par piste lancée, en local comme en cast ; un échec est sans conséquence
+    logged = t.id;
+    api(`/history/${t.id}`, { method: 'POST' }).catch(() => {});
+  }
+  if (!t) logged = null;
   if (ms) ms.playbackState = t ? (on ? 'playing' : 'paused') : 'none';
   positionState();
   if (ui) {
@@ -314,8 +322,8 @@ function update() {
     ui.rel.textContent = t?.release_name || '';
     ui.rel.href = t ? `#/release/${encodeURIComponent(t.release_name)}` : '#/';
     ui.play.textContent = on ? '⏸︎' : '▶︎';
-    label(ui.play, on ? 'Pause' : 'Lecture');
-    ui.cast.textContent = backend ? `Diffusion sur ${backend.name}` : '';
+    label(ui.play, on ? tr('Pause') : tr('Lecture'));
+    ui.cast.textContent = backend ? tr('Diffusion sur {0}', backend.name) : '';
     volUI();
     ui.shuffle.setAttribute('aria-pressed', q.shuffle);
     const [glyph, text] = REPEAT[q.repeat];
@@ -333,14 +341,14 @@ function renderPanel() {
   // ligne qui a le focus (lecture ou retrait) : on le rend à la même ligne après reconstruction
   const a = document.activeElement, row = ui.list.contains(a) ? [...ui.list.children].indexOf(a.closest('li')) : -1;
   const sel = a?.classList?.contains('pl-q-remove') ? '.pl-q-remove' : '.pl-q-track';
-  ui.count.textContent = `${q.tracks.length} piste${q.tracks.length > 1 ? 's' : ''}`;
+  ui.count.textContent = q.tracks.length > 1 ? tr('{0} pistes', q.tracks.length) : tr('{0} piste', q.tracks.length);
   ui.list.replaceChildren(...q.tracks.map((t, i) => el('li', { class: i === q.index ? 'current' : null },
     el('button', { type: 'button', class: 'pl-q-track', 'aria-current': i === q.index ? 'true' : null,
       onclick: () => player.jump(i) },
     el('span', { class: 'pl-q-title' }, title(t)),
     el('span', { class: 'pl-q-rel' }, [t.artist, t.release_name].filter(Boolean).join(' · '))),
     el('span', { class: 'pl-time' }, fmtDuration(t.duration)),
-    iconBtn('pl-q-remove', '×', 'Retirer de la file', () => player.remove(i)))));
+    iconBtn('pl-q-remove', '×', tr('Retirer de la file'), () => player.remove(i)))));
   if (row >= 0) ui.list.children[Math.min(row, ui.list.children.length - 1)]?.querySelector(sel)?.focus();
 }
 
@@ -369,11 +377,11 @@ export function initPlayer(footer) {
       expand(open);
       if (open) ui.collapse.focus();
     } });
-  ui.collapse = iconBtn('pl-collapse', '⌄', 'Réduire le lecteur', () => { expand(false); ui.title.focus(); });
+  ui.collapse = iconBtn('pl-collapse', '⌄', tr('Réduire le lecteur'), () => { expand(false); ui.title.focus(); });
   ui.rel = el('a', { class: 'pl-rel', href: '#/' });
   ui.cast = el('span', { class: 'pl-cast' }); // « Diffusion sur <appareil> » (textContent : nom non fiable)
-  ui.play = iconBtn('pl-play', '▶︎', 'Lecture', () => player.toggle());
-  ui.shuffle = iconBtn('pl-shuffle', '⇄', 'Aléatoire', () => { q().shuffle = !q().shuffle; backend?.sync(); update(); save(); });
+  ui.play = iconBtn('pl-play', '▶︎', tr('Lecture'), () => player.toggle());
+  ui.shuffle = iconBtn('pl-shuffle', '⇄', tr('Aléatoire'), () => { q().shuffle = !q().shuffle; backend?.sync(); update(); save(); });
   ui.repeat = iconBtn('pl-repeat', '↻︎', '', () => {
     q().repeat = { off: 'all', all: 'one', one: 'off' }[q().repeat];
     backend?.sync();
@@ -382,26 +390,26 @@ export function initPlayer(footer) {
   });
   ui.elapsed = el('span', { class: 'pl-time' }, '0:00');
   ui.total = el('span', { class: 'pl-time' }, '0:00');
-  ui.seek = el('input', { type: 'range', min: 0, max: 0, step: 'any', value: 0, 'aria-label': 'Position dans la piste',
+  ui.seek = el('input', { type: 'range', min: 0, max: 0, step: 'any', value: 0, 'aria-label': tr('Position dans la piste'),
     oninput: () => { dragging = true; ui.elapsed.textContent = fmtDuration(+ui.seek.value); },
     onchange: () => { dragging = false; player.seek(+ui.seek.value); } });
   ui.vol = el('input', { type: 'range', class: 'pl-vol', min: 0, max: 1, step: 0.05, value: audio.volume,
-    'aria-label': 'Volume', title: 'Volume', 'aria-orientation': 'vertical', oninput: () => player.setVolume(+ui.vol.value) });
-  ui.volbtn = iconBtn('pl-volbtn', '', 'Couper le son', mute);
+    'aria-label': tr('Volume'), title: tr('Volume'), 'aria-orientation': 'vertical', oninput: () => player.setVolume(+ui.vol.value) });
+  ui.volbtn = iconBtn('pl-volbtn', '', tr('Couper le son'), mute);
   // Curseur vertical dans une bulle : visible au survol ou au focus clavier (CSS) ; la molette règle aussi le volume.
   const volwrap = el('div', { class: 'pl-volwrap',
     onwheel: (e) => { e.preventDefault(); player.setVolume(volume() + (e.deltaY < 0 ? 0.05 : -0.05)); } },
   ui.volbtn, el('div', { class: 'pl-volpop' }, ui.vol));
-  ui.qbtn = iconBtn('pl-qbtn', '☰', "File d'attente", () => openPanel(ui.panel.hidden));
+  ui.qbtn = iconBtn('pl-qbtn', '☰', tr("File d'attente"), () => openPanel(ui.panel.hidden));
   ui.qbtn.setAttribute('aria-expanded', 'false');
   ui.msg = el('p', { class: 'pl-msg', role: 'status' });
 
   ui.count = el('span', { class: 'pl-count' });
   ui.list = el('ol');
-  ui.close = iconBtn('pl-close', '×', "Fermer la file d'attente", () => { openPanel(false); ui.qbtn.focus(); });
-  ui.panel = el('section', { class: 'pl-queue', hidden: true, 'aria-label': "File d'attente" },
-    el('div', { class: 'pl-q-head' }, el('h2', {}, "File d'attente"), ui.count,
-      el('button', { type: 'button', onclick: () => player.clear() }, 'Vider la file'), ui.close),
+  ui.close = iconBtn('pl-close', '×', tr("Fermer la file d'attente"), () => { openPanel(false); ui.qbtn.focus(); });
+  ui.panel = el('section', { class: 'pl-queue', hidden: true, 'aria-label': tr("File d'attente") },
+    el('div', { class: 'pl-q-head' }, el('h2', {}, tr("File d'attente")), ui.count,
+      el('button', { type: 'button', onclick: () => player.clear() }, tr('Vider la file')), ui.close),
     ui.list);
 
   footer.replaceChildren(ui.panel, ui.msg, el('div', { class: 'pl-progress', 'aria-hidden': 'true' }),
@@ -410,9 +418,9 @@ export function initPlayer(footer) {
       el('div', { class: 'pl-info' }, ui.title, ui.rel, ui.cast),
       el('div', { class: 'pl-controls' },
         ui.shuffle,
-        iconBtn('pl-prev', '⏮︎', 'Précédent', () => player.prev()),
+        iconBtn('pl-prev', '⏮︎', tr('Précédent'), () => player.prev()),
         ui.play,
-        iconBtn('pl-next', '⏭︎', 'Suivant', () => player.next()),
+        iconBtn('pl-next', '⏭︎', tr('Suivant'), () => player.next()),
         ui.repeat),
       el('div', { class: 'pl-seek' }, ui.elapsed, ui.seek, ui.total),
       el('div', { class: 'pl-tools' }, volwrap, ui.qbtn,
@@ -457,7 +465,7 @@ export function initPlayer(footer) {
       q().append(r.tracks);
       if (wasEmpty) { failures = 0; load(true); } else { backend?.sync(); update(); } // ajout : n'interrompt jamais
       save();
-      flash(`Ajouté à la file : ${r.tracks.length} piste${r.tracks.length > 1 ? 's' : ''}.`);
+      flash(r.tracks.length > 1 ? tr('Ajouté à la file : {0} pistes.', r.tracks.length) : tr('Ajouté à la file : {0} piste.', r.tracks.length));
     });
   });
 

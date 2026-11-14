@@ -1,19 +1,20 @@
 import { api, fmtDate, fmtSize } from '../api.js';
 import { el } from '../dom.js';
+import { t as tr } from '../i18n.js';
 
 const PAGE = 50;
 const emit = (name, detail) => document.dispatchEvent(new CustomEvent(name, { detail }));
 const HEART = ['♡︎', '♥︎'];
 // [libellé, clé de tri côté serveur, sens au premier clic]
-const HEAD = [['Nom', 'name', 'asc'], ['Genre', 'genre', 'asc'], ['Date', 'date', 'desc'], ['Pistes', 'tracks', 'desc'],
-  ['Poids', 'size', 'desc'], ['Localisation', 'category', 'asc']];
+const HEAD = [[tr('Nom'), 'name', 'asc'], [tr('Genre'), 'genre', 'asc'], [tr('Date'), 'date', 'desc'], [tr('Pistes'), 'tracks', 'desc'],
+  [tr('Poids'), 'size', 'desc'], [tr('Localisation'), 'category', 'asc']];
 
 export function favButton(rel, kind = 'release') {
   const btn = el('button', { type: 'button', class: 'icon fav' });
   const paint = () => {
     btn.textContent = HEART[+rel.favorite];
     btn.setAttribute('aria-pressed', rel.favorite);
-    const label = rel.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris';
+    const label = rel.favorite ? tr('Retirer des favoris') : tr('Ajouter aux favoris');
     btn.setAttribute('aria-label', label);
     btn.title = label;
   };
@@ -33,10 +34,10 @@ export function favButton(rel, kind = 'release') {
 
 function row(rel) {
   const play = () => emit('play-release', { releaseId: rel.id });
-  const queue = el('button', { type: 'button', class: 'icon', title: 'Ajouter à la file', 'aria-label': 'Ajouter à la file',
+  const queue = el('button', { type: 'button', class: 'icon', title: tr('Ajouter à la file'), 'aria-label': tr('Ajouter à la file'),
     onclick: () => emit('queue-release', { releaseId: rel.id }) }, '+');
-  const detail = el('a', { class: 'icon', href: `#/release/${encodeURIComponent(rel.name)}`, title: 'Détail de la release',
-    'aria-label': 'Détail de la release' }, '›');
+  const detail = el('a', { class: 'icon', href: `#/release/${encodeURIComponent(rel.name)}`, title: tr('Détail de la release'),
+    'aria-label': tr('Détail de la release') }, '›');
   return el('li', {
     class: 'rel', tabIndex: 0,
     onclick: (e) => { if (!e.target.closest('button, a')) play(); },
@@ -47,7 +48,7 @@ function row(rel) {
   el('span', { class: 'rel-info' },
     el('span', {}, rel.genre || ''),
     el('span', {}, fmtDate(rel.added_at)),
-    el('span', { class: 'num' }, String(rel.track_count), el('span', { class: 'unit' }, rel.track_count > 1 ? ' pistes' : ' piste')),
+    el('span', { class: 'num' }, String(rel.track_count), el('span', { class: 'unit' }, ' ' + (rel.track_count > 1 ? tr('pistes') : tr('piste')))),
     el('span', { class: 'num' }, fmtSize(rel.size)),
     el('span', { class: 'rel-loc', title: rel.category || '' }, rel.category || '')),
   el('span', { class: 'rel-actions' }, queue, favButton(rel), detail));
@@ -56,7 +57,7 @@ function row(rel) {
 // Liste infinie par pages de 50. fetchPage(offset, tri) -> {items, has_more}, où `tri` vaut '&sort=…&dir=…'.
 // `sort` : tri affiché au départ, [clé, sens]. Retourne la fonction de nettoyage.
 // ponytail: le tri choisi n'est pas dans l'adresse (perdu au retour arrière) ; le passer en paramètre de hash si besoin.
-export function releaseList(container, fetchPage, { empty = 'Aucun résultat', sort = ['date', 'desc'] } = {}) {
+export function releaseList(container, fetchPage, { empty = tr('Aucun résultat'), sort = ['date', 'desc'] } = {}) {
   const list = el('ul', { class: 'rel-list' });
   const status = el('p', { class: 'status', role: 'status' });
   const sentinel = el('div', { class: 'sentinel' });
@@ -75,8 +76,8 @@ export function releaseList(container, fetchPage, { empty = 'Aucun résultat', s
     HEAD.forEach(([text, key], i) => {
       const on = key === sortKey;
       heads[i].textContent = on ? `${text} ${sortDir === 'asc' ? '▲' : '▼'}` : text;
-      heads[i].title = on ? `Trié par ${text.toLowerCase()}, ordre ${sortDir === 'asc' ? 'croissant' : 'décroissant'}`
-        : `Trier par ${text.toLowerCase()}`;
+      heads[i].title = on ? tr(sortDir === 'asc' ? 'Trié par {0}, ordre croissant' : 'Trié par {0}, ordre décroissant', text.toLowerCase())
+        : tr('Trier par {0}', text.toLowerCase());
     });
   }
   paintHead();
@@ -91,17 +92,17 @@ export function releaseList(container, fetchPage, { empty = 'Aucun résultat', s
     if (loading || done || dead) return;
     loading = true;
     const g = gen;
-    status.replaceChildren('Chargement…');
+    status.replaceChildren(tr('Chargement…'));
     try {
       const page = await fetchPage(offset, `&sort=${sortKey}&dir=${sortDir}`);
       if (dead || g !== gen) return; // réponse d'une vue remplacée ou d'un tri abandonné
       list.append(...page.items.map(row));
       offset += page.items.length;
       done = !page.has_more;
-      status.textContent = done ? (offset ? 'Fin de la liste' : empty) : '';
+      status.textContent = done ? (offset ? tr('Fin de la liste') : empty) : '';
     } catch (err) {
       if (dead || g !== gen) return;
-      status.replaceChildren(err.message + ' ', el('button', { type: 'button', onclick: load }, 'Réessayer'));
+      status.replaceChildren(err.message + ' ', el('button', { type: 'button', onclick: load }, tr('Réessayer')));
       return;
     } finally {
       if (g === gen) loading = false;
@@ -141,8 +142,8 @@ export function render(container, params) {
   let dead = false;
   loadFilters().then((f) => {
     if (dead) return;
-    bar.replaceChildren(select('Catégorie', 'Catégories', 'category', f.categories, category, setFilter),
-      select('Genre', 'Genres', 'genre', f.genres, genre, setFilter), select('Année', 'Années', 'year', f.years, year, setFilter));
+    bar.replaceChildren(select(tr('Catégorie'), tr('Catégories'), 'category', f.categories, category, setFilter),
+      select(tr('Genre'), tr('Genres'), 'genre', f.genres, genre, setFilter), select(tr('Année'), tr('Années'), 'year', f.years, year, setFilter));
   }).catch(() => {});
 
   const query = new URLSearchParams(Object.entries({ q, category, genre, year }).filter(([, v]) => v));
@@ -150,6 +151,6 @@ export function render(container, params) {
     query.set('offset', offset);
     query.set('limit', PAGE);
     return api('/releases?' + query + tri);
-  }, { empty: 'Aucun résultat' });
+  }, { empty: tr('Aucun résultat') });
   return () => { dead = true; dispose(); };
 }

@@ -58,6 +58,19 @@ def test_folders(user_client, library):
     assert user_client.get("/api/folders", params={"path": "Singles", "offset": 1}).json()["folders"] == []
 
 
+def test_history_per_user(user_client, admin_client, library):
+    rel = user_client.get("/api/releases", params={"q": "ibanez"}).json()["items"][0]
+    a, b = [t["id"] for t in user_client.get(f"/api/releases/{rel['id']}").json()["tracks"]]
+    for tid in (a, b, a):
+        assert user_client.post(f"/api/history/{tid}").status_code == 204
+    items = user_client.get("/api/history").json()["items"]
+    assert [t["id"] for t in items] == [a, b, a] and items[0]["played_at"] > 0 and items[0]["release_name"] == rel["name"]
+    assert admin_client.get("/api/history").json()["items"] == []
+    assert user_client.post("/api/history/99999").status_code == 404
+    assert user_client.delete("/api/history").status_code == 204
+    assert user_client.get("/api/history").json()["items"] == []
+
+
 def test_sort(user_client, library):
     get = lambda **p: user_client.get("/api/releases", params=p).json()["items"]
     sizes = [r["size"] for r in get(sort="size", dir="desc")]

@@ -4,6 +4,20 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.4.0](https://github.com/djkix/mp3-scene/compare/v1.3.0...v1.4.0) (2026-11-14)
+
+### Résumé
+
+**Historique d'écoute et interface en anglais.** Chaque piste lancée est notée dans un historique propre à chaque
+compte, affiché dans un nouvel onglet de la page Favoris et effaçable. L'interface existe en français et en
+anglais : elle suit la langue du navigateur, avec un choix sur la page Compte et sur la page de connexion.
+Nouvelle table `plays`, créée au démarrage ; aucune action à la mise à jour.
+
+### Fonctionnalités
+
+* historique d'écoute par compte (lecture locale et Chromecast), onglet Historique, effacement
+* interface en français et en anglais, messages d'erreur du serveur compris
+
 ## [1.3.0](https://github.com/djkix/mp3-scene/compare/v1.2.0...v1.3.0) (2026-11-14)
 
 ### Résumé

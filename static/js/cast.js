@@ -3,6 +3,7 @@
 // fenêtres de 100 pistes au plus : à la fin d'une fenêtre, l'émetteur (si la page vit encore) charge la suivante.
 // Le lecteur (player.js) ne connaît que l'objet `backend` ci-dessous : aucune référence au SDK hors de ce fichier.
 import { api } from './api.js';
+import { t as tr } from './i18n.js';
 import {
   castWindow, windowValid, receiverRepeat, isLastOfWindow, afterWindow, windowFinished,
   batches, itemMap, urlsStale, URL_REFRESH_AGE,
@@ -120,7 +121,7 @@ function setup(player) {
       if (g !== gen || s !== session) return;
       // le récepteur ne doit pas continuer l'ancienne file pendant que l'interface affiche la nouvelle
       stopMedia();
-      if (e?.status !== 401) player.flash('Diffusion impossible.'); // 401 : api() a déjà redirigé vers la connexion
+      if (e?.status !== 401) player.flash(tr('Diffusion impossible.')); // 401 : api() a déjà redirigé vers la connexion
       return;
     }
     player.refresh();
@@ -287,7 +288,7 @@ function setup(player) {
   });
 
   const launcher = document.createElement('google-cast-launcher');
-  launcher.title = 'Diffuser sur un appareil';
-  launcher.setAttribute('aria-label', 'Diffuser sur un appareil');
+  launcher.title = tr('Diffuser sur un appareil');
+  launcher.setAttribute('aria-label', tr('Diffuser sur un appareil'));
   document.getElementById('cast-slot')?.append(launcher);
 }
