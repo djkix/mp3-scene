@@ -51,7 +51,7 @@ Un **bandeau** peut apparaître sous la barre du haut, pour les administrateurs 
 Liste des releases, la plus récente en premier. La recherche (champ de la barre du haut, résultats au fil de la
 frappe) affiche la même liste, filtrée.
 
-- **Filtres**, centrés au-dessus de la liste : **Catégories**, **Genres**, **Années** (listes déroulantes ;
+- **Filtres**, centrés au-dessus de la liste : **Localisations**, **Genres**, **Années** (listes déroulantes ;
   jusqu'à plusieurs dizaines de genres).
 - **Colonnes**, dans cet ordre, avec libellé en tête, séparées par de l'espace sans trait vertical :
 
@@ -77,12 +77,13 @@ frappe) affiche la même liste, filtrée.
 ### 4.4 Fiche d'une release
 - **Nom** de la release en titre.
 - **Informations** (les champs absents ne s'affichent pas) : Artiste, Titre, Source (WEB, CD, VINYL, SAT…),
-  Année, Groupe, Catégorie, Genre, Taille, Durée.
+  Année, Groupe, Localisation, Genre, Taille, Durée.
 - **Actions** : **Lire** (principale), **Ajouter à la file**, **Favori**, **Télécharger (zip)**.
 - **Tableau des pistes** : N°, Titre (« Titre — Artiste », ou nom de fichier à défaut), Durée, Débit (kbit/s,
   masqué sur téléphone), favori de la piste, téléchargement de la piste. Séparateurs « CD 1 », « CD 2 » pour
   les releases multi-disques. Clic sur une piste : lecture à partir de cette piste.
-- **NFO** : bloc de texte en chasse fixe, art ASCII, largeur fixe (défilement horizontal si besoin).
+- **NFO** : bloc de texte en chasse fixe, art ASCII, centré ; sur téléphone la police est réduite pour que
+  toute la largeur soit visible sans défilement horizontal.
 
 ### 4.5 Favoris
 - Deux onglets : **Releases** (même liste qu'à l'accueil) et **Pistes** (durée, artiste, titre, release

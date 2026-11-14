@@ -251,8 +251,10 @@ td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-n
 .trk-title { overflow-wrap: anywhere; }
 tr.disc th { background: var(--hover); font-size: 12px; color: var(--muted); }
 .nfo-h { font-size: 15px; margin: 20px 0 8px; }
-.nfo { font: 11px/1 "Cascadia Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace; white-space: pre; overflow-x: auto;
-  max-width: 100%; margin: 0; padding: 8px; border: 1px solid var(--line); background: var(--hover); }
+.nfo-h { text-align: center; }
+.nfo { width: fit-content; /* bloc centré, texte aligné à gauche : l'art ASCII reste en place */
+  font: 11px/1 "Cascadia Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace; white-space: pre; overflow-x: auto;
+  max-width: 100%; margin: 0 auto; padding: 8px; border: 1px solid var(--line); background: var(--hover); }
 .tabs { display: flex; gap: 4px; padding: 10px 12px; }
 .tabs [aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
 .trk-fav { grid-template-columns: 8rem 6rem minmax(0, 1fr) auto auto; gap: 0 12px; }

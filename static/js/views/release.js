@@ -74,6 +74,14 @@ async function loadNfo(id, slot, isDead) {
     if (!res.ok) return; // 404 : rien à afficher
     const text = await res.text();
     if (isDead()) return;
-    slot.replaceChildren(el('h2', { class: 'nfo-h' }, 'NFO'), el('pre', { class: 'nfo' }, text));
+    const pre = el('pre', { class: 'nfo' }, text);
+    slot.replaceChildren(el('h2', { class: 'nfo-h' }, 'NFO'), pre);
+    // Réduit la police pour que la ligne la plus longue tienne dans la largeur (téléphone) : pas de défilement horizontal.
+    const fit = () => {
+      pre.style.fontSize = '';
+      const ratio = (slot.clientWidth - 18) / (pre.scrollWidth - 16); // hors marge intérieure et bordure du bloc
+      if (ratio < 1) pre.style.fontSize = `${Math.max(4, Math.floor(110 * ratio) / 10)}px`;
+    };
+    new ResizeObserver(fit).observe(slot); // premier calcul, puis rotation de l'écran ou redimensionnement
   } catch { /* NFO facultatif */ }
 }

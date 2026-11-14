@@ -142,7 +142,7 @@ export function render(container, params) {
   let dead = false;
   loadFilters().then((f) => {
     if (dead) return;
-    bar.replaceChildren(select(tr('Catégorie'), tr('Catégories'), 'category', f.categories, category, setFilter),
+    bar.replaceChildren(select(tr('Localisation'), tr('Localisations'), 'category', f.categories, category, setFilter),
       select(tr('Genre'), tr('Genres'), 'genre', f.genres, genre, setFilter), select(tr('Année'), tr('Années'), 'year', f.years, year, setFilter));
   }).catch(() => {});
 

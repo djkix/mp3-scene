@@ -66,7 +66,6 @@ export const EN = {
   'Source': 'Source',
   'Année': 'Year',
   'Groupe': 'Group',
-  'Catégorie': 'Category',
   'Genre': 'Genre',
   'Taille': 'Size',
 
@@ -154,7 +153,7 @@ export const EN = {
   'Trié par {0}, ordre décroissant': 'Sorted by {0}, descending',
   'Trier par {0}': 'Sort by {0}',
   'Fin de la liste': 'End of list',
-  'Catégories': 'Categories',
+  'Localisations': 'Locations',
   'Genres': 'Genres',
   'Années': 'Years',
   'Releases': 'Releases',

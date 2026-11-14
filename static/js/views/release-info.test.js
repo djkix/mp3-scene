@@ -18,7 +18,7 @@ test('infoRows : paires dt/dd, champs null omis, aucun [object]', () => {
   assert.ok(rows.every((n) => n instanceof N), 'tous les éléments sont des noeuds, pas des tableaux');
   assert.deepEqual(rows.map((n) => n.tag), rows.map((_, i) => (i % 2 ? 'dd' : 'dt')));
   const labels = rows.filter((n) => n.tag === 'dt').map((n) => n.children[0].text);
-  assert.deepEqual(labels, ['Artiste', 'Source', 'Année', 'Catégorie', 'Genre', 'Taille', 'Durée']);
+  assert.deepEqual(labels, ['Artiste', 'Source', 'Année', 'Localisation', 'Genre', 'Taille', 'Durée']);
   const dl = el('dl', {}, rows);
   assert.equal(dl.children.length, 14);
   assert.ok(!JSON.stringify(dl.children).includes('[object'));

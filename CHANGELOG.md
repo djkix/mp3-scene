@@ -4,6 +4,19 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.4.1](https://github.com/djkix/mp3-scene/compare/v1.4.0...v1.4.1) (2026-11-14)
+
+### Résumé
+
+**NFO centré et lisible sur téléphone.** Le bloc NFO est centré sous la fiche ; quand il est plus large que
+l'écran, sa police est réduite pour que toute la largeur soit visible sans défilement horizontal. « Catégorie »
+devient « Localisation » sur la fiche et dans les filtres, comme dans la liste. Aucune migration.
+
+### Correctifs
+
+* NFO centré, ajusté à la largeur de l'écran
+* libellé « Localisation » à la place de « Catégorie »
+
 ## [1.4.0](https://github.com/djkix/mp3-scene/compare/v1.3.0...v1.4.0) (2026-11-14)
 
 ### Résumé

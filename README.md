@@ -4,7 +4,7 @@
 
 **Collection de releases MP3 « scene » — bibliothèque · lecteur web · Chromecast · PWA**
 
-[![Version](https://img.shields.io/badge/version-1.4.0-purple?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.4.1-purple?style=for-the-badge)](CHANGELOG.md)
 [![Stack](https://img.shields.io/badge/stack-FastAPI_·_SQLite_·_JavaScript_pur-blue?style=for-the-badge)](#stack-technique)
 [![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
 
@@ -16,7 +16,7 @@
 ┌──────────────────────────────────────────────────────────────────────────┐
 │ Mp3 Scene   🔍 Rechercher une release…   Derniers Dossiers Favoris Admin │
 ├──────────────────────────────────────────────────────────────────────────┤
-│              [ Catégories ▾ ]  [ Genres ▾ ]  [ Années ▾ ]                │
+│              [ Localisations ▾ ] [ Genres ▾ ] [ Années ▾ ]               │
 │ Nom                               Genre   Date        Pistes   Poids     │
 │ VA-Compilation_Ete-2CD-2026-GRP   House   26/05/2026      52  934 Mo + ♡ │
 │ Artiste-Titre-SINGLE-WEB-2026-GRP House   29/06/2026       1   11 Mo + ♥ │
@@ -59,7 +59,7 @@ Tout est déduit des dossiers et des fichiers, sans rien saisir.
 
 | Déduit automatiquement | D'où ça vient |
 |------------------------|---------------|
-| **Catégorie** | Dossier de premier niveau du partage |
+| **Localisation** | Dossier de premier niveau du partage |
 | **Artiste, titre, année, source, groupe** | Nom du dossier de la release |
 | **Genre, durée, artiste de la piste** | Tags ID3, lus en tâche de fond |
 
@@ -70,7 +70,7 @@ Tout est déduit des dossiers et des fichiers, sans rien saisir.
 ### 📚 Bibliothèque
 - Liste en colonnes : **nom, genre, date, pistes, poids, localisation**, avec libellés ; sur téléphone, le nom puis une ligne de détails
 - Colonnes **triables** d'un clic sur leur titre (bureau)
-- Filtres **Catégories**, **Genres**, **Années** et recherche plein texte (SQLite FTS5)
+- Filtres **Localisations**, **Genres**, **Années** et recherche plein texte (SQLite FTS5)
 - Défilement infini par pages de 50, navigation par dossiers
 - Fiche de release : pistes par disque, NFO affiché, **téléchargement en zip** à la volée
 
@@ -381,6 +381,10 @@ git tag v1.2.0 && git push origin v1.2.0
 ## Historique des versions
 
 Le détail est dans le [journal des modifications](CHANGELOG.md).
+
+### 1.4.1 — 14 novembre 2026
+
+**NFO centré et lisible sur téléphone**, sans défilement horizontal. « Catégorie » devient « Localisation ».
 
 ### 1.4.0 — 14 novembre 2026
 
