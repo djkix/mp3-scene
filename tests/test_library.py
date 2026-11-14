@@ -65,6 +65,8 @@ def test_detail_tracks_and_tag_artist(user_client, library):
     assert [t["filename"] for t in d["tracks"]] == ["01-a-trak--ibanez.mp3", "02-a-trak--ibanez_(dub).mp3"]
     assert {"id", "release_id", "release_name", "filename", "disc", "size", "title", "artist", "duration",
             "bitrate", "favorite"} <= d["tracks"][0].keys() and d["tracks"][0]["release_name"] == A
+    assert user_client.get("/api/release-by-name", params={"name": A}).json() == d
+    assert user_client.get("/api/release-by-name", params={"name": "inconnue"}).status_code == 404
     vid = user_client.get("/api/releases", params={"q": "big"}).json()["items"][0]["id"]
     v = user_client.get(f"/api/releases/{vid}").json()
     assert [t["disc"] for t in v["tracks"]] == [1, 2]

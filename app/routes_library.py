@@ -100,6 +100,16 @@ def _release_row(conn, uid, rid):
     return row
 
 
+@router.get("/api/release-by-name")
+def release_by_name(name: str = Query(max_length=1024), user=Depends(current_user), conn=Depends(get_conn)):
+    # adresse lisible de la fiche (#/release/<nom>)
+    # ponytail: deux releases de même nom dans deux dossiers -> la plus récente ; l'autre reste joignable par #/release/<id>
+    row = conn.execute("SELECT id FROM releases WHERE name=? ORDER BY added_at DESC, id DESC LIMIT 1", (name,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "Release introuvable.")
+    return release_detail(row["id"], user, conn)
+
+
 @router.get("/api/releases/{rid}")
 def release_detail(rid: Id, user=Depends(current_user), conn=Depends(get_conn)):
     d = _release(_release_row(conn, user["id"], rid))

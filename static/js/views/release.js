@@ -11,7 +11,8 @@ export function render(container, params) {
   let dead = false;
   container.replaceChildren(el('p', { class: 'status', role: 'status' }, 'Chargement…'));
 
-  api(`/releases/${encodeURIComponent(id)}`).then((rel) => {
+  // adresse par nom ; un identifiant numérique (anciens liens, favoris du navigateur) reste accepté
+  api(/^\d+$/.test(id) ? `/releases/${id}` : `/release-by-name?name=${encodeURIComponent(id)}`).then((rel) => {
     if (dead) return;
     const nfo = el('div');
     container.replaceChildren(el('div', { class: 'detail' }, header(rel), trackTable(rel), nfo));

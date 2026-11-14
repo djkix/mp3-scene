@@ -50,7 +50,7 @@ function trackList(container) {
     el('span', { class: 'rel-date' }, t.duration == null ? '—' : fmtDuration(t.duration)),
     el('span', { class: 'rel-cat' }, t.artist || ''),
     el('span', { class: 'rel-name' }, t.title || t.filename),
-    el('a', { class: 'rel-meta', href: `#/release/${t.release_id}` }, t.release_name),
+    el('a', { class: 'rel-meta', href: `#/release/${encodeURIComponent(t.release_name)}` }, t.release_name),
     el('span', { class: 'rel-actions' }, unfav));
     return li;
   }

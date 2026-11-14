@@ -4,6 +4,22 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.2.0](https://github.com/djkix/mp3-scene/compare/v1.1.0...v1.2.0) (2026-11-14)
+
+### Résumé
+
+**Adresse lisible des fiches.** L'adresse d'une fiche porte le nom de la release
+(`#/release/VA-Compilation-2CD-2026-GRP`) au lieu d'un numéro. Les anciens liens numérotés fonctionnent toujours.
+Licence MIT ajoutée. Aucune migration.
+
+### Fonctionnalités
+
+* adresse de fiche par nom de release ; les liens par numéro restent acceptés
+
+### Documentation
+
+* licence MIT, descriptif du site pour maquette (`docs/brief-design.md`)
+
 ## [1.1.0](https://github.com/djkix/mp3-scene/compare/v1.0.0...v1.1.0) (2026-11-14)
 
 ### Résumé

@@ -312,7 +312,7 @@ function update() {
     ui.title.textContent = t ? title(t) : '';
     ui.title.title = ui.title.textContent;
     ui.rel.textContent = t?.release_name || '';
-    ui.rel.href = t ? `#/release/${encodeURIComponent(t.release_id)}` : '#/';
+    ui.rel.href = t ? `#/release/${encodeURIComponent(t.release_name)}` : '#/';
     ui.play.textContent = on ? '⏸︎' : '▶︎';
     label(ui.play, on ? 'Pause' : 'Lecture');
     ui.cast.textContent = backend ? `Diffusion sur ${backend.name}` : '';

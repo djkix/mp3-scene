@@ -33,7 +33,7 @@ function row(rel) {
   const play = () => emit('play-release', { releaseId: rel.id });
   const queue = el('button', { type: 'button', class: 'icon', title: 'Ajouter à la file', 'aria-label': 'Ajouter à la file',
     onclick: () => emit('queue-release', { releaseId: rel.id }) }, '+');
-  const detail = el('a', { class: 'icon', href: `#/release/${rel.id}`, title: 'Détail de la release',
+  const detail = el('a', { class: 'icon', href: `#/release/${encodeURIComponent(rel.name)}`, title: 'Détail de la release',
     'aria-label': 'Détail de la release' }, '›');
   return el('li', {
     class: 'rel', tabIndex: 0,
