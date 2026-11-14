@@ -48,9 +48,12 @@ button:disabled { opacity: .6; cursor: default; }
 
 .rel-list, .sub-list { list-style: none; margin: 0; padding: 0; }
 .rel, .rel-head { display: grid; align-items: center; gap: 0 24px; padding: 6px 12px; border-bottom: 1px solid var(--line);
-  grid-template-columns: minmax(0, 1fr) 9rem 5.5rem 3.5rem 4.5rem 11rem 100px; } /* colonnes séparées par l'espace seul */
+  grid-template-columns: minmax(0, 1fr) 6rem 5.5rem 3.5rem 4.5rem 10rem 100px; } /* colonnes séparées par l'espace seul */
 .rel { cursor: pointer; }
 .rel-head { color: var(--muted); font-size: 12px; font-weight: 600; }
+.rel-head button { padding: 4px 0; border: 0; background: none; color: inherit; font: inherit; text-align: center;
+  white-space: nowrap; cursor: pointer; } /* seuls les titres sont centrés, pas le contenu des colonnes */
+.rel-head button:hover, .rel-head button:active { color: var(--fg); background: none; }
 .rel-head:has(+ .rel-list:empty) { display: none; }
 .rel-info { display: contents; } /* ses cellules se rangent dans la grille de la ligne */
 .rel-info > span { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

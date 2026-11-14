@@ -58,6 +58,18 @@ def test_folders(user_client, library):
     assert user_client.get("/api/folders", params={"path": "Singles", "offset": 1}).json()["folders"] == []
 
 
+def test_sort(user_client, library):
+    get = lambda **p: user_client.get("/api/releases", params=p).json()["items"]
+    sizes = [r["size"] for r in get(sort="size", dir="desc")]
+    assert sizes == sorted(sizes, reverse=True) and len(sizes) > 1
+    names = [r["name"].lower() for r in get(sort="name")]
+    assert names == sorted(names)
+    assert get() == get(sort="date", dir="desc")  # l'ordre par défaut est inchangé
+    assert user_client.get("/api/releases", params={"sort": "id; DROP"}).status_code == 422
+    f = user_client.get("/api/folders", params={"path": "Singles/A", "sort": "name", "dir": "desc"}).json()["releases"]["items"]
+    assert [r["name"].lower() for r in f] == sorted((r["name"].lower() for r in f), reverse=True)
+
+
 def test_detail_tracks_and_tag_artist(user_client, library):
     rid = user_client.get("/api/releases", params={"q": "ibanez"}).json()["items"][0]["id"]
     d = user_client.get(f"/api/releases/{rid}").json()

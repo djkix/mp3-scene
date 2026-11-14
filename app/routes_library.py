@@ -1,5 +1,6 @@
 import re
 import time
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
@@ -21,6 +22,20 @@ TRACK_COLS = """t.id, t.release_id, r.name AS release_name, t.relpath, t.disc, t
   t.duration, t.bitrate, (f.item_id IS NOT NULL) AS favorite"""
 TRACK_FROM = ("tracks t JOIN releases r ON r.id=t.release_id "
               "LEFT JOIN favorites f ON f.user_id=? AND f.kind='track' AND f.item_id=t.id")
+
+
+# tri des listes : colonnes autorisées (jamais de texte du client dans le SQL)
+SORTS = {"name": "r.name COLLATE NOCASE", "genre": "r.genre COLLATE NOCASE", "date": "r.added_at",
+         "tracks": "r.track_count", "size": "r.size", "category": "r.category COLLATE NOCASE"}
+Sort = Literal["name", "genre", "date", "tracks", "size", "category"]
+Dir = Literal["asc", "desc"]
+
+
+def _order(sort: str | None, direction: str, default: str) -> str:
+    if sort is None:
+        return default
+    d = direction.upper()
+    return f"{SORTS[sort]} {d}, r.id {d}"  # r.id départage : pagination stable
 
 
 def _fts_query(q: str) -> str:
@@ -54,6 +69,7 @@ def _page(conn, cols, source, where, params, order, uid, offset, limit, build):
 @router.get("/api/releases")
 def list_releases(q: str = "", category: str | None = None, genre: str | None = None,
                   year: int | None = Query(None, ge=0, le=MAX_INT), favorites: int = Query(0, ge=0, le=1),
+                  sort: Sort | None = None, dir: Dir = "asc",
                   offset: int = Query(0, ge=0, le=MAX_INT), limit: int = Query(50, ge=1, le=MAX_INT),
                   user=Depends(current_user), conn=Depends(get_conn)):
     conds, params = [], []
@@ -67,7 +83,7 @@ def list_releases(q: str = "", category: str | None = None, genre: str | None = 
     if favorites:
         conds.append("f.item_id IS NOT NULL")
     where = "WHERE " + " AND ".join(conds) if conds else ""
-    return _page(conn, RELEASE_COLS, RELEASE_FROM, where, params, "r.added_at DESC, r.id DESC",
+    return _page(conn, RELEASE_COLS, RELEASE_FROM, where, params, _order(sort, dir, "r.added_at DESC, r.id DESC"),
                  user["id"], offset, limit, _release)
 
 
@@ -80,7 +96,7 @@ def filters(conn=Depends(get_conn)):
 
 
 @router.get("/api/folders")
-def folders(path: str = "", offset: int = Query(0, ge=0, le=MAX_INT), limit: int = Query(50, ge=1, le=MAX_INT),
+def folders(path: str = "", sort: Sort | None = None, dir: Dir = "asc", offset: int = Query(0, ge=0, le=MAX_INT), limit: int = Query(50, ge=1, le=MAX_INT),
             user=Depends(current_user), conn=Depends(get_conn)):
     if path and conn.execute("SELECT 1 FROM folders WHERE path=?", (path,)).fetchone() is None:
         raise HTTPException(404, "Dossier introuvable.")
@@ -88,8 +104,8 @@ def folders(path: str = "", offset: int = Query(0, ge=0, le=MAX_INT), limit: int
     if offset == 0:
         subs = [{"path": r["path"], "name": r["path"].rsplit("/", 1)[-1]} for r in conn.execute(
             "SELECT path FROM folders WHERE parent=? ORDER BY path COLLATE NOCASE", (path,))]
-    rels = _page(conn, RELEASE_COLS, RELEASE_FROM, "WHERE r.parent=?", [path], "r.name COLLATE NOCASE, r.id",
-                 user["id"], offset, limit, _release)
+    rels = _page(conn, RELEASE_COLS, RELEASE_FROM, "WHERE r.parent=?", [path],
+                 _order(sort, dir, "r.name COLLATE NOCASE, r.id"), user["id"], offset, limit, _release)
     return {"path": path, "folders": subs, "releases": rels}
 
 

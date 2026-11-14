@@ -4,7 +4,9 @@ import { el } from '../dom.js';
 const PAGE = 50;
 const emit = (name, detail) => document.dispatchEvent(new CustomEvent(name, { detail }));
 const HEART = ['♡︎', '♥︎'];
-const HEAD = [['Nom'], ['Genre'], ['Date'], ['Pistes', 'num'], ['Poids', 'num'], ['Localisation'], ['']];
+// [libellé, clé de tri côté serveur, sens au premier clic]
+const HEAD = [['Nom', 'name', 'asc'], ['Genre', 'genre', 'asc'], ['Date', 'date', 'desc'], ['Pistes', 'tracks', 'desc'],
+  ['Poids', 'size', 'desc'], ['Localisation', 'category', 'asc']];
 
 export function favButton(rel, kind = 'release') {
   const btn = el('button', { type: 'button', class: 'icon fav' });
@@ -51,15 +53,35 @@ function row(rel) {
   el('span', { class: 'rel-actions' }, queue, favButton(rel), detail));
 }
 
-// Liste infinie par pages de 50. fetchPage(offset) -> {items, has_more}. Retourne la fonction de nettoyage.
-export function releaseList(container, fetchPage, { empty = 'Aucun résultat' } = {}) {
+// Liste infinie par pages de 50. fetchPage(offset, tri) -> {items, has_more}, où `tri` vaut '&sort=…&dir=…'.
+// `sort` : tri affiché au départ, [clé, sens]. Retourne la fonction de nettoyage.
+// ponytail: le tri choisi n'est pas dans l'adresse (perdu au retour arrière) ; le passer en paramètre de hash si besoin.
+export function releaseList(container, fetchPage, { empty = 'Aucun résultat', sort = ['date', 'desc'] } = {}) {
   const list = el('ul', { class: 'rel-list' });
   const status = el('p', { class: 'status', role: 'status' });
   const sentinel = el('div', { class: 'sentinel' });
-  // libellés de colonnes (bureau) ; décoratifs : chaque ligne reste lisible seule
-  const head = el('div', { class: 'rel-head', 'aria-hidden': 'true' }, HEAD.map(([t, c]) => el('span', { class: c }, t)));
+  let [sortKey, sortDir] = sort;
+  let offset = 0, loading = false, done = false, dead = false, gen = 0;
+  // en-têtes de colonnes (bureau) : un clic trie, un second inverse
+  const heads = HEAD.map(([text, key, first]) => el('button', { type: 'button', onclick: () => {
+    sortDir = sortKey === key ? (sortDir === 'asc' ? 'desc' : 'asc') : first;
+    sortKey = key;
+    paintHead();
+    gen++; offset = 0; done = false; loading = false; // la réponse d'un tri précédent sera ignorée
+    list.replaceChildren();
+    load();
+  } }, text));
+  function paintHead() {
+    HEAD.forEach(([text, key], i) => {
+      const on = key === sortKey;
+      heads[i].textContent = on ? `${text} ${sortDir === 'asc' ? '▲' : '▼'}` : text;
+      heads[i].title = on ? `Trié par ${text.toLowerCase()}, ordre ${sortDir === 'asc' ? 'croissant' : 'décroissant'}`
+        : `Trier par ${text.toLowerCase()}`;
+    });
+  }
+  paintHead();
+  const head = el('div', { class: 'rel-head' }, heads, el('span'));
   container.replaceChildren(head, list, status, sentinel);
-  let offset = 0, loading = false, done = false, dead = false;
 
   const observer = new IntersectionObserver((entries) => {
     if (entries.some((e) => e.isIntersecting)) load();
@@ -68,20 +90,21 @@ export function releaseList(container, fetchPage, { empty = 'Aucun résultat' } 
   async function load() {
     if (loading || done || dead) return;
     loading = true;
+    const g = gen;
     status.replaceChildren('Chargement…');
     try {
-      const page = await fetchPage(offset);
-      if (dead) return; // réponse d'une vue remplacée
+      const page = await fetchPage(offset, `&sort=${sortKey}&dir=${sortDir}`);
+      if (dead || g !== gen) return; // réponse d'une vue remplacée ou d'un tri abandonné
       list.append(...page.items.map(row));
       offset += page.items.length;
       done = !page.has_more;
       status.textContent = done ? (offset ? 'Fin de la liste' : empty) : '';
     } catch (err) {
-      if (dead) return;
+      if (dead || g !== gen) return;
       status.replaceChildren(err.message + ' ', el('button', { type: 'button', onclick: load }, 'Réessayer'));
       return;
     } finally {
-      loading = false;
+      if (g === gen) loading = false;
     }
     if (!done) { observer.unobserve(sentinel); observer.observe(sentinel); } // re-teste si la sentinelle est encore visible
   }
@@ -123,10 +146,10 @@ export function render(container, params) {
   }).catch(() => {});
 
   const query = new URLSearchParams(Object.entries({ q, category, genre, year }).filter(([, v]) => v));
-  const dispose = releaseList(list, (offset) => {
+  const dispose = releaseList(list, (offset, tri) => {
     query.set('offset', offset);
     query.set('limit', PAGE);
-    return api('/releases?' + query);
+    return api('/releases?' + query + tri);
   }, { empty: 'Aucun résultat' });
   return () => { dead = true; dispose(); };
 }

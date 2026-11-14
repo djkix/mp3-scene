@@ -11,7 +11,7 @@ export function render(container, params) {
     acc = acc ? acc + '/' + seg : seg;
     crumbs.push(' › ', el('a', { href: '#/folders/' + encodePath(acc) }, seg));
   }
-  const page = (offset) => api(`/folders?path=${encodeURIComponent(path)}&offset=${offset}&limit=50`);
+  const page = (offset, tri = '') => api(`/folders?path=${encodeURIComponent(path)}&offset=${offset}&limit=50${tri}`);
   container.replaceChildren(el('nav', { class: 'crumbs', 'aria-label': "Fil d'Ariane" }, ...crumbs),
     el('p', { class: 'status' }, 'Chargement…'));
 
@@ -23,8 +23,11 @@ export function render(container, params) {
       el('li', {}, el('a', { href: '#/folders/' + encodePath(f.path) }, '▸ ', f.name))));
     const list = el('div');
     container.lastChild.replaceWith(...(data.folders.length ? [subs] : []), list);
-    disposeList = releaseList(list, async (offset) => (offset === 0 ? first : await page(offset)).releases,
-      { empty: data.folders.length ? '' : 'Dossier vide.' });
+    disposeList = releaseList(list, async (offset, tri) => {
+      const d = first || await page(offset, tri); // première page déjà reçue avec les sous-dossiers
+      first = null;
+      return d.releases;
+    }, { empty: data.folders.length ? '' : 'Dossier vide.', sort: ['name', 'asc'] });
   }).catch((err) => {
     if (dead) return;
     container.lastChild.textContent = err instanceof ApiError && err.status === 404

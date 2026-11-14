@@ -14,7 +14,7 @@ export function render(container, params) {
     el('div', { class: 'tabs', role: 'tablist', 'aria-label': 'Favoris' }, tabBtn('releases', 'Releases'), tabBtn('tracks', 'Pistes')),
     body);
   return tab === 'tracks' ? trackList(body) : releaseList(body,
-    (offset) => api(`/releases?favorites=1&offset=${offset}&limit=${PAGE}`), { empty: 'Aucune release favorite' });
+    (offset, tri) => api(`/releases?favorites=1&offset=${offset}&limit=${PAGE}${tri}`), { empty: 'Aucune release favorite' });
 }
 
 function trackList(container) {

@@ -4,6 +4,19 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.3.0](https://github.com/djkix/mp3-scene/compare/v1.2.0...v1.3.0) (2026-11-14)
+
+### Résumé
+
+**Colonnes triables.** Un clic sur un titre de colonne trie la liste (nom, genre, date, pistes, poids,
+localisation), un second inverse l'ordre ; le tri est fait par le serveur, sur toute la bibliothèque. La colonne
+du nom gagne de la place sur celle du genre, et les titres de colonnes sont centrés. Aucune migration.
+
+### Fonctionnalités
+
+* tri par colonne dans les listes Derniers, Recherche, Dossiers et Favoris (bureau)
+* colonne Nom élargie, titres de colonnes centrés
+
 ## [1.2.0](https://github.com/djkix/mp3-scene/compare/v1.1.0...v1.2.0) (2026-11-14)
 
 ### Résumé
