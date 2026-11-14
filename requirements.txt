@@ -4,3 +4,4 @@ starlette==1.10.0
 uvicorn[standard]==0.54.0
 mutagen==1.48.1
 argon2-cffi==25.1.0
+pillow==13.0.0

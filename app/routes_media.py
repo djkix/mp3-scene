@@ -1,3 +1,4 @@
+import io
 import os
 import re
 import shutil
@@ -13,6 +14,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import FileResponse, StreamingResponse
 from mutagen.id3 import ID3
+from PIL import Image
 from pydantic import BaseModel, Field
 
 from . import db
@@ -74,9 +76,9 @@ def pick_cover(names: list[str]) -> str | None:
     return min(images, key=rank, default=None)
 
 
-@router.get("/api/releases/{rid}/cover")
-def cover(rid: Id, request: Request, conn=Depends(get_conn)):
-    """Pochette : image du dossier de la release, sinon image incluse dans les tags de la première piste."""
+def _find_cover(request: Request, conn, rid: int):
+    """Pochette d'une release : (chemin, None, type) pour une image du dossier, (None, octets, type) pour celle
+    incluse dans les tags de la première piste. 404 s'il n'y en a pas."""
     root = request.app.state.settings.music_root
     row = conn.execute("SELECT path FROM releases WHERE id=?", (rid,)).fetchone()
     if row is None:
@@ -87,20 +89,63 @@ def cover(rid: Id, request: Request, conn=Depends(get_conn)):
             path = safe_path(root, row["path"], name)
             st = os.stat(path)
             if stat.S_ISREG(st.st_mode) and st.st_size <= COVER_MAX:
-                return FileResponse(path, media_type=IMAGE_TYPES[os.path.splitext(name)[1].lower()], stat_result=st,
-                                    headers=COVER_CACHE)
+                return path, None, IMAGE_TYPES[os.path.splitext(name)[1].lower()]
         first = conn.execute("SELECT relpath FROM tracks WHERE release_id=? ORDER BY disc, relpath LIMIT 1",
                              (rid,)).fetchone()
         if first:
             with open(safe_path(root, row["path"], first["relpath"]), "rb") as fh:  # lecture seule
                 pics = ID3(fh).getall("APIC")
             if pics and pics[0].mime in IMAGE_TYPES.values() and len(pics[0].data) <= COVER_MAX:
-                return Response(pics[0].data, media_type=pics[0].mime, headers=COVER_CACHE)
+                return None, pics[0].data, pics[0].mime
     except HTTPException:
         raise
     except Exception:  # dossier illisible, tags absents ou corrompus : pas de pochette
         pass
     raise HTTPException(404, "Pochette introuvable.")
+
+
+@router.get("/api/releases/{rid}/cover")
+def cover(rid: Id, request: Request, conn=Depends(get_conn)):
+    path, data, mime = _find_cover(request, conn, rid)
+    if path:
+        return FileResponse(path, media_type=mime, headers=COVER_CACHE)
+    return Response(data, media_type=mime, headers=COVER_CACHE)
+
+
+THUMB_SIZE = 128  # affichée en 40 px : nette sur écran haute densité
+
+
+@router.get("/api/releases/{rid}/thumb")
+def thumb(rid: Id, request: Request, conn=Depends(get_conn)):
+    """Vignette de la pochette, pour les listes. Créée à la première demande puis gardée dans data/thumbs/ ;
+    un fichier vide y retient qu'une release n'a pas de pochette (pas de nouvelle recherche sur le NAS)."""
+    # ponytail: jamais invalidée ni nettoyée (environ 5 Ko par release) ; supprimer data/thumbs/ pour tout refaire
+    folder = request.app.state.settings.data_dir / "thumbs"
+    cached = folder / f"{rid}.jpg"
+    try:
+        size = cached.stat().st_size
+    except OSError:
+        size = None
+    if size is None:
+        folder.mkdir(exist_ok=True)
+        tmp = folder / f"{rid}.{threading.get_ident()}.tmp"
+        try:
+            path, data, _ = _find_cover(request, conn, rid)
+            with Image.open(path or io.BytesIO(data)) as img:
+                img = img.convert("RGB")
+                img.thumbnail((THUMB_SIZE, THUMB_SIZE))
+                img.save(tmp, "JPEG", quality=80)
+        except HTTPException as err:
+            if err.detail != "Pochette introuvable.":
+                raise  # release inconnue : rien à retenir
+            tmp.write_bytes(b"")
+        except Exception:  # image illisible
+            tmp.write_bytes(b"")
+        os.replace(tmp, cached)  # écriture atomique : jamais de vignette à moitié écrite
+        size = cached.stat().st_size
+    if not size:
+        raise HTTPException(404, "Pochette introuvable.")
+    return FileResponse(cached, media_type="image/jpeg", headers=COVER_CACHE)
 
 
 WAVE_POINTS = 800   # largeur de la forme d'onde, en barres

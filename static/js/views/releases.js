@@ -43,6 +43,9 @@ function row(rel) {
     onclick: (e) => { if (!e.target.closest('button, a')) play(); },
     onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) play(); },
   },
+  // vignette : chargée seulement quand la ligne approche de l'écran ; sans pochette, la place reste vide
+  el('img', { class: 'rel-thumb', src: `/api/releases/${rel.id}/thumb`, alt: '', loading: 'lazy', width: 40, height: 40,
+    onerror: (e) => { e.target.style.visibility = 'hidden'; } }),
   el('span', { class: 'rel-name' }, rel.name),
   // même ordre que HEAD ; sur mobile, .rel-info devient une ligne de détails sous le nom
   el('span', { class: 'rel-info' },
@@ -81,7 +84,7 @@ export function releaseList(container, fetchPage, { empty = tr('Aucun résultat'
     });
   }
   paintHead();
-  const head = el('div', { class: 'rel-head' }, heads, el('span'));
+  const head = el('div', { class: 'rel-head' }, el('span'), heads, el('span'));
   container.replaceChildren(head, list, status, sentinel);
 
   const observer = new IntersectionObserver((entries) => {

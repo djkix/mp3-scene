@@ -91,6 +91,25 @@ def test_cover_prefers_front_image(user_client, settings, library):
     assert user_client.get("/api/releases/99999/cover").status_code == 404
 
 
+def test_thumb_is_small_and_cached(user_client, settings, library):
+    import io
+    from PIL import Image
+    a, b = (user_client.get("/api/releases", params={"q": q}).json()["items"][0]["id"] for q in ("ibanez", "bicep"))
+    buf = io.BytesIO()
+    Image.new("RGB", (900, 600), "red").save(buf, "PNG")
+    (settings.music_root / A / "cover.png").write_bytes(buf.getvalue())
+    r = user_client.get(f"/api/releases/{a}/thumb")
+    assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg"
+    assert Image.open(io.BytesIO(r.content)).size == (128, 85)  # proportions gardées
+    (settings.music_root / A / "cover.png").unlink()  # la vignette vient maintenant du cache
+    assert user_client.get(f"/api/releases/{a}/thumb").content == r.content
+    assert user_client.get(f"/api/releases/{b}/thumb").status_code == 404  # sans pochette : retenu par un fichier vide
+    assert (settings.data_dir / "thumbs" / f"{b}.jpg").stat().st_size == 0
+    assert user_client.get(f"/api/releases/{b}/thumb").status_code == 404
+    assert user_client.get("/api/releases/99999/thumb").status_code == 404
+    assert not (settings.data_dir / "thumbs" / "99999.jpg").exists()
+
+
 def test_download_name_cannot_inject_headers(user_client, conn, settings, library):
     name = 'Café "live"\r\nX-Evil: 1.mp3'
     (settings.music_root / A / name).write_bytes(b"\xff\xfb\x90\x64" * 10)

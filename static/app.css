@@ -48,8 +48,9 @@ button:disabled { opacity: .6; cursor: default; }
 
 .rel-list, .sub-list { list-style: none; margin: 0; padding: 0; }
 .rel, .rel-head { display: grid; align-items: center; gap: 0 24px; padding: 6px 12px; border-bottom: 1px solid var(--line);
-  grid-template-columns: minmax(0, 1fr) 6rem 5.5rem 3.5rem 4.5rem 10rem 100px; } /* colonnes séparées par l'espace seul */
+  grid-template-columns: 40px minmax(0, 1fr) 6rem 5.5rem 3.5rem 4.5rem 10rem 100px; } /* colonnes séparées par l'espace seul */
 .rel { cursor: pointer; }
+.rel-thumb { display: block; width: 40px; height: 40px; object-fit: cover; border-radius: 3px; }
 .rel-head { color: var(--muted); font-size: 12px; font-weight: 600; }
 .rel-head button { padding: 4px 0; border: 0; background: none; color: inherit; font: inherit; text-align: center;
   white-space: nowrap; cursor: pointer; } /* seuls les titres sont centrés, pas le contenu des colonnes */
@@ -184,11 +185,13 @@ google-cast-launcher:hover { background: var(--hover); }
 /* Mobile : onglets en bas (à portée de pouce), lecteur réduit au-dessus, lecteur plein écran au toucher du titre */
 @media (max-width: 699px) {
   :root { --nav-h: calc(52px + env(safe-area-inset-bottom)); }
-  .rel { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; grid-template-areas: "name act" "info act"; }
+  .rel { grid-template-columns: 40px minmax(0, 1fr) auto; gap: 2px 10px; grid-template-areas: "thumb name act" "thumb info act"; }
+  .rel-thumb { grid-area: thumb; }
   .rel-head { display: none; }
   .rel-info { display: flex; flex-wrap: wrap; gap: 0 10px; grid-area: info; }
   .unit { display: inline; }
-  .filters select { flex: 1 1 0; }
+  .filters { gap: 6px; }
+  .filters select { flex: 1 1 auto; padding-inline: 4px; } /* largeur selon le libellé : « Localisations » entier */
   .rel-name { grid-area: name; }
   .rel-actions { grid-area: act; }
   .rel-date { grid-area: date; }

@@ -4,7 +4,7 @@
 
 **Collection de releases MP3 « scene » — bibliothèque · lecteur web · Chromecast · PWA**
 
-[![Version](https://img.shields.io/badge/version-1.6.1-purple?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.7.0-purple?style=for-the-badge)](CHANGELOG.md)
 [![Stack](https://img.shields.io/badge/stack-FastAPI_·_SQLite_·_JavaScript_pur-blue?style=for-the-badge)](#stack-technique)
 [![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
 
@@ -68,7 +68,7 @@ Tout est déduit des dossiers et des fichiers, sans rien saisir.
 ## Fonctionnalités
 
 ### 📚 Bibliothèque
-- Liste en colonnes : **nom, genre, date, pistes, poids, localisation**, avec libellés ; sur téléphone, le nom puis une ligne de détails
+- Liste en colonnes : **vignette de pochette, nom, genre, date, pistes, poids, localisation**, avec libellés ; sur téléphone, le nom puis une ligne de détails
 - Colonnes **triables** d'un clic sur leur titre (bureau)
 - Filtres **Localisations**, **Genres**, **Années** et recherche plein texte (SQLite FTS5)
 - Défilement infini par pages de 50, navigation par dossiers
@@ -129,7 +129,7 @@ Chromecast ──HTTPS /cast/ (URL signées)──▶            │            
 |--------|--------------|
 | Backend | Python 3.12, FastAPI, Starlette, Uvicorn |
 | Base de données | SQLite (WAL, FTS5) |
-| Audio | mutagen (tags ID3), flux HTTP avec `Range`, mpg123 (formes d'onde) |
+| Audio et images | mutagen (tags ID3), flux HTTP avec `Range`, mpg123 (formes d'onde), Pillow (vignettes) |
 | Sécurité | argon2-cffi, cookie de session, URL de cast signées |
 | Frontend | JavaScript pur (modules ES), CSS, service worker, Google Cast SDK |
 | Tests | pytest (serveur), `node --test` (interface) |
@@ -314,7 +314,7 @@ La coquille de l'interface est mise en cache pour démarrer vite ; la musique et
 
 ## Sauvegarde
 
-Sauvegardez uniquement `./data` (base SQLite : comptes, favoris, index). Sans elle, il faut refaire un scan complet et les comptes et favoris sont perdus ; la musique n'est pas touchée. Pour une copie cohérente : `docker compose stop mp3-scene`, copier `data/`, `docker compose start mp3-scene`.
+Sauvegardez uniquement `./data` (base SQLite : comptes, favoris, index ; le sous-dossier `thumbs/` des vignettes peut être exclu, il se reconstruit). Sans elle, il faut refaire un scan complet et les comptes et favoris sont perdus ; la musique n'est pas touchée. Pour une copie cohérente : `docker compose stop mp3-scene`, copier `data/`, `docker compose start mp3-scene`.
 
 Vider réellement l'index (le scan refuse de retirer toutes les releases d'un coup) : `docker compose stop mp3-scene`, supprimer `data/mp3scene.db*`, `docker compose start mp3-scene`, puis relancer un scan. **Tout** est perdu : index, comptes (l'administrateur est recréé depuis `ADMIN_USER` / `ADMIN_PASSWORD`, à remettre dans `.env`) et favoris de tous les utilisateurs.
 
@@ -367,7 +367,7 @@ git tag v1.2.0 && git push origin v1.2.0
 
 ## Limites connues
 
-- Pochette absente de la liste et du Chromecast. Forme d'onde calculée à la première écoute seulement (une piste à la fois).
+- Pochette absente du Chromecast. Une vignette déjà créée n'est pas refaite si l'image change sur le NAS (supprimer `data/thumbs/` pour tout refaire). Forme d'onde calculée à la première écoute seulement (une piste à la fois).
 - Pas d'écoute hors ligne.
 - Pas de playlists ni de reprise entre appareils.
 - Pas d'AirPlay dédié, de Sonos ni de DLNA (le Bluetooth est géré par le téléphone).
@@ -382,6 +382,10 @@ git tag v1.2.0 && git push origin v1.2.0
 ## Historique des versions
 
 Le détail est dans le [journal des modifications](CHANGELOG.md).
+
+### 1.7.0 — 14 novembre 2026
+
+**Vignettes de pochette dans les listes**, créées à la première demande et gardées dans `data/thumbs/`.
 
 ### 1.6.0 — 14 novembre 2026
 

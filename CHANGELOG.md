@@ -4,6 +4,23 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.7.0](https://github.com/djkix/mp3-scene/compare/v1.6.1...v1.7.0) (2026-11-14)
+
+### Résumé
+
+**Vignettes de pochette dans les listes.** Chaque ligne de release affiche sa pochette en vignette, sur bureau
+comme sur téléphone ; une release sans pochette garde un emplacement vide, pour que les noms restent alignés. La
+vignette est créée à la première demande puis gardée dans `data/thumbs/` (environ 5 Ko par release), y compris
+le fait qu'une release n'a pas de pochette. Nouvelle dépendance : Pillow. Aucune migration, aucun scan.
+
+### Fonctionnalités
+
+* vignettes de pochette dans les listes Derniers, Recherche, Dossiers et Favoris
+
+### Correctifs
+
+* filtre « Localisations » affiché en entier sur téléphone
+
 ## [1.6.1](https://github.com/djkix/mp3-scene/compare/v1.6.0...v1.6.1) (2026-11-14)
 
 ### Résumé

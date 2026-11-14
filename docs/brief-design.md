@@ -57,6 +57,7 @@ frappe) affiche la même liste, filtrée.
 
 | Colonne | Exemple | Remarques |
 |---|---|---|
+| Vignette | pochette 40 px | Sans libellé ; vide s'il n'y a pas de pochette |
 | Nom | `VA-Toolroom_Ibiza_2026-(TOOL142001Z)-WEB-2026-AOV` | Chasse fixe, peut passer sur deux lignes, jamais tronqué |
 | Genre | House | Peut être vide tant que les tags ne sont pas lus |
 | Date | 26/05/2026 | Date d'ajout |
@@ -157,7 +158,7 @@ lecteur réduit **au-dessus** des onglets.
 - Noms de release longs (jusqu'à 100 caractères et plus), sans espaces : prévoir le retour à la ligne.
 - Champs souvent vides : genre, artiste, durée (tant que les tags ne sont pas lus).
 - Une seule image : la **pochette**, sur la fiche et dans le lecteur, souvent absente (prévoir l'affichage sans).
-  Pas de vignette dans les listes : le design repose sur la typographie et la densité.
+  Une **vignette** de 40 px ouvre chaque ligne des listes ; sans pochette, l'emplacement reste vide.
 - Listes très longues : la lisibilité d'une ligne et la vitesse de balayage priment.
 
 **Technique**
