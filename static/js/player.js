@@ -228,7 +228,9 @@ audio.addEventListener('volumechange', volUI);
 function metadata(t) {
   if (!ms) return;
   ms.metadata = t && typeof MediaMetadata === 'function'
-    ? new MediaMetadata({ title: title(t), artist: t.artist || '', album: t.release_name || '' }) : null;
+    ? new MediaMetadata({ title: title(t), artist: t.artist || '', album: t.release_name || '',
+      artwork: [{ src: `/api/releases/${t.release_id}/cover` }] }) // pochette sur l'écran verrouillé, ignorée si absente
+    : null;
 }
 
 function positionState() {
@@ -320,6 +322,12 @@ function update() {
     ui.title.textContent = t ? title(t) : '';
     ui.title.title = ui.title.textContent;
     ui.rel.textContent = t?.release_name || '';
+    const cover = t ? `/api/releases/${t.release_id}/cover` : '';
+    if (ui.cover.dataset.src !== cover) { // même release : l'image n'est pas rechargée à chaque piste
+      ui.cover.dataset.src = cover;
+      ui.cover.hidden = true;
+      if (cover) ui.cover.src = cover; else ui.cover.removeAttribute('src');
+    }
     ui.rel.href = t ? `#/release/${encodeURIComponent(t.release_name)}` : '#/';
     ui.play.textContent = on ? '⏸︎' : '▶︎';
     label(ui.play, on ? tr('Pause') : tr('Lecture'));
@@ -379,6 +387,9 @@ export function initPlayer(footer) {
     } });
   ui.collapse = iconBtn('pl-collapse', '⌄', tr('Réduire le lecteur'), () => { expand(false); ui.title.focus(); });
   ui.rel = el('a', { class: 'pl-rel', href: '#/' });
+  // pochette : masquée tant qu'elle n'est pas chargée, et s'il n'y en a pas
+  ui.cover = el('img', { class: 'pl-cover', alt: '', hidden: true,
+    onload: () => { ui.cover.hidden = false; }, onerror: () => { ui.cover.hidden = true; } });
   ui.cast = el('span', { class: 'pl-cast' }); // « Diffusion sur <appareil> » (textContent : nom non fiable)
   ui.play = iconBtn('pl-play', '▶︎', tr('Lecture'), () => player.toggle());
   ui.shuffle = iconBtn('pl-shuffle', '⇄', tr('Aléatoire'), () => { q().shuffle = !q().shuffle; backend?.sync(); update(); save(); });
@@ -415,7 +426,7 @@ export function initPlayer(footer) {
   footer.replaceChildren(ui.panel, ui.msg, el('div', { class: 'pl-progress', 'aria-hidden': 'true' }),
     el('div', { class: 'pl-bar' },
       ui.collapse,
-      el('div', { class: 'pl-info' }, ui.title, ui.rel, ui.cast),
+      el('div', { class: 'pl-info' }, ui.cover, ui.title, ui.rel, ui.cast),
       el('div', { class: 'pl-controls' },
         ui.shuffle,
         iconBtn('pl-prev', '⏮︎', tr('Précédent'), () => player.prev()),

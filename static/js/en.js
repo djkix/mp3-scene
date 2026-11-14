@@ -154,6 +154,7 @@ export const EN = {
   'Trier par {0}': 'Sort by {0}',
   'Fin de la liste': 'End of list',
   'Localisations': 'Locations',
+  'Pochette': 'Cover',
   'Genres': 'Genres',
   'Années': 'Years',
   'Releases': 'Releases',

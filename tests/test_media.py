@@ -62,6 +62,18 @@ def test_download_disposition(user_client, tid):
                                                 "filename*=UTF-8''01-a-trak--ibanez.mp3")
 
 
+def test_cover_prefers_front_image(user_client, settings, library):
+    from app.routes_media import pick_cover
+    assert pick_cover(["a.nfo", "00-x-2cd-2008-back.jpg", "00-x-2cd-2008-front.JPG", "zz.png"]) == "00-x-2cd-2008-front.JPG"
+    assert pick_cover(["x-back.jpg"]) == "x-back.jpg" and pick_cover(["a.mp3", "a.nfo"]) is None
+    rid = user_client.get("/api/releases", params={"q": "ibanez"}).json()["items"][0]["id"]
+    assert user_client.get(f"/api/releases/{rid}/cover").status_code == 404  # ni image ni tag
+    (settings.music_root / A / "00-a-trak--ibanez-front.jpg").write_bytes(b"\xff\xd8jpeg")
+    r = user_client.get(f"/api/releases/{rid}/cover")
+    assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg" and r.content == b"\xff\xd8jpeg"
+    assert user_client.get("/api/releases/99999/cover").status_code == 404
+
+
 def test_download_name_cannot_inject_headers(user_client, conn, settings, library):
     name = 'Café "live"\r\nX-Evil: 1.mp3'
     (settings.music_root / A / name).write_bytes(b"\xff\xfb\x90\x64" * 10)

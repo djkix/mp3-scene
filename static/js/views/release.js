@@ -31,7 +31,11 @@ function header(rel) {
   const play = () => player.playTracks(rel.tracks, 0);
   return el('header', { class: 'detail-head' },
     el('h1', { class: 'detail-name' }, rel.name),
-    el('dl', { class: 'detail-info' }, infoRows(rel, el)),
+    el('div', { class: 'detail-top' },
+      // pochette facultative : sans image (404), le lien disparaît
+      el('a', { class: 'cover', href: `/api/releases/${rel.id}/cover`, target: '_blank', rel: 'noopener' },
+        el('img', { src: `/api/releases/${rel.id}/cover`, alt: t('Pochette'), onerror: (e) => e.target.parentNode.remove() })),
+      el('dl', { class: 'detail-info' }, infoRows(rel, el))),
     el('div', { class: 'detail-actions' },
       el('button', { type: 'button', class: 'primary', disabled: !rel.tracks.length, onclick: play }, t('Lire')),
       el('button', { type: 'button', onclick: () => emit('queue-release', { releaseId: rel.id }) }, t('Ajouter à la file')),

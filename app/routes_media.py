@@ -8,6 +8,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import FileResponse, StreamingResponse
+from mutagen.id3 import ID3
 from pydantic import BaseModel, Field
 
 from . import db
@@ -51,6 +52,51 @@ def _track_file(request: Request, conn, track_id: int, download: bool = False, h
 @router.get("/api/tracks/{track_id}/stream")
 def stream(track_id: Id, request: Request, download: bool = False, conn=Depends(get_conn)):
     return _track_file(request, conn, track_id, download)
+
+
+IMAGE_TYPES = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
+COVER_MAX = 8 * 1024 * 1024
+COVER_CACHE = {"Cache-Control": "private, max-age=86400"}
+_FRONT = ("front", "cover", "folder")
+_NOT_FRONT = ("back", "inlay", "inside", "cd", "cd1", "cd2", "disc", "booklet", "proof")
+
+
+def pick_cover(names: list[str]) -> str | None:
+    """Image de pochette parmi les fichiers d'un dossier : « front/cover/folder » d'abord, « back/cd/… » en dernier."""
+    def rank(name: str):
+        stem = name.lower().rsplit(".", 1)[0]
+        return (0 if stem.endswith(_FRONT) else 2 if stem.endswith(_NOT_FRONT) else 1, name.lower())
+    images = [n for n in names if os.path.splitext(n)[1].lower() in IMAGE_TYPES]
+    return min(images, key=rank, default=None)
+
+
+@router.get("/api/releases/{rid}/cover")
+def cover(rid: Id, request: Request, conn=Depends(get_conn)):
+    """Pochette : image du dossier de la release, sinon image incluse dans les tags de la première piste."""
+    root = request.app.state.settings.music_root
+    row = conn.execute("SELECT path FROM releases WHERE id=?", (rid,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "Release introuvable.")
+    try:
+        name = pick_cover([p.name for p in safe_path(root, row["path"]).iterdir()])
+        if name:
+            path = safe_path(root, row["path"], name)
+            st = os.stat(path)
+            if stat.S_ISREG(st.st_mode) and st.st_size <= COVER_MAX:
+                return FileResponse(path, media_type=IMAGE_TYPES[os.path.splitext(name)[1].lower()], stat_result=st,
+                                    headers=COVER_CACHE)
+        first = conn.execute("SELECT relpath FROM tracks WHERE release_id=? ORDER BY disc, relpath LIMIT 1",
+                             (rid,)).fetchone()
+        if first:
+            with open(safe_path(root, row["path"], first["relpath"]), "rb") as fh:  # lecture seule
+                pics = ID3(fh).getall("APIC")
+            if pics and pics[0].mime in IMAGE_TYPES.values() and len(pics[0].data) <= COVER_MAX:
+                return Response(pics[0].data, media_type=pics[0].mime, headers=COVER_CACHE)
+    except HTTPException:
+        raise
+    except Exception:  # dossier illisible, tags absents ou corrompus : pas de pochette
+        pass
+    raise HTTPException(404, "Pochette introuvable.")
 
 
 class _Sink:

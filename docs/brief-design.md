@@ -14,7 +14,7 @@ par exemple `VA-Toolroom_Ibiza_2026-(TOOL142001Z)-WEB-2026-AOV`, qui contient de
 - **Usage** : retrouver une release, la lancer, enchaîner, écouter longtemps (mixes d'une heure et plus).
 - **Appareils** : ordinateur (navigateur) et téléphone (application installée, PWA). Les deux comptent autant.
 - **Langue** : français uniquement.
-- **Ce que l'appli ne fait pas** : pas de pochettes, pas de playlists, pas d'édition, pas d'écoute hors ligne.
+- **Ce que l'appli ne fait pas** : pas de playlists, pas d'édition, pas d'écoute hors ligne.
 
 ## 2. Utilisateurs
 
@@ -76,6 +76,7 @@ frappe) affiche la même liste, filtrée.
 
 ### 4.4 Fiche d'une release
 - **Nom** de la release en titre.
+- **Pochette** à gauche des informations (au-dessus sur téléphone), quand la release en a une ; un clic l'ouvre en grand.
 - **Informations** (les champs absents ne s'affichent pas) : Artiste, Titre, Source (WEB, CD, VINYL, SAT…),
   Année, Groupe, Localisation, Genre, Taille, Durée.
 - **Actions** : **Lire** (principale), **Ajouter à la file**, **Favori**, **Télécharger (zip)**.
@@ -154,7 +155,8 @@ lecteur réduit **au-dessus** des onglets.
 **Contenu**
 - Noms de release longs (jusqu'à 100 caractères et plus), sans espaces : prévoir le retour à la ligne.
 - Champs souvent vides : genre, artiste, durée (tant que les tags ne sont pas lus).
-- Aucune image : ni pochette, ni avatar. Le design repose sur la typographie et la densité.
+- Une seule image : la **pochette**, sur la fiche et dans le lecteur, souvent absente (prévoir l'affichage sans).
+  Pas de vignette dans les listes : le design repose sur la typographie et la densité.
 - Listes très longues : la lisibilité d'une ligne et la vitesse de balayage priment.
 
 **Technique**

@@ -4,7 +4,7 @@
 
 **Collection de releases MP3 « scene » — bibliothèque · lecteur web · Chromecast · PWA**
 
-[![Version](https://img.shields.io/badge/version-1.4.1-purple?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.5.0-purple?style=for-the-badge)](CHANGELOG.md)
 [![Stack](https://img.shields.io/badge/stack-FastAPI_·_SQLite_·_JavaScript_pur-blue?style=for-the-badge)](#stack-technique)
 [![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
 
@@ -52,7 +52,7 @@ Tout est déduit des dossiers et des fichiers, sans rien saisir.
 |-------|------|
 | **Derniers** | Releases par date d'ajout, filtres catégorie, genre et année, recherche plein texte |
 | **Dossiers** | Navigation dans l'arborescence du NAS |
-| **Fiche** | Pistes, durées, débit, NFO, téléchargement en zip |
+| **Fiche** | Pochette, pistes, durées, débit, NFO, téléchargement en zip |
 | **Favoris** | Releases et pistes favorites, **historique d'écoute**, par compte |
 | **Compte** | Changement de mot de passe, langue (français ou anglais) |
 | **Admin** | Utilisateurs, scan de la bibliothèque, version installée |
@@ -72,10 +72,10 @@ Tout est déduit des dossiers et des fichiers, sans rien saisir.
 - Colonnes **triables** d'un clic sur leur titre (bureau)
 - Filtres **Localisations**, **Genres**, **Années** et recherche plein texte (SQLite FTS5)
 - Défilement infini par pages de 50, navigation par dossiers
-- Fiche de release : pistes par disque, NFO affiché, **téléchargement en zip** à la volée
+- Fiche de release : **pochette**, pistes par disque, NFO affiché, **téléchargement en zip** à la volée
 
 ### 🎵 Lecteur
-- Barre de lecture en pied de page : titre sur deux lignes, lecture, précédent, suivant, **aléatoire**, **répétition**
+- Barre de lecture en pied de page : pochette, titre sur deux lignes, lecture, précédent, suivant, **aléatoire**, **répétition**
 - **File d'attente** modifiable, ajout d'une release entière d'un clic
 - Volume **vertical** au survol, coupure du son, molette
 - Raccourcis clavier : Espace (lecture/pause), ← → (± 5 s), Échap
@@ -366,7 +366,7 @@ git tag v1.2.0 && git push origin v1.2.0
 
 ## Limites connues
 
-- Pas de pochettes ni de forme d'onde.
+- Pas de forme d'onde. Pochette absente de la liste et du Chromecast.
 - Pas d'écoute hors ligne.
 - Pas de playlists ni de reprise entre appareils.
 - Pas d'AirPlay dédié, de Sonos ni de DLNA (le Bluetooth est géré par le téléphone).
@@ -381,6 +381,10 @@ git tag v1.2.0 && git push origin v1.2.0
 ## Historique des versions
 
 Le détail est dans le [journal des modifications](CHANGELOG.md).
+
+### 1.5.0 — 14 novembre 2026
+
+**Pochettes.** Sur la fiche, dans le lecteur et sur l'écran verrouillé, depuis l'image du dossier ou celle des tags.
 
 ### 1.4.1 — 14 novembre 2026
 

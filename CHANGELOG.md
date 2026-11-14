@@ -4,6 +4,23 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.5.0](https://github.com/djkix/mp3-scene/compare/v1.4.1...v1.5.0) (2026-11-14)
+
+### Résumé
+
+**Pochettes.** La pochette d'une release s'affiche sur sa fiche (un clic l'ouvre en grand), dans le lecteur —
+vignette sur bureau et dans le lecteur réduit, grande image dans le lecteur plein écran du téléphone — et sur
+l'écran verrouillé. Elle vient de l'image du dossier (« front », « cover » ou « folder » de préférence), sinon de
+l'image incluse dans les tags de la première piste. Sans image, rien ne s'affiche. Aucune migration, aucun scan.
+
+### Fonctionnalités
+
+* pochette sur la fiche, dans le lecteur et sur l'écran verrouillé
+
+### Tests
+
+* vérification de la syntaxe de tous les fichiers de l'interface
+
 ## [1.4.1](https://github.com/djkix/mp3-scene/compare/v1.4.0...v1.4.1) (2026-11-14)
 
 ### Résumé
