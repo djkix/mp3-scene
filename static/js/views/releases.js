@@ -3,8 +3,8 @@ import { el } from '../dom.js';
 
 const PAGE = 50;
 const emit = (name, detail) => document.dispatchEvent(new CustomEvent(name, { detail }));
-const plural = (n, one, many) => `${n} ${n > 1 ? many : one}`;
 const HEART = ['♡︎', '♥︎'];
+const HEAD = [['Nom'], ['Genre'], ['Date'], ['Pistes', 'num'], ['Poids', 'num'], ['Localisation'], ['']];
 
 export function favButton(rel, kind = 'release') {
   const btn = el('button', { type: 'button', class: 'icon fav' });
@@ -35,16 +35,19 @@ function row(rel) {
     onclick: () => emit('queue-release', { releaseId: rel.id }) }, '+');
   const detail = el('a', { class: 'icon', href: `#/release/${rel.id}`, title: 'Détail de la release',
     'aria-label': 'Détail de la release' }, '›');
-  const meta = [rel.genre, plural(rel.track_count, 'piste', 'pistes'), fmtSize(rel.size)].filter(Boolean).join(' · ');
   return el('li', {
     class: 'rel', tabIndex: 0,
     onclick: (e) => { if (!e.target.closest('button, a')) play(); },
     onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) play(); },
   },
-  el('span', { class: 'rel-date' }, fmtDate(rel.added_at)),
-  el('span', { class: 'rel-cat' }, rel.category || ''),
   el('span', { class: 'rel-name' }, rel.name),
-  el('span', { class: 'rel-meta' }, meta),
+  // même ordre que HEAD ; sur mobile, .rel-info devient une ligne de détails sous le nom
+  el('span', { class: 'rel-info' },
+    el('span', {}, rel.genre || ''),
+    el('span', {}, fmtDate(rel.added_at)),
+    el('span', { class: 'num' }, String(rel.track_count), el('span', { class: 'unit' }, rel.track_count > 1 ? ' pistes' : ' piste')),
+    el('span', { class: 'num' }, fmtSize(rel.size)),
+    el('span', { class: 'rel-loc', title: rel.category || '' }, rel.category || '')),
   el('span', { class: 'rel-actions' }, queue, favButton(rel), detail));
 }
 
@@ -53,7 +56,9 @@ export function releaseList(container, fetchPage, { empty = 'Aucun résultat' } 
   const list = el('ul', { class: 'rel-list' });
   const status = el('p', { class: 'status', role: 'status' });
   const sentinel = el('div', { class: 'sentinel' });
-  container.replaceChildren(list, status, sentinel);
+  // libellés de colonnes (bureau) ; décoratifs : chaque ligne reste lisible seule
+  const head = el('div', { class: 'rel-head', 'aria-hidden': 'true' }, HEAD.map(([t, c]) => el('span', { class: c }, t)));
+  container.replaceChildren(head, list, status, sentinel);
   let offset = 0, loading = false, done = false, dead = false;
 
   const observer = new IntersectionObserver((entries) => {
@@ -113,8 +118,8 @@ export function render(container, params) {
   let dead = false;
   loadFilters().then((f) => {
     if (dead) return;
-    bar.replaceChildren(select('Catégorie', 'Toutes', 'category', f.categories, category, setFilter),
-      select('Genre', 'Tous', 'genre', f.genres, genre, setFilter), select('Année', 'Toutes', 'year', f.years, year, setFilter));
+    bar.replaceChildren(select('Catégorie', 'Catégories', 'category', f.categories, category, setFilter),
+      select('Genre', 'Genres', 'genre', f.genres, genre, setFilter), select('Année', 'Années', 'year', f.years, year, setFilter));
   }).catch(() => {});
 
   const query = new URLSearchParams(Object.entries({ q, category, genre, year }).filter(([, v]) => v));

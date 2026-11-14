@@ -1,6 +1,6 @@
 services:
   mp3-scene:
-    build: .
+    image: ghcr.io/djkix/mp3-scene:latest   # ou une version précise : ghcr.io/djkix/mp3-scene:1.1.0
     container_name: mp3-scene
     restart: unless-stopped
     environment:

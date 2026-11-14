@@ -1,17 +1,150 @@
-# Mp3 Scene
+<div align="center">
 
-Application web auto-hébergée pour parcourir et écouter une collection privée de releases MP3 « scene » stockée sur un NAS.
-Backend FastAPI + SQLite, interface en JavaScript pur (aucune étape de build), lecteur intégré, cast Chromecast, installable en PWA.
-La musique n'est jamais modifiée : le partage est monté en lecture seule, l'appli n'écrit que dans son dossier `data/`.
+# 🎧 Mp3 Scene
 
-## Prérequis
+**Collection de releases MP3 « scene » — bibliothèque · lecteur web · Chromecast · PWA**
 
-- Une machine avec Docker et Docker Compose v2, **distincte du NAS**, qui monte le partage en NFS.
-- Le **client NFS** installé sur la machine Docker : `sudo apt install nfs-common` (Debian/Ubuntu) ou `sudo dnf install nfs-utils` (Fedora/RHEL). Sans lui, `docker compose up` échoue avec `mount: ... bad option; for several filesystems (e.g. nfs, cifs) you might need a /sbin/mount.<type> helper program`.
-- Un NAS qui exporte le dossier des releases en NFS (v4).
-- Un reverse proxy HTTPS (domaine + certificat valide) devant l'appli.
+[![Version](https://img.shields.io/badge/version-1.1.0-purple?style=for-the-badge)](CHANGELOG.md)
+[![Stack](https://img.shields.io/badge/stack-FastAPI_·_SQLite_·_JavaScript_pur-blue?style=for-the-badge)](#stack-technique)
+[![Image](https://img.shields.io/badge/image-ghcr.io-green?style=for-the-badge)](https://github.com/djkix/mp3-scene/pkgs/container/mp3-scene)
 
-## Côté NAS : export NFS en lecture seule
+*Parcourir et écouter des dizaines de milliers de releases stockées sur un NAS, depuis le navigateur ou le téléphone. Auto-hébergée, la musique n'est jamais modifiée.*
+
+<br />
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│ Mp3 Scene   🔍 Rechercher une release…   Derniers Dossiers Favoris Admin │
+├──────────────────────────────────────────────────────────────────────────┤
+│              [ Catégories ▾ ]  [ Genres ▾ ]  [ Années ▾ ]                │
+│ Nom                               Genre   Date        Pistes   Poids     │
+│ VA-Compilation_Ete-2CD-2026-GRP   House   26/05/2026      52  934 Mo + ♡ │
+│ Artiste-Titre-SINGLE-WEB-2026-GRP House   29/06/2026       1   11 Mo + ♥ │
+│ Artiste-Essential_Mix-SAT-2025-…  Techno  25/09/2025       1  224 Mo + ♡ │
+│                                                                          │
+├──────────────────────────────────────────────────────────────────────────┤
+│ Titre de la piste           ⇄  ⏮  ▶  ⏭  ↻                   🔊  ☰  ⎚   │
+│ Nom-De-La-Release     1:36 ━━━━━━━●────────── 55:36                      │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+<br />
+
+[Fonctionnalités](#fonctionnalités) ·
+[Architecture](#architecture) ·
+[Installation](#installation) ·
+[Dockge](#installation-via-dockge) ·
+[Reverse proxy](#reverse-proxy) ·
+[Variables d'environnement](#variables-denvironnement) ·
+[Historique](#historique-des-versions)
+
+</div>
+
+---
+
+## Vue d'ensemble
+
+**Mp3 Scene** transforme un dossier de releases MP3 sur un NAS en bibliothèque consultable et écoutable.
+Le partage est monté **en lecture seule** : l'application n'écrit que dans son dossier `data/` (une base SQLite).
+Tout est déduit des dossiers et des fichiers, sans rien saisir.
+
+| Écran | Rôle |
+|-------|------|
+| **Derniers** | Releases par date d'ajout, filtres catégorie, genre et année, recherche plein texte |
+| **Dossiers** | Navigation dans l'arborescence du NAS |
+| **Fiche** | Pistes, durées, débit, NFO, téléchargement en zip |
+| **Favoris** | Releases et pistes favorites, par compte |
+| **Compte** | Changement de mot de passe |
+| **Admin** | Utilisateurs, scan de la bibliothèque, version installée |
+
+| Déduit automatiquement | D'où ça vient |
+|------------------------|---------------|
+| **Catégorie** | Dossier de premier niveau du partage |
+| **Artiste, titre, année, source, groupe** | Nom du dossier de la release |
+| **Genre, durée, artiste de la piste** | Tags ID3, lus en tâche de fond |
+
+---
+
+## Fonctionnalités
+
+### 📚 Bibliothèque
+- Liste en colonnes : **nom, genre, date, pistes, poids, localisation**, avec libellés ; sur téléphone, le nom puis une ligne de détails
+- Filtres **Catégories**, **Genres**, **Années** et recherche plein texte (SQLite FTS5)
+- Défilement infini par pages de 50, navigation par dossiers
+- Fiche de release : pistes par disque, NFO affiché, **téléchargement en zip** à la volée
+
+### 🎵 Lecteur
+- Barre de lecture en pied de page : titre sur deux lignes, lecture, précédent, suivant, **aléatoire**, **répétition**
+- **File d'attente** modifiable, ajout d'une release entière d'un clic
+- Volume **vertical** au survol, coupure du son, molette
+- Raccourcis clavier : Espace (lecture/pause), ← → (± 5 s), Échap
+- Commandes sur l'écran verrouillé et le casque (Media Session)
+
+### 📱 Deux interfaces
+- **Bureau** : barre en trois colonnes, tableau large
+- **Téléphone** : onglets en bas, à portée de pouce ; lecteur réduit, puis **plein écran** au toucher du titre ; cibles de 44 px
+- Thème clair ou sombre selon le système
+
+### 📺 Chromecast
+- Envoi de la file au Chromecast depuis Chrome ou Edge (Android et ordinateur)
+- Liens signés valables 12 heures, sans session
+
+### 🔎 Scan
+- **Manuel**, lancé depuis la page Admin ; incrémental : un second scan ne relit que ce qui a changé
+- Deux phases : structure (détection des releases), puis tags ID3 en tâche de fond
+- Reprise après redémarrage ; dossiers illisibles et noms non UTF-8 ignorés et signalés
+
+### 🛡️ Comptes et administration
+- Comptes **administrateur** et **utilisateur**, mots de passe hachés (argon2)
+- Session par cookie de 30 jours, anti-force brute (5 échecs → 15 minutes)
+- **Numéro de version** dans la page Admin et **bandeau** quand une version plus récente est publiée (administrateurs seulement)
+
+### 📲 PWA
+- Installable sur Android et iPhone ; la coquille de l'interface est en cache, jamais la musique
+
+---
+
+## Architecture
+
+```
+Navigateur / PWA ──HTTPS──▶ Reverse proxy ──HTTP──▶ mp3-scene (FastAPI, port 8000)
+                                                      │            │
+Chromecast ──HTTPS /cast/ (URL signées)──▶            │            │
+                                              /data (SQLite)   /music (NAS, lecture seule)
+```
+
+- **Un seul conteneur** : API, fichiers statiques et flux audio.
+- **SQLite** dans `data/` : index, comptes, sessions, favoris. Rien d'autre à sauvegarder.
+- **Interface sans étape de build** : modules JavaScript servis tels quels.
+- Les MP3 sont servis tels quels, avec `Range` ; aucun transcodage.
+
+---
+
+## Stack technique
+
+| Couche | Technologies |
+|--------|--------------|
+| Backend | Python 3.12, FastAPI, Starlette, Uvicorn |
+| Base de données | SQLite (WAL, FTS5) |
+| Audio | mutagen (tags ID3), flux HTTP avec `Range` |
+| Sécurité | argon2-cffi, cookie de session, URL de cast signées |
+| Frontend | JavaScript pur (modules ES), CSS, service worker, Google Cast SDK |
+| Tests | pytest (serveur), `node --test` (interface) |
+| CI/CD | GitHub Actions, GHCR (`ghcr.io/djkix/mp3-scene`) |
+| Orchestration | Docker Compose, compatible **Dockge** |
+
+---
+
+## Installation
+
+### Prérequis
+
+- Une machine avec Docker et Docker Compose v2, **distincte du NAS**, qui accède au partage en NFS.
+- Le **client NFS** sur la machine Docker : `sudo apt install nfs-common` (Debian/Ubuntu) ou `sudo dnf install nfs-utils` (Fedora/RHEL).
+- Un NAS qui exporte le dossier des releases en NFS.
+- Un reverse proxy HTTPS (domaine et certificat valide) devant l'application.
+
+### Côté NAS : export NFS en lecture seule
 
 Sur Synology (DSM) — les chemins de menus ci-dessous sont écrits de mémoire et peuvent varier selon la version de DSM :
 
@@ -29,36 +162,76 @@ avertissement sur la page Administration (voir « Première connexion et premier
 Les dossiers système de Synology (`#recycle`, `@eaDir`) présents sous l'export apparaissent comme des catégories :
 pour les exclure, exportez un sous-dossier propre qui ne contient que les releases.
 
-## Installation
+### Installation via Dockge
 
-> **Note de l'auteur :** le `Dockerfile` et le `docker-compose.yml` ont été écrits et relus sans Docker disponible sur la machine de développement. Ils n'ont **pas** été construits ni exécutés par l'auteur : votre premier `docker compose build` est le vrai test. Si une étape échoue, c'est un bug à signaler.
+L'image est publiée sur GHCR : rien à construire sur le serveur.
 
-```bash
-git clone <URL_DU_DEPOT> mp3-scene && cd mp3-scene
-cp .env.example .env
-python3 -c "import secrets; print(secrets.token_urlsafe(48))"   # à coller dans SECRET_KEY (32 caractères minimum)
-nano .env                                                       # SECRET_KEY, ADMIN_USER, ADMIN_PASSWORD (à remplir)
-mkdir -p data && sudo chown 1000:1000 data                      # sinon Docker crée data/ en root et l'appli ne peut pas écrire
+1. Dans Dockge, créer un stack `mp3-scene` et y coller ce `compose.yaml` :
+
+```yaml
+services:
+  mp3-scene:
+    image: ghcr.io/djkix/mp3-scene:latest
+    container_name: mp3-scene
+    restart: unless-stopped
+    environment:
+      SECRET_KEY: ${SECRET_KEY:?renseignez SECRET_KEY dans .env}
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      PUBLIC_URL: https://mp3.exemple.fr
+      TZ: Europe/Paris
+    ports:
+      - 127.0.0.1:8000:8000
+    volumes:
+      - /mnt/media/releases:/music:ro
+      - ./data:/data
 ```
 
-Dans `.env`, `SECRET_KEY` et `ADMIN_PASSWORD` sont volontairement vides : `docker compose` refuse de démarrer tant que `SECRET_KEY` n'est pas renseignée, et sans `ADMIN_PASSWORD` (au moins 8 caractères) le premier démarrage n'a aucun compte et l'écrit dans les journaux. Le mot de passe reste en clair dans `.env` et dans l'environnement du conteneur jusqu'à ce que vous le retiriez (voir Sécurité).
-
-Éditer `docker-compose.yml` :
-
-- `PUBLIC_URL` : l'adresse publique HTTPS du site, sans slash final (`https://mp3.exemple.fr`). Elle sert aux URL envoyées au Chromecast ; si elle est vide ou ne commence pas par `http://` ou `https://`, le démarrage écrit un avertissement dans les journaux et le cast ne fonctionnera pas.
-- `<IP_NAS>` et `device` (chemin de montage NFS du NAS) dans le volume `music`.
-- `ports` : par défaut `127.0.0.1:8000:8000` (reverse proxy sur la même machine). Si le proxy est sur une autre machine, mettre l'adresse LAN de la machine Docker et filtrer au pare-feu ; ne jamais publier ce port sur Internet ni sur tout le réseau (voir plus bas). Attention : les ports publiés par Docker contournent en général les règles ufw/firewalld ; l'adresse de liaison est la vraie protection, surtout si vous liez une adresse LAN au lieu de `127.0.0.1`.
+2. Dans la zone `.env` du stack :
 
 ```bash
-docker compose up -d --build
-docker compose logs -t -f mp3-scene   # démarrage, avertissements, progression du scan (horodatés)
-docker compose ps                     # l'état doit passer à « healthy »
+SECRET_KEY=        # python3 -c "import secrets; print(secrets.token_urlsafe(48))"
+ADMIN_USER=admin
+ADMIN_PASSWORD=    # 8 caractères au moins ; à retirer après le premier démarrage
 ```
+
+3. Adapter trois lignes :
+   - `PUBLIC_URL` : l'adresse publique HTTPS du site, sans slash final. Elle sert aux URL envoyées au Chromecast.
+   - `ports` : `127.0.0.1` si le proxy est sur la même machine ; sinon l'adresse LAN de la machine Docker. Ne jamais publier ce port sur Internet : les ports publiés par Docker contournent en général ufw/firewalld.
+   - le volume `/music` : le dossier où la machine Docker monte le partage du NAS (ici `/mnt/media/releases`).
+4. Créer le dossier de données avec le bon propriétaire, sinon Docker le crée en root : `mkdir -p data && sudo chown 1000:1000 data` dans le dossier du stack.
+5. Cliquer sur **Déployer**. L'état doit passer à « healthy ».
 
 Le compte administrateur est créé au premier démarrage, uniquement s'il n'existe encore aucun utilisateur.
-Si vous changez plus tard `<IP_NAS>` ou le chemin de l'export dans `docker-compose.yml`, le volume nommé existant garde l'ancienne définition : `docker compose down`, puis `docker volume ls` (repérer `<dossier du projet>_music`, soit `mp3-scene_music` si le dépôt est cloné dans `mp3-scene`), `docker volume rm mp3-scene_music`, puis `docker compose up -d`.
-
 Vérifier que la bibliothèque est bien en lecture seule : `docker compose exec mp3-scene touch /music/x` doit échouer.
+
+### Sans Dockge
+
+```bash
+git clone https://github.com/djkix/mp3-scene.git && cd mp3-scene
+cp .env.example .env && nano .env        # SECRET_KEY, ADMIN_USER, ADMIN_PASSWORD
+mkdir -p data && sudo chown 1000:1000 data
+nano docker-compose.yml                  # PUBLIC_URL, ports, adresse et chemin NFS du NAS
+docker compose up -d
+docker compose logs -t -f mp3-scene
+```
+
+Le `docker-compose.yml` du dépôt monte le partage lui-même, par un volume NFS (`<IP_NAS>` et `device`).
+Si vous changez ces valeurs plus tard, le volume nommé garde l'ancienne définition : `docker compose down`,
+`docker volume rm mp3-scene_music`, puis `docker compose up -d`.
+
+### Mettre à jour
+
+Dans Dockge : **Mettre à jour** (télécharge la dernière image et recrée le conteneur). En ligne de commande :
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+Une nouvelle version est annoncée par un bandeau dans l'application (administrateurs). Pour rester sur une version
+précise, remplacer `latest` par son numéro : `ghcr.io/djkix/mp3-scene:1.1.0`.
+
+---
 
 ## Reverse proxy
 
@@ -99,6 +272,8 @@ Synology DSM (Panneau de configuration → Portail de connexion → Avancé → 
 - Associer le certificat du domaine (Sécurité → Certificat → Configurer). Ne cocher aucune règle d'accès (pas d'authentification du portail).
 - DSM ne propose pas de désactiver la mise en tampon : si la lecture ou les zips saccadent, utiliser Nginx directement.
 - Le port 8000 de la machine Docker doit n'être joignable que depuis le DSM (pare-feu), donc `ports` du compose sur l'adresse LAN de la machine Docker.
+
+---
 
 ## Première connexion et premier scan
 
@@ -142,28 +317,50 @@ Vider réellement l'index (le scan refuse de retirer toutes les releases d'un co
 
 Une base créée par une version plus récente de l'appli est refusée au démarrage (message dans les journaux) : revenir à cette version, ou restaurer une sauvegarde de `data/`.
 
-## Mise à jour
+---
 
-```bash
-git pull && docker compose up -d --build
-```
+## Variables d'environnement
 
-Les dépendances Python sont figées (`==`) dans `requirements.txt` et `requirements-dev.txt` : une reconstruction installe exactement les versions testées. Pour les mettre à jour délibérément : changer les versions dans ces fichiers, `.venv/bin/pip install -r requirements-dev.txt`, lancer les tests (voir Développement), puis reconstruire l'image.
+| Variable | Obligatoire | Rôle |
+|----------|-------------|------|
+| `SECRET_KEY` | oui | Signe les sessions et les liens de cast ; 32 caractères au moins. La changer invalide toutes les sessions |
+| `ADMIN_USER` | non (`admin`) | Identifiant du premier compte administrateur |
+| `ADMIN_PASSWORD` | au premier démarrage | Mot de passe du premier compte, 8 caractères au moins ; lu seulement tant qu'aucun compte n'existe |
+| `PUBLIC_URL` | pour le cast | Adresse publique HTTPS, sans slash final |
+| `TZ` | non | Fuseau des journaux du serveur |
+| `MUSIC_ROOT` | non (`/music`) | Dossier des releases dans le conteneur |
+| `DATA_DIR` | non (`/data`) | Dossier de la base SQLite |
+
+---
 
 ## Développement
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/pytest -q                       # tests Python
-node --test static/js/                    # tests JavaScript (exécutés avec Node v26.12.1)
+node --test static/js/                    # tests JavaScript
 python3 scripts/make_demo_library.py /tmp/demo-music     # fausse bibliothèque
+mkdir -p /tmp/demo-data
 MUSIC_ROOT=/tmp/demo-music DATA_DIR=/tmp/demo-data SECRET_KEY=dev-dev-dev-dev-dev-dev-dev-dev-32 ADMIN_USER=admin ADMIN_PASSWORD=adminadmin \
   PUBLIC_URL=http://localhost:8000 .venv/bin/uvicorn --factory app.main:create_app --port 8000
-python3 scripts/make_icons.py             # régénère les icônes PWA (bibliothèque standard seule)
+python3 scripts/make_icons.py             # régénère les icônes PWA
+docker build -t mp3-scene .               # image locale
 ```
 
-(`mkdir -p /tmp/demo-data` au préalable.) En local, utilisez `http://localhost` (les navigateurs y acceptent le cookie `Secure`).
+En local, utilisez `http://localhost` (les navigateurs y acceptent le cookie `Secure`).
 Si vous modifiez un fichier de `static/`, incrémentez `VERSION` dans `static/sw.js` et gardez sa liste `PRECACHE` à jour (un test le vérifie).
+Les dépendances Python sont figées (`==`) : une reconstruction installe exactement les versions testées.
+
+### Publier une version
+
+Une version = une étiquette `vX.Y.Z` poussée sur `main`. GitHub Actions construit alors l'image
+(`X.Y.Z` et `latest`) puis crée la publication GitHub, que l'application consulte pour afficher le bandeau.
+
+```bash
+git tag v1.2.0 && git push origin v1.2.0
+```
+
+---
 
 ## Limites connues
 
@@ -176,3 +373,22 @@ Si vous modifiez un fichier de `static/`, incrémentez `VERSION` dans `static/sw
 - Pas d'édition de tags, de vérification SFV, ni de suppression ou déplacement de fichiers.
 - Interface en français uniquement.
 - Cast : Chrome/Edge uniquement, pas depuis un iPhone.
+
+---
+
+## Historique des versions
+
+Le détail est dans le [journal des modifications](CHANGELOG.md).
+
+### 1.1.0 — 14 novembre 2026
+
+**Liste en colonnes.** Nom, genre, date, pistes, poids et localisation ont chacun leur colonne, avec un libellé
+en tête ; les filtres portent leur nom (Catégories, Genres, Années) et sont centrés. Sur téléphone, le nom reste
+en première ligne, les détails en dessous. README refait, journal des modifications ajouté.
+
+### 1.0.0 — 14 novembre 2026
+
+**Première version publiée.** Bibliothèque, recherche, dossiers, fiche de release, favoris, lecteur avec file
+d'attente, Chromecast, PWA, comptes et administration. Interface en deux mises en page, bureau et téléphone,
+lecteur repensé avec volume vertical. Image publiée sur GHCR, numéro de version dans la page Admin et bandeau
+de nouvelle version.
