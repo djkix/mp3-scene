@@ -4,6 +4,17 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.6.1](https://github.com/djkix/mp3-scene/compare/v1.6.0...v1.6.1) (2026-11-14)
+
+### Résumé
+
+**Forme d'onde plus lisible.** Le relief est accentué à l'affichage : sur les musiques très compressées, dont le
+niveau varie peu, la forme d'onde ressemblait à un bloc presque plein. Les données calculées ne changent pas.
+
+### Correctifs
+
+* relief de la forme d'onde accentué
+
 ## [1.6.0](https://github.com/djkix/mp3-scene/compare/v1.5.0...v1.6.0) (2026-11-14)
 
 ### Résumé

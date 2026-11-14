@@ -317,7 +317,8 @@ function waveMask(peaks, bars = 160) {
   const g = c.getContext('2d');
   for (let i = 0; i < bars; i++) {
     const part = peaks.slice(Math.floor(i * peaks.length / bars), Math.max(Math.floor((i + 1) * peaks.length / bars), Math.floor(i * peaks.length / bars) + 1));
-    const h = Math.max(2, Math.max(0, ...part) / 255 * c.height);
+    // puissance 2,5 : creuse le relief des musiques très compressées, dont les crêtes restent entre 60 et 100 %
+    const h = Math.max(2, (Math.max(0, ...part) / 255) ** 2.5 * c.height);
     g.fillRect(i * 4, (c.height - h) / 2, 3, h);
   }
   return c.toDataURL();
