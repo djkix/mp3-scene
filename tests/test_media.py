@@ -62,6 +62,23 @@ def test_download_disposition(user_client, tid):
                                                 "filename*=UTF-8''01-a-trak--ibanez.mp3")
 
 
+def test_waveform_reduce_and_cache(user_client, conn, monkeypatch, library):
+    from app import routes_media
+    assert routes_media.reduce_peaks([]) == b""
+    assert routes_media.reduce_peaks([10, 20, 5]) == bytes([127, 255, 63])          # normalisée sur la plus forte
+    assert routes_media.reduce_peaks([1, 9, 2, 4], points=2) == bytes([255, 113])   # crête de chaque moitié
+    tid = conn.execute("SELECT id FROM tracks ORDER BY id LIMIT 1").fetchone()[0]
+    calls = []
+    monkeypatch.setattr(routes_media, "compute_waveform", lambda path: calls.append(path) or bytes([0, 128, 255]))
+    for _ in range(2):  # le second appel vient du cache
+        assert user_client.get(f"/api/tracks/{tid}/waveform").json() == {"peaks": [0, 128, 255]}
+    assert len(calls) == 1
+    assert user_client.get("/api/tracks/99999/waveform").status_code == 404
+    monkeypatch.setattr(routes_media, "compute_waveform", lambda path: None)  # décodeur absent ou fichier illisible
+    other = conn.execute("SELECT id FROM tracks ORDER BY id DESC LIMIT 1").fetchone()[0]
+    assert user_client.get(f"/api/tracks/{other}/waveform").status_code == 404
+
+
 def test_cover_prefers_front_image(user_client, settings, library):
     from app.routes_media import pick_cover
     assert pick_cover(["a.nfo", "00-x-2cd-2008-back.jpg", "00-x-2cd-2008-front.JPG", "zz.png"]) == "00-x-2cd-2008-front.JPG"

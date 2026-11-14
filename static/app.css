@@ -109,6 +109,15 @@ a.icon:hover { background: var(--hover); }
 #player [aria-pressed="true"] { color: var(--accent-text); }
 .pl-seek { grid-area: seek; min-width: 0; display: flex; align-items: center; gap: 8px; }
 #player input[type="range"] { flex: 1; min-width: 0; padding: 0; border: 0; background: none; accent-color: var(--accent); }
+/* Forme d'onde : elle remplace visuellement le curseur de position, qui reste dessous (invisible) pour le clic et le clavier */
+.pl-wave { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; }
+.pl-wave.has-wave { height: 32px; border-radius: 3px; }
+.pl-wave.has-wave::before, .pl-wave.has-wave::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  -webkit-mask: var(--wave) center / 100% 100% no-repeat; mask: var(--wave) center / 100% 100% no-repeat; }
+.pl-wave.has-wave::before { background: var(--muted); opacity: .45; }
+.pl-wave.has-wave::after { background: var(--accent); clip-path: inset(0 calc(100% - var(--p, 0) * 100%) 0 0); } /* partie écoutée */
+.pl-wave.has-wave input { height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.pl-wave.has-wave:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 .pl-time { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* Volume : bouton (clic = couper le son) + curseur vertical dans une bulle, au survol ou au focus clavier */
@@ -220,7 +229,8 @@ google-cast-launcher:hover { background: var(--hover); }
   #player.expanded .pl-title:hover { text-decoration: none; }
   #player.expanded .pl-rel { display: block; font-size: 14px; white-space: normal; overflow-wrap: anywhere; }
   #player.expanded .pl-seek { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
-  #player.expanded .pl-seek input { grid-column: 1 / -1; grid-row: 1; min-height: 44px; }
+  #player.expanded .pl-wave { grid-column: 1 / -1; grid-row: 1; min-height: 44px; }
+  #player.expanded .pl-wave.has-wave { height: 64px; }
   #player.expanded .pl-seek .pl-time:last-child { justify-self: end; }
   #player.expanded .pl-seek { order: 1; }
   #player.expanded .pl-controls { order: 2; justify-content: space-between; }

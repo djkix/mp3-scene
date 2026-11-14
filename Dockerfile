@@ -7,6 +7,9 @@ ENV MUSIC_ROOT=/music DATA_DIR=/data PYTHONUNBUFFERED=1 PIP_DISABLE_PIP_VERSION_
 
 WORKDIR /srv
 
+# mpg123 : décodeur MP3 pour le calcul des formes d'onde
+RUN apt-get update && apt-get install -y --no-install-recommends mpg123 && rm -rf /var/lib/apt/lists/*
+
 # dépendances d'abord : cette couche n'est reconstruite que si requirements.txt change
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

@@ -113,7 +113,8 @@ Présent en bas de tous les écrans. C'est l'élément le plus utilisé.
 - **Titre** de la piste (sur deux lignes au besoin) et **nom de la release** (lien vers sa fiche).
 - **Commandes** : aléatoire, précédent, **lecture/pause** (bouton principal), suivant, répétition
   (désactivée, toute la file, une piste).
-- **Progression** : temps écoulé, barre déplaçable, durée totale.
+- **Progression** : temps écoulé, **forme d'onde** de la piste servant de barre déplaçable (partie écoutée
+  colorée), durée totale. Tant que la forme d'onde n'est pas calculée, un curseur simple la remplace.
 - **Outils** : volume, file d'attente, bouton Chromecast (quand un appareil est disponible).
 - **Volume** : curseur **vertical** dans une bulle qui s'ouvre au survol ou au focus du bouton haut-parleur ;
   clic sur le bouton : couper ou rétablir le son. Absent sur téléphone (volume matériel).

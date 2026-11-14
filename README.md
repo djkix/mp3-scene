@@ -4,7 +4,7 @@
 
 **Collection de releases MP3 « scene » — bibliothèque · lecteur web · Chromecast · PWA**
 
-[![Version](https://img.shields.io/badge/version-1.5.0-purple?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.6.0-purple?style=for-the-badge)](CHANGELOG.md)
 [![Stack](https://img.shields.io/badge/stack-FastAPI_·_SQLite_·_JavaScript_pur-blue?style=for-the-badge)](#stack-technique)
 [![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
 
@@ -76,6 +76,7 @@ Tout est déduit des dossiers et des fichiers, sans rien saisir.
 
 ### 🎵 Lecteur
 - Barre de lecture en pied de page : pochette, titre sur deux lignes, lecture, précédent, suivant, **aléatoire**, **répétition**
+- **Forme d'onde** en guise de barre de progression, calculée à la première écoute puis gardée en base
 - **File d'attente** modifiable, ajout d'une release entière d'un clic
 - Volume **vertical** au survol, coupure du son, molette
 - Raccourcis clavier : Espace (lecture/pause), ← → (± 5 s), Échap
@@ -128,7 +129,7 @@ Chromecast ──HTTPS /cast/ (URL signées)──▶            │            
 |--------|--------------|
 | Backend | Python 3.12, FastAPI, Starlette, Uvicorn |
 | Base de données | SQLite (WAL, FTS5) |
-| Audio | mutagen (tags ID3), flux HTTP avec `Range` |
+| Audio | mutagen (tags ID3), flux HTTP avec `Range`, mpg123 (formes d'onde) |
 | Sécurité | argon2-cffi, cookie de session, URL de cast signées |
 | Frontend | JavaScript pur (modules ES), CSS, service worker, Google Cast SDK |
 | Tests | pytest (serveur), `node --test` (interface) |
@@ -366,7 +367,7 @@ git tag v1.2.0 && git push origin v1.2.0
 
 ## Limites connues
 
-- Pas de forme d'onde. Pochette absente de la liste et du Chromecast.
+- Pochette absente de la liste et du Chromecast. Forme d'onde calculée à la première écoute seulement (une piste à la fois).
 - Pas d'écoute hors ligne.
 - Pas de playlists ni de reprise entre appareils.
 - Pas d'AirPlay dédié, de Sonos ni de DLNA (le Bluetooth est géré par le téléphone).
@@ -381,6 +382,11 @@ git tag v1.2.0 && git push origin v1.2.0
 ## Historique des versions
 
 Le détail est dans le [journal des modifications](CHANGELOG.md).
+
+### 1.6.0 — 14 novembre 2026
+
+**Forme d'onde.** La barre de progression du lecteur devient la forme d'onde de la piste, calculée à la première
+écoute puis gardée en base.
 
 ### 1.5.0 — 14 novembre 2026
 

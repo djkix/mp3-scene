@@ -1,8 +1,12 @@
 import os
 import re
+import shutil
 import stat
+import subprocess
+import threading
 import time
 import zipfile
+from array import array
 from typing import Annotated
 from urllib.parse import quote
 
@@ -97,6 +101,78 @@ def cover(rid: Id, request: Request, conn=Depends(get_conn)):
     except Exception:  # dossier illisible, tags absents ou corrompus : pas de pochette
         pass
     raise HTTPException(404, "Pochette introuvable.")
+
+
+WAVE_POINTS = 800   # largeur de la forme d'onde, en barres
+WAVE_RATE = 8000    # décodage en mono 8 kHz : largement assez pour une enveloppe
+WAVE_WINDOW = 800   # échantillons par crête intermédiaire (0,1 s)
+WAVE_TIMEOUT = 600
+# ponytail: un seul calcul à la fois pour tout le serveur (un mix de 2 h occupe un cœur 20 à 60 s) ;
+# passer à un verrou par piste si l'attente devient gênante à plusieurs utilisateurs.
+_wave_lock = threading.Lock()
+
+
+def _decode_cmd(path) -> list[str] | None:
+    """Commande qui écrit la piste en PCM 16 bits mono sur sa sortie ; None si aucun décodeur n'est installé."""
+    if exe := shutil.which("mpg123"):  # celui de l'image Docker : petit, MP3 seulement
+        return [exe, "-q", "-s", "-m", "-r", str(WAVE_RATE), "-e", "s16", str(path)]
+    if exe := shutil.which("ffmpeg"):
+        return [exe, "-v", "error", "-nostdin", "-i", str(path), "-vn", "-ac", "1", "-ar", str(WAVE_RATE),
+                "-f", "s16le", "-"]
+    return None
+
+
+def reduce_peaks(peaks: list[int], points: int = WAVE_POINTS) -> bytes:
+    """Ramène une suite de crêtes à `points` valeurs au plus, de 0 à 255 (255 = crête la plus forte de la piste)."""
+    if not peaks:
+        return b""
+    n = min(points, len(peaks))
+    out = [max(peaks[i * len(peaks) // n:(i + 1) * len(peaks) // n]) for i in range(n)]
+    top = max(out) or 1
+    return bytes(v * 255 // top for v in out)
+
+
+def compute_waveform(path) -> bytes | None:
+    cmd = _decode_cmd(path)
+    if cmd is None:
+        return None
+    peaks, deadline = [], time.monotonic() + WAVE_TIMEOUT
+    proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    try:
+        while chunk := proc.stdout.read(WAVE_WINDOW * 2):
+            if time.monotonic() > deadline:
+                return None
+            samples = array("h", chunk[:len(chunk) & ~1])  # ordre des octets natif : petit-boutiste sur x86 et ARM
+            if samples:
+                peaks.append(max(max(samples), -min(samples)))
+    finally:
+        proc.kill()
+        proc.wait()
+    return reduce_peaks(peaks) or None
+
+
+@router.get("/api/tracks/{track_id}/waveform")
+def waveform(track_id: Id, request: Request, conn=Depends(get_conn)):
+    """Forme d'onde de la piste : calculée à la première demande, puis gardée en base."""
+    def cached():
+        row = conn.execute("SELECT peaks FROM waveforms WHERE track_id=?", (track_id,)).fetchone()
+        return row and {"peaks": list(row["peaks"])}
+    if hit := cached():
+        return hit
+    row = conn.execute("SELECT r.path, t.relpath FROM tracks t JOIN releases r ON r.id=t.release_id WHERE t.id=?",
+                       (track_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "Piste introuvable.")
+    path = safe_path(request.app.state.settings.music_root, row["path"], row["relpath"])
+    with _wave_lock:
+        if hit := cached():  # calculée par une autre requête pendant l'attente
+            return hit
+        peaks = compute_waveform(path)  # aucune écriture SQLite pendant la lecture du fichier
+        if not peaks:
+            raise HTTPException(404, "Forme d'onde indisponible.")
+        conn.execute("INSERT OR REPLACE INTO waveforms(track_id, peaks) VALUES (?,?)", (track_id, peaks))
+        conn.commit()
+    return {"peaks": list(peaks)}
 
 
 class _Sink:

@@ -307,6 +307,34 @@ function volUI() {
 }
 
 let logged = null; // dernière piste inscrite à l'historique d'écoute
+let waveId = null; // piste dont la forme d'onde est affichée ou demandée
+
+// Forme d'onde -> image servant de masque CSS à la barre de progression : les couleurs restent celles du thème.
+function waveMask(peaks, bars = 160) {
+  const c = document.createElement('canvas');
+  c.width = bars * 4; // barre de 3, espace de 1
+  c.height = 64;
+  const g = c.getContext('2d');
+  for (let i = 0; i < bars; i++) {
+    const part = peaks.slice(Math.floor(i * peaks.length / bars), Math.max(Math.floor((i + 1) * peaks.length / bars), Math.floor(i * peaks.length / bars) + 1));
+    const h = Math.max(2, Math.max(0, ...part) / 255 * c.height);
+    g.fillRect(i * 4, (c.height - h) / 2, 3, h);
+  }
+  return c.toDataURL();
+}
+
+function loadWave(t) {
+  const id = t?.id ?? null;
+  if (id === waveId) return;
+  waveId = id;
+  ui.wave.classList.remove('has-wave'); // curseur simple en attendant (premier calcul : jusqu'à une minute pour un long mix)
+  if (id === null) return;
+  api(`/tracks/${id}/waveform`).then((w) => {
+    if (waveId !== id || !w.peaks?.length) return;
+    ui.wave.style.setProperty('--wave', `url(${waveMask(w.peaks)})`);
+    ui.wave.classList.add('has-wave');
+  }).catch(() => {}); // pas de forme d'onde : le curseur simple reste
+}
 
 function update() {
   const q = player.queue, t = q.current(), on = playing();
@@ -322,6 +350,7 @@ function update() {
     ui.title.textContent = t ? title(t) : '';
     ui.title.title = ui.title.textContent;
     ui.rel.textContent = t?.release_name || '';
+    loadWave(t);
     const cover = t ? `/api/releases/${t.release_id}/cover` : '';
     if (ui.cover.dataset.src !== cover) { // même release : l'image n'est pas rechargée à chaque piste
       ui.cover.dataset.src = cover;
@@ -402,8 +431,13 @@ export function initPlayer(footer) {
   ui.elapsed = el('span', { class: 'pl-time' }, '0:00');
   ui.total = el('span', { class: 'pl-time' }, '0:00');
   ui.seek = el('input', { type: 'range', min: 0, max: 0, step: 'any', value: 0, 'aria-label': tr('Position dans la piste'),
-    oninput: () => { dragging = true; ui.elapsed.textContent = fmtDuration(+ui.seek.value); },
+    oninput: () => {
+      dragging = true;
+      ui.elapsed.textContent = fmtDuration(+ui.seek.value);
+      ui.footer.style.setProperty('--p', +ui.seek.max ? ui.seek.value / ui.seek.max : 0); // la forme d'onde suit le doigt
+    },
     onchange: () => { dragging = false; player.seek(+ui.seek.value); } });
+  ui.wave = el('div', { class: 'pl-wave' }, ui.seek);
   ui.vol = el('input', { type: 'range', class: 'pl-vol', min: 0, max: 1, step: 0.05, value: audio.volume,
     'aria-label': tr('Volume'), title: tr('Volume'), 'aria-orientation': 'vertical', oninput: () => player.setVolume(+ui.vol.value) });
   ui.volbtn = iconBtn('pl-volbtn', '', tr('Couper le son'), mute);
@@ -433,7 +467,7 @@ export function initPlayer(footer) {
         ui.play,
         iconBtn('pl-next', '⏭︎', tr('Suivant'), () => player.next()),
         ui.repeat),
-      el('div', { class: 'pl-seek' }, ui.elapsed, ui.seek, ui.total),
+      el('div', { class: 'pl-seek' }, ui.elapsed, ui.wave, ui.total),
       el('div', { class: 'pl-tools' }, volwrap, ui.qbtn,
         el('span', { id: 'cast-slot' })))); // emplacement du bouton cast (cast.js)
 
