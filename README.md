@@ -6,7 +6,7 @@
 
 [![Version](https://img.shields.io/badge/version-1.1.0-purple?style=for-the-badge)](CHANGELOG.md)
 [![Stack](https://img.shields.io/badge/stack-FastAPI_·_SQLite_·_JavaScript_pur-blue?style=for-the-badge)](#stack-technique)
-[![Image](https://img.shields.io/badge/image-ghcr.io-green?style=for-the-badge)](https://github.com/djkix/mp3-scene/pkgs/container/mp3-scene)
+[![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
 
 *Parcourir et écouter des dizaines de milliers de releases stockées sur un NAS, depuis le navigateur ou le téléphone. Auto-hébergée, la musique n'est jamais modifiée.*
 
@@ -392,3 +392,9 @@ en première ligne, les détails en dessous. README refait, journal des modifica
 d'attente, Chromecast, PWA, comptes et administration. Interface en deux mises en page, bureau et téléphone,
 lecteur repensé avec volume vertical. Image publiée sur GHCR, numéro de version dans la page Admin et bandeau
 de nouvelle version.
+
+---
+
+## Licence
+
+[MIT](LICENSE)
