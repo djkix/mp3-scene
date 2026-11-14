@@ -42,6 +42,13 @@ def test_invalid_or_expired_cookie_rejected(app, settings):
     assert _with_token(app, token).get("/api/me").status_code == 401
 
 
+def test_version_admin_only(admin_client, user_client, monkeypatch):
+    assert admin_client.get("/api/admin/version").json() == {"version": "dev"}
+    monkeypatch.setenv("APP_VERSION", "1.2.3")
+    assert admin_client.get("/api/admin/version").json() == {"version": "1.2.3"}
+    assert user_client.get("/api/admin/version").status_code == 403
+
+
 def test_csrf_header_required(admin_client):
     assert admin_client.post("/api/logout", headers={"X-CSRF": ""}).status_code == 403
     assert admin_client.get("/api/me").status_code == 200

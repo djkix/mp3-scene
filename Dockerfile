@@ -20,6 +20,10 @@ RUN groupadd --gid ${GID} app \
  && mkdir -p /data /music \
  && chown ${UID}:${GID} /data
 
+# en dernier : changer de version ne reconstruit aucune couche
+ARG APP_VERSION=dev
+ENV APP_VERSION=${APP_VERSION}
+
 USER app
 EXPOSE 8000
 VOLUME /data

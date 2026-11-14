@@ -9,6 +9,7 @@ import * as account from './views/account.js';
 import * as admin from './views/admin.js';
 import { initPlayer, player } from './player.js';
 import { initCast } from './cast.js';
+import { versionInfo } from './version.js';
 
 
 // Table des routes : premier segment du hash -> vue. Ajouter une vue = ajouter une ligne.
@@ -65,6 +66,14 @@ async function route() {
   const loggedIn = !!session.user && name !== 'login';
   $('topbar').hidden = $('player').hidden = !loggedIn;
   $('nav-admin').hidden = session.user?.role !== 'admin';
+  const isAdmin = loggedIn && session.user.role === 'admin';
+  if (!isAdmin) $('update').hidden = true;
+  else versionInfo().then((v) => { // bandeau réservé aux administrateurs : eux seuls peuvent mettre à jour
+    if (!v.update || session.user?.role !== 'admin') return;
+    $('update').replaceChildren(`Nouvelle version ${v.latest} disponible (installée : ${v.version}). `,
+      el('a', { href: v.url, target: '_blank', rel: 'noopener' }, 'Voir les nouveautés'));
+    $('update').hidden = false;
+  }).catch(() => {});
   document.querySelectorAll('#nav a').forEach((a) =>
     a.classList.toggle('active', a.dataset.route === name || (name === 'search' && a.dataset.route === '')));
   const search = $('search');

@@ -1,3 +1,4 @@
+import os
 import sqlite3
 from typing import Literal
 
@@ -35,6 +36,11 @@ def _get_user(conn, user_id: int):
     if row is None:
         raise HTTPException(404, "Utilisateur introuvable.")
     return row
+
+
+@router.get("/version")
+def version():
+    return {"version": os.environ.get("APP_VERSION", "dev")}  # posée à la construction de l'image
 
 
 @router.get("/users")

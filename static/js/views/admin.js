@@ -1,6 +1,7 @@
 import { api, session } from '../api.js';
 import { el } from '../dom.js';
 import { invalidateFilters } from './releases.js';
+import { versionInfo } from '../version.js';
 
 const ROLES = [['user', 'Utilisateur'], ['admin', 'Administrateur']];
 const PHASES = { idle: 'Au repos', structure: 'Analyse des dossiers…', tags: 'Lecture des tags…', error: 'Erreur' };
@@ -127,6 +128,16 @@ export function render(container) {
     }
   }
 
+  // --- Version ---
+  const verOut = el('p', { role: 'status' }, 'Vérification…');
+  versionInfo().then((v) => {
+    if (dead) return;
+    const state = v.update ? ` — nouvelle version ${v.latest} disponible : dans Dockge, cliquez sur « Mettre à jour ».`
+      : v.latest ? ' — à jour.' : ' — impossible de vérifier la dernière version.';
+    verOut.replaceChildren(`Version installée : ${v.version}`, state,
+      v.update && el('a', { href: v.url, target: '_blank', rel: 'noopener' }, ' Voir les nouveautés'));
+  }).catch((err) => { if (!dead) verOut.textContent = err.message; });
+
   const th = (t) => el('th', { scope: 'col' }, t);
   container.replaceChildren(el('div', { class: 'page' },
     el('h1', {}, 'Administration'),
@@ -136,7 +147,8 @@ export function render(container) {
     el('h3', {}, 'Créer un utilisateur'), createForm, createMsg,
     el('h2', {}, 'Scan de la bibliothèque'),
     el('p', { class: 'hint' }, 'Le genre et la durée apparaissent au fur et à mesure de la lecture des tags.'),
-    scanBtn, scanOut, scanMsg));
+    scanBtn, scanOut, scanMsg,
+    el('h2', {}, 'Version'), verOut));
   loadUsers();
   refreshScan();
   return () => { dead = true; clearTimeout(pollTimer); };

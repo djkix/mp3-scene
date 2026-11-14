@@ -39,6 +39,8 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 button.primary:hover:not(:disabled) { background: var(--accent); filter: brightness(1.08); }
 button:disabled { opacity: .6; cursor: default; }
 
+#update { margin: 0; padding: 8px 12px; background: var(--hover); border-bottom: 1px solid var(--line); text-align: center; }
+#update a { text-decoration: underline; }
 #view { padding: 0 0 calc(var(--player-h, 0px) + 24px); /* --player-h : hauteur réelle du lecteur, mesurée par player.js */ }
 .status { color: var(--muted); padding: 12px; margin: 0; text-align: center; }
 .filters { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
