@@ -27,7 +27,10 @@ let msgTimer, playReq = 0;
 let releases = Promise.resolve(); // réponses play-release / queue-release appliquées dans l'ordre des clics
 let backend = null;       // null : <audio> local ; sinon le récepteur Cast (cast.js)
 
+let lastVol = 1;          // volume à rétablir après « couper le son »
+
 const playing = () => (backend ? !backend.paused() : !audio.paused);
+const volume = () => (backend ? backend.volume() : audio.volume);
 const position = () => (backend ? backend.time() : pendingPos ?? audio.currentTime ?? 0);
 
 const title = (t) => t.title || t.filename;
@@ -67,7 +70,7 @@ function detach(b, pos) {
   if (backend !== b) return;
   backend = null;
   load(false, pos > 0 ? pos : null);
-  if (ui) ui.vol.value = audio.volume;
+  volUI();
   save();
 }
 
@@ -145,6 +148,11 @@ function setVolume(v) {
   save();
 }
 
+function mute() {
+  const v = volume();
+  if (v > 0) { lastVol = v; setVolume(0); } else setVolume(lastVol || 0.5);
+}
+
 function jump(i) {
   if (!player.queue.jump(i)) return;
   failures = 0;
@@ -213,7 +221,7 @@ for (const ev of ['play', 'emptied']) audio.addEventListener(ev, update);
 audio.addEventListener('pause', () => { update(); save(); });
 for (const ev of ['timeupdate', 'durationchange']) audio.addEventListener(ev, tick);
 for (const ev of ['seeked', 'ratechange']) audio.addEventListener(ev, positionState);
-audio.addEventListener('volumechange', () => { if (ui) ui.vol.value = audio.volume; });
+audio.addEventListener('volumechange', volUI);
 
 // --- Media Session -------------------------------------------------------------------------------
 function metadata(t) {
@@ -283,6 +291,16 @@ function tick() {
   const pos = position();
   ui.seek.value = pos;
   ui.elapsed.textContent = fmtDuration(pos);
+  ui.seek.setAttribute('aria-valuetext', `${fmtDuration(pos)} sur ${fmtDuration(d)}`);
+  ui.footer.style.setProperty('--p', d ? Math.min(1, pos / d) : 0); // filet de progression du lecteur réduit (mobile)
+}
+
+function volUI() {
+  if (!ui) return;
+  const v = volume();
+  if (!ui.vol.matches(':focus, :active')) ui.vol.value = v; // pas pendant un réglage
+  ui.volbtn.setAttribute('aria-pressed', v === 0);
+  label(ui.volbtn, v === 0 ? 'Rétablir le son' : 'Couper le son');
 }
 
 function update() {
@@ -298,7 +316,7 @@ function update() {
     ui.play.textContent = on ? '⏸︎' : '▶︎';
     label(ui.play, on ? 'Pause' : 'Lecture');
     ui.cast.textContent = backend ? `Diffusion sur ${backend.name}` : '';
-    if (backend && !ui.vol.matches(':focus, :active')) ui.vol.value = backend.volume(); // pas pendant un réglage
+    volUI();
     ui.shuffle.setAttribute('aria-pressed', q.shuffle);
     const [glyph, text] = REPEAT[q.repeat];
     ui.repeat.textContent = glyph;
@@ -332,8 +350,11 @@ function openPanel(open) {
   if (open) { renderPanel(); ui.list.querySelector('.current button')?.scrollIntoView({ block: 'nearest' }); ui.close.focus(); }
 }
 
+// Lecteur plein écran : mobile uniquement (sur bureau tout tient dans la barre).
 function expand(on) {
+  on = on && mobile.matches;
   ui.footer.classList.toggle('expanded', on);
+  document.documentElement.classList.toggle('player-open', on); // fige le défilement de la page derrière
   ui.title.setAttribute('aria-expanded', on);
 }
 
@@ -342,7 +363,13 @@ export function initPlayer(footer) {
   const q = () => player.queue;
   ui = { footer };
   ui.title = el('button', { type: 'button', class: 'pl-title', 'aria-expanded': 'false',
-    onclick: () => { if (mobile.matches) expand(!footer.classList.contains('expanded')); } });
+    onclick: () => {
+      if (!mobile.matches) { location.hash = ui.rel.getAttribute('href'); return; } // bureau : ouvre la fiche
+      const open = !footer.classList.contains('expanded');
+      expand(open);
+      if (open) ui.collapse.focus();
+    } });
+  ui.collapse = iconBtn('pl-collapse', '⌄', 'Réduire le lecteur', () => { expand(false); ui.title.focus(); });
   ui.rel = el('a', { class: 'pl-rel', href: '#/' });
   ui.cast = el('span', { class: 'pl-cast' }); // « Diffusion sur <appareil> » (textContent : nom non fiable)
   ui.play = iconBtn('pl-play', '▶︎', 'Lecture', () => player.toggle());
@@ -359,7 +386,12 @@ export function initPlayer(footer) {
     oninput: () => { dragging = true; ui.elapsed.textContent = fmtDuration(+ui.seek.value); },
     onchange: () => { dragging = false; player.seek(+ui.seek.value); } });
   ui.vol = el('input', { type: 'range', class: 'pl-vol', min: 0, max: 1, step: 0.05, value: audio.volume,
-    'aria-label': 'Volume', title: 'Volume', oninput: () => player.setVolume(+ui.vol.value) });
+    'aria-label': 'Volume', title: 'Volume', 'aria-orientation': 'vertical', oninput: () => player.setVolume(+ui.vol.value) });
+  ui.volbtn = iconBtn('pl-volbtn', '', 'Couper le son', mute);
+  // Curseur vertical dans une bulle : visible au survol ou au focus clavier (CSS) ; la molette règle aussi le volume.
+  const volwrap = el('div', { class: 'pl-volwrap',
+    onwheel: (e) => { e.preventDefault(); player.setVolume(volume() + (e.deltaY < 0 ? 0.05 : -0.05)); } },
+  ui.volbtn, el('div', { class: 'pl-volpop' }, ui.vol));
   ui.qbtn = iconBtn('pl-qbtn', '☰', "File d'attente", () => openPanel(ui.panel.hidden));
   ui.qbtn.setAttribute('aria-expanded', 'false');
   ui.msg = el('p', { class: 'pl-msg', role: 'status' });
@@ -372,23 +404,33 @@ export function initPlayer(footer) {
       el('button', { type: 'button', onclick: () => player.clear() }, 'Vider la file'), ui.close),
     ui.list);
 
-  footer.replaceChildren(ui.panel, ui.msg, el('div', { class: 'pl-bar' },
-    el('div', { class: 'pl-info' }, ui.title, ui.rel, ui.cast),
-    iconBtn('pl-prev', '⏮︎', 'Précédent', () => player.prev()),
-    ui.play,
-    iconBtn('pl-next', '⏭︎', 'Suivant', () => player.next()),
-    ui.shuffle, ui.repeat,
-    el('div', { class: 'pl-seek' }, ui.elapsed, ui.seek, ui.total),
-    ui.vol, ui.qbtn,
-    el('span', { id: 'cast-slot' }))); // emplacement du bouton cast (tâche 11) — laisser vide ici
+  footer.replaceChildren(ui.panel, ui.msg, el('div', { class: 'pl-progress', 'aria-hidden': 'true' }),
+    el('div', { class: 'pl-bar' },
+      ui.collapse,
+      el('div', { class: 'pl-info' }, ui.title, ui.rel, ui.cast),
+      el('div', { class: 'pl-controls' },
+        ui.shuffle,
+        iconBtn('pl-prev', '⏮︎', 'Précédent', () => player.prev()),
+        ui.play,
+        iconBtn('pl-next', '⏭︎', 'Suivant', () => player.next()),
+        ui.repeat),
+      el('div', { class: 'pl-seek' }, ui.elapsed, ui.seek, ui.total),
+      el('div', { class: 'pl-tools' }, volwrap, ui.qbtn,
+        el('span', { id: 'cast-slot' })))); // emplacement du bouton cast (cast.js)
 
+  // Clavier : Échap ferme la file puis le lecteur plein écran ; Espace = lecture/pause ; ← → = ±5 s.
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !ui.panel.hidden) { openPanel(false); ui.qbtn.focus(); return; }
-    if (e.code !== 'Space' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === 'Escape' && footer.classList.contains('expanded')) { expand(false); ui.title.focus(); return; }
+    const step = { ArrowLeft: -5, ArrowRight: 5 }[e.key];
+    if ((e.code !== 'Space' && !step) || e.ctrlKey || e.metaKey || e.altKey || (e.repeat && !step)) return;
     if (footer.hidden || !q().current() || e.target.closest?.('input, select, textarea, button, a, [contenteditable]')) return;
     e.preventDefault();
-    player.toggle();
+    if (step) player.seek(Math.min(Math.max(0, position() + step), duration() || Infinity));
+    else player.toggle();
   });
+  mobile.addEventListener('change', () => expand(false));  // rotation / redimensionnement vers la vue bureau
+  addEventListener('hashchange', () => expand(false));     // lien vers la fiche depuis le lecteur plein écran
 
   // Requête lancée tout de suite, réponse appliquée dans l'ordre des clics : une lecture en retard
   // n'écrase pas les pistes ajoutées après elle.
@@ -425,8 +467,9 @@ export function initPlayer(footer) {
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
 
   // Hauteur réelle du lecteur -> marge basse de la vue (état réduit, agrandi, encoche).
-  new ResizeObserver(() => document.documentElement.style.setProperty('--player-h', footer.offsetHeight + 'px'))
-    .observe(footer);
+  new ResizeObserver(() => {
+    if (!footer.classList.contains('expanded')) document.documentElement.style.setProperty('--player-h', footer.offsetHeight + 'px');
+  }).observe(footer);
 
   restore();
   update();
