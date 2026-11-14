@@ -73,6 +73,8 @@ function setup(player) {
     md.title = title(t);
     md.artist = t.artist || '';
     md.albumName = t.release_name || '';
+    // même signature que la piste ; sans pochette le récepteur reçoit un 404 et garde son affichage par défaut
+    md.images = [new chrome.cast.Image(info.contentId.replace('?', '/cover?'))];
     info.metadata = md;
     info.streamType = M.StreamType.BUFFERED;
     info.customData = { q: queueIndex, t: t.id }; // retrouve la piste locale si la liste des itemId est incomplète

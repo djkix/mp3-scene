@@ -159,6 +159,17 @@ def test_cast_url_roundtrip_without_session(user_client, client, tid):
     assert head.headers["access-control-allow-origin"] == "*"
 
 
+def test_cast_cover_without_session(client, settings, tid):
+    cover = cast_path(tid).replace("?", "/cover?")
+    assert client.get(cover).status_code == 404                              # signature valide, pas de pochette
+    (settings.music_root / A / "front.jpg").write_bytes(b"\xff\xd8jpeg")
+    r = client.get(cover)                                                    # client sans cookie
+    assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg" and r.content == b"\xff\xd8jpeg"
+    assert r.headers["access-control-allow-origin"] == "*"
+    assert client.get(f"/cast/{tid}/cover?exp={int(time.time()) + 60}&sig={'0' * 64}").status_code == 403
+    assert client.get(f"/cast/{tid}/cover").status_code == 403
+
+
 def test_cast_preflight(client, tid):
     r = client.options(f"/cast/{tid}", headers={"Origin": "https://cast.example", "Access-Control-Request-Method": "GET",
                                                "Access-Control-Request-Headers": "range"})

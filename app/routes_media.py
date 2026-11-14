@@ -320,6 +320,26 @@ def cast(track_id: int, request: Request, exp: str = "", sig: str = ""):
         conn.close()
 
 
+@cast_router.get("/cast/{track_id}/cover")
+def cast_cover(track_id: int, request: Request, exp: str = "", sig: str = ""):
+    """Pochette de la release d'une piste, pour l'écran du Chromecast : même signature que la piste."""
+    settings = request.app.state.settings
+    if not check_track_sig(settings.secret_key, track_id, exp, sig, time.time()):
+        raise HTTPException(403, "Lien de diffusion invalide ou expiré.")
+    if not 1 <= track_id <= MAX_INT:
+        raise HTTPException(404, "Piste introuvable.")
+    conn = db.connect(settings.data_dir)
+    try:
+        row = conn.execute("SELECT release_id FROM tracks WHERE id=?", (track_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "Piste introuvable.")
+        path, data, mime = _find_cover(request, conn, row["release_id"])
+    finally:
+        conn.close()
+    headers = {**CAST_CORS, **COVER_CACHE}
+    return FileResponse(path, media_type=mime, headers=headers) if path else Response(data, media_type=mime, headers=headers)
+
+
 @cast_router.options("/cast/{track_id}")
 def cast_preflight(track_id: int):
     return Response(status_code=204, headers={**CAST_CORS, "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",

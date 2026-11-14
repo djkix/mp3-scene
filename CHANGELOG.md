@@ -4,6 +4,14 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.7.1](https://github.com/djkix/mp3-scene/compare/v1.7.0...v1.7.1) (2026-11-14)
+
+### Résumé
+
+**Pochette sur le Chromecast.** Pendant une diffusion, l'écran affiche la pochette de la release en cours. L'image
+est servie par un lien signé, comme la piste (`/cast/<piste>/cover`, valable 12 heures, sans session). Aucune
+migration, aucun scan.
+
 ## [1.7.0](https://github.com/djkix/mp3-scene/compare/v1.6.1...v1.7.0) (2026-11-14)
 
 ### Résumé
