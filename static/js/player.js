@@ -348,7 +348,7 @@ function update() {
   positionState();
   if (ui) {
     ui.footer.classList.toggle('is-empty', !t);
-    ui.title.textContent = t ? title(t) : '';
+    ui.title.textContent = !t ? '' : t.title && t.artist ? `${t.artist} - ${t.title}` : title(t);
     ui.title.title = ui.title.textContent;
     ui.rel.textContent = t?.release_name || '';
     loadWave(t);

@@ -4,6 +4,14 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.9.1](https://github.com/djkix/mp3-scene/compare/v1.9.0...v1.9.1) (2026-11-15)
+
+### Résumé
+
+**Lecteur : artiste devant le titre, plus de cadre au clic sur l'onde.** Le lecteur affiche « Artiste - Titre »
+quand les tags donnent les deux. Le cadre vert autour de la forme d'onde n'apparaît plus au clic ; il reste au
+clavier, pour repérer le focus.
+
 ## [1.9.0](https://github.com/djkix/mp3-scene/compare/v1.8.0...v1.9.0) (2026-11-15)
 
 ### Résumé

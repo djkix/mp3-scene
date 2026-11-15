@@ -118,7 +118,8 @@ a.icon:hover { background: var(--hover); }
 .pl-wave.has-wave::before { background: var(--muted); opacity: .45; }
 .pl-wave.has-wave::after { background: var(--accent); clip-path: inset(0 calc(100% - var(--p, 0) * 100%) 0 0); } /* partie écoutée */
 .pl-wave.has-wave input { height: 100%; margin: 0; opacity: 0; cursor: pointer; }
-.pl-wave.has-wave:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pl-wave.has-wave:has(input:focus-visible) { /* focus clavier seulement : pas de cadre au clic */
+  outline: 2px solid var(--accent); outline-offset: 2px; }
 .pl-time { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* Volume : bouton (clic = couper le son) + curseur vertical dans une bulle, au survol ou au focus clavier */
