@@ -160,7 +160,7 @@ L'appli tourne dans le conteneur sous l'UID/GID **1000:1000** (modifiables à la
 Cet utilisateur doit pouvoir **lire** tous les dossiers et fichiers de l'export. Avec `all_squash`, c'est le compte
 vers lequel le NAS ramène tout le monde qui compte, pas l'UID 1000 ; sans squash, les permissions Unix du NAS
 s'appliquent à l'UID 1000. Un dossier illisible est ignoré par le scan, signalé dans les journaux et par un
-avertissement sur la page Administration (voir « Première connexion et premier scan »).
+avertissement sur la page Compte (voir « Première connexion et premier scan »).
 
 Les dossiers système de Synology (`#recycle`, `@eaDir`) présents sous l'export apparaissent comme des catégories :
 pour les exclure, exportez un sous-dossier propre qui ne contient que les releases.
@@ -282,10 +282,10 @@ Synology DSM (Panneau de configuration → Portail de connexion → Avancé → 
 
 1. Ouvrir `https://mp3.exemple.fr`, se connecter avec `ADMIN_USER` / `ADMIN_PASSWORD`, puis **changer le mot de passe** (page Compte).
 2. Page **Administration → Lancer le scan**. Le scan est **manuel** : il n'y a pas de scan planifié, relancez-le quand la collection change.
-3. La phase « structure » (détection des releases) parcourt tous les dossiers : sur une très grande bibliothèque en NFS, elle peut elle aussi être longue. Le compteur « Releases trouvées » progresse et les releases apparaissent par lots dans la liste, mais la vue par dossiers ne se remplit qu'à la fin de cette phase. Si le conteneur est arrêté pendant cette phase, la page Administration l'indique : relancez le scan.
+3. La phase « structure » (détection des releases) parcourt tous les dossiers : sur une très grande bibliothèque en NFS, elle peut elle aussi être longue. Le compteur « Releases trouvées » progresse et les releases apparaissent par lots dans la liste, mais la vue par dossiers ne se remplit qu'à la fin de cette phase. Si le conteneur est arrêté pendant cette phase, la page Compte l'indique : relancez le scan.
 4. La phase « tags » (lecture des durées, genres, artistes ID3) peut durer **plusieurs heures** sur 100 000 releases et plus en NFS. Pendant toute cette phase (donc parfois des heures au premier scan), le bouton « Lancer le scan » reste désactivé et aucun nouveau scan n'est possible. Le filtre par genre et les durées se complètent progressivement ; un redémarrage du conteneur ne perd pas le travail déjà fait, et un second scan sans changement ne relit aucun tag.
 5. Suivre un scan : `docker compose logs -t -f mp3-scene` (début du scan, fin de chaque phase avec ses chiffres, erreurs).
-6. Si le scan a ignoré quelque chose, il se termine normalement mais la page Administration affiche un **avertissement** (par ex. « 3 dossier(s) illisible(s) et 2 nom(s) non UTF-8 ignorés — voir les journaux ») et les journaux donnent les chemins :
+6. Si le scan a ignoré quelque chose, il se termine normalement mais la page Compte affiche un **avertissement** (par ex. « 3 dossier(s) illisible(s) et 2 nom(s) non UTF-8 ignorés — voir les journaux ») et les journaux donnent les chemins :
    - `dossier illisible ignoré` : l'appli n'a pas le droit de lire ce dossier ; vérifier les permissions NFS et le squash sur le NAS (voir plus haut). Les releases déjà indexées dessous sont conservées.
    - `nom non UTF-8 ignoré` : nom de fichier ou de dossier qui n'est pas de l'UTF-8 valide (SQLite ne peut pas le stocker) ; le renommer sur le NAS, puis relancer un scan.
 7. Un scan lancé alors que le montage NFS est tombé, ou sur une racine qui ne contient aucune des releases déjà indexées (mauvais export, dossiers système seuls), échoue sans rien retirer de l'index.
