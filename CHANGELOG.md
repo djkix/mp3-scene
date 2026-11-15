@@ -4,6 +4,14 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.8.0](https://github.com/djkix/mp3-scene/compare/v1.7.1...v1.8.0) (2026-11-15)
+
+### Résumé
+
+**Balayage dans le lecteur plein écran.** Sur téléphone, un balayage vers la gauche passe à la piste suivante, vers
+la droite revient à la précédente (ou au début de la piste après 3 secondes d'écoute, comme le bouton). Un geste
+court, vertical, ou parti de la forme d'onde ou de la file d'attente est ignoré. Aucune migration, aucun scan.
+
 ## [1.7.1](https://github.com/djkix/mp3-scene/compare/v1.7.0...v1.7.1) (2026-11-14)
 
 ### Résumé

@@ -129,7 +129,8 @@ outils à droite. Hauteur d'environ 76 px.
 **Téléphone**, trois états :
 1. **Réduit**, au-dessus des onglets : fine ligne de progression, titre, lecture/pause, suivant.
 2. **Plein écran**, au toucher du titre : bouton pour réduire, titre et release en grand, progression,
-   commandes larges (bouton lecture de 72 px), outils.
+   commandes larges (bouton lecture de 72 px), outils. Un balayage vers la gauche passe à la piste suivante,
+   vers la droite à la précédente.
 3. **File d'attente** en plein écran.
 
 ## 6. Bureau et téléphone

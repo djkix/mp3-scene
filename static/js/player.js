@@ -472,6 +472,23 @@ export function initPlayer(footer) {
       el('div', { class: 'pl-tools' }, volwrap, ui.qbtn,
         el('span', { id: 'cast-slot' })))); // emplacement du bouton cast (cast.js)
 
+  // Plein écran : balayage vers la gauche = piste suivante, vers la droite = précédente.
+  // Ignoré s'il part de la barre de progression ou de la file, ou s'il est plutôt vertical (défilement).
+  let sx = null, sy = 0;
+  footer.addEventListener('touchstart', (e) => {
+    const ok = footer.classList.contains('expanded') && e.touches.length === 1 && !e.target.closest('input, .pl-wave, .pl-queue');
+    sx = ok ? e.touches[0].clientX : null;
+    sy = ok ? e.touches[0].clientY : 0;
+  }, { passive: true });
+  footer.addEventListener('touchend', (e) => {
+    if (sx === null) return;
+    const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
+    sx = null;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < 2 * Math.abs(dy)) return;
+    if (dx < 0) player.next(); else player.prev();
+  }, { passive: true });
+  footer.addEventListener('touchcancel', () => { sx = null; }, { passive: true });
+
   // Clavier : Échap ferme la file puis le lecteur plein écran ; Espace = lecture/pause ; ← → = ±5 s.
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !ui.panel.hidden) { openPanel(false); ui.qbtn.focus(); return; }
