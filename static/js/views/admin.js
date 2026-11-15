@@ -140,8 +140,8 @@ export function render(container) {
   }).catch((err) => { if (!dead) verOut.textContent = err.message; });
 
   const th = (t) => el('th', { scope: 'col' }, t);
-  container.replaceChildren(el('div', { class: 'page' },
-    el('h1', {}, t('Administration')),
+  // sections d'administration, incluses dans la page Compte (account.js)
+  container.replaceChildren(el('div', {},
     el('h2', {}, t('Utilisateurs')),
     el('div', { class: 'table-wrap' }, el('table', { class: 'users' },
       el('thead', {}, el('tr', {}, th(t('Identifiant')), th(t('Rôle')), th(t('Actions')))), tbody)), listMsg,

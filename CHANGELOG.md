@@ -4,6 +4,14 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.9.0](https://github.com/djkix/mp3-scene/compare/v1.8.0...v1.9.0) (2026-11-15)
+
+### Résumé
+
+**Admin fusionné dans Compte.** L'onglet Admin disparaît : pour un administrateur, la page Compte contient aussi les
+utilisateurs, le scan de la bibliothèque et la version. Un utilisateur simple garde la page Compte seule.
+L'ancienne adresse `#/admin` renvoie vers Compte. Aucune migration, aucun scan.
+
 ## [1.8.0](https://github.com/djkix/mp3-scene/compare/v1.7.1...v1.8.0) (2026-11-15)
 
 ### Résumé

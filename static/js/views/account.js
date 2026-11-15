@@ -2,6 +2,7 @@ import { api, session } from '../api.js';
 import { el } from '../dom.js';
 import { player } from '../player.js';
 import { t, lang, setLang } from '../i18n.js';
+import * as admin from './admin.js';
 
 export function render(container) {
   let dead = false;
@@ -42,6 +43,7 @@ export function render(container) {
     location.hash = '#/login';
   } }, t('Se déconnecter'));
 
+  const adminBox = el('div');
   container.replaceChildren(el('div', { class: 'page' },
     el('h1', {}, t('Compte')),
     el('p', {}, t('Identifiant :') + ' ', el('strong', {}, u.username || ''), ' · ' + t('Rôle :') + ' ',
@@ -50,6 +52,8 @@ export function render(container) {
     el('h2', {}, t('Langue')),
     el('select', { 'aria-label': t('Langue'), onchange: (e) => setLang(e.target.value) },
       [['fr', 'Français'], ['en', 'English']].map(([v, l]) => el('option', { value: v, selected: v === lang }, l))),
+    adminBox,
     el('h2', {}, t('Session')), logout));
-  return () => { dead = true; };
+  const disposeAdmin = u.role === 'admin' ? admin.render(adminBox) : null; // utilisateurs, scan, version
+  return () => { dead = true; disposeAdmin?.(); };
 }

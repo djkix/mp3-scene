@@ -4,7 +4,7 @@
 
 **Collection de releases MP3 « scene » — bibliothèque · lecteur web · Chromecast · PWA**
 
-[![Version](https://img.shields.io/badge/version-1.8.0-purple?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.9.0-purple?style=for-the-badge)](CHANGELOG.md)
 [![Stack](https://img.shields.io/badge/stack-FastAPI_·_SQLite_·_JavaScript_pur-blue?style=for-the-badge)](#stack-technique)
 [![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
 
@@ -14,7 +14,7 @@
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│ Mp3 Scene   🔍 Rechercher une release…   Derniers Dossiers Favoris Admin │
+│ Mp3 Scene   🔍 Rechercher une release…   Derniers Dossiers Favoris Compte│
 ├──────────────────────────────────────────────────────────────────────────┤
 │              [ Localisations ▾ ] [ Genres ▾ ] [ Années ▾ ]               │
 │ Nom                               Genre   Date        Pistes   Poids     │
@@ -54,8 +54,7 @@ Tout est déduit des dossiers et des fichiers, sans rien saisir.
 | **Dossiers** | Navigation dans l'arborescence du NAS |
 | **Fiche** | Pochette, pistes, durées, débit, NFO, téléchargement en zip |
 | **Favoris** | Releases et pistes favorites, **historique d'écoute**, par compte |
-| **Compte** | Changement de mot de passe, langue (français ou anglais) |
-| **Admin** | Utilisateurs, scan de la bibliothèque, version installée |
+| **Compte** | Changement de mot de passe, langue (français ou anglais) ; pour un administrateur, aussi : utilisateurs, scan de la bibliothèque, version installée |
 
 | Déduit automatiquement | D'où ça vient |
 |------------------------|---------------|
@@ -94,14 +93,14 @@ Tout est déduit des dossiers et des fichiers, sans rien saisir.
 - Pochette de la release affichée sur l'écran
 
 ### 🔎 Scan
-- **Manuel**, lancé depuis la page Admin ; incrémental : un second scan ne relit que ce qui a changé
+- **Manuel**, lancé depuis la page Compte (administrateurs) ; incrémental : un second scan ne relit que ce qui a changé
 - Deux phases : structure (détection des releases), puis tags ID3 en tâche de fond
 - Reprise après redémarrage ; dossiers illisibles et noms non UTF-8 ignorés et signalés
 
 ### 🛡️ Comptes et administration
 - Comptes **administrateur** et **utilisateur**, mots de passe hachés (argon2)
 - Session par cookie de 30 jours, anti-force brute (5 échecs → 15 minutes)
-- **Numéro de version** dans la page Admin et **bandeau** quand une version plus récente est publiée (administrateurs seulement)
+- **Numéro de version** dans la page Compte et **bandeau** quand une version plus récente est publiée (administrateurs seulement)
 
 ### 📲 PWA
 - Installable sur Android et iPhone ; la coquille de l'interface est en cache, jamais la musique
@@ -383,6 +382,10 @@ git tag v1.2.0 && git push origin v1.2.0
 ## Historique des versions
 
 Le détail est dans le [journal des modifications](CHANGELOG.md).
+
+### 1.9.0 — 15 novembre 2026
+
+**Admin fusionné dans Compte** : un seul onglet ; les sections d'administration n'apparaissent que pour un administrateur.
 
 ### 1.8.0 — 15 novembre 2026
 

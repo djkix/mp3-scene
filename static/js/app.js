@@ -7,7 +7,6 @@ import * as folders from './views/folders.js';
 import * as release from './views/release.js';
 import * as favorites from './views/favorites.js';
 import * as account from './views/account.js';
-import * as admin from './views/admin.js';
 import { initPlayer, player } from './player.js';
 import { initCast } from './cast.js';
 import { versionInfo } from './version.js';
@@ -22,7 +21,6 @@ const ROUTES = {
   release,
   favorites,
   account,
-  admin,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -56,6 +54,7 @@ async function route() {
   const parsed = parseHash();
   if (!parsed) return location.replace('#/');
   const { name, params } = parsed;
+  if (name === 'admin') return location.replace('#/account'); // ancienne adresse : l'administration est dans Compte
   dispose?.();
   dispose = null;
   if (name === 'login') player.reset(); // déconnexion / session expirée : la file n'est pas transmise au suivant
@@ -75,7 +74,6 @@ async function route() {
   const mod = ROUTES[name];
   const loggedIn = !!session.user && name !== 'login';
   $('topbar').hidden = $('player').hidden = !loggedIn;
-  $('nav-admin').hidden = session.user?.role !== 'admin';
   const isAdmin = loggedIn && session.user.role === 'admin';
   if (!isAdmin) $('update').hidden = true;
   else versionInfo().then((v) => { // bandeau réservé aux administrateurs : eux seuls peuvent mettre à jour

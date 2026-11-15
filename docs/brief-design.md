@@ -21,7 +21,7 @@ par exemple `VA-Toolroom_Ibiza_2026-(TOOL142001Z)-WEB-2026-AOV`, qui contient de
 | Profil | Ce qu'il fait | Particularités |
 |---|---|---|
 | **Utilisateur** | Parcourt, cherche, écoute, met en favori, télécharge | Quelques proches du propriétaire |
-| **Administrateur** | Tout cela, plus : comptes, scan de la bibliothèque, mise à jour | Voit l'onglet Admin et le bandeau de nouvelle version |
+| **Administrateur** | Tout cela, plus : comptes, scan de la bibliothèque, mise à jour | Voit les sections d'administration dans Compte et le bandeau de nouvelle version |
 
 Ce sont des connaisseurs : le **nom brut de la release est l'information principale**, il doit rester lisible
 en entier, en police à chasse fixe, sans être tronqué.
@@ -34,8 +34,7 @@ Trois zones permanentes, une fois connecté :
 2. **Contenu** : l'écran courant.
 3. **Lecteur** : fixé en bas, visible dès qu'une piste a été lancée, sur tous les écrans.
 
-Navigation, cinq entrées : **Derniers** (accueil), **Dossiers**, **Favoris**, **Compte**, **Admin**
-(administrateurs seulement). L'entrée active est marquée.
+Navigation, quatre entrées : **Derniers** (accueil), **Dossiers**, **Favoris**, **Compte**. L'entrée active est marquée.
 
 Un **bandeau** peut apparaître sous la barre du haut, pour les administrateurs :
 « Nouvelle version 1.2.0 disponible (installée : 1.1.0). Voir les nouveautés ».
@@ -97,7 +96,7 @@ frappe) affiche la même liste, filtrée.
 - **Changer le mot de passe** : mot de passe actuel, nouveau, bouton, message de succès ou d'erreur.
 - **Session** : bouton **Se déconnecter**.
 
-### 4.7 Admin (administrateurs)
+### 4.7 Administration (dans la page Compte, administrateurs seulement, avant « Session »)
 - **Utilisateurs** : tableau Identifiant, Rôle (liste déroulante), Actions (Réinitialiser le mot de passe,
   Supprimer avec confirmation). Message par ligne. Le dernier administrateur ne peut être ni rétrogradé ni supprimé.
 - **Créer un utilisateur** : identifiant, mot de passe, rôle, bouton **Créer**.
@@ -196,7 +195,7 @@ Pour chaque écran, en **bureau (1440 px)** et **téléphone (375 px)**, thèmes
 5. Fiche d'une release multi-disques avec NFO
 6. Favoris, onglets Releases et Pistes
 7. Compte
-8. Admin, scan en cours, bandeau de nouvelle version affiché
+8. Compte d'un administrateur, scan en cours, bandeau de nouvelle version affiché
 9. Lecteur : barre bureau avec bulle de volume ouverte et file ouverte ; sur téléphone, réduit, plein écran et file
 
 États à prévoir : chargement, liste vide, erreur avec « Réessayer », bouton désactivé, favori actif, piste en cours.

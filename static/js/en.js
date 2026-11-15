@@ -129,7 +129,6 @@ export const EN = {
   ' — à jour.': ' — up to date.',
   ' — impossible de vérifier la dernière version.': ' — unable to check the latest version.',
   'Version installée : {0}': 'Installed version: {0}',
-  'Administration': 'Administration',
   'Utilisateurs': 'Users',
   'Actions': 'Actions',
   'Créer un utilisateur': 'Create a user',
