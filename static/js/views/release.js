@@ -49,10 +49,10 @@ function trackTable(rel) {
   let disc = null;
   rel.tracks.forEach((tk, i) => {
     if (rel.tracks.some((x) => x.disc !== rel.tracks[0].disc) && tk.disc !== disc) {
-      rows.push(el('tr', { class: 'disc' }, el('th', { scope: 'rowgroup', colspan: 6 }, `CD ${tk.disc}`)));
+      rows.push(el('tr', { class: 'disc' }, el('th', { scope: 'rowgroup', colspan: 7 }, `CD ${tk.disc}`)));
     }
     disc = tk.disc;
-    const label = tk.title ? (tk.artist ? `${tk.title} — ${tk.artist}` : tk.title) : tk.filename;
+    const label = tk.title ? (tk.artist ? `${tk.artist} - ${tk.title}` : tk.title) : tk.filename;
     rows.push(el('tr', { class: 'trk', tabIndex: 0,
       onclick: (e) => { if (!e.target.closest('button, a')) player.playTracks(rel.tracks, i); },
       onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) player.playTracks(rel.tracks, i); } },
@@ -60,13 +60,15 @@ function trackTable(rel) {
     el('td', { class: 'trk-title' }, label),
     el('td', { class: 'num' }, tk.duration == null ? '—' : fmtDuration(tk.duration)),
     el('td', { class: 'num col-bitrate' }, tk.bitrate == null ? '—' : `${Math.round(tk.bitrate / 1000)} kbit/s`),
+    el('td', { class: 'num col-bitrate' }, tk.genre || '—'),
     el('td', {}, favButton(tk, 'track')),
     el('td', {}, el('a', { class: 'icon', href: `/api/tracks/${tk.id}/stream?download=1`, download: '',
       title: t('Télécharger la piste'), 'aria-label': t('Télécharger {0}', tk.filename) }, '⤓'))));
   });
   const th = (txt, cls) => el('th', { scope: 'col', class: cls }, txt);
   return el('div', { class: 'table-wrap' }, el('table', { class: 'tracks' },
-    el('thead', {}, el('tr', {}, th(t('N°')), th(t('Titre')), th(t('Durée')), th(t('Débit'), 'col-bitrate'),
+    el('thead', {}, el('tr', {}, th(t('N°'), 'num'), th(t('Artiste - Titre')), th(t('Durée'), 'num'), th(t('Débit'), 'num col-bitrate'),
+      th(t('Genre'), 'num col-bitrate'),
       el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, t('Favori'))),
       el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, t('Télécharger'))))),
     el('tbody', {}, rows)));

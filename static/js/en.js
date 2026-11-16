@@ -64,6 +64,7 @@ export const EN = {
   'Télécharger la piste': 'Download track',
   'Télécharger {0}': 'Download {0}',
   'N°': 'No.',
+  'Artiste - Titre': 'Artist - Title',
   'Titre': 'Title',
   'Durée': 'Duration',
   'Débit': 'Bitrate',

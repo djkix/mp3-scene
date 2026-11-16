@@ -22,7 +22,7 @@ RELEASE_COLS = """r.id, r.name, r.path, r.category, r.added_at, r.size, r.track_
   """ + BITRATE + """ AS bitrate, (f.item_id IS NOT NULL) AS favorite"""
 RELEASE_FROM = "releases r LEFT JOIN favorites f ON f.user_id=? AND f.kind='release' AND f.item_id=r.id"
 TRACK_COLS = """t.id, t.release_id, r.name AS release_name, t.relpath, t.disc, t.size, t.title, t.artist,
-  t.duration, t.bitrate, (f.item_id IS NOT NULL) AS favorite"""
+  t.genre, t.duration, t.bitrate, (f.item_id IS NOT NULL) AS favorite"""
 TRACK_FROM = ("tracks t JOIN releases r ON r.id=t.release_id "
               "LEFT JOIN favorites f ON f.user_id=? AND f.kind='track' AND f.item_id=t.id")
 

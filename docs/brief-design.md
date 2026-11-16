@@ -85,7 +85,7 @@ frappe) affiche la même liste, filtrée.
 - **Informations** (les champs absents ne s'affichent pas) : Artiste, Titre, Source (WEB, CD, VINYL, SAT…),
   Année, Groupe, Localisation, Genre, Taille, Durée.
 - **Actions** : **Lire** (principale), **Ajouter à la file**, **Favori**, **Télécharger (zip)**.
-- **Tableau des pistes** : N°, Titre (« Titre — Artiste », ou nom de fichier à défaut), Durée, Débit (kbit/s,
+- **Tableau des pistes** : N°, Artiste - Titre (ou nom de fichier à défaut), Durée, Débit, Genre (colonnes centrées ; Débit en kbit/s,
   masqué sur téléphone), favori de la piste, téléchargement de la piste. Séparateurs « CD 1 », « CD 2 » pour
   les releases multi-disques. Clic sur une piste : lecture à partir de cette piste.
 - **NFO** : bloc de texte en chasse fixe, art ASCII, centré ; sur téléphone la police est réduite pour que

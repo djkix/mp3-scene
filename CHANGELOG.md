@@ -4,6 +4,14 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.12.1](https://github.com/djkix/mp3-scene/compare/v1.12.0...v1.12.1) (2026-11-16)
+
+### Résumé
+
+**Fiche release : pistes en « artiste - titre », avec leur genre.** Le tableau des pistes affiche l'artiste avant le
+titre, gagne une colonne Genre (le tag de chaque piste), et ses colonnes N°, Durée, Débit et Genre sont centrées,
+libellés compris. Sur téléphone, Débit et Genre restent masqués.
+
 ## [1.12.0](https://github.com/djkix/mp3-scene/compare/v1.11.0...v1.12.0) (2026-11-16)
 
 ### Résumé
