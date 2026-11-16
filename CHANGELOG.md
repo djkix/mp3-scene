@@ -4,6 +4,16 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.11.0](https://github.com/djkix/mp3-scene/compare/v1.10.1...v1.11.0) (2026-11-16)
+
+### Résumé
+
+**Dix minutes d'avance pour les coupures de réseau.** Pendant la lecture, le lecteur télécharge en mémoire les
+pistes suivantes jusqu'à disposer d'environ dix minutes d'audio d'avance : une coupure dans les transports ne
+s'entend plus. Si le réseau manque quand même, la piste n'est plus sautée : le lecteur affiche « Connexion perdue »
+et reprend seul, au même endroit, au retour de la connexion. Rien n'est téléchargé tant que la lecture est en pause,
+ni pendant un cast. La piste lancée à la main reste lue en flux : l'avance vaut à partir de la piste suivante.
+
 ## [1.10.1](https://github.com/djkix/mp3-scene/compare/v1.10.0...v1.10.1) (2026-11-16)
 
 ### Résumé

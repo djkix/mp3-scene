@@ -90,3 +90,8 @@ test("fromJSON restaure shuffle", () => {
   const q = new Queue(); q.replace(T(4), 2); q.shuffle = true; const r = Queue.fromJSON(JSON.parse(JSON.stringify(q)));
   assert.equal(r.shuffle, true); assert.equal(r.current().id, 3);
 });
+test("upcoming : la suite dans l'ordre de lecture", () => {
+  const q = new Queue(); assert.deepEqual(q.upcoming(), []);
+  q.replace(T(4), 1); assert.deepEqual(q.upcoming().map((t) => t.id), [3, 4]);
+  q.shuffle = true; assert.deepEqual(q.upcoming().map((t) => t.id).sort(), [1, 3, 4]);
+});

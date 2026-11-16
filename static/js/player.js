@@ -8,7 +8,7 @@ import { Queue } from './queue.js';
 
 const KEY = 'mp3scene.player';
 const audio = new Audio();
-audio.preload = 'metadata'; // pas de préchargement de la piste suivante (NFS, données mobiles)
+audio.preload = 'metadata'; // rien n'est chargé avant la lecture ; ensuite, voir buffer()
 const ms = 'mediaSession' in navigator ? navigator.mediaSession : null;
 const mobile = matchMedia('(max-width: 699px)');
 
@@ -96,7 +96,49 @@ function stopAudio() {
   loadedId = null;
 }
 
-// Charge la piste courante de la file (et seulement elle).
+// --- Tampon --------------------------------------------------------------------------------------
+// Pendant la lecture, garde AHEAD secondes d'audio d'avance : les pistes suivantes sont téléchargées en entier,
+// une à la fois, jusqu'à couvrir cette durée (coupures de réseau dans les transports).
+// ponytail: la piste lancée à la main reste lue en flux (tampon du navigateur) ; seules les suivantes sont garanties.
+const AHEAD = 600;
+const blobs = new Map();  // id de piste -> URL d'objet de la piste téléchargée
+let fetching = false, fetchRetry = 0;
+const streamUrl = (id) => `/api/tracks/${encodeURIComponent(id)}/stream`;
+
+function dropBlobs(keep = new Set()) {
+  for (const [id, url] of blobs) if (!keep.has(id)) { URL.revokeObjectURL(url); blobs.delete(id); }
+}
+
+async function buffer() {
+  const cur = player.queue.current();
+  if (backend || fetching || !cur || audio.paused || Date.now() < fetchRetry) return;
+  let ahead = Math.max(0, duration() - position());
+  const keep = new Set([cur.id]);
+  let todo = null;
+  for (const t of player.queue.upcoming()) {
+    if (ahead >= AHEAD) break;
+    keep.add(t.id);
+    if (!blobs.has(t.id)) todo ??= t;
+    ahead += t.duration || AHEAD; // durée inconnue : on s'arrête là plutôt que de charger toute la file
+  }
+  dropBlobs(keep);
+  if (!todo) return;
+  fetching = true;
+  try {
+    const res = await fetch(streamUrl(todo.id));
+    if (!res.ok) throw new Error(res.status);
+    blobs.set(todo.id, URL.createObjectURL(await res.blob()));
+  } catch { fetchRetry = Date.now() + 10000; } // réseau coupé ou fichier absent : nouvel essai plus tard
+  fetching = false;
+}
+
+// Réseau coupé : la piste n'est pas sautée, on la recharge à la même position jusqu'au retour de la connexion.
+function retry(id, pos) {
+  flash(tr('Connexion perdue, nouvelle tentative…'));
+  setTimeout(() => { if (loadedId === id && audio.error) load(wantPlay, pos || null); }, 5000);
+}
+
+// Charge la piste courante de la file.
 function load(play, pos = null) {
   const t = player.queue.current();
   if (backend) { metadata(t); backend.load(play, pos); return update(); }
@@ -104,7 +146,7 @@ function load(play, pos = null) {
   wantPlay = play && !!t;
   if (!t) { stopAudio(); metadata(null); return update(); }
   loadedId = t.id;
-  audio.src = `/api/tracks/${encodeURIComponent(t.id)}/stream`;
+  audio.src = blobs.get(t.id) || streamUrl(t.id);
   metadata(t);
   if (play) start();
   update();
@@ -181,6 +223,7 @@ function reset() {
   if (b) { backend = null; b.end(); } // déconnexion : ce navigateur ne pilote plus le récepteur
   player.queue.clear();
   load(false);
+  dropBlobs();
   try { localStorage.removeItem(KEY); } catch { /* idem */ }
   if (ui) { openPanel(false); expand(false); }
 }
@@ -194,9 +237,12 @@ audio.addEventListener('ended', () => {
 });
 
 audio.addEventListener('error', async () => {
-  const failedId = loadedId;
+  const failedId = loadedId, pos = position();
   if (failedId == null || !audio.getAttribute('src')) return;
-  try { await api('/me'); } catch (e) { if (e.status === 401) return; } // 401 : api() a déjà redirigé vers #/login
+  try { await api('/me'); } catch (e) {
+    if (e.status === 401) return; // api() a déjà redirigé vers #/login
+    if (!e.status) return retry(failedId, pos);
+  }
   if (loadedId !== failedId) return; // une autre piste a été chargée entre-temps
   failures++;
   if (failures >= player.queue.tracks.length || !player.queue.next({ auto: false })) {
@@ -221,6 +267,7 @@ audio.addEventListener('waiting', () => busy(true));
 for (const ev of ['play', 'emptied']) audio.addEventListener(ev, update);
 audio.addEventListener('pause', () => { update(); save(); });
 for (const ev of ['timeupdate', 'durationchange']) audio.addEventListener(ev, tick);
+audio.addEventListener('timeupdate', buffer);
 for (const ev of ['seeked', 'ratechange']) audio.addEventListener(ev, positionState);
 audio.addEventListener('volumechange', volUI);
 

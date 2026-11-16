@@ -5,6 +5,7 @@ export const EN = {
   'Diffuser sur un appareil': 'Cast to a device',
   'Lecture bloquée par le navigateur : appuyez sur lecture.': 'Playback blocked by the browser: press play.',
   'Lecture impossible.': 'Playback failed.',
+  'Connexion perdue, nouvelle tentative…': 'Connection lost, retrying…',
   'Lecture impossible, piste suivante.': 'Playback failed, skipping to the next track.',
   'Répétition désactivée': 'Repeat off',
   'Répéter toute la file': 'Repeat all',

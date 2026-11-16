@@ -33,6 +33,9 @@ export class Queue {
 
   current() { return this.tracks[this.index] ?? null; }
 
+  // Pistes qui suivent la courante dans l'ordre de lecture (sans reboucler).
+  upcoming() { return this.index < 0 ? [] : this.order.slice(this._pos() + 1).map((i) => this.tracks[i]); }
+
   replace(tracks, startIndex = 0) {
     this.tracks = [...tracks];
     this.index = this.tracks.length ? Math.min(Math.max(startIndex | 0, 0), this.tracks.length - 1) : -1;
