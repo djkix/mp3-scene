@@ -84,6 +84,7 @@ def _drop(conn, loser, survivor=None):
         pairs = conn.execute("SELECT s.id, l.id FROM tracks l JOIN tracks s ON s.relpath=l.relpath AND s.release_id=?"
                              " WHERE l.release_id=?", (survivor, loser)).fetchall()
         conn.executemany("UPDATE OR IGNORE favorites SET item_id=? WHERE kind='track' AND item_id=?", pairs)
+        conn.executemany("UPDATE OR IGNORE playlist_tracks SET track_id=? WHERE track_id=?", pairs)
     conn.execute("DELETE FROM favorites WHERE kind='release' AND item_id=?", (loser,))
     conn.execute("DELETE FROM favorites WHERE kind='track' AND item_id IN"
                  " (SELECT id FROM tracks WHERE release_id=?)", (loser,))

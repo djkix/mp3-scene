@@ -25,6 +25,14 @@ CREATE TABLE IF NOT EXISTS plays(
   user_id INTEGER NOT NULL REFERENCES users ON DELETE CASCADE,
   track_id INTEGER NOT NULL REFERENCES tracks ON DELETE CASCADE, played_at REAL NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_plays_user ON plays(user_id, played_at DESC);
+-- playlists : une piste au plus une fois par playlist, dans l'ordre d'ajout
+CREATE TABLE IF NOT EXISTS playlists(
+  id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users ON DELETE CASCADE,
+  name TEXT NOT NULL, created_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS playlist_tracks(
+  playlist_id INTEGER NOT NULL REFERENCES playlists ON DELETE CASCADE,
+  track_id INTEGER NOT NULL REFERENCES tracks ON DELETE CASCADE,
+  position INTEGER NOT NULL, PRIMARY KEY(playlist_id, track_id));
 -- forme d'onde : 800 crêtes (un octet chacune), calculées à la première écoute
 CREATE TABLE IF NOT EXISTS waveforms(
   track_id INTEGER PRIMARY KEY REFERENCES tracks ON DELETE CASCADE, peaks BLOB NOT NULL);

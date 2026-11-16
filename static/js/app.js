@@ -20,6 +20,8 @@ const ROUTES = {
   search: releases,
   folders,
   groups,
+  artists: { render: (c, p) => groups.render(c, { ...p, kind: 'artists' }) },
+  genres: { render: (c, p) => groups.render(c, { ...p, kind: 'genres' }) },
   release,
   favorites,
   account,
@@ -85,7 +87,8 @@ async function route() {
     $('update').hidden = false;
   }).catch(() => {});
   document.querySelectorAll('#nav a').forEach((a) =>
-    a.classList.toggle('active', a.dataset.route === name || (name === 'search' && a.dataset.route === '')));
+    a.classList.toggle('active', a.dataset.route === name || (name === 'search' && a.dataset.route === '')
+      || (['artists', 'genres'].includes(name) && a.dataset.route === 'groups')));
   const search = $('search');
   if (name !== 'search' && search.value) search.value = '';
   else if (name === 'search' && document.activeElement !== search) search.value = params.q || '';
@@ -103,7 +106,8 @@ $('search').addEventListener('input', (e) => {
   clearTimeout(timer);
   timer = setTimeout(() => {
     const q = e.target.value.trim();
-    location.replace(q ? '#/search?q=' + encodeURIComponent(q) : '#/'); // remplace l'entrée : pas d'historique à chaque frappe
+    const tracks = parseHash()?.params.in === 'tracks' ? '&in=tracks' : ''; // on reste sur l'onglet Pistes
+    location.replace(q ? '#/search?q=' + encodeURIComponent(q) + tracks : '#/'); // remplace l'entrée : pas d'historique à chaque frappe
   }, 250);
 });
 

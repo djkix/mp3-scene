@@ -33,8 +33,50 @@ def test_groups(user_client, library):
     g = user_client.get("/api/groups").json()
     assert sorted(x["name"] for x in g) == ["GRP", "PWT", "WUS"] and all(x["releases"] == 1 and x["size"] > 0 for x in g)
     assert [x["name"] for x in user_client.get("/api/groups?genre=House&year=2015").json()] == ["WUS"]
-    assert user_client.get("/api/groups?grp=WUS&year=2017").json() == []
+    assert user_client.get("/api/groups?name=WUS&year=2017").json() == []
     assert [x["name"] for x in user_client.get("/api/releases?grp=WUS").json()["items"]] == [A]
+    assert {"A-Trak", "Bicep"} <= {x["name"] for x in user_client.get("/api/groups?by=artist").json()}
+    assert {x["name"] for x in user_client.get("/api/groups?by=genre").json()} == {"House", "Techno"}
+    assert [x["name"] for x in user_client.get("/api/releases?artist=A-Trak").json()["items"]] == [A]
+    assert user_client.get("/api/groups?by=password_hash").status_code == 422
+
+
+def test_search_tracks(user_client, library):
+    find = lambda q: [t["title"] for t in user_client.get("/api/tracks", params={"q": q}).json()["items"]]
+    assert find("ibanez") == ["Ibanez", "Ibanez Dub"] and find("trak dub") == ["Ibanez Dub"] and find("glu") == ["Glue"]
+    assert find("") == [] and find("%") == [] and find("_") == [] and find("zzz") == []
+
+
+def test_playlists(user_client, admin_client, library):
+    ids = [t["id"] for t in user_client.get("/api/tracks", params={"q": "ibanez"}).json()["items"]]
+    rid = user_client.get("/api/releases?grp=PWT").json()["items"][0]["id"]
+    pid = user_client.post("/api/playlists", json={"name": " Soir "}).json()["id"]
+    assert user_client.post("/api/playlists", json={"name": "  "}).status_code == 422
+    add = lambda body: user_client.post(f"/api/playlists/{pid}/tracks", json=body).status_code
+    assert add({"track_ids": [ids[1], 99999]}) == 204 and add({"track_ids": ids}) == 204 and add({"release_id": rid}) == 204
+    p = user_client.get(f"/api/playlists/{pid}").json()
+    assert p["name"] == "Soir" and [t["title"] for t in p["items"]] == ["Ibanez Dub", "Ibanez", "Glue"]
+    assert user_client.get("/api/playlists").json()[0]["tracks"] == 3
+    # privées : un autre utilisateur ne les voit pas et ne peut rien y faire
+    assert admin_client.get("/api/playlists").json() == [] and admin_client.get(f"/api/playlists/{pid}").status_code == 404
+    assert admin_client.post(f"/api/playlists/{pid}/tracks", json={"track_ids": ids}).status_code == 404
+    assert admin_client.delete(f"/api/playlists/{pid}").status_code == 204 and len(user_client.get("/api/playlists").json()) == 1
+    assert user_client.delete(f"/api/playlists/{pid}/tracks/{ids[0]}").status_code == 204
+    assert user_client.put(f"/api/playlists/{pid}", json={"name": "Nuit"}).status_code == 204
+    assert [t["title"] for t in user_client.get(f"/api/playlists/{pid}").json()["items"]] == ["Ibanez Dub", "Glue"]
+    assert user_client.get("/api/playlists").json()[0]["name"] == "Nuit"
+    assert user_client.delete(f"/api/playlists/{pid}").status_code == 204 and user_client.get("/api/playlists").json() == []
+
+
+def test_stats(user_client, admin_client, library):
+    ids = [t["id"] for t in user_client.get("/api/tracks", params={"q": "ibanez"}).json()["items"]]
+    for tid in (ids[0], ids[0], ids[1]):
+        assert user_client.post(f"/api/history/{tid}").status_code == 204
+    s = user_client.get("/api/stats?days=7").json()
+    assert s["plays"] == 3 and s["duration"] > 0 and [(t["id"], t["plays"]) for t in s["tracks"]] == [(ids[0], 2), (ids[1], 1)]
+    assert s["artists"] == [{"name": "A-Trak", "plays": 3}] and s["genres"] == [{"name": "House", "plays": 3}]
+    assert s["groups"] == [{"name": "WUS", "plays": 3}]
+    assert admin_client.get("/api/stats").json()["plays"] == 0
 
 
 def test_search_words_and_prefix(user_client, library):

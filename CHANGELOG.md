@@ -4,6 +4,26 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.13.0](https://github.com/djkix/mp3-scene/compare/v1.12.1...v1.13.0) (2026-11-16)
+
+### Résumé
+
+**Playlists, recherche par piste, statistiques d'écoute, pages Artistes et Genres.**
+
+- **Playlists** : listes de pistes nommées, propres à chaque utilisateur (Favoris › Playlists). Le bouton ♫ ajoute une
+  piste depuis la fiche d'une release, une liste de pistes ou les résultats de recherche ; « Ajouter à une playlist »
+  ajoute une release entière. Une playlist se lit, se renomme et se supprime ; une piste n'y figure qu'une fois.
+- **Recherche par piste** : la recherche a un onglet Pistes, qui cherche dans le titre et l'artiste des tags (utile
+  pour retrouver un morceau dans une compilation).
+- **Statistiques** (Favoris › Statistiques) : nombre d'écoutes, durée écoutée, et les dix pistes, artistes, genres et
+  groupes les plus écoutés, sur 7 jours, 30 jours, 12 mois ou tout l'historique.
+- **Explorer** : l'entrée Groupes devient Explorer, avec trois onglets — Groupes, Artistes, Genres — chacun avec le
+  nombre de releases et le poids. Au-delà de 1000 lignes, la liste demande d'affiner le filtre.
+- **Fiche release** : l'artiste, l'année, le groupe et le genre sont des liens vers la liste correspondante.
+- Sur téléphone, le téléchargement piste par piste est masqué dans la fiche (le zip reste disponible).
+
+Deux tables sont créées au démarrage (playlists) : aucune migration manuelle, aucun scan.
+
 ## [1.12.1](https://github.com/djkix/mp3-scene/compare/v1.12.0...v1.12.1) (2026-11-16)
 
 ### Résumé

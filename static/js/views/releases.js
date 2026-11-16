@@ -1,6 +1,7 @@
 import { api, fmtDate, fmtSize } from '../api.js';
 import { el } from '../dom.js';
 import { t as tr } from '../i18n.js';
+import { trackList } from './tracklist.js';
 
 const PAGE = 50;
 const emit = (name, detail) => document.dispatchEvent(new CustomEvent(name, { detail }));
@@ -130,17 +131,25 @@ export function select(label, all, name, values, current, onChange) {
   return sel;
 }
 
-// Vue « derniers ajouts » (#/), « recherche » (#/search?q=) et releases d'un groupe (params.grp, voir groups.js)
+// Vue « derniers ajouts » (#/), « recherche » (#/search?q=, onglet Pistes avec &in=tracks) et releases épinglées
+// sur un groupe ou un artiste (params.pin = {key, value, base}, voir groups.js).
 export function render(container, params) {
-  const { q = '', category = '', genre = '', year = '', grp = '' } = params;
+  const { q = '', category = '', genre = '', year = '', pin = null } = params;
   const bar = el('div', { class: 'filters' });
   const list = el('div');
-  container.replaceChildren(bar, list);
+  const inTracks = q && params.in === 'tracks';
+  const tab = (label, on, hash) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(on),
+    onclick: () => { location.hash = hash; } }, label);
+  const tabs = q && el('div', { class: 'tabs', role: 'tablist', 'aria-label': tr('Rechercher') },
+    tab(tr('Releases'), !inTracks, `#/search?q=${encodeURIComponent(q)}`),
+    tab(tr('Pistes'), inTracks, `#/search?q=${encodeURIComponent(q)}&in=tracks`));
+  container.replaceChildren(...(tabs ? [tabs] : []), ...(inTracks ? [] : [bar]), list);
+  if (inTracks) return trackList(list, { path: `/tracks?q=${encodeURIComponent(q)}`, empty: tr('Aucun résultat') });
 
   function setFilter(name, value) {
     const next = { q, category, genre, year, [name]: value };
     const qs = Object.entries(next).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
-    location.hash = (grp ? `#/groups/${encodeURIComponent(grp)}` : q ? '#/search' : '#/') + (qs ? '?' + qs : ''); // nouvelle entrée d'historique, pagination remise à zéro
+    location.hash = (pin ? pin.base : q ? '#/search' : '#/') + (qs ? '?' + qs : ''); // nouvelle entrée d'historique, pagination remise à zéro
   }
 
   let dead = false;
@@ -150,7 +159,7 @@ export function render(container, params) {
       select(tr('Genre'), tr('Genres'), 'genre', f.genres, genre, setFilter), select(tr('Année'), tr('Années'), 'year', f.years, year, setFilter));
   }).catch(() => {});
 
-  const query = new URLSearchParams(Object.entries({ q, category, genre, year, grp }).filter(([, v]) => v));
+  const query = new URLSearchParams(Object.entries({ q, category, genre, year, ...(pin && { [pin.key]: pin.value }) }).filter(([, v]) => v));
   const dispose = releaseList(list, (offset, tri) => {
     query.set('offset', offset);
     query.set('limit', PAGE);

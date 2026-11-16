@@ -34,7 +34,7 @@ Trois zones permanentes, une fois connecté :
 2. **Contenu** : l'écran courant.
 3. **Lecteur** : fixé en bas, visible dès qu'une piste a été lancée, sur tous les écrans.
 
-Navigation, cinq entrées : **Derniers** (accueil), **Dossiers**, **Groupes**, **Favoris**, **Compte**. L'entrée active est marquée.
+Navigation, cinq entrées : **Derniers** (accueil), **Dossiers**, **Explorer**, **Favoris**, **Compte**. L'entrée active est marquée.
 
 Un **bandeau** peut apparaître sous la barre du haut, pour les administrateurs :
 « Nouvelle version 1.2.0 disponible (installée : 1.1.0). Voir les nouveautés ».
@@ -70,9 +70,12 @@ frappe) affiche la même liste, filtrée.
 - Défilement infini (50 par page). Messages : « Chargement… », « Fin de la liste », « Aucun résultat »,
   erreur avec bouton « Réessayer ».
 
-### 4.2 bis Groupes
-- **Liste des groupes** : tableau Groupe, Releases, Poids ; en-têtes cliquables pour trier ; champ « Filtrer les groupes… », sélecteurs Genre et Année ; total en bas (groupes, releases, poids).
-- **Page d'un groupe** : titre « Groupes › NOM » suivi du nombre de releases et du poids, puis la liste de releases habituelle avec ses filtres.
+### 4.2 bis Explorer
+- **Onglets** Groupes, Artistes, Genres. Chaque onglet : tableau Nom, Releases, Poids ; en-têtes cliquables pour trier ; champ « Filtrer la liste… », sélecteurs Genre et Année ; total en bas. Au plus 1000 lignes affichées.
+- **Page d'un groupe ou d'un artiste** : titre « Groupes › NOM » suivi du nombre de releases et du poids, puis la liste de releases habituelle avec ses filtres. Un genre ouvre la liste Derniers filtrée.
+- **Recherche** : onglets Releases et Pistes ; l'onglet Pistes liste les pistes dont le titre ou l'artiste contient les mots cherchés.
+- **Favoris** : onglets Releases, Pistes, Playlists, Historique, Statistiques. Playlists : tableau (nom, pistes, durée, lire, renommer, supprimer) et contenu d'une playlist. Statistiques : sélecteur de période, total, quatre classements.
+- **Ajout à une playlist** : bouton ♫ sur chaque piste, boîte de dialogue listant les playlists avec un champ « Nouvelle playlist ».
 
 ### 4.3 Dossiers
 - **Fil d'Ariane** : Dossiers › 02.Various Artists - Compilations › -=Kontor=-

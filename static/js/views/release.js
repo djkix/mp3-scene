@@ -4,6 +4,7 @@ import { el } from '../dom.js';
 import { player } from '../player.js';
 import { favButton } from './releases.js';
 import { infoRows } from './release-info.js';
+import { addButton } from '../playlist-add.js';
 
 const emit = (name, detail) => document.dispatchEvent(new CustomEvent(name, { detail }));
 
@@ -39,6 +40,7 @@ function header(rel) {
     el('div', { class: 'detail-actions' },
       el('button', { type: 'button', class: 'primary', disabled: !rel.tracks.length, onclick: play }, t('Lire')),
       el('button', { type: 'button', onclick: () => emit('queue-release', { releaseId: rel.id }) }, t('Ajouter à la file')),
+      addButton({ release_id: rel.id }, t('Ajouter à une playlist')),
       favButton(rel),
       el('a', { class: 'btn', href: `/api/releases/${rel.id}/zip`, download: '' }, t('Télécharger (zip)'))));
 }
@@ -49,7 +51,7 @@ function trackTable(rel) {
   let disc = null;
   rel.tracks.forEach((tk, i) => {
     if (rel.tracks.some((x) => x.disc !== rel.tracks[0].disc) && tk.disc !== disc) {
-      rows.push(el('tr', { class: 'disc' }, el('th', { scope: 'rowgroup', colspan: 7 }, `CD ${tk.disc}`)));
+      rows.push(el('tr', { class: 'disc' }, el('th', { scope: 'rowgroup', colspan: 8 }, `CD ${tk.disc}`)));
     }
     disc = tk.disc;
     const label = tk.title ? (tk.artist ? `${tk.artist} - ${tk.title}` : tk.title) : tk.filename;
@@ -61,16 +63,18 @@ function trackTable(rel) {
     el('td', { class: 'num' }, tk.duration == null ? '—' : fmtDuration(tk.duration)),
     el('td', { class: 'num col-bitrate' }, tk.bitrate == null ? '—' : `${Math.round(tk.bitrate / 1000)} kbit/s`),
     el('td', { class: 'num col-bitrate' }, tk.genre || '—'),
+    el('td', {}, addButton({ track_ids: [tk.id] })),
     el('td', {}, favButton(tk, 'track')),
-    el('td', {}, el('a', { class: 'icon', href: `/api/tracks/${tk.id}/stream?download=1`, download: '',
+    el('td', { class: 'col-bitrate' }, el('a', { class: 'icon', href: `/api/tracks/${tk.id}/stream?download=1`, download: '',
       title: t('Télécharger la piste'), 'aria-label': t('Télécharger {0}', tk.filename) }, '⤓'))));
   });
   const th = (txt, cls) => el('th', { scope: 'col', class: cls }, txt);
   return el('div', { class: 'table-wrap' }, el('table', { class: 'tracks' },
     el('thead', {}, el('tr', {}, th(t('N°'), 'num'), th(t('Artiste - Titre')), th(t('Durée'), 'num'), th(t('Débit'), 'num col-bitrate'),
       th(t('Genre'), 'num col-bitrate'),
+      el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, t('Playlist'))),
       el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, t('Favori'))),
-      el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, t('Télécharger'))))),
+      el('th', { scope: 'col', class: 'col-bitrate' }, el('span', { class: 'sr-only' }, t('Télécharger'))))),
     el('tbody', {}, rows)));
 }
 

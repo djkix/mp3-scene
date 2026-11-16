@@ -1,12 +1,17 @@
 import { fmtDuration, fmtSize } from '../api.js';
 import { t } from '../i18n.js';
 
-// Lignes <dt>/<dd> de la fiche ; les champs null sont omis. `el` est injecté pour pouvoir tester sans navigateur.
+const enc = encodeURIComponent;
+
+// Lignes <dt>/<dd> de la fiche ; les champs null sont omis. Artiste, année, groupe et genre mènent à la liste
+// correspondante. `el` est injecté pour pouvoir tester sans navigateur.
 export function infoRows(rel, el) {
-  return [[t('Artiste'), rel.artist], [t('Titre'), rel.title], [t('Source'), rel.source], [t('Année'), rel.year],
-    [t('Groupe'), rel.grp], [t('Localisation'), rel.category], [t('Genre'), rel.genre],
+  return [[t('Artiste'), rel.artist, (v) => `#/artists/${enc(v)}`], [t('Titre'), rel.title], [t('Source'), rel.source],
+    [t('Année'), rel.year, (v) => `#/?year=${enc(v)}`], [t('Groupe'), rel.grp, (v) => `#/groups/${enc(v)}`],
+    [t('Localisation'), rel.category], [t('Genre'), rel.genre, (v) => `#/?genre=${enc(v)}`],
     [t('Taille'), rel.size == null ? null : fmtSize(rel.size)],
     [t('Durée'), rel.duration == null ? null : fmtDuration(rel.duration)]]
     .filter(([, v]) => v != null && v !== '')
-    .flatMap(([k, v]) => [el('dt', {}, k), el('dd', {}, String(v))]); // à plat : el() n'aplatit qu'un niveau
+    // à plat : el() n'aplatit qu'un niveau
+    .flatMap(([k, v, href]) => [el('dt', {}, k), el('dd', {}, href ? el('a', { href: href(v) }, String(v)) : String(v))]);
 }

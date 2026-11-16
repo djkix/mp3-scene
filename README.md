@@ -4,7 +4,7 @@
 
 **Collection de releases MP3 « scene » — bibliothèque · lecteur web · Chromecast · PWA**
 
-[![Version](https://img.shields.io/badge/version-1.12.1-purple?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.13.0-purple?style=for-the-badge)](CHANGELOG.md)
 [![Stack](https://img.shields.io/badge/stack-FastAPI_·_SQLite_·_JavaScript_pur-blue?style=for-the-badge)](#stack-technique)
 [![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
 
@@ -14,7 +14,7 @@
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│ Mp3 Scene  🔍 Rechercher une release…  Derniers Dossiers Groupes Favoris… │
+│ Mp3 Scene  🔍 Rechercher une release…  Derniers Dossiers Explorer Favoris…│
 ├──────────────────────────────────────────────────────────────────────────┤
 │              [ Localisations ▾ ] [ Genres ▾ ] [ Années ▾ ]               │
 │ Nom                               Genre   Date        Pistes   Poids     │
@@ -53,7 +53,8 @@ Tout est déduit des dossiers et des fichiers, sans rien saisir.
 | **Derniers** | Releases par date d'ajout, filtres catégorie, genre et année, recherche plein texte |
 | **Dossiers** | Navigation dans l'arborescence du NAS |
 | **Fiche** | Pochette, pistes, durées, débit, NFO, téléchargement en zip |
-| **Favoris** | Releases et pistes favorites, **historique d'écoute**, par compte |
+| **Favoris** | Releases et pistes favorites, **playlists**, **historique** et **statistiques d'écoute**, par compte |
+| **Explorer** | Groupes, artistes et genres : nombre de releases et poids ; recherche par release ou par piste |
 | **Compte** | Changement de mot de passe, langue (français ou anglais) ; pour un administrateur, aussi : utilisateurs, scan de la bibliothèque, version installée |
 
 | Déduit automatiquement | D'où ça vient |
@@ -382,6 +383,10 @@ git tag v1.2.0 && git push origin v1.2.0
 ## Historique des versions
 
 Le détail est dans le [journal des modifications](CHANGELOG.md).
+
+### 1.13.0 — 16 novembre 2026
+
+**Playlists**, **recherche par piste**, **statistiques d'écoute**, pages **Artistes** et **Genres** (entrée Explorer), liens depuis la fiche release.
 
 ### 1.12.1 — 16 novembre 2026
 

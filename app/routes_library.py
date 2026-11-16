@@ -72,6 +72,7 @@ def _page(conn, cols, source, where, params, order, uid, offset, limit, build):
 
 @router.get("/api/releases")
 def list_releases(q: str = "", category: str | None = None, genre: str | None = None, grp: str | None = None,
+                  artist: str | None = None,
                   year: int | None = Query(None, ge=0, le=MAX_INT), favorites: int = Query(0, ge=0, le=1),
                   sort: Sort | None = None, dir: Dir = "asc",
                   offset: int = Query(0, ge=0, le=MAX_INT), limit: int = Query(50, ge=1, le=MAX_INT),
@@ -84,6 +85,9 @@ def list_releases(q: str = "", category: str | None = None, genre: str | None = 
         if val is not None:
             conds.append(f"r.{col}=?")
             params.append(val)
+    if artist is not None:
+        conds.append("COALESCE(r.tag_artist, r.artist)=?")
+        params.append(artist)
     if favorites:
         conds.append("f.item_id IS NOT NULL")
     where = "WHERE " + " AND ".join(conds) if conds else ""
@@ -99,19 +103,38 @@ def filters(conn=Depends(get_conn)):
             "years": col("SELECT DISTINCT year FROM releases WHERE year IS NOT NULL ORDER BY year DESC")}
 
 
+# regroupements de la page Explorer : colonnes autorisées (jamais de texte du client dans le SQL)
+GROUP_BY = {"grp": "grp", "artist": "COALESCE(tag_artist, artist)", "genre": "genre"}
+
+
 @router.get("/api/groups")
-def groups(grp: str | None = None, genre: str | None = None, year: int | None = Query(None, ge=0, le=MAX_INT),
-           conn=Depends(get_conn)):
-    """Groupes de release : nombre de releases et poids total, restreints au genre / à l'année demandés."""
-    conds, params = ["grp IS NOT NULL"], []
-    for col, val in (("grp", grp), ("genre", genre), ("year", year)):
+def groups(by: Literal["grp", "artist", "genre"] = "grp", name: str | None = None, genre: str | None = None,
+           year: int | None = Query(None, ge=0, le=MAX_INT), conn=Depends(get_conn)):
+    """Releases regroupées par groupe, artiste ou genre : nombre et poids total, restreints au genre / à l'année."""
+    col = GROUP_BY[by]
+    conds, params = [f"{col} IS NOT NULL"], []
+    for c, val in ((col, name), ("genre", genre), ("year", year)):
         if val is not None:
-            conds.append(f"{col}=?")
+            conds.append(f"{c}=?")
             params.append(val)
-    # ponytail: liste entière sans pagination (quelques milliers de groupes) ; paginer si elle devient lourde
+    # ponytail: liste entière sans pagination (l'interface n'affiche que les 1000 premières lignes) ; paginer si lourd
     return [dict(r) for r in conn.execute(
-        "SELECT grp AS name, COUNT(*) AS releases, SUM(size) AS size FROM releases WHERE " + " AND ".join(conds)
-        + " GROUP BY grp ORDER BY releases DESC, grp COLLATE NOCASE", params)]
+        f"SELECT {col} AS name, COUNT(*) AS releases, SUM(size) AS size FROM releases WHERE " + " AND ".join(conds)
+        + " GROUP BY 1 ORDER BY releases DESC, 1 COLLATE NOCASE", params)]
+
+
+@router.get("/api/tracks")
+def search_tracks(q: str = Query("", max_length=200), offset: int = Query(0, ge=0, le=MAX_INT),
+                  limit: int = Query(50, ge=1, le=MAX_INT), user=Depends(current_user), conn=Depends(get_conn)):
+    """Recherche dans les tags : chaque mot doit figurer dans le titre ou l'artiste de la piste."""
+    words = [w for w in _WORDS.split(q) if w][:8]
+    if not words:
+        return {"items": [], "has_more": False}
+    # ponytail: LIKE parcourt toutes les pistes (~0,1 s pour 500 000) ; index FTS sur les pistes si trop lent
+    conds = " AND ".join("(t.title LIKE ? OR t.artist LIKE ?)" for _ in words)
+    params = [f"%{w}%" for w in words for _ in range(2)]  # mots sans % ni _ : _WORDS les a retirés
+    return _page(conn, TRACK_COLS, TRACK_FROM, "WHERE " + conds, params,
+                 "t.artist COLLATE NOCASE, t.title COLLATE NOCASE, t.id", user["id"], offset, limit, _track)
 
 
 @router.get("/api/folders")
@@ -184,6 +207,29 @@ def history(offset: int = Query(0, ge=0, le=MAX_INT), limit: int = Query(50, ge=
     return _page(conn, TRACK_COLS + ", p.played_at", "plays p JOIN " + TRACK_FROM,
                  "WHERE p.track_id=t.id AND p.user_id=?", [user["id"]], "p.played_at DESC, p.rowid DESC",
                  user["id"], offset, limit, _track)
+
+
+@router.get("/api/stats")
+def stats(days: int = Query(0, ge=0, le=36500), user=Depends(current_user), conn=Depends(get_conn)):
+    """Statistiques d'écoute de l'utilisateur sur les `days` derniers jours (0 : tout l'historique)."""
+    uid, since = user["id"], time.time() - days * 86400 if days else 0
+    src = "plays p JOIN tracks t ON t.id=p.track_id JOIN releases r ON r.id=t.release_id"
+    where = "WHERE p.user_id=? AND p.played_at>=?"
+    total = conn.execute(f"SELECT COUNT(*) AS plays, COALESCE(SUM(t.duration), 0) AS duration FROM {src} {where}",
+                         (uid, since)).fetchone()
+
+    def top(col):
+        return [dict(r) for r in conn.execute(
+            f"SELECT {col} AS name, COUNT(*) AS plays FROM {src} {where} AND {col} IS NOT NULL"
+            " GROUP BY 1 ORDER BY plays DESC, 1 COLLATE NOCASE LIMIT 10", (uid, since))]
+
+    tracks = [_track(r) for r in conn.execute(
+        f"SELECT {TRACK_COLS}, n.plays FROM (SELECT track_id, COUNT(*) AS plays FROM plays p {where} GROUP BY track_id"
+        f" ORDER BY plays DESC, track_id LIMIT 10) n JOIN {TRACK_FROM} WHERE t.id=n.track_id"
+        " ORDER BY n.plays DESC, t.id", (uid, since, uid))]
+    return {"plays": total["plays"], "duration": total["duration"], "tracks": tracks,
+            "artists": top("COALESCE(t.artist, r.tag_artist, r.artist)"), "genres": top("COALESCE(t.genre, r.genre)"),
+            "groups": top("r.grp")}
 
 
 @router.post("/api/history/{track_id}", status_code=204)

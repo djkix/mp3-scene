@@ -274,6 +274,20 @@ thead th { color: var(--muted); font-weight: 500; font-size: 12px; }
 .groups th button { padding: 4px 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
 .groups th button:hover { color: var(--fg); background: none; }
 .groups td a { display: block; overflow-wrap: anywhere; }
+.groups .actions { justify-content: flex-end; flex-wrap: nowrap; }
+.groups td.muted, .grp-title .muted { color: var(--muted); }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0 24px; padding: 0 12px 12px; }
+.stats h2 { font-size: 14px; margin: 16px 0 4px; }
+.stats td:first-child { overflow-wrap: anywhere; }
+dialog.pl-add { width: min(360px, calc(100vw - 24px)); padding: 16px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--bg); color: var(--fg); }
+dialog.pl-add::backdrop { background: rgb(0 0 0 / .5); }
+dialog.pl-add h2 { margin: 0 0 10px; font-size: 15px; }
+.pl-add-list { display: flex; flex-direction: column; gap: 4px; max-height: 40vh; overflow-y: auto; margin-bottom: 10px; }
+.pl-add-list button { text-align: left; overflow-wrap: anywhere; }
+dialog.pl-add .inline-form input { flex: 1 1 120px; min-width: 0; }
+dialog.pl-add .status { padding: 8px 0; min-height: 1em; }
+.detail-info a:hover, .groups td a:hover, .grp-title a:hover { text-decoration: underline; }
 .grp-title { margin: 0; padding: 10px 12px 0; font-size: 16px; overflow-wrap: anywhere; }
 .grp-title .muted { color: var(--muted); font-size: 12px; font-weight: 400; margin-left: 8px; white-space: nowrap; }
 td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); }
@@ -287,10 +301,11 @@ tr.disc th { background: var(--hover); font-size: 12px; color: var(--muted); }
 .nfo { width: fit-content; /* bloc centré, texte aligné à gauche : l'art ASCII reste en place */
   font: 11px/1 "Cascadia Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace; white-space: pre; overflow-x: auto;
   max-width: 100%; margin: 0 auto; padding: 8px; border: 1px solid var(--line); background: var(--hover); }
-.tabs { display: flex; gap: 4px; padding: 10px 12px; }
+.tabs { display: flex; gap: 4px; padding: 10px 12px; overflow-x: auto; }
+.tabs button { flex: none; }
 .tabs [aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
 /* date | artiste | titre | release | action : artiste et release passent à la ligne plutôt que d'être coupés */
-.trk-fav { grid-template-columns: 8rem minmax(0, 2fr) minmax(0, 3fr) minmax(0, 4fr) 40px; gap: 0 16px; }
+.trk-fav { grid-template-columns: 8rem minmax(0, 2fr) minmax(0, 3fr) minmax(0, 4fr) 72px; gap: 0 16px; }
 .trk-fav .rel-cat, .trk-fav .rel-meta { white-space: normal; overflow-wrap: anywhere; }
 .trk-fav .rel-meta:hover { text-decoration: underline; }
 .stack { display: flex; flex-direction: column; gap: 10px; max-width: 320px; }
