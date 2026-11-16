@@ -149,6 +149,9 @@ export function render(container) {
     el('h2', {}, t('Scan de la bibliothèque')),
     el('p', { class: 'hint' }, t('Le genre et la durée apparaissent au fur et à mesure de la lecture des tags.')),
     scanBtn, scanOut, scanMsg,
+    el('h2', {}, t('Bibliothèque')),
+    el('p', {}, el('a', { class: 'btn', href: '#/library' }, t('Tableau de bord')), ' ',
+      el('a', { class: 'btn', href: '#/library?tab=quality' }, t('Contrôle qualité'))),
     el('h2', {}, t('Version')), verOut));
   loadUsers();
   refreshScan();

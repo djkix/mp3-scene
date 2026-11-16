@@ -1,4 +1,5 @@
-// Lecteur persistant (pied de page) : élément <audio> unique, file, panneau de file, persistance, Media Session.
+// Lecteur persistant (pied de page) : file, panneau de file, persistance, Media Session. Deux éléments <audio> :
+// `audio` joue la piste courante, l'autre prépare la suivante pour l'enchaîner sans blanc ou en fondu.
 // Toutes les commandes passent par les méthodes de `player`. Pendant un cast, `backend` (fourni par cast.js via
 // attach/detach) remplace l'<audio> local pour le transport et l'état lu (lecture, position, durée, volume).
 import { api, fmtDuration } from './api.js';
@@ -8,13 +9,20 @@ import { Queue } from './queue.js';
 import { offline } from './offline.js';
 
 const KEY = 'mp3scene.player';
-const audio = new Audio();
-audio.preload = 'metadata'; // rien n'est chargé avant la lecture ; ensuite, voir buffer()
+const els = [new Audio(), new Audio()];
+for (const a of els) a.preload = 'metadata'; // rien n'est chargé avant la lecture ; ensuite, voir buffer()
+let audio = els[0];       // élément qui joue la piste courante ; les rôles s'échangent à chaque enchaînement
+const other = () => els[audio === els[0] ? 1 : 0];
+// Écouteur posé sur les deux éléments, qui n'agit que pour l'élément courant.
+const on = (ev, fn) => { for (const a of els) a.addEventListener(ev, (e) => { if (a === audio) fn(e); }); };
+let userVol = 1;          // volume choisi ; celui des éléments varie pendant un fondu
+// iOS ignore audio.volume : pas de fondu possible, l'enchaînement reste sans blanc
+const canFade = (() => { const a = new Audio(); a.volume = 0.5; return a.volume === 0.5; })();
 const ms = 'mediaSession' in navigator ? navigator.mediaSession : null;
 const mobile = matchMedia('(max-width: 699px)');
 
 export const player = {
-  queue: new Queue(), audio, events: new EventTarget(),
+  queue: new Queue(), get audio() { return audio; }, events: new EventTarget(),
   playTracks, toggle, next, prev, seek, setVolume, jump, remove, clear, reset,
   attach, detach, refresh, tick, flash, pull, enqueue, move,
 };
@@ -32,7 +40,7 @@ let backend = null;       // null : <audio> local ; sinon le récepteur Cast (ca
 let lastVol = 1;          // volume à rétablir après « couper le son »
 
 const playing = () => (backend ? !backend.paused() : !audio.paused);
-const volume = () => (backend ? backend.volume() : audio.volume);
+const volume = () => (backend ? backend.volume() : userVol);
 const position = () => (backend ? backend.time() : pendingPos ?? audio.currentTime ?? 0);
 
 const title = (t) => t.title || t.filename;
@@ -42,7 +50,7 @@ function save() {
   try {
     if (!player.queue.current()) return localStorage.removeItem(KEY);
     localStorage.setItem(KEY, JSON.stringify({
-      queue: player.queue, volume: audio.volume, position: position(),
+      queue: player.queue, volume: userVol, position: position(),
     }));
   } catch { /* navigation privée, quota */ } finally { push(); }
 }
@@ -120,13 +128,31 @@ function refresh() {
 }
 
 // --- Transport -----------------------------------------------------------------------------------
+// Minuscule son silencieux : le lancer sur le second élément pendant un geste de l'utilisateur l'autorise ensuite
+// à démarrer seul (les navigateurs mobiles refusent play() sur un élément jamais activé).
+const SILENCE = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+let unlocked = false;
+
 function start() {
+  ctx?.resume();
+  if (!unlocked && !other().getAttribute('src')) {
+    unlocked = true;
+    const o = other();
+    o.muted = true;
+    o.src = SILENCE;
+    o.play().then(() => o.pause()).catch(() => {}).finally(() => {
+      o.muted = false;
+      if (o.getAttribute('src') === SILENCE) { o.removeAttribute('src'); o.load(); }
+    });
+  }
   audio.play().catch((e) => { // l'état affiché vient des événements de <audio>, pas de cette promesse
     if (e.name === 'NotAllowedError') flash(tr('Lecture bloquée par le navigateur : appuyez sur lecture.'));
   });
 }
 
 function stopAudio() {
+  stopFade();
+  unprime();
   audio.pause();
   audio.removeAttribute('src');
   audio.load();
@@ -179,10 +205,144 @@ function retry(id, pos) {
   setTimeout(() => { if (loadedId === id && audio.error) load(wantPlay, pos || null); }, 5000);
 }
 
+// --- Enchaînement sans blanc et fondu --------------------------------------------------------------
+// Vingt secondes avant la fin, la piste suivante (déjà en mémoire, voir buffer()) est chargée dans le second élément.
+// À la fin de la piste, ou `prefs.fade` secondes avant si un fondu est réglé, les deux éléments échangent leurs rôles.
+// ponytail: « sans blanc » = démarrage immédiat ; le silence de quelques ms propre à l'encodage MP3 reste audible.
+let primedId = null;      // piste chargée dans le second élément
+let fade = null;          // fondu en cours : {old, timer}
+
+function unprime() {
+  if (primedId === null || fade) return;
+  primedId = null;
+  const o = other();
+  o.pause(); o.removeAttribute('src'); o.load();
+}
+
+function stopFade() {
+  if (!fade) return;
+  clearInterval(fade.timer);
+  const { old } = fade;
+  fade = null;
+  old.pause(); old.removeAttribute('src'); old.load();
+  for (const a of els) a.volume = userVol;
+}
+
+function prime() {
+  if (backend || fade || sleepAtEnd || audio.paused) return;
+  const d = audio.duration, left = d - audio.currentTime;
+  if (!(left < 20)) return; // faux aussi tant que la durée est inconnue
+  const t = player.queue.peekNext();
+  if (!t || t.id === loadedId) { unprime(); return; } // fin de file, ou répétition de la piste
+  if (primedId !== t.id) {
+    const url = blobs.get(t.id);
+    if (!url) return; // pas encore en mémoire : enchaînement classique
+    const o = other();
+    o.preload = 'auto';
+    o.src = url;
+    o.load();
+    primedId = t.id;
+  }
+  const x = canFade ? prefs.fade : 0;
+  if (x > 0 && left <= x && d > 3 * x) { // fondu : la suivante démarre avant la fin de la courante
+    player.queue.next({ auto: true });
+    swap(x);
+    save();
+  }
+}
+
+// Le second élément (piste déjà chargée) devient le courant ; fondu de `x` secondes si x > 0.
+function swap(x) {
+  const old = audio, t = player.queue.current();
+  audio = other();
+  primedId = null; loadedId = t.id; pendingPos = null; wantPlay = true;
+  audio.volume = x ? 0 : userVol;
+  audio.play().catch(() => { // refusé (élément jamais activé, source illisible) : chargement classique
+    if (loadedId !== t.id || audio === old) return;
+    stopFade();
+    audio = old;
+    load(true);
+  });
+  if (x) {
+    const t0 = performance.now();
+    fade = { old, timer: setInterval(() => {
+      const k = Math.min(1, (performance.now() - t0) / (x * 1000));
+      audio.volume = userVol * k;
+      old.volume = userVol * (1 - k);
+      if (k >= 1) stopFade();
+    }, 50) };
+  } else { old.removeAttribute('src'); old.load(); }
+  metadata(t);
+  update();
+  tick();
+}
+
+// --- Égaliseur et nivellement --------------------------------------------------------------------
+// Réglages audio de cet appareil. Tant que l'égaliseur est à zéro et le nivellement coupé, le son ne passe pas par
+// Web Audio (sur iPhone, Web Audio peut couper la lecture écran verrouillé) ; une fois créé, le circuit reste en place
+// jusqu'au rechargement de la page.
+// ponytail: nivellement = compresseur (réduit les écarts de volume), pas une analyse ReplayGain piste par piste.
+const PREFS = KEY + '.audio';
+const prefs = { eq: [0, 0, 0], level: false, fade: 0 };
+try { Object.assign(prefs, JSON.parse(localStorage.getItem(PREFS))); } catch { /* absent ou corrompu */ }
+if (!Array.isArray(prefs.eq) || prefs.eq.length !== 3) prefs.eq = [0, 0, 0];
+let ctx = null, fx = null;
+
+function applyPrefs() {
+  try { localStorage.setItem(PREFS, JSON.stringify(prefs)); } catch { /* navigation privée */ }
+  const AC = globalThis.AudioContext || globalThis.webkitAudioContext;
+  if (!ctx && AC && (prefs.level || prefs.eq.some(Boolean))) {
+    ctx = new AC();
+    const bands = [['lowshelf', 200], ['peaking', 1000], ['highshelf', 4000]].map(([type, freq]) => {
+      const f = ctx.createBiquadFilter();
+      f.type = type; f.frequency.value = freq;
+      return f;
+    });
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -24; comp.knee.value = 30; comp.ratio.value = 4; comp.attack.value = 0.003; comp.release.value = 0.25;
+    for (const a of els) ctx.createMediaElementSource(a).connect(bands[0]);
+    bands[0].connect(bands[1]); bands[1].connect(bands[2]);
+    comp.connect(ctx.destination);
+    fx = { bands, comp };
+    if (!audio.paused) ctx.resume();
+  }
+  if (!fx) return;
+  fx.bands.forEach((f, i) => { f.gain.value = Number(prefs.eq[i]) || 0; });
+  fx.bands[2].disconnect();
+  fx.bands[2].connect(prefs.level ? fx.comp : ctx.destination);
+}
+
+let fxDlg = null;
+function openAudioPrefs() {
+  fxDlg ??= document.body.appendChild(el('dialog', { class: 'pl-add' }));
+  const slider = (label, i) => {
+    const out = el('span', { class: 'pl-time' }, `${prefs.eq[i]} dB`);
+    return el('label', {}, label, el('input', { type: 'range', min: -12, max: 12, step: 1, value: prefs.eq[i],
+      oninput: (e) => { prefs.eq[i] = +e.target.value; out.textContent = `${prefs.eq[i]} dB`; applyPrefs(); } }), out);
+  };
+  const fadeSel = el('select', { disabled: !canFade, onchange: () => { prefs.fade = +fadeSel.value; applyPrefs(); } },
+    [0, 2, 4, 6, 8, 12].map((s) => el('option', { value: s }, s ? tr('{0} s', s) : tr('Aucun'))));
+  fadeSel.value = prefs.fade;
+  fxDlg.replaceChildren(el('h2', {}, tr('Réglages audio')),
+    el('div', { class: 'stack fx' }, slider(tr('Graves'), 0), slider(tr('Médiums'), 1), slider(tr('Aigus'), 2),
+      el('label', { class: 'check' }, el('input', { type: 'checkbox', checked: prefs.level,
+        onchange: (e) => { prefs.level = e.target.checked; applyPrefs(); } }), tr('Niveler le volume entre les pistes')),
+      el('label', {}, tr('Fondu enchaîné'), fadeSel),
+      el('p', { class: 'hint' }, canFade ? tr("Les pistes s'enchaînent sans blanc ; le fondu les fait se chevaucher.")
+        : tr("Les pistes s'enchaînent sans blanc. Le fondu n'est pas possible sur cet appareil.")),
+      el('p', { class: 'hint' }, tr("Sur iPhone, l'égaliseur et le nivellement peuvent couper le son écran verrouillé : remettez-les à zéro puis rechargez la page."))),
+    el('div', { class: 'inline' },
+      el('button', { type: 'button', onclick: () => { prefs.eq = [0, 0, 0]; prefs.level = false; prefs.fade = 0; applyPrefs(); openAudioPrefs(); } }, tr('Réinitialiser')),
+      el('button', { type: 'button', onclick: () => fxDlg.close() }, tr('Fermer'))));
+  if (!fxDlg.open) fxDlg.showModal();
+}
+
 // Charge la piste courante de la file.
 function load(play, pos = null) {
   const t = player.queue.current();
   if (backend) { metadata(t); backend.load(play, pos); return update(); }
+  stopFade();
+  unprime();
   pendingPos = pos;
   wantPlay = play && !!t;
   if (!t) { stopAudio(); metadata(null); return update(); }
@@ -218,7 +378,7 @@ function toggle() {
   if (!t) return;
   if (backend) return backend.toggle();
   if (loadedId !== t.id || audio.error) return load(true); // piste en erreur : nouvel essai
-  if (audio.paused) { wantPlay = true; start(); } else { wantPlay = false; audio.pause(); }
+  if (audio.paused) { wantPlay = true; start(); } else { wantPlay = false; stopFade(); audio.pause(); }
 }
 
 function next() {
@@ -240,7 +400,9 @@ function seek(seconds) {
 function setVolume(v) {
   v = Math.min(1, Math.max(0, Number(v) || 0));
   if (backend) return backend.setVolume(v);
-  audio.volume = v; // ignoré par iOS : rien n'en dépend
+  userVol = v;
+  if (!fade) for (const a of els) a.volume = v; // ignoré par iOS : rien n'en dépend
+  volUI();
   save();
 }
 
@@ -316,15 +478,17 @@ function reset() {
 }
 
 // --- Événements de <audio> -----------------------------------------------------------------------
-audio.addEventListener('ended', () => {
+on('ended', () => {
   const t = player.queue.next({ auto: true });
   if (!t) return update(); // fin de file
   if (sleepAtEnd) { load(false); sleepDone(); } // minuterie « fin de la piste » : la suivante est prête, en pause
-  else if (t.id === loadedId) { audio.currentTime = 0; start(); } else load(true);
+  else if (t.id === loadedId) { audio.currentTime = 0; start(); }
+  else if (primedId === t.id) swap(0); // suivante déjà chargée : enchaînée sans blanc
+  else load(true);
   save();
 });
 
-audio.addEventListener('error', async () => {
+on('error', async () => {
   const failedId = loadedId, pos = position();
   if (failedId == null || !audio.getAttribute('src')) return;
   try { await api('/me'); } catch (e) {
@@ -342,7 +506,7 @@ audio.addEventListener('error', async () => {
   save();
 });
 
-audio.addEventListener('loadedmetadata', () => {
+on('loadedmetadata', () => {
   if (pendingPos != null) {
     audio.currentTime = Math.min(pendingPos, audio.duration || pendingPos);
     pendingPos = null;
@@ -350,14 +514,15 @@ audio.addEventListener('loadedmetadata', () => {
   positionState();
   tick();
 });
-audio.addEventListener('playing', () => { failures = 0; busy(false); });
-audio.addEventListener('waiting', () => busy(true));
-for (const ev of ['play', 'emptied']) audio.addEventListener(ev, update);
-audio.addEventListener('pause', () => { update(); save(); });
-for (const ev of ['timeupdate', 'durationchange']) audio.addEventListener(ev, tick);
-audio.addEventListener('timeupdate', buffer);
-for (const ev of ['seeked', 'ratechange']) audio.addEventListener(ev, positionState);
-audio.addEventListener('volumechange', volUI);
+on('playing', () => { failures = 0; busy(false); });
+on('waiting', () => busy(true));
+for (const ev of ['play', 'emptied']) on(ev, update);
+on('pause', () => { update(); save(); });
+for (const ev of ['timeupdate', 'durationchange']) on(ev, tick);
+on('timeupdate', buffer);
+on('timeupdate', prime);
+for (const ev of ['seeked', 'ratechange']) on(ev, positionState);
+on('volumechange', volUI);
 
 // --- Media Session -------------------------------------------------------------------------------
 function metadata(t) {
@@ -576,7 +741,7 @@ export function initPlayer(footer) {
     },
     onchange: () => { dragging = false; player.seek(+ui.seek.value); } });
   ui.wave = el('div', { class: 'pl-wave' }, ui.seek);
-  ui.vol = el('input', { type: 'range', class: 'pl-vol', min: 0, max: 1, step: 0.05, value: audio.volume,
+  ui.vol = el('input', { type: 'range', class: 'pl-vol', min: 0, max: 1, step: 0.05, value: userVol,
     'aria-label': tr('Volume'), title: tr('Volume'), 'aria-orientation': 'vertical', oninput: () => player.setVolume(+ui.vol.value) });
   ui.volbtn = iconBtn('pl-volbtn', '', tr('Couper le son'), mute);
   // Curseur vertical dans une bulle : visible au survol ou au focus clavier (CSS) ; la molette règle aussi le volume.
@@ -584,6 +749,7 @@ export function initPlayer(footer) {
     onwheel: (e) => { e.preventDefault(); player.setVolume(volume() + (e.deltaY < 0 ? 0.05 : -0.05)); } },
   ui.volbtn, el('div', { class: 'pl-volpop' }, ui.vol));
   ui.qbtn = iconBtn('pl-qbtn', '☰', tr("File d'attente"), () => openPanel(ui.panel.hidden));
+  ui.fx = iconBtn('pl-fx', '≋', tr('Réglages audio'), openAudioPrefs);
   ui.qbtn.setAttribute('aria-expanded', 'false');
   ui.msg = el('p', { class: 'pl-msg', role: 'status' });
 
@@ -614,7 +780,7 @@ export function initPlayer(footer) {
         iconBtn('pl-next', '⏭︎', tr('Suivant'), () => player.next()),
         ui.repeat),
       el('div', { class: 'pl-seek' }, ui.elapsed, ui.wave, ui.total),
-      el('div', { class: 'pl-tools' }, volwrap, ui.qbtn,
+      el('div', { class: 'pl-tools' }, volwrap, ui.fx, ui.qbtn,
         el('span', { id: 'cast-slot' })))); // emplacement du bouton cast (cast.js)
 
   // Plein écran : balayage vers la gauche = piste suivante, vers la droite = précédente.
@@ -687,5 +853,6 @@ export function initPlayer(footer) {
   }).observe(footer);
 
   restore();
+  applyPrefs(); // égaliseur ou nivellement déjà réglés : circuit audio recréé
   update();
 }

@@ -117,10 +117,11 @@ def test_share(client, user_client, admin_client, library, settings):
     bad = token[:-1] + ("0" if token[-1] != "0" else "1")
     assert client.get(f"/s/{bad}").status_code == 404 and client.get(f"/s/{bad}/info").status_code == 404
     assert client.get(f"/s/{bad}/track/{tid}").status_code == 404 and client.get("/s/nimporte").status_code == 404
-    # jeton expiré
+    # anciens liens signés (1.15.0) : valides jusqu'à leur échéance, refusés ensuite
+    import time
     from app.security import sign_share
-    old = sign_share(settings.secret_key, "r", rid, 1000)
-    assert client.get(f"/s/{old}/info").status_code == 404
+    assert client.get(f"/s/{sign_share(settings.secret_key, 'r', rid, int(time.time()) + 3600)}/info").status_code == 200
+    assert client.get(f"/s/{sign_share(settings.secret_key, 'r', rid, 1000)}/info").status_code == 404
     # playlist : seul son propriétaire peut la partager
     pid = user_client.post("/api/playlists", json={"name": "Amis"}).json()["id"]
     user_client.post(f"/api/playlists/{pid}/tracks", json={"track_ids": [other]})
@@ -129,6 +130,28 @@ def test_share(client, user_client, admin_client, library, settings):
     assert [t["title"] for t in client.get(f"/s/{ptoken}/info").json()["tracks"]] == ["Glue"]
     assert client.get(f"/s/{ptoken}/track/{tid}").status_code == 404
     assert user_client.post("/api/share", json={"kind": "release", "id": 99999}).status_code == 404
+    # liste, compteur d'ouvertures, révocation
+    mine = user_client.get("/api/shares").json()
+    assert [(s["kind"], s["name"], s["opens"]) for s in mine] == [("playlist", "Amis", 1), ("release", A, 1)]
+    assert mine[1]["url"] == url and admin_client.get("/api/shares").json() == []
+    assert admin_client.delete(f"/api/shares/{mine[1]['id']}").status_code == 204   # pas le sien : sans effet
+    assert client.get(f"/s/{token}/info").status_code == 200
+    assert user_client.delete(f"/api/shares/{mine[1]['id']}").status_code == 204
+    assert client.get(f"/s/{token}").status_code == 404 and client.get(f"/s/{token}/track/{tid}").status_code == 404
+    assert len(user_client.get("/api/shares").json()) == 1
+
+
+def test_admin_library_and_quality(user_client, admin_client, library):
+    assert user_client.get("/api/admin/library").status_code == 403 and user_client.get("/api/admin/quality").status_code == 403
+    s = admin_client.get("/api/admin/library").json()
+    assert s["releases"] == 3 and s["tracks"] == 5 and s["size"] > 0
+    assert [y["name"] for y in s["years"]] == [2017, 2015, 2003] and {g["name"] for g in s["genres"]} == {"House", "Techno"}
+    assert sum(b["n"] for b in s["bitrates"]) == 5 and len(s["months"]) >= 1 and {c["name"] for c in s["categories"]} == {"Albums", "Singles"}
+    q = admin_client.get("/api/admin/quality").json()
+    assert q["no_nfo"] == 2 and q["no_tracks"] == 0 and q["no_year"] == 0
+    names = [r["name"] for r in admin_client.get("/api/admin/quality?kind=no_nfo").json()["items"]]
+    assert names == ["Bicep-Glue-(NT123)-WEB-2017-PWT", "VA-Big_Mix-2CD-2003-GRP"]
+    assert admin_client.get("/api/admin/quality?kind=drop").status_code == 422
 
 
 def test_stats(user_client, admin_client, library):

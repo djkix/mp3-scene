@@ -216,7 +216,7 @@ google-cast-launcher:hover { background: var(--hover); }
   .pl-bar { display: flex; gap: 2px; min-height: 60px; padding: 4px 4px 4px 12px; }
   .pl-info { flex: 1 1 0; }
   .pl-cover { width: 40px; height: 40px; }
-  .pl-rel, .pl-seek, .pl-qbtn, .pl-volwrap, .pl-controls :is(.pl-shuffle, .pl-prev, .pl-repeat) { display: none; }
+  .pl-rel, .pl-seek, .pl-qbtn, .pl-fx, .pl-volwrap, .pl-controls :is(.pl-shuffle, .pl-prev, .pl-repeat) { display: none; }
   #player .icon { min-width: 44px; height: 44px; font-size: 16px; }
 
   /* Lecteur plein écran : titre entier en haut, commandes larges en bas */
@@ -243,7 +243,7 @@ google-cast-launcher:hover { background: var(--hover); }
   #player.expanded .pl-controls .icon { display: inline-flex; min-width: 52px; height: 52px; font-size: 22px; }
   #player.expanded .pl-controls .pl-play { min-width: 72px; height: 72px; font-size: 28px; }
   #player.expanded .pl-tools { justify-content: space-between; }
-  #player.expanded .pl-qbtn { display: inline-flex; min-width: 48px; height: 48px; font-size: 20px; }
+  #player.expanded :is(.pl-qbtn, .pl-fx) { display: inline-flex; min-width: 48px; height: 48px; font-size: 20px; }
 
   /* File d'attente : plein écran */
   .pl-queue { position: fixed; inset: 0; z-index: 1; width: auto; max-height: none; border: 0; box-shadow: none;
@@ -300,6 +300,12 @@ dialog.pl-add .status { padding: 8px 0; min-height: 1em; }
 .share-list button { display: flex; justify-content: space-between; gap: 12px; width: 100%; padding: 10px 8px; border: 0;
   background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
 .share-list button:hover { background: var(--hover); }
+.bars td.bar { width: 40%; padding-inline: 4px; }
+.bars td.bar span { display: block; height: 8px; min-width: 2px; border-radius: 2px; background: var(--accent); }
+.fx { max-width: none; margin-bottom: 12px; }
+.fx label { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr) 3.5rem; align-items: center; gap: 8px; }
+.fx label.check { display: flex; flex-direction: row; color: inherit; }
+.fx .hint { margin: 0; font-size: 12px; color: var(--muted); }
 .grp-title { margin: 0; padding: 10px 12px 0; font-size: 16px; overflow-wrap: anywhere; }
 .grp-title .muted { color: var(--muted); font-size: 12px; font-weight: 400; margin-left: 8px; white-space: nowrap; }
 td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); }

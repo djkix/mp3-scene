@@ -4,6 +4,28 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.16.0](https://github.com/djkix/mp3-scene/compare/v1.15.0...v1.16.0) (2026-11-16)
+
+### Résumé
+
+**Enchaînement sans blanc, fondu, égaliseur, liens de partage révocables, tableau de bord et contrôle qualité.**
+
+- **Enchaînement sans blanc** : la piste suivante est préparée vingt secondes avant la fin et démarre à l'instant où
+  la courante s'achève. Un **fondu enchaîné** de 2 à 12 secondes est réglable (indisponible sur iPhone, qui ne
+  permet pas de régler le volume d'une page).
+- **Réglages audio** (bouton ≋ du lecteur) : égaliseur graves, médiums, aigus, et nivellement du volume entre les
+  pistes (un compresseur, pas une analyse piste par piste). Réglages gardés sur l'appareil. Sur iPhone, l'égaliseur
+  et le nivellement peuvent couper le son écran verrouillé ; ils sont inactifs tant qu'ils restent à zéro.
+- **Liens de partage** : la page Compte liste les liens en cours, avec leur échéance et leur nombre d'ouvertures, et
+  permet de les copier ou de les révoquer. Les liens créés avec la 1.15.0 restent valables jusqu'à leur échéance
+  mais n'apparaissent pas dans la liste.
+- **Tableau de bord** (administrateur, Compte › Bibliothèque) : totaux, ajouts par mois, répartition par année,
+  genre, source, localisation et débit.
+- **Contrôle qualité** (administrateur) : releases sans NFO, sans tags, avec des pistes illisibles, à débit inférieur
+  à 192 kbit/s, sans année ou sans piste. Pas de contrôle « sans pochette » : il faudrait relire chaque dossier du NAS.
+
+Une table est créée au démarrage (liens de partage) : aucune migration manuelle.
+
 ## [1.15.0](https://github.com/djkix/mp3-scene/compare/v1.14.0...v1.15.0) (2026-11-16)
 
 ### Résumé

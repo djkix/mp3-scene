@@ -36,6 +36,11 @@ CREATE TABLE IF NOT EXISTS playlist_tracks(
 -- état du lecteur (file, piste, position) : repris sur un autre appareil
 CREATE TABLE IF NOT EXISTS player_state(
   user_id INTEGER PRIMARY KEY REFERENCES users ON DELETE CASCADE, data TEXT NOT NULL, updated_at REAL NOT NULL);
+-- liens de partage : le jeton est le secret du lien ; supprimer la ligne révoque le lien
+CREATE TABLE IF NOT EXISTS shares(
+  id INTEGER PRIMARY KEY, token TEXT UNIQUE NOT NULL, user_id INTEGER NOT NULL REFERENCES users ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK(kind IN ('r','p')), item_id INTEGER NOT NULL,
+  created_at REAL NOT NULL, expires_at REAL NOT NULL, opens INTEGER NOT NULL DEFAULT 0);
 -- forme d'onde : 800 crêtes (un octet chacune), calculées à la première écoute
 CREATE TABLE IF NOT EXISTS waveforms(
   track_id INTEGER PRIMARY KEY REFERENCES tracks ON DELETE CASCADE, peaks BLOB NOT NULL);

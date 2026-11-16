@@ -66,6 +66,14 @@ export class Queue {
     else if (i < this.index) this.index--;
   }
 
+  // Piste que next({auto: true}) choisirait, sans rien changer (préparation de l'enchaînement).
+  peekNext() {
+    if (this.index < 0) return null;
+    if (this.repeat === 'one') return this.current();
+    const p = this._pos();
+    return this.tracks[p + 1 < this.order.length ? this.order[p + 1] : this.repeat === 'all' ? this.order[0] : -1] ?? null;
+  }
+
   // Déplace la piste i à la place j dans la file affichée ; la piste courante et l'ordre aléatoire suivent.
   move(i, j) {
     const n = this.tracks.length;

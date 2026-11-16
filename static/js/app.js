@@ -8,6 +8,7 @@ import * as groups from './views/groups.js';
 import * as release from './views/release.js';
 import * as favorites from './views/favorites.js';
 import * as account from './views/account.js';
+import * as library from './views/library.js';
 import * as offlineView from './views/offline.js';
 import { offline } from './offline.js';
 import { initPlayer, player } from './player.js';
@@ -27,6 +28,7 @@ const ROUTES = {
   release,
   favorites,
   account,
+  library,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -100,7 +102,8 @@ async function route() {
   }).catch(() => {});
   document.querySelectorAll('#nav a').forEach((a) =>
     a.classList.toggle('active', a.dataset.route === name || (name === 'search' && a.dataset.route === '')
-      || (['artists', 'genres'].includes(name) && a.dataset.route === 'groups')));
+      || (['artists', 'genres'].includes(name) && a.dataset.route === 'groups')
+      || (name === 'library' && a.dataset.route === 'account')));
   const search = $('search');
   if (name !== 'search' && search.value) search.value = '';
   else if (name === 'search' && document.activeElement !== search) search.value = params.q || '';

@@ -112,3 +112,10 @@ test("insertNext : lues juste après la courante, même en aléatoire", () => {
   assert.equal(q.current().id, 2); assert.equal(q.upcoming()[0].id, 7); assert.equal(q.upcoming().length, 5);
   const e = new Queue(); e.insertNext([{ id: 1 }]); assert.equal(e.current().id, 1);
 });
+test("peekNext : la prochaine piste automatique, sans changer d'état", () => {
+  const q = new Queue(); assert.equal(q.peekNext(), null);
+  q.replace(T(2), 0); assert.equal(q.peekNext().id, 2); assert.equal(q.current().id, 1);
+  q.next(); assert.equal(q.peekNext(), null);
+  q.repeat = 'all'; assert.equal(q.peekNext().id, 1);
+  q.repeat = 'one'; assert.equal(q.peekNext().id, 2);
+});

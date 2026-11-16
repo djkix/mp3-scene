@@ -4,7 +4,7 @@
 
 **Collection de releases MP3 « scene » — bibliothèque · lecteur web · Chromecast · PWA**
 
-[![Version](https://img.shields.io/badge/version-1.15.0-purple?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.16.0-purple?style=for-the-badge)](CHANGELOG.md)
 [![Stack](https://img.shields.io/badge/stack-FastAPI_·_SQLite_·_JavaScript_pur-blue?style=for-the-badge)](#stack-technique)
 [![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
 
@@ -311,7 +311,7 @@ La coquille de l'interface est mise en cache pour démarrer vite ; la musique et
 - 5 échecs de connexion pour un même identifiant ou une même adresse IP : blocage 15 minutes. Conséquence : quiconque connaît un identifiant peut tenir ce compte bloqué, 15 minutes à la fois, en ratant 5 connexions. Choisissez un `ADMIN_USER` peu devinable (pas `admin`) et gardez un second compte administrateur.
 - Changer le mot de passe administrateur après la première connexion ; `ADMIN_PASSWORD` n'est lu qu'à la création du premier compte, retirez-le de `.env` après le premier démarrage (le compose n'en a plus besoin ; d'ici là il est en clair dans `.env` et dans l'environnement du conteneur), puis `docker compose up -d`.
 - Changer `SECRET_KEY` invalide toutes les sessions, tous les liens de cast et tous les liens de partage en cours.
-- **Liens de partage** (`/s/…`) : tout utilisateur connecté peut en créer pour une release ou pour l'une de ses playlists. Ils donnent accès, sans compte, aux seules pistes partagées, pendant 7 jours, et ne peuvent pas être révoqués un par un avant leur échéance.
+- **Liens de partage** (`/s/…`) : tout utilisateur connecté peut en créer pour une release ou pour l'une de ses playlists. Ils donnent accès, sans compte, aux seules pistes partagées, pendant 7 jours. Leur auteur peut les révoquer depuis la page Compte.
 - `.env` contient des secrets : il est ignoré par git, ne le publiez pas.
 
 ## Sauvegarde
@@ -384,6 +384,10 @@ git tag v1.2.0 && git push origin v1.2.0
 ## Historique des versions
 
 Le détail est dans le [journal des modifications](CHANGELOG.md).
+
+### 1.16.0 — 16 novembre 2026
+
+**Enchaînement sans blanc** et fondu, **égaliseur**, liens de partage **révocables**, **tableau de bord** et **contrôle qualité** de la bibliothèque.
 
 ### 1.15.0 — 16 novembre 2026
 
