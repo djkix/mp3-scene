@@ -7,7 +7,7 @@ const emit = (name, detail) => document.dispatchEvent(new CustomEvent(name, { de
 const HEART = ['♡︎', '♥︎'];
 // [libellé, clé de tri côté serveur, sens au premier clic]
 const HEAD = [[tr('Nom'), 'name', 'asc'], [tr('Genre'), 'genre', 'asc'], [tr('Date'), 'date', 'desc'], [tr('Pistes'), 'tracks', 'desc'],
-  [tr('Poids'), 'size', 'desc'], [tr('Localisation'), 'category', 'asc']];
+  [tr('Débit'), 'bitrate', 'desc'],  [tr('Poids'), 'size', 'desc'], [tr('Localisation'), 'category', 'asc']];
 
 export function favButton(rel, kind = 'release') {
   const btn = el('button', { type: 'button', class: 'icon fav' });
@@ -49,9 +49,10 @@ function row(rel) {
   el('span', { class: 'rel-name' }, rel.name),
   // même ordre que HEAD ; sur mobile, .rel-info devient une ligne de détails sous le nom
   el('span', { class: 'rel-info' },
-    el('span', {}, rel.genre || ''),
-    el('span', {}, fmtDate(rel.added_at)),
-    el('span', { class: 'num' }, String(rel.track_count), el('span', { class: 'unit' }, ' ' + (rel.track_count > 1 ? tr('pistes') : tr('piste')))),
+    el('span', { class: 'mid' }, rel.genre || ''),
+    el('span', { class: 'mid' }, fmtDate(rel.added_at)),
+    el('span', { class: 'mid' }, String(rel.track_count), el('span', { class: 'unit' }, ' ' + (rel.track_count > 1 ? tr('pistes') : tr('piste')))),
+    el('span', { class: 'mid' }, rel.bitrate ? `${Math.round(rel.bitrate / 1000)} kbit/s` : ''),
     el('span', { class: 'num' }, fmtSize(rel.size)),
     el('span', { class: 'rel-loc', title: rel.category || '' }, rel.category || '')),
   el('span', { class: 'rel-actions' }, queue, favButton(rel), detail));

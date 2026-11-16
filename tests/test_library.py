@@ -78,6 +78,8 @@ def test_sort(user_client, library):
     names = [r["name"].lower() for r in get(sort="name")]
     assert names == sorted(names)
     assert get() == get(sort="date", dir="desc")  # l'ordre par défaut est inchangé
+    rates = [r["bitrate"] or 0 for r in get(sort="bitrate", dir="desc")]
+    assert rates == sorted(rates, reverse=True) and "bitrate" in get()[0]
     assert user_client.get("/api/releases", params={"sort": "id; DROP"}).status_code == 422
     f = user_client.get("/api/folders", params={"path": "Singles/A", "sort": "name", "dir": "desc"}).json()["releases"]["items"]
     assert [r["name"].lower() for r in f] == sorted((r["name"].lower() for r in f), reverse=True)

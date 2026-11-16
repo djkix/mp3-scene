@@ -48,7 +48,7 @@ button:disabled { opacity: .6; cursor: default; }
 
 .rel-list, .sub-list { list-style: none; margin: 0; padding: 0; }
 .rel, .rel-head { display: grid; align-items: center; gap: 0 24px; padding: 6px 12px; border-bottom: 1px solid var(--line);
-  grid-template-columns: 40px minmax(0, 1fr) 6rem 5.5rem 3.5rem 4.5rem 10rem 100px; } /* colonnes séparées par l'espace seul */
+  grid-template-columns: 40px minmax(0, 1fr) 6rem 5.5rem 3.5rem 4.5rem 4.5rem 10rem 100px; } /* colonnes séparées par l'espace seul */
 .rel { cursor: pointer; }
 .rel-thumb { display: block; width: 40px; height: 40px; object-fit: cover; border-radius: 3px; }
 .rel-head { color: var(--muted); font-size: 12px; font-weight: 600; }
@@ -59,6 +59,7 @@ button:disabled { opacity: .6; cursor: default; }
 .rel-info { display: contents; } /* ses cellules se rangent dans la grille de la ligne */
 .rel-info > span { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .num { text-align: right; }
+.mid { text-align: center; }
 .unit { display: none; }
 .rel:hover { background: var(--hover); }
 .rel-date, .rel-cat, .rel-meta { color: var(--muted); font-size: 12px; white-space: nowrap; }

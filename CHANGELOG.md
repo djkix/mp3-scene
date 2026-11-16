@@ -4,6 +4,14 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.10.0](https://github.com/djkix/mp3-scene/compare/v1.9.1...v1.10.0) (2026-11-16)
+
+### Résumé
+
+**Colonne Débit dans les listes, colonnes centrées.** Chaque release affiche le débit moyen de ses pistes (en
+kbit/s), entre Pistes et Poids ; la colonne est triable. Les colonnes Genre, Date, Pistes et Débit sont centrées.
+Le débit vient des tags déjà lus : aucune migration, aucun scan.
+
 ## [1.9.1](https://github.com/djkix/mp3-scene/compare/v1.9.0...v1.9.1) (2026-11-15)
 
 ### Résumé

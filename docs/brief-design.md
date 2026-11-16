@@ -58,9 +58,10 @@ frappe) affiche la même liste, filtrée.
 |---|---|---|
 | Vignette | pochette 40 px | Sans libellé ; vide s'il n'y a pas de pochette |
 | Nom | `VA-Toolroom_Ibiza_2026-(TOOL142001Z)-WEB-2026-AOV` | Chasse fixe, peut passer sur deux lignes, jamais tronqué |
-| Genre | House | Peut être vide tant que les tags ne sont pas lus |
-| Date | 26/05/2026 | Date d'ajout |
-| Pistes | 52 | Aligné à droite |
+| Genre | House | Centré ; peut être vide tant que les tags ne sont pas lus |
+| Date | 26/05/2026 | Centré ; date d'ajout |
+| Pistes | 52 | Centré |
+| Débit | 320 kbit/s | Centré ; moyenne des pistes, vide tant que les tags ne sont pas lus |
 | Poids | 934 Mo | Aligné à droite |
 | Localisation | 02.Various Artists - Compilations | Dossier de premier niveau ; tronqué avec info-bulle |
 | Actions | + ♡ › | Ajouter à la file, favori (plein quand actif), ouvrir la fiche |
