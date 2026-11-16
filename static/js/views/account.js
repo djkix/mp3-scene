@@ -1,3 +1,4 @@
+import { offline } from '../offline.js';
 import { api, session } from '../api.js';
 import { el } from '../dom.js';
 import { player } from '../player.js';
@@ -40,6 +41,7 @@ export function render(container) {
     try { await api('/logout', { method: 'POST' }); } catch { /* session déjà invalide : on sort quand même */ }
     session.user = null;
     player.reset();
+    await offline.clear(); // déconnexion volontaire : aucune musique ne reste sur l'appareil
     location.hash = '#/login';
   } }, t('Se déconnecter'));
 

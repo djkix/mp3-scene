@@ -74,7 +74,8 @@ frappe) affiche la même liste, filtrée.
 - **Onglets** Groupes, Artistes, Genres. Chaque onglet : tableau Nom, Releases, Poids ; en-têtes cliquables pour trier ; champ « Filtrer la liste… », sélecteurs Genre et Année ; total en bas. Au plus 1000 lignes affichées.
 - **Page d'un groupe ou d'un artiste** : titre « Groupes › NOM » suivi du nombre de releases et du poids, puis la liste de releases habituelle avec ses filtres. Un genre ouvre la liste Derniers filtrée.
 - **Recherche** : onglets Releases et Pistes ; l'onglet Pistes liste les pistes dont le titre ou l'artiste contient les mots cherchés.
-- **Favoris** : onglets Releases, Pistes, Playlists, Historique, Statistiques. Playlists : tableau (nom, pistes, durée, lire, renommer, supprimer) et contenu d'une playlist. Statistiques : sélecteur de période, total, quatre classements.
+- **Hors ligne** : bouton « Garder hors ligne » / « Retirer du hors-ligne » sur la fiche (progression « Téléchargement 3/12… ») ; sans serveur, l'application n'affiche que le bandeau « Serveur injoignable : mode hors ligne. », la liste des releases gardées et le lecteur.
+- **Favoris** : onglets Releases, Pistes, Playlists, Hors ligne, Historique, Statistiques. Playlists : tableau (nom, pistes, durée, lire, renommer, supprimer) et contenu d'une playlist. Statistiques : sélecteur de période, total, quatre classements.
 - **Ajout à une playlist** : bouton ♫ sur chaque piste, boîte de dialogue listant les playlists avec un champ « Nouvelle playlist ».
 
 ### 4.3 Dossiers

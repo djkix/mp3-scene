@@ -68,6 +68,18 @@ def test_playlists(user_client, admin_client, library):
     assert user_client.delete(f"/api/playlists/{pid}").status_code == 204 and user_client.get("/api/playlists").json() == []
 
 
+def test_player_state(user_client, admin_client, library):
+    assert user_client.get("/api/player-state").json() == {"state": None, "updated_at": 0}
+    at = user_client.put("/api/player-state", json={"queue": {"tracks": [{"id": 1}], "index": 0}, "position": 12}).json()["updated_at"]
+    got = user_client.get("/api/player-state").json()
+    assert got["updated_at"] == at > 0 and got["state"]["position"] == 12
+    assert user_client.put("/api/player-state", json={"position": 3}).json()["updated_at"] >= at
+    assert user_client.get("/api/player-state").json()["state"] == {"position": 3}
+    assert admin_client.get("/api/player-state").json()["state"] is None   # un état par utilisateur
+    assert user_client.put("/api/player-state", json={"x": "a" * 600_000}).status_code == 413
+    assert user_client.put("/api/player-state", json=[1]).status_code == 422
+
+
 def test_stats(user_client, admin_client, library):
     ids = [t["id"] for t in user_client.get("/api/tracks", params={"q": "ibanez"}).json()["items"]]
     for tid in (ids[0], ids[0], ids[1]):

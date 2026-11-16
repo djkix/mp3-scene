@@ -1,6 +1,7 @@
+import json
 import time
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from .deps import MAX_INT, Id, current_user, get_conn
@@ -93,3 +94,26 @@ def remove_track(pid: Id, track_id: Id, user=Depends(current_user), conn=Depends
     _own(conn, user["id"], pid)
     conn.execute("DELETE FROM playlist_tracks WHERE playlist_id=? AND track_id=?", (pid, track_id))
     conn.commit()
+
+
+STATE_MAX = 512 * 1024
+
+
+@router.get("/api/player-state")
+def get_player_state(user=Depends(current_user), conn=Depends(get_conn)):
+    row = conn.execute("SELECT data, updated_at FROM player_state WHERE user_id=?", (user["id"],)).fetchone()
+    return {"state": json.loads(row["data"]), "updated_at": row["updated_at"]} if row else {"state": None, "updated_at": 0}
+
+
+@router.put("/api/player-state")
+def put_player_state(state: dict = Body(), user=Depends(current_user), conn=Depends(get_conn)):
+    """Dernier état du lecteur de l'utilisateur. Contenu opaque : seul son propre navigateur le relit."""
+    data = json.dumps(state, separators=(",", ":"))
+    if len(data) > STATE_MAX:
+        raise HTTPException(413, "File de lecture trop longue pour être synchronisée.")
+    now = time.time()
+    conn.execute("INSERT INTO player_state(user_id, data, updated_at) VALUES (?,?,?)"
+                 " ON CONFLICT(user_id) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at",
+                 (user["id"], data, now))
+    conn.commit()
+    return {"updated_at": now}

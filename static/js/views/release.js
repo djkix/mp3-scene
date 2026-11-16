@@ -5,6 +5,7 @@ import { player } from '../player.js';
 import { favButton } from './releases.js';
 import { infoRows } from './release-info.js';
 import { addButton } from '../playlist-add.js';
+import { offlineButton } from './offline.js';
 
 const emit = (name, detail) => document.dispatchEvent(new CustomEvent(name, { detail }));
 
@@ -41,6 +42,7 @@ function header(rel) {
       el('button', { type: 'button', class: 'primary', disabled: !rel.tracks.length, onclick: play }, t('Lire')),
       el('button', { type: 'button', onclick: () => emit('queue-release', { releaseId: rel.id }) }, t('Ajouter à la file')),
       addButton({ release_id: rel.id }, t('Ajouter à une playlist')),
+      offlineButton(rel),
       favButton(rel),
       el('a', { class: 'btn', href: `/api/releases/${rel.id}/zip`, download: '' }, t('Télécharger (zip)'))));
 }

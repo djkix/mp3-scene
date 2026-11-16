@@ -5,6 +5,7 @@ import { api, fmtDuration } from './api.js';
 import { t as tr } from './i18n.js';
 import { el } from './dom.js';
 import { Queue } from './queue.js';
+import { offline } from './offline.js';
 
 const KEY = 'mp3scene.player';
 const audio = new Audio();
@@ -15,7 +16,7 @@ const mobile = matchMedia('(max-width: 699px)');
 export const player = {
   queue: new Queue(), audio, events: new EventTarget(),
   playTracks, toggle, next, prev, seek, setVolume, jump, remove, clear, reset,
-  attach, detach, refresh, tick, flash,
+  attach, detach, refresh, tick, flash, pull,
 };
 
 let ui = null;            // éléments du pied de page, créés par initPlayer
@@ -43,7 +44,43 @@ function save() {
     localStorage.setItem(KEY, JSON.stringify({
       queue: player.queue, volume: audio.volume, position: position(),
     }));
-  } catch { /* navigation privée, quota */ }
+  } catch { /* navigation privée, quota */ } finally { push(); }
+}
+
+// --- Reprise sur un autre appareil ---------------------------------------------------------------
+// L'état (file, piste, position) est aussi envoyé au serveur. À l'ouverture, ou quand la page redevient visible, si un
+// autre appareil a écrit depuis notre dernier envoi et que rien ne joue ici, on reprend son état, en pause.
+// SYNC garde l'heure serveur de notre dernier envoi ou de notre dernière reprise : aucune horloge d'appareil comparée.
+// ponytail: le dernier qui écrit gagne ; une file de plus de ~500 Ko n'est pas synchronisée.
+const SYNC = KEY + '.sync';
+let synced = false, pushTimer = null;
+
+function push() {
+  if (!synced || pushTimer) return;
+  pushTimer = setTimeout(async () => { // au plus un envoi toutes les 10 s en lecture ; presque immédiat en pause
+    pushTimer = null;
+    const state = { queue: player.queue.toJSON(), position: position() };
+    try {
+      const r = await api('/player-state', { method: 'PUT', body: state });
+      localStorage.setItem(SYNC, r.updated_at);
+    } catch { /* hors ligne, file trop longue : prochain essai à la prochaine sauvegarde */ }
+  }, playing() ? 10000 : 500);
+}
+
+async function pull() {
+  try {
+    const { state, updated_at: at } = await api('/player-state');
+    const mine = Number(localStorage.getItem(SYNC)) || 0;
+    if (state && at > mine && !playing() && !backend) {
+      const q = Queue.fromJSON(state.queue);
+      if (q.current()) {
+        player.queue = q;
+        load(false, Number.isFinite(state.position) && state.position > 0 ? state.position : null);
+      }
+      localStorage.setItem(SYNC, at);
+    }
+  } catch { /* hors ligne ou session expirée : on garde l'état local */ }
+  synced = true;
 }
 
 function restore() {
@@ -125,9 +162,13 @@ async function buffer() {
   if (!todo) return;
   fetching = true;
   try {
-    const res = await fetch(streamUrl(todo.id));
-    if (!res.ok) throw new Error(res.status);
-    blobs.set(todo.id, URL.createObjectURL(await res.blob()));
+    let blob = offline.has(todo.id) ? await offline.blob(todo.id) : null; // déjà sur l'appareil : pas de réseau
+    if (!blob) {
+      const res = await fetch(streamUrl(todo.id));
+      if (!res.ok) throw new Error(res.status);
+      blob = await res.blob();
+    }
+    blobs.set(todo.id, URL.createObjectURL(blob));
   } catch { fetchRetry = Date.now() + 10000; } // réseau coupé ou fichier absent : nouvel essai plus tard
   fetching = false;
 }
@@ -146,8 +187,20 @@ function load(play, pos = null) {
   wantPlay = play && !!t;
   if (!t) { stopAudio(); metadata(null); return update(); }
   loadedId = t.id;
-  audio.src = blobs.get(t.id) || streamUrl(t.id);
   metadata(t);
+  if (!blobs.has(t.id) && offline.has(t.id)) { // piste gardée hors ligne : lue depuis le stockage de l'appareil
+    stopAudio();
+    loadedId = t.id; // stopAudio l'a effacé
+    offline.blob(t.id).then((b) => {
+      if (loadedId !== t.id) return; // une autre piste a été chargée entre-temps
+      if (b && !blobs.has(t.id)) blobs.set(t.id, URL.createObjectURL(b));
+      audio.src = blobs.get(t.id) || streamUrl(t.id);
+      if (wantPlay) start();
+    });
+    update();
+    return tick();
+  }
+  audio.src = blobs.get(t.id) || streamUrl(t.id);
   if (play) start();
   update();
   tick();
@@ -224,6 +277,9 @@ function reset() {
   player.queue.clear();
   load(false);
   dropBlobs();
+  synced = false; // plus aucun envoi au serveur avant la prochaine connexion
+  clearTimeout(pushTimer); pushTimer = null;
+  try { localStorage.removeItem(SYNC); } catch { /* idem */ }
   try { localStorage.removeItem(KEY); } catch { /* idem */ }
   if (ui) { openPanel(false); expand(false); }
 }
@@ -582,7 +638,7 @@ export function initPlayer(footer) {
   // Sauvegarde : toutes les 5 s en lecture, et quand la page passe en arrière-plan ou se ferme.
   setInterval(() => { if (playing()) save(); }, 5000);
   addEventListener('pagehide', save);
-  document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else if (synced) pull(); });
 
   // Hauteur réelle du lecteur -> marge basse de la vue (état réduit, agrandi, encoche).
   new ResizeObserver(() => {

@@ -4,6 +4,22 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.14.0](https://github.com/djkix/mp3-scene/compare/v1.13.0...v1.14.0) (2026-11-16)
+
+### Résumé
+
+**Écoute hors ligne et reprise sur un autre appareil.**
+
+- **Hors ligne** : le bouton « Garder hors ligne » de la fiche copie les pistes d'une release dans le stockage du
+  navigateur. Ces pistes se lisent ensuite sans réseau, y compris en ouvrant l'application sans connexion : elle
+  affiche alors la liste des releases gardées. La liste est aussi dans Favoris › Hors ligne, avec la place occupée.
+  Se déconnecter efface ces copies. Nécessite HTTPS ; le système peut vider ce stockage s'il manque de place.
+- **Reprise entre appareils** : la file, la piste et la position sont enregistrées sur le serveur, par compte. En
+  ouvrant l'application ailleurs (ou en y revenant), on retrouve ce qu'on écoutait, en pause au même endroit. Rien
+  n'est repris pendant une lecture en cours ; le dernier appareil utilisé fait foi.
+
+Une table est créée au démarrage : aucune migration manuelle.
+
 ## [1.13.0](https://github.com/djkix/mp3-scene/compare/v1.12.1...v1.13.0) (2026-11-16)
 
 ### Résumé

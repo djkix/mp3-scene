@@ -33,6 +33,9 @@ CREATE TABLE IF NOT EXISTS playlist_tracks(
   playlist_id INTEGER NOT NULL REFERENCES playlists ON DELETE CASCADE,
   track_id INTEGER NOT NULL REFERENCES tracks ON DELETE CASCADE,
   position INTEGER NOT NULL, PRIMARY KEY(playlist_id, track_id));
+-- état du lecteur (file, piste, position) : repris sur un autre appareil
+CREATE TABLE IF NOT EXISTS player_state(
+  user_id INTEGER PRIMARY KEY REFERENCES users ON DELETE CASCADE, data TEXT NOT NULL, updated_at REAL NOT NULL);
 -- forme d'onde : 800 crêtes (un octet chacune), calculées à la première écoute
 CREATE TABLE IF NOT EXISTS waveforms(
   track_id INTEGER PRIMARY KEY REFERENCES tracks ON DELETE CASCADE, peaks BLOB NOT NULL);

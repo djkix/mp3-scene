@@ -8,6 +8,8 @@ import * as groups from './views/groups.js';
 import * as release from './views/release.js';
 import * as favorites from './views/favorites.js';
 import * as account from './views/account.js';
+import * as offlineView from './views/offline.js';
+import { offline } from './offline.js';
 import { initPlayer, player } from './player.js';
 import { initCast } from './cast.js';
 import { versionInfo } from './version.js';
@@ -65,7 +67,17 @@ async function route() {
   if (name !== 'login' && !session.user) {
     try {
       session.user = await api('/me');
+      player.pull(); // reprend la file laissée sur un autre appareil
     } catch (err) {
+      if (!err.status && id === navId && offline.releases().length) { // serveur injoignable : ce qui est sur l'appareil reste écoutable
+        $('topbar').hidden = true;
+        $('player').hidden = false;
+        const list = el('div');
+        view.replaceChildren(el('p', { class: 'status', role: 'alert' }, t('Serveur injoignable : mode hors ligne.') + ' ',
+          el('button', { type: 'button', onclick: route }, t('Réessayer'))), list);
+        offlineView.render(list);
+        return;
+      }
       // 401 : api() a déjà redirigé vers #/login ; sinon (serveur injoignable, 5xx) message et nouvel essai
       if (err.status !== 401 && id === navId) {
         view.replaceChildren(el('p', { class: 'status', role: 'alert' }, err.message + ' ',
