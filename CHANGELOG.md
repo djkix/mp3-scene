@@ -4,6 +4,14 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.10.1](https://github.com/djkix/mp3-scene/compare/v1.10.0...v1.10.1) (2026-11-16)
+
+### Résumé
+
+**Pistes favorites et historique plus lisibles.** La liste a des libellés de colonnes (Date ou Durée, Artiste,
+Titre, Release), l'artiste dispose de plus de place, et l'artiste comme la release passent à la ligne au lieu
+d'être coupés. Sur téléphone, chaque piste s'affiche sur quatre lignes : titre, artiste, release, date.
+
 ## [1.10.0](https://github.com/djkix/mp3-scene/compare/v1.9.1...v1.10.0) (2026-11-16)
 
 ### Résumé

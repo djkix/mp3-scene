@@ -38,7 +38,9 @@ function trackList(container, history = false) {
     list.replaceChildren();
     status.textContent = empty;
   } }, tr("Effacer l'historique")));
-  container.replaceChildren(...(clear ? [clear] : []), list, status, sentinel);
+  const head = el('div', { class: 'rel-head trk-fav' },
+    [history ? tr('Date') : tr('Durée'), tr('Artiste'), tr('Titre'), tr('Release')].map((x) => el('span', {}, x)), el('span'));
+  container.replaceChildren(...(clear ? [clear] : []), head, list, status, sentinel);
   const tracks = []; // pistes chargées, dans l'ordre : file de lecture au clic
   let offset = 0, loading = false, done = false, dead = false;
   const observer = new IntersectionObserver((e) => { if (e.some((x) => x.isIntersecting)) load(); }, { rootMargin: '400px' });

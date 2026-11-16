@@ -157,6 +157,7 @@ export const EN = {
   'Genres': 'Genres',
   'Années': 'Years',
   'Releases': 'Releases',
+  'Release': 'Release',
   'Historique': 'History',
   'Aucune release favorite': 'No favourite releases',
   'Aucune écoute': 'No listening history',

@@ -282,7 +282,9 @@ tr.disc th { background: var(--hover); font-size: 12px; color: var(--muted); }
   max-width: 100%; margin: 0 auto; padding: 8px; border: 1px solid var(--line); background: var(--hover); }
 .tabs { display: flex; gap: 4px; padding: 10px 12px; }
 .tabs [aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
-.trk-fav { grid-template-columns: 8rem 6rem minmax(0, 1fr) auto auto; gap: 0 12px; }
+/* date | artiste | titre | release | action : artiste et release passent à la ligne plutôt que d'être coupés */
+.trk-fav { grid-template-columns: 8rem minmax(0, 2fr) minmax(0, 3fr) minmax(0, 4fr) 40px; gap: 0 16px; }
+.trk-fav .rel-cat, .trk-fav .rel-meta { white-space: normal; overflow-wrap: anywhere; }
 .trk-fav .rel-meta:hover { text-decoration: underline; }
 .stack { display: flex; flex-direction: column; gap: 10px; max-width: 320px; }
 .stack label, .inline-form label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); }
@@ -294,6 +296,7 @@ td .actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .hint { color: var(--muted); margin: 0 0 8px; }
 @media (max-width: 699px) {
   .col-bitrate { display: none; }
-  .trk-fav { grid-template-columns: auto minmax(0, 1fr) auto; gap: 2px 8px; grid-template-areas: "name name act" "date cat meta"; }
+  .trk-fav { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; grid-template-areas: "name act" "cat act" "meta act" "date act"; }
   .trk-fav .rel-meta { grid-area: meta; }
+  .trk-fav .rel-cat { max-width: none; }
 }
