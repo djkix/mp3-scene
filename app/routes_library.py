@@ -71,7 +71,7 @@ def _page(conn, cols, source, where, params, order, uid, offset, limit, build):
 
 
 @router.get("/api/releases")
-def list_releases(q: str = "", category: str | None = None, genre: str | None = None,
+def list_releases(q: str = "", category: str | None = None, genre: str | None = None, grp: str | None = None,
                   year: int | None = Query(None, ge=0, le=MAX_INT), favorites: int = Query(0, ge=0, le=1),
                   sort: Sort | None = None, dir: Dir = "asc",
                   offset: int = Query(0, ge=0, le=MAX_INT), limit: int = Query(50, ge=1, le=MAX_INT),
@@ -80,7 +80,7 @@ def list_releases(q: str = "", category: str | None = None, genre: str | None = 
     if match := _fts_query(q):
         conds.append("r.id IN (SELECT rowid FROM releases_fts WHERE releases_fts MATCH ?)")
         params.append(match)
-    for col, val in (("category", category), ("genre", genre), ("year", year)):
+    for col, val in (("category", category), ("genre", genre), ("year", year), ("grp", grp)):
         if val is not None:
             conds.append(f"r.{col}=?")
             params.append(val)
@@ -97,6 +97,21 @@ def filters(conn=Depends(get_conn)):
     return {"categories": col("SELECT DISTINCT category FROM releases WHERE category IS NOT NULL ORDER BY category"),
             "genres": col("SELECT DISTINCT genre FROM releases WHERE genre IS NOT NULL ORDER BY genre"),
             "years": col("SELECT DISTINCT year FROM releases WHERE year IS NOT NULL ORDER BY year DESC")}
+
+
+@router.get("/api/groups")
+def groups(grp: str | None = None, genre: str | None = None, year: int | None = Query(None, ge=0, le=MAX_INT),
+           conn=Depends(get_conn)):
+    """Groupes de release : nombre de releases et poids total, restreints au genre / à l'année demandés."""
+    conds, params = ["grp IS NOT NULL"], []
+    for col, val in (("grp", grp), ("genre", genre), ("year", year)):
+        if val is not None:
+            conds.append(f"{col}=?")
+            params.append(val)
+    # ponytail: liste entière sans pagination (quelques milliers de groupes) ; paginer si elle devient lourde
+    return [dict(r) for r in conn.execute(
+        "SELECT grp AS name, COUNT(*) AS releases, SUM(size) AS size FROM releases WHERE " + " AND ".join(conds)
+        + " GROUP BY grp ORDER BY releases DESC, grp COLLATE NOCASE", params)]
 
 
 @router.get("/api/folders")

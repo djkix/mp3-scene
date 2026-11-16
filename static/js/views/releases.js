@@ -120,9 +120,9 @@ export function releaseList(container, fetchPage, { empty = tr('Aucun résultat'
 
 let filtersCache = null;
 export const invalidateFilters = () => { filtersCache = null; }; // après un scan : nouveaux genres/années/catégories
-const loadFilters = () => (filtersCache ??= api('/filters').catch((e) => { filtersCache = null; throw e; }));
+export const loadFilters = () => (filtersCache ??= api('/filters').catch((e) => { filtersCache = null; throw e; }));
 
-function select(label, all, name, values, current, onChange) {
+export function select(label, all, name, values, current, onChange) {
   const sel = el('select', { 'aria-label': label, onchange: () => onChange(name, sel.value) },
     el('option', { value: '' }, all),
     values.map((v) => el('option', { value: String(v) }, String(v))));
@@ -130,9 +130,9 @@ function select(label, all, name, values, current, onChange) {
   return sel;
 }
 
-// Vue « derniers ajouts » (#/) et « recherche » (#/search?q=)
+// Vue « derniers ajouts » (#/), « recherche » (#/search?q=) et releases d'un groupe (params.grp, voir groups.js)
 export function render(container, params) {
-  const { q = '', category = '', genre = '', year = '' } = params;
+  const { q = '', category = '', genre = '', year = '', grp = '' } = params;
   const bar = el('div', { class: 'filters' });
   const list = el('div');
   container.replaceChildren(bar, list);
@@ -140,7 +140,7 @@ export function render(container, params) {
   function setFilter(name, value) {
     const next = { q, category, genre, year, [name]: value };
     const qs = Object.entries(next).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
-    location.hash = (q ? '#/search' : '#/') + (qs ? '?' + qs : ''); // nouvelle entrée d'historique, pagination remise à zéro
+    location.hash = (grp ? `#/groups/${encodeURIComponent(grp)}` : q ? '#/search' : '#/') + (qs ? '?' + qs : ''); // nouvelle entrée d'historique, pagination remise à zéro
   }
 
   let dead = false;
@@ -150,7 +150,7 @@ export function render(container, params) {
       select(tr('Genre'), tr('Genres'), 'genre', f.genres, genre, setFilter), select(tr('Année'), tr('Années'), 'year', f.years, year, setFilter));
   }).catch(() => {});
 
-  const query = new URLSearchParams(Object.entries({ q, category, genre, year }).filter(([, v]) => v));
+  const query = new URLSearchParams(Object.entries({ q, category, genre, year, grp }).filter(([, v]) => v));
   const dispose = releaseList(list, (offset, tri) => {
     query.set('offset', offset);
     query.set('limit', PAGE);

@@ -34,7 +34,7 @@ Trois zones permanentes, une fois connecté :
 2. **Contenu** : l'écran courant.
 3. **Lecteur** : fixé en bas, visible dès qu'une piste a été lancée, sur tous les écrans.
 
-Navigation, quatre entrées : **Derniers** (accueil), **Dossiers**, **Favoris**, **Compte**. L'entrée active est marquée.
+Navigation, cinq entrées : **Derniers** (accueil), **Dossiers**, **Groupes**, **Favoris**, **Compte**. L'entrée active est marquée.
 
 Un **bandeau** peut apparaître sous la barre du haut, pour les administrateurs :
 « Nouvelle version 1.2.0 disponible (installée : 1.1.0). Voir les nouveautés ».
@@ -69,6 +69,10 @@ frappe) affiche la même liste, filtrée.
 - **Clic sur une ligne** : lance la lecture de la release. Les trois actions sont des cibles distinctes.
 - Défilement infini (50 par page). Messages : « Chargement… », « Fin de la liste », « Aucun résultat »,
   erreur avec bouton « Réessayer ».
+
+### 4.2 bis Groupes
+- **Liste des groupes** : tableau Groupe, Releases, Poids ; en-têtes cliquables pour trier ; champ « Filtrer les groupes… », sélecteurs Genre et Année ; total en bas (groupes, releases, poids).
+- **Page d'un groupe** : titre « Groupes › NOM » suivi du nombre de releases et du poids, puis la liste de releases habituelle avec ses filtres.
 
 ### 4.3 Dossiers
 - **Fil d'Ariane** : Dossiers › 02.Various Artists - Compilations › -=Kontor=-

@@ -270,6 +270,12 @@ google-cast-launcher:hover { background: var(--hover); }
 table { border-collapse: collapse; width: 100%; }
 th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 thead th { color: var(--muted); font-weight: 500; font-size: 12px; }
+.groups th.num { text-align: right; }
+.groups th button { padding: 4px 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.groups th button:hover { color: var(--fg); background: none; }
+.groups td a { display: block; overflow-wrap: anywhere; }
+.grp-title { margin: 0; padding: 10px 12px 0; font-size: 16px; overflow-wrap: anywhere; }
+.grp-title .muted { color: var(--muted); font-size: 12px; font-weight: 400; margin-left: 8px; white-space: nowrap; }
 td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); }
 .trk { cursor: pointer; }
 .trk:hover { background: var(--hover); }

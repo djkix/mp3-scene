@@ -29,6 +29,14 @@ def test_filters(user_client, library):
     assert [x["name"] for x in user_client.get("/api/releases?category=Albums").json()["items"]] == ["VA-Big_Mix-2CD-2003-GRP"]
 
 
+def test_groups(user_client, library):
+    g = user_client.get("/api/groups").json()
+    assert sorted(x["name"] for x in g) == ["GRP", "PWT", "WUS"] and all(x["releases"] == 1 and x["size"] > 0 for x in g)
+    assert [x["name"] for x in user_client.get("/api/groups?genre=House&year=2015").json()] == ["WUS"]
+    assert user_client.get("/api/groups?grp=WUS&year=2017").json() == []
+    assert [x["name"] for x in user_client.get("/api/releases?grp=WUS").json()["items"]] == [A]
+
+
 def test_search_words_and_prefix(user_client, library):
     names = lambda q: [x["name"] for x in user_client.get("/api/releases", params={"q": q}).json()["items"]]
     assert names("ibanez trak") == [A]

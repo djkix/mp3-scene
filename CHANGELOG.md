@@ -4,6 +4,15 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.12.0](https://github.com/djkix/mp3-scene/compare/v1.11.0...v1.12.0) (2026-11-16)
+
+### Résumé
+
+**Nouvelle page Groupes.** Elle liste les groupes de release avec, pour chacun, le nombre de releases et le poids
+total ; la liste se trie par colonne, se filtre par nom, par genre et par année, et affiche le total en bas. Un clic
+sur un groupe ouvre ses releases, avec les filtres habituels (localisation, genre, année) et le total du groupe en
+tête. Les groupes viennent du nom des releases : aucune migration, aucun scan.
+
 ## [1.11.0](https://github.com/djkix/mp3-scene/compare/v1.10.1...v1.11.0) (2026-11-16)
 
 ### Résumé

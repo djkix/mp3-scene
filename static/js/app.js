@@ -4,6 +4,7 @@ import { el } from './dom.js';
 import * as login from './views/login.js';
 import * as releases from './views/releases.js';
 import * as folders from './views/folders.js';
+import * as groups from './views/groups.js';
 import * as release from './views/release.js';
 import * as favorites from './views/favorites.js';
 import * as account from './views/account.js';
@@ -18,6 +19,7 @@ const ROUTES = {
   '': releases,
   search: releases,
   folders,
+  groups,
   release,
   favorites,
   account,
