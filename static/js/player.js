@@ -16,7 +16,7 @@ const mobile = matchMedia('(max-width: 699px)');
 export const player = {
   queue: new Queue(), audio, events: new EventTarget(),
   playTracks, toggle, next, prev, seek, setVolume, jump, remove, clear, reset,
-  attach, detach, refresh, tick, flash, pull,
+  attach, detach, refresh, tick, flash, pull, enqueue, move,
 };
 
 let ui = null;            // éléments du pied de page, créés par initPlayer
@@ -263,6 +263,37 @@ function remove(i) {
   save();
 }
 
+// Ajoute des pistes à la fin de la file, ou juste après la courante (next) ; n'interrompt jamais la lecture.
+function enqueue(tracks, next = false) {
+  if (!tracks.length) return;
+  const wasEmpty = !player.queue.current();
+  if (next) player.queue.insertNext(tracks); else player.queue.append(tracks);
+  if (wasEmpty) { failures = 0; load(true); } else { backend?.sync(); update(); }
+  save();
+  flash(tracks.length > 1 ? tr('Ajouté à la file : {0} pistes.', tracks.length) : tr('Ajouté à la file : {0} piste.', tracks.length));
+}
+
+function move(i, j) {
+  player.queue.move(i, j);
+  backend?.sync();
+  update();
+  save();
+}
+
+// --- Minuterie de sommeil ------------------------------------------------------------------------
+let sleepTimer = null, sleepAtEnd = false;
+function setSleep(value) { // '' : aucune ; 'end' : fin de la piste ; sinon minutes
+  clearTimeout(sleepTimer);
+  sleepTimer = null;
+  sleepAtEnd = value === 'end';
+  if (Number(value) > 0) sleepTimer = setTimeout(() => { if (playing()) toggle(); sleepDone(); }, value * 60000);
+}
+function sleepDone() {
+  setSleep('');
+  if (ui) ui.sleep.value = '';
+  flash(tr('Minuterie : lecture arrêtée.'));
+}
+
 function clear() {
   player.queue.clear();
   load(false);
@@ -288,7 +319,8 @@ function reset() {
 audio.addEventListener('ended', () => {
   const t = player.queue.next({ auto: true });
   if (!t) return update(); // fin de file
-  if (t.id === loadedId) { audio.currentTime = 0; start(); } else load(true);
+  if (sleepAtEnd) { load(false); sleepDone(); } // minuterie « fin de la piste » : la suivante est prête, en pause
+  else if (t.id === loadedId) { audio.currentTime = 0; start(); } else load(true);
   save();
 });
 
@@ -481,7 +513,7 @@ function renderPanel() {
   const q = player.queue;
   // ligne qui a le focus (lecture ou retrait) : on le rend à la même ligne après reconstruction
   const a = document.activeElement, row = ui.list.contains(a) ? [...ui.list.children].indexOf(a.closest('li')) : -1;
-  const sel = a?.classList?.contains('pl-q-remove') ? '.pl-q-remove' : '.pl-q-track';
+  const sel = '.' + (['pl-q-remove', 'pl-q-up', 'pl-q-down'].find((c) => a?.classList?.contains(c)) || 'pl-q-track');
   ui.count.textContent = q.tracks.length > 1 ? tr('{0} pistes', q.tracks.length) : tr('{0} piste', q.tracks.length);
   ui.list.replaceChildren(...q.tracks.map((t, i) => el('li', { class: i === q.index ? 'current' : null },
     el('button', { type: 'button', class: 'pl-q-track', 'aria-current': i === q.index ? 'true' : null,
@@ -489,6 +521,8 @@ function renderPanel() {
     el('span', { class: 'pl-q-title' }, title(t)),
     el('span', { class: 'pl-q-rel' }, [t.artist, t.release_name].filter(Boolean).join(' · '))),
     el('span', { class: 'pl-time' }, fmtDuration(t.duration)),
+    iconBtn('pl-q-up', '▲', tr('Monter'), () => player.move(i, i - 1)),
+    iconBtn('pl-q-down', '▼', tr('Descendre'), () => player.move(i, i + 1)),
     iconBtn('pl-q-remove', '×', tr('Retirer de la file'), () => player.remove(i)))));
   if (row >= 0) ui.list.children[Math.min(row, ui.list.children.length - 1)]?.querySelector(sel)?.focus();
 }
@@ -554,10 +588,18 @@ export function initPlayer(footer) {
   ui.msg = el('p', { class: 'pl-msg', role: 'status' });
 
   ui.count = el('span', { class: 'pl-count' });
+  ui.sleep = el('select', { class: 'pl-sleep', 'aria-label': tr('Minuterie de sommeil'), title: tr('Minuterie de sommeil'),
+    onchange: () => setSleep(ui.sleep.value) },
+  el('option', { value: '' }, tr('Minuterie')), [15, 30, 60].map((m) => el('option', { value: m }, tr('{0} min', m))),
+  el('option', { value: 'end' }, tr('Fin de la piste')));
   ui.list = el('ol');
   ui.close = iconBtn('pl-close', '×', tr("Fermer la file d'attente"), () => { openPanel(false); ui.qbtn.focus(); });
   ui.panel = el('section', { class: 'pl-queue', hidden: true, 'aria-label': tr("File d'attente") },
-    el('div', { class: 'pl-q-head' }, el('h2', {}, tr("File d'attente")), ui.count,
+    el('div', { class: 'pl-q-head' }, el('h2', {}, tr("File d'attente")), ui.count, ui.sleep,
+      el('button', { type: 'button', onclick: async () => { // import à la demande : playlist-add.js importe ce module
+        const ids = q().tracks.slice(0, 1000).map((t) => t.id);
+        if (ids.length) (await import('./playlist-add.js')).openDialog({ track_ids: ids });
+      } }, tr('Enregistrer')),
       el('button', { type: 'button', onclick: () => player.clear() }, tr('Vider la file')), ui.close),
     ui.list);
 
@@ -592,15 +634,21 @@ export function initPlayer(footer) {
   }, { passive: true });
   footer.addEventListener('touchcancel', () => { sx = null; }, { passive: true });
 
-  // Clavier : Échap ferme la file puis le lecteur plein écran ; Espace = lecture/pause ; ← → = ±5 s.
+  // Clavier : Échap ferme la file puis le lecteur plein écran ; Espace = lecture/pause ; ← → = ±5 s ;
+  // N / P = piste suivante / précédente ; M = couper le son ; / = aller à la recherche.
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !ui.panel.hidden) { openPanel(false); ui.qbtn.focus(); return; }
     if (e.key === 'Escape' && footer.classList.contains('expanded')) { expand(false); ui.title.focus(); return; }
+    if (e.ctrlKey || e.metaKey || e.altKey || footer.hidden || document.querySelector('dialog[open]')) return;
+    const typing = e.target.closest?.('input, select, textarea, [contenteditable]');
+    if (e.key === '/' && !typing) { e.preventDefault(); document.getElementById('search')?.focus(); return; }
     const step = { ArrowLeft: -5, ArrowRight: 5 }[e.key];
-    if ((e.code !== 'Space' && !step) || e.ctrlKey || e.metaKey || e.altKey || (e.repeat && !step)) return;
-    if (footer.hidden || !q().current() || e.target.closest?.('input, select, textarea, button, a, [contenteditable]')) return;
+    const act = !e.repeat && { n: next, p: prev, m: mute }[e.key.toLowerCase()];
+    if ((e.code !== 'Space' && !step && !act) || (e.repeat && !step)) return;
+    if (!q().current() || typing || (!act && e.target.closest?.('button, a'))) return;
     e.preventDefault();
     if (step) player.seek(Math.min(Math.max(0, position() + step), duration() || Infinity));
+    else if (act) act();
     else player.toggle();
   });
   mobile.addEventListener('change', () => expand(false));  // rotation / redimensionnement vers la vue bureau
@@ -625,14 +673,7 @@ export function initPlayer(footer) {
   });
 
   document.addEventListener('queue-release', (e) => {
-    release(e.detail?.releaseId, (r) => {
-      if (!r.tracks.length) return;
-      const wasEmpty = !q().current();
-      q().append(r.tracks);
-      if (wasEmpty) { failures = 0; load(true); } else { backend?.sync(); update(); } // ajout : n'interrompt jamais
-      save();
-      flash(r.tracks.length > 1 ? tr('Ajouté à la file : {0} pistes.', r.tracks.length) : tr('Ajouté à la file : {0} piste.', r.tracks.length));
-    });
+    release(e.detail?.releaseId, (r) => enqueue(r.tracks));
   });
 
   // Sauvegarde : toutes les 5 s en lecture, et quand la page passe en arrière-plan ou se ferme.

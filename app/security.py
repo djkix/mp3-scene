@@ -170,3 +170,21 @@ def check_track_sig(secret: str, track_id: int, exp, sig, now: float) -> bool:
     if not now <= exp <= now + CAST_TTL + _CAST_SKEW:
         return False
     return hmac.compare_digest(sign_track(secret, track_id, exp), sig)
+
+
+SHARE_TTL = 7 * DAY
+
+
+def sign_share(secret: str, kind: str, item_id: int, exp: int) -> str:
+    """Jeton de partage « r12-1794900000-<signature> » (r : release, p : playlist) ; préfixe « share: » réservé."""
+    sig = hmac.new(secret.encode(), f"share:{kind}{item_id}:{exp}".encode(), hashlib.sha256).hexdigest()[:32]
+    return f"{kind}{item_id}-{exp}-{sig}"
+
+
+def check_share(secret: str, token, now: float) -> tuple[str, int] | None:
+    """(kind, id) si le jeton est bien signé et non expiré, sinon None."""
+    m = re.fullmatch(r"([rp])([0-9]{1,15})-([0-9]{1,12})-([0-9a-f]{32})", token) if isinstance(token, str) else None
+    if not m or not now <= int(m[3]) <= now + SHARE_TTL + DAY:
+        return None
+    ok = hmac.compare_digest(sign_share(secret, m[1], int(m[2]), int(m[3])), token)
+    return (m[1], int(m[2])) if ok else None

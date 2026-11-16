@@ -4,6 +4,25 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.15.0](https://github.com/djkix/mp3-scene/compare/v1.14.0...v1.15.0) (2026-11-16)
+
+### Résumé
+
+**File et playlists réordonnables, mix aléatoire, nouveautés, partage, minuterie, raccourcis.**
+
+- **File d'attente** : boutons ▲ ▼ pour changer l'ordre, « Enregistrer » pour en faire une playlist. Le bouton ⋯
+  d'une piste propose « Lire ensuite », « Ajouter à la file » et l'ajout à une playlist.
+- **Playlists** : ordre modifiable (▲ ▼), bouton « Garder hors ligne » (aussi sur les pistes favorites) et « Partager ».
+  Une playlist gardée hors ligne est une copie à l'instant du clic : les pistes ajoutées ensuite ne sont pas téléchargées.
+- **Mix** : le bouton Mix des listes lance 50 pistes au hasard parmi les releases qui passent les filtres affichés
+  (toute la bibliothèque, un genre, une année, un groupe, un artiste).
+- **Nouveautés** : les releases ajoutées depuis la visite précédente portent une pastille « nouveau », et Derniers
+  affiche leur nombre. Mémorisé par appareil.
+- **Partage** : « Partager » sur une release ou une playlist copie un lien valable 7 jours, écoutable sans compte
+  (page avec la liste des pistes et un lecteur). Le lien ne peut pas être révoqué avant son échéance.
+- **Minuterie de sommeil** dans la file d'attente : 15, 30, 60 minutes ou fin de la piste.
+- **Raccourcis clavier** : N et P (piste suivante, précédente), M (couper le son), / (recherche), en plus d'Espace et ← →.
+
 ## [1.14.0](https://github.com/djkix/mp3-scene/compare/v1.13.0...v1.14.0) (2026-11-16)
 
 ### Résumé

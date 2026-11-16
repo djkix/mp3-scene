@@ -288,6 +288,18 @@ dialog.pl-add h2 { margin: 0 0 10px; font-size: 15px; }
 dialog.pl-add .inline-form input { flex: 1 1 120px; min-width: 0; }
 dialog.pl-add .status { padding: 8px 0; min-height: 1em; }
 .detail-info a:hover, .groups td a:hover, .grp-title a:hover { text-decoration: underline; }
+.new { margin-left: 8px; padding: 1px 6px; border-radius: 8px; background: var(--accent); color: var(--on-accent);
+  font: 600 10px var(--sans); vertical-align: middle; white-space: nowrap; }
+.pl-sleep { max-width: 8.5rem; padding-block: 2px; font-size: 12px; }
+.pl-q-head { flex-wrap: wrap; }
+.share { margin: 0 auto; padding-top: 12px; }
+.share audio { width: 100%; margin: 8px 0; }
+.share-list { list-style: none; margin: 0; padding: 0; }
+.share-list li { border-bottom: 1px solid var(--line); }
+.share-list li.current { box-shadow: inset 3px 0 var(--accent); }
+.share-list button { display: flex; justify-content: space-between; gap: 12px; width: 100%; padding: 10px 8px; border: 0;
+  background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.share-list button:hover { background: var(--hover); }
 .grp-title { margin: 0; padding: 10px 12px 0; font-size: 16px; overflow-wrap: anywhere; }
 .grp-title .muted { color: var(--muted); font-size: 12px; font-weight: 400; margin-left: 8px; white-space: nowrap; }
 td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); }
@@ -305,7 +317,7 @@ tr.disc th { background: var(--hover); font-size: 12px; color: var(--muted); }
 .tabs button { flex: none; }
 .tabs [aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
 /* date | artiste | titre | release | action : artiste et release passent à la ligne plutôt que d'être coupés */
-.trk-fav { grid-template-columns: 8rem minmax(0, 2fr) minmax(0, 3fr) minmax(0, 4fr) 72px; gap: 0 16px; }
+.trk-fav { grid-template-columns: 8rem minmax(0, 2fr) minmax(0, 3fr) minmax(0, 4fr) var(--acts, 72px); gap: 0 16px; }
 .trk-fav .rel-cat, .trk-fav .rel-meta { white-space: normal; overflow-wrap: anywhere; }
 .trk-fav .rel-meta:hover { text-decoration: underline; }
 .stack { display: flex; flex-direction: column; gap: 10px; max-width: 320px; }

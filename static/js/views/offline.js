@@ -6,13 +6,14 @@ import { player } from '../player.js';
 import { t as tr } from '../i18n.js';
 import { offline } from '../offline.js';
 
-export function offlineButton(rel) {
-  if (!offline.supported || !rel.tracks.length) return null;
+// `rel` : {id, name, tracks, size?}. Sans `tracks`, `load()` les fournit au moment du clic (playlist, pistes favorites).
+export function offlineButton(rel, load = null) {
+  if (!offline.supported || (!load && !rel.tracks.length)) return null;
   const btn = el('button', { type: 'button', onclick: async () => {
     btn.disabled = true;
     try {
       if (offline.hasRelease(rel.id)) await offline.remove(rel.id);
-      else await offline.save(rel, (n, total) => { btn.textContent = tr('Téléchargement {0}/{1}…', n + 1, total); });
+      else await offline.save(load ? { ...rel, tracks: await load() } : rel, (n, total) => { btn.textContent = tr('Téléchargement {0}/{1}…', n + 1, total); });
     } catch (err) {
       player.flash(tr('Téléchargement impossible : {0}', err.message));
     }
@@ -29,7 +30,7 @@ export function render(container) {
   const status = el('p', { class: 'status', role: 'status' });
   const th = (text, cls) => el('th', { scope: 'col', class: cls }, text);
   container.replaceChildren(el('div', { class: 'table-wrap' }, el('table', { class: 'groups' },
-    el('thead', {}, el('tr', {}, th(tr('Release')), th(tr('Pistes'), 'num'), th(tr('Poids'), 'num'), th(''))), body)), status);
+    el('thead', {}, el('tr', {}, th(tr('Nom')), th(tr('Pistes'), 'num'), th(tr('Poids'), 'num'), th(''))), body)), status);
 
   function paint() {
     const all = offline.releases();

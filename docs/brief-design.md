@@ -76,7 +76,10 @@ frappe) affiche la même liste, filtrée.
 - **Recherche** : onglets Releases et Pistes ; l'onglet Pistes liste les pistes dont le titre ou l'artiste contient les mots cherchés.
 - **Hors ligne** : bouton « Garder hors ligne » / « Retirer du hors-ligne » sur la fiche (progression « Téléchargement 3/12… ») ; sans serveur, l'application n'affiche que le bandeau « Serveur injoignable : mode hors ligne. », la liste des releases gardées et le lecteur.
 - **Favoris** : onglets Releases, Pistes, Playlists, Hors ligne, Historique, Statistiques. Playlists : tableau (nom, pistes, durée, lire, renommer, supprimer) et contenu d'une playlist. Statistiques : sélecteur de période, total, quatre classements.
-- **Ajout à une playlist** : bouton ♫ sur chaque piste, boîte de dialogue listant les playlists avec un champ « Nouvelle playlist ».
+- **Actions d'une piste** : bouton ⋯ sur chaque piste, boîte de dialogue avec « Lire ensuite », « Ajouter à la file », puis les playlists et un champ « Nouvelle playlist ».
+- **File d'attente** : sélecteur de minuterie, « Enregistrer », « Vider la file » ; chaque ligne a ▲ ▼ ×.
+- **Listes de releases** : bouton Mix à côté des filtres ; pastille « nouveau » après le nom ; ligne « N nouvelles releases depuis votre dernière visite » en tête de Derniers.
+- **Page de partage** (/s/…, sans compte) : nom, lecteur natif, liste des pistes, mention d'expiration.
 
 ### 4.3 Dossiers
 - **Fil d'Ariane** : Dossiers › 02.Various Artists - Compilations › -=Kontor=-

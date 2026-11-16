@@ -95,3 +95,20 @@ test("upcoming : la suite dans l'ordre de lecture", () => {
   q.replace(T(4), 1); assert.deepEqual(q.upcoming().map((t) => t.id), [3, 4]);
   q.shuffle = true; assert.deepEqual(q.upcoming().map((t) => t.id).sort(), [1, 3, 4]);
 });
+test("move : la courante et l'ordre suivent", () => {
+  const q = new Queue(); q.replace(T(4), 1); // ids 1..4, courante id 2
+  q.move(1, 3); assert.deepEqual(q.tracks.map((t) => t.id), [1, 3, 4, 2]); assert.equal(q.current().id, 2);
+  q.move(0, 1); assert.deepEqual(q.tracks.map((t) => t.id), [3, 1, 4, 2]); assert.equal(q.current().id, 2);
+  q.move(3, 0); assert.deepEqual(q.tracks.map((t) => t.id), [2, 3, 1, 4]); assert.equal(q.current().id, 2);
+  assert.deepEqual(q.upcoming().map((t) => t.id), [3, 1, 4]);
+  q.move(0, 9); q.move(-1, 0); assert.deepEqual(q.tracks.map((t) => t.id), [2, 3, 1, 4]);
+});
+test("insertNext : lues juste après la courante, même en aléatoire", () => {
+  const q = new Queue({ random: () => 0.42 }); q.replace(T(3), 1);
+  q.insertNext([{ id: 8 }, { id: 9 }]);
+  assert.deepEqual(q.tracks.map((t) => t.id), [1, 2, 8, 9, 3]); assert.equal(q.current().id, 2);
+  assert.deepEqual(q.upcoming().map((t) => t.id), [8, 9, 3]);
+  q.shuffle = true; q.insertNext([{ id: 7 }]);
+  assert.equal(q.current().id, 2); assert.equal(q.upcoming()[0].id, 7); assert.equal(q.upcoming().length, 5);
+  const e = new Queue(); e.insertNext([{ id: 1 }]); assert.equal(e.current().id, 1);
+});

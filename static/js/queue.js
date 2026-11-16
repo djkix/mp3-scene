@@ -66,6 +66,25 @@ export class Queue {
     else if (i < this.index) this.index--;
   }
 
+  // Déplace la piste i à la place j dans la file affichée ; la piste courante et l'ordre aléatoire suivent.
+  move(i, j) {
+    const n = this.tracks.length;
+    if (![i, j].every((k) => Number.isInteger(k) && k >= 0 && k < n) || i === j) return;
+    this.tracks.splice(j, 0, ...this.tracks.splice(i, 1));
+    const to = (k) => (k === i ? j : i < j ? (k > i && k <= j ? k - 1 : k) : (k >= j && k < i ? k + 1 : k));
+    this.index = to(this.index);
+    if (this._shuffle) this.order = this.order.map(to); else this._reorder(); // sans aléatoire : l'ordre de lecture suit la file
+  }
+
+  // Insère des pistes juste après la courante : elles seront lues ensuite, même en aléatoire.
+  insertNext(tracks) {
+    if (this.index < 0) return this.append(tracks);
+    const at = this.index + 1, n = tracks.length;
+    this.tracks.splice(at, 0, ...tracks);
+    this.order = this.order.map((k) => (k >= at ? k + n : k));
+    this.order.splice(this._pos() + 1, 0, ...tracks.map((_, k) => at + k));
+  }
+
   clear() { this.replace([]); }
 
   jump(i) {

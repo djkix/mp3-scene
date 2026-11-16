@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
-from . import config, db, routes_admin, routes_auth, routes_library, routes_media, routes_playlists, security
+from . import config, db, routes_admin, routes_auth, routes_library, routes_media, routes_playlists, routes_share, security
 from .config import Settings
 from .deps import csrf
 from .scanner import Runner
@@ -115,8 +115,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def health():
         return {"ok": True}
 
-    for module in (routes_auth, routes_admin, routes_library, routes_media, routes_playlists):
+    for module in (routes_auth, routes_admin, routes_library, routes_media, routes_playlists, routes_share):
         app.include_router(module.router)
     app.include_router(routes_media.cast_router)  # hors /api/ : sans session, URL signée
+    app.include_router(routes_share.public_router)  # idem : lien de partage signé
     app.mount("/", NoCacheStatic(directory=STATIC_DIR, html=True), name="static")  # après les routeurs
     return app

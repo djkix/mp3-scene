@@ -2,6 +2,8 @@ import json
 import time
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from .deps import MAX_INT, Id, current_user, get_conn
@@ -87,6 +89,23 @@ def add_tracks(pid: Id, body: Add, user=Depends(current_user), conn=Depends(get_
                      " SELECT ?, id, ? FROM tracks WHERE id=?",
                      [(pid, pos + n, tid) for n, tid in enumerate(ids, 1) if 0 < tid <= MAX_INT])
     conn.commit()
+
+
+@router.post("/api/playlists/{pid}/tracks/{track_id}/move", status_code=204)
+def move_track(pid: Id, track_id: Id, dir: Literal["up", "down"], user=Depends(current_user), conn=Depends(get_conn)):
+    """Échange la piste avec sa voisine du dessus ou du dessous ; sans effet en bout de liste."""
+    _own(conn, user["id"], pid)
+    me = conn.execute("SELECT position FROM playlist_tracks WHERE playlist_id=? AND track_id=?", (pid, track_id)).fetchone()
+    if me is None:
+        raise HTTPException(404, "Piste introuvable.")
+    op, order = ("<", "DESC") if dir == "up" else (">", "ASC")
+    other = conn.execute(f"SELECT track_id, position FROM playlist_tracks WHERE playlist_id=? AND position{op}?"
+                         f" ORDER BY position {order} LIMIT 1", (pid, me["position"])).fetchone()
+    if other is not None:
+        conn.execute("UPDATE playlist_tracks SET position=? WHERE playlist_id=? AND track_id=?", (other["position"], pid, track_id))
+        conn.execute("UPDATE playlist_tracks SET position=? WHERE playlist_id=? AND track_id=?",
+                     (me["position"], pid, other["track_id"]))
+        conn.commit()
 
 
 @router.delete("/api/playlists/{pid}/tracks/{track_id}", status_code=204)

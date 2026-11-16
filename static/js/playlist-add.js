@@ -7,12 +7,14 @@ import { player } from './player.js';
 let dlg = null;
 
 // `payload` : corps de POST /playlists/<id>/tracks ({track_ids: […]} ou {release_id}). Sans `text` : bouton icône.
-export function addButton(payload, text) {
-  return el('button', { type: 'button', class: text ? '' : 'icon', title: tr('Ajouter à une playlist'),
-    'aria-label': tr('Ajouter à une playlist'), onclick: () => open(payload) }, text || '♫');
+// `tracks` (pistes complètes) : la boîte propose aussi « Lire ensuite » et « Ajouter à la file ».
+export function addButton(payload, text, tracks = null) {
+  const label = tracks ? tr('Plus d’actions') : tr('Ajouter à une playlist');
+  return el('button', { type: 'button', class: text ? '' : 'icon', title: label, 'aria-label': label,
+    onclick: () => openDialog(payload, tracks) }, text || (tracks ? '⋯' : '♫'));
 }
 
-async function open(payload) {
+export async function openDialog(payload, tracks = null) {
   dlg ??= document.body.appendChild(el('dialog', { class: 'pl-add' }));
   const msg = el('p', { class: 'status', role: 'status' }, tr('Chargement…'));
   const list = el('div', { class: 'pl-add-list' });
@@ -28,7 +30,10 @@ async function open(payload) {
     e.preventDefault();
     try { await add(await api('/playlists', { method: 'POST', body: { name: name.value } })); } catch (err) { msg.textContent = err.message; }
   } }, name, el('button', { type: 'submit' }, tr('Créer et ajouter')));
-  dlg.replaceChildren(el('h2', {}, tr('Ajouter à une playlist')), list, form, msg,
+  const queue = (next) => el('button', { type: 'button', onclick: () => { player.enqueue(tracks, next); dlg.close(); } },
+    next ? tr('Lire ensuite') : tr('Ajouter à la file'));
+  dlg.replaceChildren(...(tracks ? [el('div', { class: 'pl-add-list' }, queue(true), queue(false))] : []),
+    el('h2', {}, tr('Ajouter à une playlist')), list, form, msg,
     el('button', { type: 'button', onclick: () => dlg.close() }, tr('Fermer')));
   dlg.showModal();
   try {

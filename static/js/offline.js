@@ -5,7 +5,7 @@ const CACHE = 'mp3scene-offline';
 const KEY = 'mp3scene.offline';
 const url = (id) => `/api/tracks/${encodeURIComponent(id)}/stream`;
 
-let index = {}; // id de release -> {id, name, size, tracks}
+let index = {}; // clé (id de release, 'pl:<id>', 'fav') -> {id, name, size, tracks}
 try { index = JSON.parse(localStorage.getItem(KEY)) || {}; } catch { /* absent, corrompu, ou hors navigateur */ }
 let ids = new Set();
 function reindex() {
@@ -14,7 +14,8 @@ function reindex() {
 }
 reindex();
 
-async function drop(cache, tracks) { for (const t of tracks) await cache.delete(url(t.id)); }
+// Supprime les fichiers des pistes qu'aucune entrée restante de l'index n'utilise.
+async function drop(cache, tracks) { for (const t of tracks) if (!ids.has(t.id)) await cache.delete(url(t.id)); }
 
 export const offline = {
   supported: 'caches' in globalThis, // absent hors HTTPS
@@ -30,7 +31,7 @@ export const offline = {
     } catch { return null; }
   },
 
-  // Télécharge toutes les pistes de `rel` (fiche complète) ; progress(n, total) avant chaque piste. Tout ou rien.
+  // Télécharge toutes les pistes de `rel` ({id, name, tracks, size?}) ; progress(n, total) avant chaque piste. Tout ou rien.
   async save(rel, progress) {
     const cache = await caches.open(CACHE);
     navigator.storage?.persist?.().catch(() => {});
@@ -46,7 +47,8 @@ export const offline = {
       await drop(cache, rel.tracks).catch(() => {});
       throw err;
     }
-    index[rel.id] = { id: rel.id, name: rel.name, size: rel.size, tracks: rel.tracks };
+    index[rel.id] = { id: rel.id, name: rel.name, tracks: rel.tracks,
+      size: rel.size ?? rel.tracks.reduce((n, t) => n + (t.size || 0), 0) };
     reindex();
   },
 

@@ -4,15 +4,18 @@ import { el } from '../dom.js';
 import { player } from '../player.js';
 import { t as tr } from '../i18n.js';
 import { trackList } from './tracklist.js';
+import { offlineButton } from './offline.js';
+import { shareButton } from '../share-button.js';
 
 const HOME = '#/favorites?tab=playlists';
 const count = (n) => `${n} ${n > 1 ? tr('pistes') : tr('piste')}`;
 
-// Toutes les pistes d'une playlist, page par page (pour « Lire »).
-async function allTracks(id) {
+// Toutes les pistes d'une liste paginée (playlist, pistes favorites), page par page.
+const allTracks = (id) => allPages(`/playlists/${id}`);
+export async function allPages(path) {
   const out = [];
   for (;;) {
-    const page = await api(`/playlists/${id}?offset=${out.length}&limit=100`);
+    const page = await api(`${path}?offset=${out.length}&limit=100`);
     out.push(...page.items);
     if (!page.has_more) return out;
   }
@@ -70,9 +73,12 @@ function detail(container, id) {
   const body = el('div');
   container.replaceChildren(
     el('h1', { class: 'grp-title' }, el('a', { href: HOME }, tr('Playlists')), ' › ', title, ' ', status),
-    el('p', { class: 'tabs' }, el('button', { type: 'button', class: 'primary', onclick: () => play(id, status) }, tr('Lire'))),
+    el('p', { class: 'tabs' }, el('button', { type: 'button', class: 'primary', onclick: () => play(id, status) }, tr('Lire')),
+      offlineButton({ id: `pl:${id}`, get name() { return title.textContent; } }, () => allTracks(id)),
+      shareButton('playlist', +id)),
     body);
   return trackList(body, { path: `/playlists/${id}`, empty: tr('Playlist vide'),
     onPage: (page) => { title.textContent = page.name; },
+    move: (t, dir) => `/playlists/${id}/tracks/${t.id}/move?dir=${dir}`,
     remove: { url: (t) => `/playlists/${id}/tracks/${t.id}`, icon: '✕', label: tr('Retirer de la playlist') } });
 }

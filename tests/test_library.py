@@ -80,6 +80,57 @@ def test_player_state(user_client, admin_client, library):
     assert user_client.put("/api/player-state", json=[1]).status_code == 422
 
 
+def test_mix_and_new_count(user_client, library):
+    ids = lambda qs="": sorted(t["title"] for t in user_client.get("/api/mix" + qs).json()["items"])
+    assert ids() == ["Glue", "Ibanez", "Ibanez Dub", "One", "Two"]
+    assert ids("?grp=WUS") == ["Ibanez", "Ibanez Dub"] and ids("?genre=Techno&limit=5") == ["Glue"] and ids("?year=1990") == []
+    assert user_client.get("/api/new-count?since=0").json() == {"count": 3}
+    assert user_client.get("/api/new-count?since=99999999999").json() == {"count": 0}
+    assert user_client.get("/api/new-count").status_code == 422
+
+
+def test_playlist_move(user_client, library):
+    rid = user_client.get("/api/releases?grp=GRP").json()["items"][0]["id"]
+    pid = user_client.post("/api/playlists", json={"name": "Ordre"}).json()["id"]
+    user_client.post(f"/api/playlists/{pid}/tracks", json={"release_id": rid})
+    titles = lambda: [t["title"] for t in user_client.get(f"/api/playlists/{pid}").json()["items"]]
+    ids = [t["id"] for t in user_client.get(f"/api/playlists/{pid}").json()["items"]]
+    assert titles() == ["One", "Two"]
+    move = lambda tid, d: user_client.post(f"/api/playlists/{pid}/tracks/{tid}/move?dir={d}").status_code
+    assert move(ids[0], "down") == 204 and titles() == ["Two", "One"]
+    assert move(ids[0], "down") == 204 and titles() == ["Two", "One"]   # déjà en bas
+    assert move(ids[0], "up") == 204 and titles() == ["One", "Two"]
+    assert move(99999, "up") == 404 and move(ids[0], "left") == 422
+
+
+def test_share(client, user_client, admin_client, library, settings):
+    rid = user_client.get("/api/releases?grp=WUS").json()["items"][0]["id"]
+    other = user_client.get("/api/tracks", params={"q": "glue"}).json()["items"][0]["id"]
+    url = user_client.post("/api/share", json={"kind": "release", "id": rid}).json()["url"]
+    token = url.rsplit("/", 1)[-1]
+    assert client.get(f"/s/{token}").status_code == 200   # sans session
+    info = client.get(f"/s/{token}/info").json()
+    assert info["name"] == A and [t["title"] for t in info["tracks"]] == ["Ibanez", "Ibanez Dub"]
+    tid = info["tracks"][0]["id"]
+    assert client.get(f"/s/{token}/track/{tid}").status_code == 200
+    assert client.get(f"/s/{token}/track/{other}").status_code == 404   # piste hors du partage
+    bad = token[:-1] + ("0" if token[-1] != "0" else "1")
+    assert client.get(f"/s/{bad}").status_code == 404 and client.get(f"/s/{bad}/info").status_code == 404
+    assert client.get(f"/s/{bad}/track/{tid}").status_code == 404 and client.get("/s/nimporte").status_code == 404
+    # jeton expiré
+    from app.security import sign_share
+    old = sign_share(settings.secret_key, "r", rid, 1000)
+    assert client.get(f"/s/{old}/info").status_code == 404
+    # playlist : seul son propriétaire peut la partager
+    pid = user_client.post("/api/playlists", json={"name": "Amis"}).json()["id"]
+    user_client.post(f"/api/playlists/{pid}/tracks", json={"track_ids": [other]})
+    assert admin_client.post("/api/share", json={"kind": "playlist", "id": pid}).status_code == 404
+    ptoken = user_client.post("/api/share", json={"kind": "playlist", "id": pid}).json()["url"].rsplit("/", 1)[-1]
+    assert [t["title"] for t in client.get(f"/s/{ptoken}/info").json()["tracks"]] == ["Glue"]
+    assert client.get(f"/s/{ptoken}/track/{tid}").status_code == 404
+    assert user_client.post("/api/share", json={"kind": "release", "id": 99999}).status_code == 404
+
+
 def test_stats(user_client, admin_client, library):
     ids = [t["id"] for t in user_client.get("/api/tracks", params={"q": "ibanez"}).json()["items"]]
     for tid in (ids[0], ids[0], ids[1]):

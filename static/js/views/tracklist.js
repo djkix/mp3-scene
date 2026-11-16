@@ -9,7 +9,8 @@ const PAGE = 50;
 
 // path : route d'API renvoyant {items, has_more}. history : heure d'écoute à la place de la durée, bouton d'effacement.
 // remove : {url(piste), icon, label} — bouton qui retire la piste de la liste. onPage(page) : appelé à chaque page reçue.
-export function trackList(container, { path, empty, history = false, remove = null, onPage = null }) {
+// move(piste, 'up'|'down') -> route d'API (POST) qui échange la piste avec sa voisine : ajoute les boutons ▲ ▼.
+export function trackList(container, { path, empty, history = false, remove = null, onPage = null, move = null }) {
   const list = el('ul', { class: 'rel-list' });
   const status = el('p', { class: 'status', role: 'status' });
   const sentinel = el('div', { class: 'sentinel' });
@@ -28,6 +29,7 @@ export function trackList(container, { path, empty, history = false, remove = nu
   } }, tr("Effacer l'historique")));
   const head = el('div', { class: 'rel-head trk-fav' },
     [history ? tr('Date') : tr('Durée'), tr('Artiste'), tr('Titre'), tr('Release')].map((x) => el('span', {}, x)), el('span'));
+  if (move) container.style.setProperty('--acts', '136px');
   container.replaceChildren(...(clear ? [clear] : []), head, list, status, sentinel);
   const tracks = []; // pistes chargées, dans l'ordre : file de lecture au clic
   let offset = 0, loading = false, done = false, dead = false;
@@ -51,6 +53,17 @@ export function trackList(container, { path, empty, history = false, remove = nu
           status.textContent = err.message;
         }
       } }, remove.icon);
+    const shift = (dir) => move && el('button', { type: 'button', class: 'icon', title: tr(dir === 'up' ? 'Monter' : 'Descendre'),
+      'aria-label': tr(dir === 'up' ? 'Monter' : 'Descendre'), onclick: async () => {
+        const i = tracks.indexOf(t), j = dir === 'up' ? i - 1 : i + 1;
+        if (j < 0 || j >= tracks.length) return;
+        try {
+          await api(move(t, dir), { method: 'POST' });
+          if (dead) return;
+          [tracks[i], tracks[j]] = [tracks[j], tracks[i]];
+          if (dir === 'up') li.previousSibling.before(li); else li.nextSibling.after(li);
+        } catch (err) { if (!dead) status.textContent = err.message; }
+      } }, dir === 'up' ? '▲' : '▼');
     const li = el('li', { class: 'rel trk-fav', tabIndex: 0,
       onclick: (e) => { if (!e.target.closest('button, a')) play(); },
       onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) play(); } },
@@ -60,7 +73,7 @@ export function trackList(container, { path, empty, history = false, remove = nu
     el('span', { class: 'rel-cat' }, t.artist || ''),
     el('span', { class: 'rel-name' }, t.title || t.filename),
     el('a', { class: 'rel-meta', href: `#/release/${encodeURIComponent(t.release_name)}` }, t.release_name),
-    el('span', { class: 'rel-actions' }, addButton({ track_ids: [t.id] }), del));
+    el('span', { class: 'rel-actions' }, shift('up'), shift('down'), addButton({ track_ids: [t.id] }, null, [t]), del));
     return li;
   }
 

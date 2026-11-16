@@ -6,6 +6,7 @@ import { favButton } from './releases.js';
 import { infoRows } from './release-info.js';
 import { addButton } from '../playlist-add.js';
 import { offlineButton } from './offline.js';
+import { shareButton } from '../share-button.js';
 
 const emit = (name, detail) => document.dispatchEvent(new CustomEvent(name, { detail }));
 
@@ -43,6 +44,7 @@ function header(rel) {
       el('button', { type: 'button', onclick: () => emit('queue-release', { releaseId: rel.id }) }, t('Ajouter à la file')),
       addButton({ release_id: rel.id }, t('Ajouter à une playlist')),
       offlineButton(rel),
+      shareButton('release', rel.id),
       favButton(rel),
       el('a', { class: 'btn', href: `/api/releases/${rel.id}/zip`, download: '' }, t('Télécharger (zip)'))));
 }
@@ -65,7 +67,7 @@ function trackTable(rel) {
     el('td', { class: 'num' }, tk.duration == null ? '—' : fmtDuration(tk.duration)),
     el('td', { class: 'num col-bitrate' }, tk.bitrate == null ? '—' : `${Math.round(tk.bitrate / 1000)} kbit/s`),
     el('td', { class: 'num col-bitrate' }, tk.genre || '—'),
-    el('td', {}, addButton({ track_ids: [tk.id] })),
+    el('td', {}, addButton({ track_ids: [tk.id] }, null, [tk])),
     el('td', {}, favButton(tk, 'track')),
     el('td', { class: 'col-bitrate' }, el('a', { class: 'icon', href: `/api/tracks/${tk.id}/stream?download=1`, download: '',
       title: t('Télécharger la piste'), 'aria-label': t('Télécharger {0}', tk.filename) }, '⤓'))));
@@ -74,7 +76,7 @@ function trackTable(rel) {
   return el('div', { class: 'table-wrap' }, el('table', { class: 'tracks' },
     el('thead', {}, el('tr', {}, th(t('N°'), 'num'), th(t('Artiste - Titre')), th(t('Durée'), 'num'), th(t('Débit'), 'num col-bitrate'),
       th(t('Genre'), 'num col-bitrate'),
-      el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, t('Playlist'))),
+      el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, t('Actions'))),
       el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, t('Favori'))),
       el('th', { scope: 'col', class: 'col-bitrate' }, el('span', { class: 'sr-only' }, t('Télécharger'))))),
     el('tbody', {}, rows)));

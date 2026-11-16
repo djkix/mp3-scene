@@ -70,17 +70,9 @@ def _page(conn, cols, source, where, params, order, uid, offset, limit, build):
     return {"items": [build(r) for r in rows[:limit]], "has_more": len(rows) > limit}
 
 
-@router.get("/api/releases")
-def list_releases(q: str = "", category: str | None = None, genre: str | None = None, grp: str | None = None,
-                  artist: str | None = None,
-                  year: int | None = Query(None, ge=0, le=MAX_INT), favorites: int = Query(0, ge=0, le=1),
-                  sort: Sort | None = None, dir: Dir = "asc",
-                  offset: int = Query(0, ge=0, le=MAX_INT), limit: int = Query(50, ge=1, le=MAX_INT),
-                  user=Depends(current_user), conn=Depends(get_conn)):
+def _release_conds(category=None, genre=None, year=None, grp=None, artist=None):
+    """Conditions SQL (et leurs paramètres) des filtres de release communs aux listes et au mix."""
     conds, params = [], []
-    if match := _fts_query(q):
-        conds.append("r.id IN (SELECT rowid FROM releases_fts WHERE releases_fts MATCH ?)")
-        params.append(match)
     for col, val in (("category", category), ("genre", genre), ("year", year), ("grp", grp)):
         if val is not None:
             conds.append(f"r.{col}=?")
@@ -88,6 +80,40 @@ def list_releases(q: str = "", category: str | None = None, genre: str | None = 
     if artist is not None:
         conds.append("COALESCE(r.tag_artist, r.artist)=?")
         params.append(artist)
+    return conds, params
+
+
+@router.get("/api/mix")
+def mix(category: str | None = None, genre: str | None = None, year: int | None = Query(None, ge=0, le=MAX_INT),
+        grp: str | None = None, artist: str | None = None, limit: int = Query(50, ge=1, le=MAX_LIMIT),
+        user=Depends(current_user), conn=Depends(get_conn)):
+    """Pistes tirées au hasard parmi les releases qui passent les filtres."""
+    conds, params = _release_conds(category, genre, year, grp, artist)
+    where = "WHERE " + " AND ".join(conds) if conds else ""
+    # ponytail: ORDER BY RANDOM() trie tous les identifiants candidats (rapide jusqu'au million de pistes)
+    rows = conn.execute(
+        f"SELECT {TRACK_COLS} FROM {TRACK_FROM} WHERE t.id IN (SELECT t.id FROM tracks t JOIN releases r"
+        f" ON r.id=t.release_id {where} ORDER BY RANDOM() LIMIT ?) ORDER BY RANDOM()", [user["id"], *params, limit])
+    return {"items": [_track(r) for r in rows]}
+
+
+@router.get("/api/new-count")
+def new_count(since: float = Query(ge=0, le=1e12), conn=Depends(get_conn)):
+    """Nombre de releases ajoutées après `since` (heure Unix de la visite précédente)."""
+    return {"count": conn.execute("SELECT COUNT(*) FROM releases WHERE added_at>?", (since,)).fetchone()[0]}
+
+
+@router.get("/api/releases")
+def list_releases(q: str = "", category: str | None = None, genre: str | None = None, grp: str | None = None,
+                  artist: str | None = None,
+                  year: int | None = Query(None, ge=0, le=MAX_INT), favorites: int = Query(0, ge=0, le=1),
+                  sort: Sort | None = None, dir: Dir = "asc",
+                  offset: int = Query(0, ge=0, le=MAX_INT), limit: int = Query(50, ge=1, le=MAX_INT),
+                  user=Depends(current_user), conn=Depends(get_conn)):
+    conds, params = _release_conds(category, genre, year, grp, artist)
+    if match := _fts_query(q):
+        conds.append("r.id IN (SELECT rowid FROM releases_fts WHERE releases_fts MATCH ?)")
+        params.append(match)
     if favorites:
         conds.append("f.item_id IS NOT NULL")
     where = "WHERE " + " AND ".join(conds) if conds else ""

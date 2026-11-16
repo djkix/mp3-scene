@@ -2,10 +2,25 @@ import { api, fmtDate, fmtSize } from '../api.js';
 import { el } from '../dom.js';
 import { t as tr } from '../i18n.js';
 import { trackList } from './tracklist.js';
+import { player } from '../player.js';
 
 const PAGE = 50;
 const emit = (name, detail) => document.dispatchEvent(new CustomEvent(name, { detail }));
 const HEART = ['♡︎', '♥︎'];
+
+// Visite précédente sur cet appareil (heure Unix, 0 si inconnue) : les releases ajoutées depuis sont marquées.
+// Une « visite » dure 6 h : recharger la page ne fait pas disparaître les nouveautés.
+// ponytail: mémorisé par appareil (localStorage), pas par compte.
+let seen = null;
+export function since() {
+  if (seen !== null) return seen;
+  let s = {};
+  try { s = JSON.parse(localStorage.getItem('mp3scene.seen')) || {}; } catch { /* absent, corrompu */ }
+  const now = Date.now() / 1000;
+  if (!s.cur) s = { cur: now }; else if (now - s.cur > 6 * 3600) s = { prev: s.cur, cur: now };
+  try { localStorage.setItem('mp3scene.seen', JSON.stringify(s)); } catch { /* navigation privée */ }
+  return (seen = s.prev || 0);
+}
 // [libellé, clé de tri côté serveur, sens au premier clic]
 const HEAD = [[tr('Nom'), 'name', 'asc'], [tr('Genre'), 'genre', 'asc'], [tr('Date'), 'date', 'desc'], [tr('Pistes'), 'tracks', 'desc'],
   [tr('Débit'), 'bitrate', 'desc'],  [tr('Poids'), 'size', 'desc'], [tr('Localisation'), 'category', 'asc']];
@@ -47,7 +62,7 @@ function row(rel) {
   // vignette : chargée seulement quand la ligne approche de l'écran ; sans pochette, la place reste vide
   el('img', { class: 'rel-thumb', src: `/api/releases/${rel.id}/thumb`, alt: '', loading: 'lazy', width: 40, height: 40,
     onerror: (e) => { e.target.style.visibility = 'hidden'; } }),
-  el('span', { class: 'rel-name' }, rel.name),
+  el('span', { class: 'rel-name' }, rel.name, since() && rel.added_at > since() ? el('span', { class: 'new' }, tr('nouveau')) : null),
   // même ordre que HEAD ; sur mobile, .rel-info devient une ligne de détails sous le nom
   el('span', { class: 'rel-info' },
     el('span', { class: 'mid' }, rel.genre || ''),
@@ -156,8 +171,27 @@ export function render(container, params) {
   loadFilters().then((f) => {
     if (dead) return;
     bar.replaceChildren(select(tr('Localisation'), tr('Localisations'), 'category', f.categories, category, setFilter),
-      select(tr('Genre'), tr('Genres'), 'genre', f.genres, genre, setFilter), select(tr('Année'), tr('Années'), 'year', f.years, year, setFilter));
+      select(tr('Genre'), tr('Genres'), 'genre', f.genres, genre, setFilter), select(tr('Année'), tr('Années'), 'year', f.years, year, setFilter),
+      ...(q ? [] : [mix]));
   }).catch(() => {});
+  // Mix : 50 pistes au hasard parmi les releases qui passent les filtres affichés.
+  const mix = el('button', { type: 'button', title: tr('Lire 50 pistes au hasard parmi ces releases'), onclick: async () => {
+    mix.disabled = true;
+    try {
+      const { items } = await api('/mix?' + new URLSearchParams(Object.entries({ category, genre, year, ...(pin && { [pin.key]: pin.value }) }).filter(([, v]) => v)));
+      if (items.length) player.playTracks(items, 0); else player.flash(tr('Aucun résultat'));
+    } catch (err) { player.flash(err.message); }
+    mix.disabled = false;
+  } }, tr('Mix'));
+  const fresh = el('p', { class: 'status', role: 'status', hidden: true });
+  if (!q && !pin && !category && !genre && !year && since()) {
+    container.insertBefore(fresh, list);
+    api(`/new-count?since=${since()}`).then(({ count }) => {
+      if (dead || !count) return;
+      fresh.textContent = count > 1 ? tr('{0} nouvelles releases depuis votre dernière visite.', count) : tr('1 nouvelle release depuis votre dernière visite.');
+      fresh.hidden = false;
+    }).catch(() => {});
+  }
 
   const query = new URLSearchParams(Object.entries({ q, category, genre, year, ...(pin && { [pin.key]: pin.value }) }).filter(([, v]) => v));
   const dispose = releaseList(list, (offset, tri) => {
