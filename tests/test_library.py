@@ -167,6 +167,8 @@ def test_cover_check_and_similar(user_client, admin_client, library, settings):
     rid = user_client.get("/api/release-by-name", params={"name": A}).json()["id"]
     assert [r["name"] for r in user_client.get(f"/api/releases/{rid}/similar").json()] == ["Bicep-Glue-(NT123)-WEB-2017-PWT"]
     assert user_client.get("/api/releases/999999/similar").status_code == 404
+    assert [t["title"] for t in user_client.get(f"/api/releases/{rid}/radio").json()["items"]] == ["Glue"]   # 2017 : à deux ans près
+    assert user_client.get("/api/releases/999999/radio").status_code == 404
 
 
 def test_stats(user_client, admin_client, library):

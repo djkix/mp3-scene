@@ -24,7 +24,7 @@ const mobile = matchMedia('(max-width: 699px)');
 export const player = {
   queue: new Queue(), get audio() { return audio; }, events: new EventTarget(),
   playTracks, toggle, next, prev, seek, setVolume, jump, remove, clear, reset,
-  attach, detach, refresh, tick, flash, pull, enqueue, move,
+  attach, detach, refresh, tick, flash, pull, enqueue, move, radio,
 };
 
 let ui = null;            // éléments du pied de page, créés par initPlayer
@@ -366,7 +366,36 @@ function load(play, pos = null) {
   tick();
 }
 
+// --- Radio ---------------------------------------------------------------------------------------
+// Lit `tracks`, puis sans fin des pistes proches de la release `rid` : la file est regarnie quand il en reste moins de 5.
+// ponytail: la radio n'est pas gardée au rechargement de la page (la file reste, elle ne se regarnit plus) et la file
+// grandit sans limite ; mémoriser `radioId` et élaguer les pistes lues si les longues sessions le demandent.
+let radioId = null, refilling = false;
+
+function radio(rid, tracks) {
+  playTracks(tracks);
+  radioId = rid;
+  refill();
+  flash(tr('Radio lancée.'));
+}
+
+async function refill() {
+  if (radioId == null || refilling || player.queue.upcoming().length >= 5) return;
+  const rid = radioId;
+  refilling = true;
+  try {
+    const { items } = await api(`/releases/${rid}/radio`);
+    if (rid !== radioId) return; // une autre lecture a été lancée entre-temps
+    const have = new Set(player.queue.tracks.map((t) => t.id));
+    const fresh = items.filter((t) => !have.has(t.id));
+    if (!fresh.length) { radioId = null; return; } // plus rien de proche à proposer
+    player.queue.append(fresh);
+    backend?.sync(); update(); save();
+  } catch { /* réseau : nouvel essai au prochain passage */ } finally { refilling = false; }
+}
+
 function playTracks(tracks, startIndex = 0) {
+  radioId = null;
   failures = 0;
   player.queue.replace(tracks, startIndex);
   load(true);
@@ -457,6 +486,7 @@ function sleepDone() {
 }
 
 function clear() {
+  radioId = null;
   player.queue.clear();
   load(false);
   save();
@@ -843,7 +873,7 @@ export function initPlayer(footer) {
   });
 
   // Sauvegarde : toutes les 5 s en lecture, et quand la page passe en arrière-plan ou se ferme.
-  setInterval(() => { if (playing()) save(); }, 5000);
+  setInterval(() => { if (playing()) { save(); refill(); } }, 5000);
   addEventListener('pagehide', save);
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else if (synced) pull(); });
 

@@ -45,6 +45,8 @@ function header(rel) {
     el('div', { class: 'detail-actions' },
       el('button', { type: 'button', class: 'primary', disabled: !rel.tracks.length, onclick: play }, t('Lire')),
       el('button', { type: 'button', onclick: () => emit('queue-release', { releaseId: rel.id }) }, t('Ajouter à la file')),
+      el('button', { type: 'button', disabled: !rel.tracks.length, title: t('Lire cette release, puis sans fin des pistes proches'),
+        onclick: () => player.radio(rel.id, rel.tracks) }, t('Radio')),
       addButton({ release_id: rel.id }, t('Ajouter à une playlist')),
       offlineButton(rel),
       shareButton('release', rel.id),

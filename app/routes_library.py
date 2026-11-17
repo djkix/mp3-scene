@@ -203,13 +203,30 @@ def release_detail(rid: Id, user=Depends(current_user), conn=Depends(get_conn)):
     return d
 
 
+def _seed_artist(r):
+    """Artiste servant à rapprocher d'autres releases ; None pour une compilation, qui n'a pas d'artiste à suivre."""
+    return None if (r["artist"] or "").lower() in ("va", "various", "various artists") else r["artist"]
+
+
+@router.get("/api/releases/{rid}/radio")
+def radio(rid: Id, limit: int = Query(50, ge=1, le=MAX_LIMIT), user=Depends(current_user), conn=Depends(get_conn)):
+    """Pistes tirées au hasard dans les releases proches : même artiste, ou même genre à deux ans près."""
+    r = _release_row(conn, user["id"], rid)
+    y = r["year"]
+    # ponytail: tirage uniforme parmi les pistes candidates, comme le mix ; pondérer (artiste > genre) si la radio dérive trop
+    rows = conn.execute(
+        f"SELECT {TRACK_COLS} FROM {TRACK_FROM} WHERE t.id IN (SELECT t.id FROM tracks t JOIN releases r"
+        " ON r.id=t.release_id WHERE r.id!=? AND (COALESCE(r.tag_artist, r.artist)=? OR (r.genre=? AND r.year BETWEEN ? AND ?))"
+        " ORDER BY RANDOM() LIMIT ?) ORDER BY RANDOM()",
+        (user["id"], rid, _seed_artist(r), r["genre"], y and y - 2, y and y + 2, limit))
+    return {"items": [_track(x) for x in rows]}
+
+
 @router.get("/api/releases/{rid}/similar")
 def similar(rid: Id, user=Depends(current_user), conn=Depends(get_conn)):
     """Jusqu'à 12 releases proches : même artiste d'abord, puis même genre la même année (même groupe en tête)."""
     r = _release_row(conn, user["id"], rid)
-    # une compilation n'a pas d'artiste à suivre
-    artist = None if (r["artist"] or "").lower() in ("va", "various", "various artists") else r["artist"]
-    art = "COALESCE(r.tag_artist, r.artist)"
+    artist, art = _seed_artist(r), "COALESCE(r.tag_artist, r.artist)"
     # identifiants d'abord : le débit moyen (sous-requête) n'est calculé que pour les lignes retenues
     ids = [x[0] for x in conn.execute(
         f"SELECT r.id FROM releases r WHERE r.id!=? AND ({art}=? OR (r.genre=? AND r.year=?))"

@@ -1,8 +1,12 @@
 # Mp3 Scene — descriptif pour maquette
 
-Document destiné à un designer. Il décrit le produit tel qu'il fonctionne aujourd'hui (version 1.1.0) :
-à qui il sert, ses écrans, les données affichées, les états et les contraintes à respecter.
+Document destiné à un designer ou à un outil de maquettage. Il décrit le produit **tel qu'il fonctionne aujourd'hui
+(version 1.18.0)** : à qui il sert, ses écrans, les données affichées, les états et les contraintes à respecter.
 L'habillage visuel actuel est décrit à la fin ; il peut être remis en cause, les contraintes ne le peuvent pas.
+
+> **Règle pour la maquette : ce document est la liste complète des fonctionnalités.** Ne rien ajouter qui n'y figure
+> pas : aucun écran, bouton, onglet, réglage, donnée ou texte supplémentaire. La section 10 liste ce que
+> l'application ne fait pas.
 
 ## 1. Le produit en bref
 
@@ -11,17 +15,18 @@ releases MP3 « scene »** stockée sur un NAS. Une release est un dossier nomm�
 par exemple `VA-Toolroom_Ibiza_2026-(TOOL142001Z)-WEB-2026-AOV`, qui contient de 1 à plus de 50 pistes.
 
 - **Taille réelle** : environ 46 000 releases, de 10 Mo à 1 Go chacune.
-- **Usage** : retrouver une release, la lancer, enchaîner, écouter longtemps (mixes d'une heure et plus).
+- **Usage** : retrouver une release, la lancer, enchaîner, écouter longtemps (mixes d'une heure et plus), souvent
+  dans les transports avec une connexion instable.
 - **Appareils** : ordinateur (navigateur) et téléphone (application installée, PWA). Les deux comptent autant.
-- **Langue** : français uniquement.
-- **Ce que l'appli ne fait pas** : pas de playlists, pas d'édition, pas d'écoute hors ligne.
+- **Langues** : français (par défaut) et anglais, au choix dans la page Compte. Maquettes en français.
+- **Lecture seule** : l'application ne modifie jamais les fichiers de musique.
 
 ## 2. Utilisateurs
 
 | Profil | Ce qu'il fait | Particularités |
 |---|---|---|
-| **Utilisateur** | Parcourt, cherche, écoute, met en favori, télécharge | Quelques proches du propriétaire |
-| **Administrateur** | Tout cela, plus : comptes, scan de la bibliothèque, mise à jour | Voit les sections d'administration dans Compte et le bandeau de nouvelle version |
+| **Utilisateur** | Parcourt, cherche, écoute, met en favori, crée des playlists, garde hors ligne, partage, télécharge | Quelques proches du propriétaire |
+| **Administrateur** | Tout cela, plus : comptes, scan de la bibliothèque, tableau de bord, contrôle qualité, version | Voit les sections d'administration dans Compte et le bandeau de nouvelle version |
 
 Ce sont des connaisseurs : le **nom brut de la release est l'information principale**, il doit rester lisible
 en entier, en police à chasse fixe, sans être tronqué.
@@ -30,34 +35,39 @@ en entier, en police à chasse fixe, sans être tronqué.
 
 Trois zones permanentes, une fois connecté :
 
-1. **Barre du haut** : nom du site (lien vers l'accueil), champ de recherche, navigation.
+1. **Barre du haut** : nom du site « Mp3 Scene » (lien vers l'accueil), champ de recherche « Rechercher une release… », navigation.
 2. **Contenu** : l'écran courant.
 3. **Lecteur** : fixé en bas, visible dès qu'une piste a été lancée, sur tous les écrans.
 
 Navigation, cinq entrées : **Derniers** (accueil), **Dossiers**, **Explorer**, **Favoris**, **Compte**. L'entrée active est marquée.
 
-Un **bandeau** peut apparaître sous la barre du haut, pour les administrateurs :
-« Nouvelle version 1.2.0 disponible (installée : 1.1.0). Voir les nouveautés ».
+Deux **bandeaux** peuvent apparaître sous la barre du haut :
+- pour les administrateurs : « Nouvelle version 1.19.0 disponible (installée : 1.18.0). Voir les nouveautés » ;
+- pour tous, quand le serveur est injoignable : « Serveur injoignable : mode hors ligne. » avec un bouton « Réessayer »
+  (voir 4.11).
 
 ## 4. Écrans
 
 ### 4.1 Connexion
 - Titre « Mp3 Scene », champs **Identifiant** et **Mot de passe**, bouton **Se connecter**.
-- Erreurs : identifiants incorrects ; compte bloqué 15 minutes après 5 échecs.
+- Erreurs : « Identifiant ou mot de passe incorrect. » ; « Trop de tentatives échouées : compte bloqué 15 minutes. »
 - Pas d'inscription, pas de mot de passe oublié (les comptes sont créés par un administrateur).
 
-### 4.2 Derniers (accueil) et Recherche
-Liste des releases, la plus récente en premier. La recherche (champ de la barre du haut, résultats au fil de la
-frappe) affiche la même liste, filtrée.
+### 4.2 Derniers (accueil)
+Liste des releases, la plus récente en premier.
 
+- En tête, quand il y en a : « 12 nouvelles releases depuis votre dernière visite. » Ces releases portent une
+  pastille **nouveau** après leur nom.
 - **Filtres**, centrés au-dessus de la liste : **Localisations**, **Genres**, **Années** (listes déroulantes ;
-  jusqu'à plusieurs dizaines de genres).
-- **Colonnes**, dans cet ordre, avec libellé en tête, séparées par de l'espace sans trait vertical :
+  jusqu'à plusieurs dizaines de genres), suivis du bouton **Mix** (lit 50 pistes tirées au hasard parmi les releases
+  qui passent les filtres).
+- **Colonnes**, dans cet ordre, avec libellé en tête, séparées par de l'espace sans trait vertical. Un clic sur un
+  libellé trie la liste, un second inverse l'ordre (▲ ▼ à côté du libellé actif) :
 
 | Colonne | Exemple | Remarques |
 |---|---|---|
 | Vignette | pochette 40 px | Sans libellé ; vide s'il n'y a pas de pochette |
-| Nom | `VA-Toolroom_Ibiza_2026-(TOOL142001Z)-WEB-2026-AOV` | Chasse fixe, peut passer sur deux lignes, jamais tronqué |
+| Nom | `VA-Toolroom_Ibiza_2026-(TOOL142001Z)-WEB-2026-AOV` | Chasse fixe, peut passer sur deux lignes, jamais tronqué ; pastille « nouveau » éventuelle |
 | Genre | House | Centré ; peut être vide tant que les tags ne sont pas lus |
 | Date | 26/05/2026 | Centré ; date d'ajout |
 | Pistes | 52 | Centré |
@@ -70,56 +80,126 @@ frappe) affiche la même liste, filtrée.
 - Défilement infini (50 par page). Messages : « Chargement… », « Fin de la liste », « Aucun résultat »,
   erreur avec bouton « Réessayer ».
 
-### 4.2 bis Explorer
-- **Onglets** Groupes, Artistes, Genres. Chaque onglet : tableau Nom, Releases, Poids ; en-têtes cliquables pour trier ; champ « Filtrer la liste… », sélecteurs Genre et Année ; total en bas. Au plus 1000 lignes affichées.
-- **Page d'un groupe ou d'un artiste** : titre « Groupes › NOM » suivi du nombre de releases et du poids, puis la liste de releases habituelle avec ses filtres. Un genre ouvre la liste Derniers filtrée.
-- **Recherche** : onglets Releases et Pistes ; l'onglet Pistes liste les pistes dont le titre ou l'artiste contient les mots cherchés.
-- **Hors ligne** : bouton « Garder hors ligne » / « Retirer du hors-ligne » sur la fiche (progression « Téléchargement 3/12… ») ; sans serveur, l'application n'affiche que le bandeau « Serveur injoignable : mode hors ligne. », la liste des releases gardées et le lecteur.
-- **Favoris** : onglets Releases, Pistes, Playlists, Hors ligne, Historique, Statistiques. Playlists : tableau (nom, pistes, durée, lire, renommer, supprimer) et contenu d'une playlist. Statistiques : sélecteur de période, total, quatre classements.
-- **Actions d'une piste** : bouton ⋯ sur chaque piste, boîte de dialogue avec « Lire ensuite », « Ajouter à la file », puis les playlists et un champ « Nouvelle playlist ».
-- **File d'attente** : sélecteur de minuterie, « Enregistrer », « Vider la file » ; chaque ligne a ▲ ▼ ×.
-- **Listes de releases** : bouton Mix à côté des filtres ; pastille « nouveau » après le nom ; ligne « N nouvelles releases depuis votre dernière visite » en tête de Derniers.
-- **Réglages audio** : bouton ≋ du lecteur, boîte de dialogue avec trois curseurs (graves, médiums, aigus, −12 à +12 dB), une case « Niveler le volume entre les pistes », un sélecteur « Fondu enchaîné », « Réinitialiser ».
-- **Compte** : section « Liens de partage » (nom, échéance, ouvertures, Copier, Révoquer) ; pour un administrateur, section « Bibliothèque » menant au tableau de bord (tableaux à barres) et au contrôle qualité (onglets par contrôle, avec leur nombre, puis liste de releases).
-- **Page de partage** (/s/…, sans compte) : nom, lecteur natif, liste des pistes, mention d'expiration.
+Cette **liste de releases** (colonnes, tri, actions, messages) est réutilisée telle quelle dans la recherche, les
+dossiers, les pages de groupe et d'artiste, les favoris et le contrôle qualité.
 
-### 4.3 Dossiers
+### 4.3 Recherche
+- Le champ de la barre du haut filtre au fil de la frappe. Deux onglets : **Releases** et **Pistes**.
+- **Releases** : la liste de releases, avec les mêmes filtres (sans le bouton Mix).
+- **Pistes** : les pistes dont le titre ou l'artiste contient les mots cherchés, dans la liste de pistes décrite en 4.7.
+- Message : « Aucun résultat ».
+
+### 4.4 Dossiers
 - **Fil d'Ariane** : Dossiers › 02.Various Artists - Compilations › -=Kontor=-
-- Liste des **sous-dossiers**, puis la **liste des releases** du dossier (mêmes colonnes qu'à l'accueil).
+- Liste des **sous-dossiers**, puis la **liste des releases** du dossier.
 - Messages : « Dossier vide. », « Dossier introuvable. »
 
-### 4.4 Fiche d'une release
+### 4.5 Explorer
+- Trois **onglets** : **Groupes**, **Artistes**, **Genres**.
+- Chaque onglet : un tableau **Nom**, **Releases** (nombre), **Poids** ; en-têtes cliquables pour trier ; au-dessus,
+  un champ « Filtrer la liste… » et les sélecteurs **Genres** et **Années** ; en bas, un total
+  (« 1 240 lignes · 46 012 releases · 3,2 To »). Au plus 1000 lignes affichées, avec la mention « seules les 1000
+  premières sont affichées : filtrez pour affiner. »
+- **Page d'un groupe ou d'un artiste** : titre « Groupes › NOM » suivi du nombre de releases et du poids, puis la
+  liste de releases avec ses filtres et le bouton Mix.
+- Un clic sur un **genre** ouvre la liste Derniers filtrée sur ce genre.
+
+### 4.6 Fiche d'une release
 - **Nom** de la release en titre.
 - **Pochette** à gauche des informations (au-dessus sur téléphone), quand la release en a une ; un clic l'ouvre en grand.
 - **Informations** (les champs absents ne s'affichent pas) : Artiste, Titre, Source (WEB, CD, VINYL, SAT…),
-  Année, Groupe, Localisation, Genre, Taille, Durée.
-- **Actions** : **Lire** (principale), **Ajouter à la file**, **Favori**, **Télécharger (zip)**.
-- **Tableau des pistes** : N°, Artiste - Titre (ou nom de fichier à défaut), Durée, Débit, Genre (colonnes centrées ; Débit en kbit/s,
-  masqué sur téléphone), favori de la piste, téléchargement de la piste. Séparateurs « CD 1 », « CD 2 » pour
-  les releases multi-disques. Clic sur une piste : lecture à partir de cette piste.
+  Année, Groupe, Localisation, Genre, Taille, Durée. Artiste, Année, Groupe et Genre sont des liens vers la liste
+  correspondante.
+- **Actions**, dans cet ordre : **Lire** (principale), **Ajouter à la file**, **Radio**, **Ajouter à une playlist**,
+  **Garder hors ligne** (devient « Téléchargement 3/12… » puis « Retirer du hors-ligne »), **Partager**,
+  **Favori** (♡), **Télécharger (zip)**.
+- **Radio** : lit la release, puis enchaîne sans fin des pistes proches (même artiste, ou même genre à deux ans près).
+  Message « Radio lancée. ». Aucun écran ni réglage propre : les pistes arrivent dans la file d'attente.
+- **Partager** : crée un lien public valable 7 jours et le copie (« Lien copié, valable 7 jours. »).
+- **Tableau des pistes** : N°, Artiste - Titre (ou nom de fichier à défaut), Durée, Débit, Genre (colonnes centrées),
+  puis trois actions par piste : **⋯** (plus d'actions, voir 4.9), **♡** favori, **⤓** téléchargement. Sur téléphone,
+  Débit, Genre et téléchargement sont masqués. Séparateurs « CD 1 », « CD 2 » pour les releases multi-disques.
+  Clic sur une piste : lecture à partir de cette piste. Message : « Aucune piste. »
 - **Releases similaires** (si la release en a) : jusqu'à douze lignes compactes sous les pistes — vignette, nom,
   détails sur une seconde ligne, actions + ♡ › — même artiste d'abord, puis même genre et même année.
-- **NFO** : bloc de texte en chasse fixe, art ASCII, centré ; sur téléphone la police est réduite pour que
-  toute la largeur soit visible sans défilement horizontal.
+- **NFO** (si la release en a un) : bloc de texte en chasse fixe, art ASCII, centré ; sur téléphone la police est
+  réduite pour que toute la largeur soit visible sans défilement horizontal.
+- Erreur : « Release introuvable. Retour à la liste ».
 
-### 4.5 Favoris
-- Deux onglets : **Releases** (même liste qu'à l'accueil) et **Pistes** (durée, artiste, titre, release
-  d'origine en lien, retrait du favori).
-- Messages : « Aucune release favorite », « Aucune piste favorite ».
+### 4.7 Favoris
+Six onglets : **Releases**, **Pistes**, **Playlists**, **Hors ligne**, **Historique**, **Statistiques**
+(défilement horizontal des onglets sur téléphone).
 
-### 4.6 Compte
-- Identifiant et rôle affichés.
-- **Changer le mot de passe** : mot de passe actuel, nouveau, bouton, message de succès ou d'erreur.
+- **Releases** : la liste de releases. Vide : « Aucune release favorite ».
+- **Pistes** : **liste de pistes** — durée, artiste, titre, release d'origine (lien vers sa fiche), bouton ⋯, retrait
+  du favori. Clic sur une ligne : lecture. Vide : « Aucune piste favorite ».
+- **Playlists** : voir 4.8.
+- **Hors ligne** : tableau Nom, Pistes, Poids des releases et playlists gardées sur l'appareil, avec « Retirer du
+  hors-ligne » par ligne et le total « 1,4 Go sur cet appareil ». Vide : « Aucune release hors ligne : ouvrez une
+  release et choisissez « Garder hors ligne ». » Navigateur incompatible : « Le stockage hors ligne n'est pas
+  disponible dans ce navigateur. »
+- **Historique** : liste de pistes avec la date d'écoute en première colonne, la plus récente en premier ; bouton
+  « Effacer l'historique » (avec confirmation). Vide : « Aucune écoute ».
+- **Statistiques** : sélecteur **Période** (7 derniers jours, 30 derniers jours, 12 derniers mois, Tout
+  l'historique) ; total « 342 écoutes · 28,5 h de musique » ; quatre classements avec le nombre d'écoutes :
+  **Pistes les plus écoutées**, **Artistes les plus écoutés**, **Genres les plus écoutés**, **Groupes les plus
+  écoutés**. Vide : « Aucune écoute ».
+
+### 4.8 Playlists (onglet de Favoris)
+- **Liste** : champ « Nouvelle playlist » et bouton **Créer** ; tableau **Playlist**, **Pistes**, **Durée**, puis par
+  ligne **Lire**, **Renommer** (✎), **Supprimer** (✕, avec confirmation). Vide : « Aucune playlist : créez-en une,
+  puis ajoutez des pistes avec le bouton ♫. »
+- **Contenu d'une playlist** : titre « Playlists › NOM » ; boutons **Lire** (principal), **Garder hors ligne**,
+  **Partager** ; liste de pistes avec, par ligne, **▲ ▼** pour changer l'ordre et **✕** « Retirer de la playlist ».
+  Vide : « Playlist vide ».
+- Une piste figure au plus une fois par playlist. Les playlists sont propres à chaque utilisateur.
+
+### 4.9 Boîtes de dialogue
+- **Plus d'actions** (bouton ⋯ d'une piste) : **Lire ensuite**, **Ajouter à la file**, **Radio** ; puis « Ajouter à
+  une playlist » : un bouton par playlist existante, champ « Nouvelle playlist » avec **Créer et ajouter** ; **Fermer**.
+- **Ajouter à une playlist** (bouton ♫ ou bouton de la fiche, pour une release entière) : la même boîte sans les
+  trois premières actions.
+- **Réglages audio** : voir 5.
+- Les confirmations (supprimer, révoquer, effacer) utilisent la boîte native du navigateur.
+
+### 4.10 Compte
+Dans cet ordre :
+- **Identifiant** et **rôle** (utilisateur ou administrateur) affichés.
+- **Changer le mot de passe** : mot de passe actuel, nouveau, confirmation, bouton, message de succès ou d'erreur
+  (8 caractères au moins).
+- **Langue** : liste déroulante Français / English.
+- **Liens de partage** : tableau **Nom**, **Expire le**, **Ouvertures**, avec **Copier** et **Révoquer** (confirmation)
+  par ligne. Vide : « Aucun lien de partage en cours. »
+- **Administration** (administrateurs seulement) :
+  - **Utilisateurs** : tableau Identifiant, Rôle (liste déroulante), Actions (Réinitialiser le mot de passe,
+    Supprimer avec confirmation). Message par ligne. Le dernier administrateur ne peut être ni rétrogradé ni supprimé.
+  - **Créer un utilisateur** : identifiant, mot de passe, rôle, bouton **Créer**.
+  - **Scan de la bibliothèque** : bouton **Lancer le scan** (désactivé pendant un scan, qui peut durer des heures),
+    puis État (Au repos, Analyse des dossiers…, Lecture des tags…, Erreur), Releases trouvées, Pistes restant à
+    lire, Début, Fin, Avertissement éventuel.
+  - **Bibliothèque** : deux liens, **Tableau de bord** et **Contrôle qualité** (voir 4.12).
+  - **Version** : « Version installée : 1.18.0 — à jour. » ou annonce de la nouvelle version, lien « Voir les nouveautés ».
 - **Session** : bouton **Se déconnecter**.
 
-### 4.7 Administration (dans la page Compte, administrateurs seulement, avant « Session »)
-- **Utilisateurs** : tableau Identifiant, Rôle (liste déroulante), Actions (Réinitialiser le mot de passe,
-  Supprimer avec confirmation). Message par ligne. Le dernier administrateur ne peut être ni rétrogradé ni supprimé.
-- **Créer un utilisateur** : identifiant, mot de passe, rôle, bouton **Créer**.
-- **Scan de la bibliothèque** : bouton **Lancer le scan** (désactivé pendant un scan, qui peut durer des heures),
-  puis État (Au repos, Analyse des dossiers…, Lecture des tags…, Erreur), Releases trouvées, Pistes restant à
-  lire, Début, Fin, Avertissement éventuel.
-- **Version** : « Version installée : 1.1.0 — à jour. » ou annonce de la nouvelle version.
+### 4.11 Mode hors ligne
+Quand le serveur est injoignable et que des releases sont gardées sur l'appareil, l'application n'affiche que le
+bandeau « Serveur injoignable : mode hors ligne. » (bouton « Réessayer »), la liste des releases et playlists gardées
+(celle de l'onglet Hors ligne) et le lecteur. Rien d'autre n'est accessible.
+
+### 4.12 Bibliothèque (administrateurs)
+Page à deux onglets, ouverte depuis Compte.
+
+- **Tableau de bord** : une ligne de totaux (« 46 012 releases · 512 300 pistes · 3,2 To · 1 420 jours de musique »),
+  puis six tableaux à barres horizontales (libellé, barre, nombre) : **Ajouts par mois**, **Par année**, **Par genre**,
+  **Par source**, **Par localisation**, **Pistes par débit**.
+- **Contrôle qualité** : une rangée d'onglets, chacun avec son nombre — **Sans NFO**, **Sans tags**, **Pistes
+  illisibles**, **Débit inférieur à 192 kbit/s**, **Sans année**, **Sans pochette**, **Sans piste** — puis la liste de
+  releases concernées. Vide : « Aucune release concernée. »
+
+### 4.13 Page de partage (publique, sans compte)
+Page autonome, sans barre du haut ni navigation ni lecteur de l'application : nom de la release ou de la playlist,
+**lecteur audio natif du navigateur**, liste des pistes (un clic lit la piste), mention « Partagé avec Mp3 Scene. Ce
+lien expire au bout de 7 jours. ». Lien expiré ou révoqué : « Lien de partage invalide ou expiré. »
 
 ## 5. Le lecteur
 
@@ -131,12 +211,31 @@ Présent en bas de tous les écrans. C'est l'élément le plus utilisé.
   (désactivée, toute la file, une piste).
 - **Progression** : temps écoulé, **forme d'onde** de la piste servant de barre déplaçable (partie écoutée
   colorée), durée totale. Tant que la forme d'onde n'est pas calculée, un curseur simple la remplace.
-- **Outils** : volume, file d'attente, bouton Chromecast (quand un appareil est disponible).
+- **Outils**, dans cet ordre : volume, **réglages audio (≋)**, file d'attente, bouton Chromecast (quand un appareil
+  est disponible).
 - **Volume** : curseur **vertical** dans une bulle qui s'ouvre au survol ou au focus du bouton haut-parleur ;
   clic sur le bouton : couper ou rétablir le son. Absent sur téléphone (volume matériel).
-- **File d'attente** : panneau listant les pistes à venir, piste en cours marquée, retrait d'une piste,
-  vidage de la file.
-- **Messages** : erreur de lecture, « Diffusion sur <appareil> » pendant un cast.
+- **Messages** brefs dans le lecteur : « Lecture impossible, piste suivante. », « Connexion perdue, nouvelle
+  tentative… », « Diffusion sur Salon », « Ajouté à la file : 12 pistes. », « Radio lancée. », « Minuterie : lecture
+  arrêtée. », « Lecture bloquée par le navigateur : appuyez sur lecture. »
+
+**File d'attente** (panneau)
+- En tête : nombre de pistes, sélecteur **Minuterie** (15 min, 30 min, 60 min, Fin de la piste), bouton
+  **Enregistrer** (ouvre la boîte « Ajouter à une playlist » pour toute la file), bouton **Vider la file**, fermeture ×.
+- Liste numérotée des pistes, piste en cours marquée ; par ligne : **▲ ▼** (monter, descendre) et **×** (retirer).
+  Clic sur une ligne : lecture de cette piste.
+
+**Réglages audio** (boîte de dialogue ouverte par ≋)
+- Trois curseurs **Graves**, **Médiums**, **Aigus** (−12 à +12 dB).
+- Case **Niveler le volume entre les pistes**.
+- Liste **Fondu enchaîné** : Aucun, 2 s, 4 s, 6 s, 8 s, 12 s (grisée sur iPhone).
+- Deux textes d'aide (enchaînement sans blanc ; précaution iPhone), boutons **Réinitialiser** et **Fermer**.
+
+**Comportements sans interface propre** (rien à dessiner, mais à ne pas contredire)
+- Les pistes s'enchaînent sans blanc ; dix minutes de musique sont chargées d'avance pour passer les coupures de réseau.
+- La file, la piste et la position sont reprises sur un autre appareil du même compte, en pause.
+- Écran verrouillé et casque : titre, release, pochette et commandes du système (lecture, pause, précédent, suivant).
+- Chromecast : le lecteur pilote l'appareil ; l'écran du téléviseur affiche pochette et titre.
 
 **Bureau** : une barre en trois colonnes — informations à gauche, commandes et progression au centre,
 outils à droite. Hauteur d'environ 76 px.
@@ -166,7 +265,8 @@ lecteur réduit **au-dessus** des onglets.
 **Accessibilité**
 - Contraste suffisant en thème clair **et** sombre (les deux existent, selon le réglage du système).
 - Tout est utilisable au clavier, avec un focus visible. Raccourcis : Espace (lecture/pause), ← → (± 5 s),
-  Échap (ferme la file, puis le lecteur plein écran).
+  N (suivant), P (précédent), M (couper le son), / (aller à la recherche), Échap (ferme la file, puis le lecteur
+  plein écran).
 - Champs de saisie en 16 px au moins sur téléphone (sinon iOS zoome).
 - L'état ne repose jamais sur la couleur seule (favori plein ou vide, onglet actif en gras).
 
@@ -205,13 +305,38 @@ lecteur réduit **au-dessus** des onglets.
 Pour chaque écran, en **bureau (1440 px)** et **téléphone (375 px)**, thèmes **clair et sombre** :
 
 1. Connexion
-2. Derniers, avec filtres et lecteur actif
-3. Recherche sans résultat
+2. Derniers, avec filtres, bouton Mix, pastilles « nouveau » et lecteur actif
+3. Recherche : onglet Releases sans résultat, onglet Pistes avec résultats
 4. Dossiers, à deux niveaux de profondeur
-5. Fiche d'une release multi-disques avec NFO
-6. Favoris, onglets Releases et Pistes
-7. Compte
-8. Compte d'un administrateur, scan en cours, bandeau de nouvelle version affiché
-9. Lecteur : barre bureau avec bulle de volume ouverte et file ouverte ; sur téléphone, réduit, plein écran et file
+5. Explorer : onglet Groupes, puis page d'un groupe
+6. Fiche d'une release multi-disques, avec releases similaires et NFO
+7. Favoris : les six onglets (Releases, Pistes, Playlists, Hors ligne, Historique, Statistiques)
+8. Contenu d'une playlist
+9. Boîtes de dialogue : Plus d'actions, Réglages audio
+10. Compte d'un utilisateur, avec liens de partage
+11. Compte d'un administrateur, scan en cours, bandeau de nouvelle version affiché
+12. Bibliothèque : Tableau de bord, Contrôle qualité
+13. Mode hors ligne
+14. Page de partage publique
+15. Lecteur : barre bureau avec bulle de volume ouverte et file ouverte ; sur téléphone, réduit, plein écran et file
 
-États à prévoir : chargement, liste vide, erreur avec « Réessayer », bouton désactivé, favori actif, piste en cours.
+États à prévoir : chargement, liste vide, erreur avec « Réessayer », bouton désactivé, favori actif, piste en cours,
+téléchargement hors ligne en cours.
+
+## 10. Ce que l'application ne fait pas
+
+À ne pas faire apparaître dans les maquettes :
+
+- Pas d'inscription, de mot de passe oublié, de photo de profil ni de profil public ; aucune fonction sociale
+  (abonnements, commentaires, partage entre comptes). Le seul partage est le lien public de 7 jours.
+- Pas de notes ni d'étoiles, pas d'étiquettes personnelles, pas de bouton « Suivre », pas de notifications.
+- Pas de recommandations hors « Releases similaires » et « Radio » ; pas de page d'accueil éditoriale, de
+  carrousels, de « pour vous », de classements globaux.
+- Pas de pages d'album ou d'artiste illustrées : pas de photo d'artiste, pas de biographie, pas de paroles.
+  La seule image est la pochette de la release.
+- Pas d'édition des tags, des noms ni des fichiers ; pas d'envoi de musique ; pas de suppression de release.
+- Pas de playlists intelligentes ni partagées entre comptes, pas d'import ou d'export de playlists.
+- Pas de détection de doublons, pas de scrobbling (Last.fm…).
+- Pas de choix de thème ni de couleur dans l'interface (clair ou sombre selon le système), pas de choix de qualité
+  audio, pas de paroles ni de visualiseur autre que la forme d'onde.
+- Pas d'achat, d'abonnement ni de publicité.

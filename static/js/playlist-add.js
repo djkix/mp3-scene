@@ -32,7 +32,10 @@ export async function openDialog(payload, tracks = null) {
   } }, name, el('button', { type: 'submit' }, tr('Créer et ajouter')));
   const queue = (next) => el('button', { type: 'button', onclick: () => { player.enqueue(tracks, next); dlg.close(); } },
     next ? tr('Lire ensuite') : tr('Ajouter à la file'));
-  dlg.replaceChildren(...(tracks ? [el('div', { class: 'pl-add-list' }, queue(true), queue(false))] : []),
+  const radio = tracks?.length === 1 && tracks[0].release_id != null
+    ? el('button', { type: 'button', title: tr('Lire cette piste, puis sans fin des pistes proches'),
+      onclick: () => { player.radio(tracks[0].release_id, tracks); dlg.close(); } }, tr('Radio')) : null;
+  dlg.replaceChildren(...(tracks ? [el('div', { class: 'pl-add-list' }, queue(true), queue(false), radio)] : []),
     el('h2', {}, tr('Ajouter à une playlist')), list, form, msg,
     el('button', { type: 'button', onclick: () => dlg.close() }, tr('Fermer')));
   dlg.showModal();

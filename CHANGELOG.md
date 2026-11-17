@@ -4,6 +4,19 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.18.0](https://github.com/djkix/mp3-scene/compare/v1.17.0...v1.18.0) (2026-11-17)
+
+### Résumé
+
+**Radio : une file sans fin de pistes proches.**
+
+- **Radio** : le bouton Radio de la fiche lit la release, puis enchaîne sans fin des pistes tirées au hasard dans
+  les releases proches (même artiste, ou même genre à deux ans près). Le même bouton existe pour une piste, dans la
+  boîte « Plus d'actions » (⋯). La file se regarnit quand il reste moins de cinq pistes à venir ; lancer une autre
+  lecture ou vider la file arrête la radio, qui n'est pas non plus reprise après un rechargement de la page.
+- **Descriptif pour maquette** (`docs/brief-design.md`) réécrit : il décrit toutes les fonctionnalités actuelles et
+  liste ce que l'application ne fait pas.
+
 ## [1.17.0](https://github.com/djkix/mp3-scene/compare/v1.16.0...v1.17.0) (2026-11-17)
 
 ### Résumé
