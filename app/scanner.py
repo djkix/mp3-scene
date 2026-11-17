@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Callable
 
 import mutagen
+from mutagen.id3 import ID3
 
 from app import db
 from app.naming import parse_release_name
@@ -18,6 +19,7 @@ from app.naming import parse_release_name
 DISC_RE = re.compile(r"^(cd|disc|disk)[ _-]?(\d+)$", re.IGNORECASE)
 BATCH = 500
 TAG_BATCH = 200
+IMAGES = (".jpg", ".jpeg", ".png")  # mêmes types que routes_media.IMAGE_TYPES
 log = logging.getLogger(__name__)
 
 
@@ -146,7 +148,7 @@ def _scan_structure(conn, root, now):
         if rel in known:
             rid = known[rel][0]
             seen.add(rel)
-            conn.execute("UPDATE releases SET mtime=?, size=?, track_count=?, has_nfo=?, tags_done=0 WHERE id=?",
+            conn.execute("UPDATE releases SET mtime=?, size=?, track_count=?, has_nfo=?, tags_done=0, has_cover=NULL WHERE id=?",
                          (mtime, size, len(tracks), nfo, rid))
             old = {(r["relpath"], r["size"]): r["id"]
                    for r in conn.execute("SELECT id, relpath, size FROM tracks WHERE release_id=?", (rid,))}
@@ -389,7 +391,45 @@ def _scan_tags(conn, root, should_stop):
         # releases sans piste en attente mais pas agrégées (ex. piste supprimée par la phase structure)
         _aggregate(conn, [r[0] for r in conn.execute("SELECT id FROM releases WHERE tags_done=0")])
         conn.commit()
+    _scan_covers(conn, root, should_stop)
     return read
+
+
+def _has_cover(root, path, first):
+    """Image dans le dossier de la release, sinon incluse dans les tags de sa première piste (comme la fiche)."""
+    if any(n.lower().endswith(IMAGES) for n in os.listdir(Path(root, path))):
+        return True
+    if first is None:
+        return False
+    with open(Path(root, path, first), "rb") as raw:  # lecture seule
+        f = _Watched(raw)
+        try:
+            found = bool(ID3(f).getall("APIC"))
+        except Exception:  # pas de tags, ou corrompus
+            found = False
+        if f.error is not None:
+            raise f.error
+    return found
+
+
+def _scan_covers(conn, root, should_stop):
+    """Renseigne has_cover des releases jamais vérifiées (nouvelles, modifiées, ou antérieures à la colonne)."""
+    last = 0
+    while not should_stop():
+        rows = conn.execute(
+            "SELECT r.id, r.path, (SELECT relpath FROM tracks WHERE release_id=r.id ORDER BY disc, relpath LIMIT 1) AS first"
+            " FROM releases r WHERE r.has_cover IS NULL AND r.id>? ORDER BY r.id LIMIT ?", (last, TAG_BATCH)).fetchall()
+        if not rows:
+            break
+        last = rows[-1]["id"]
+        done = []  # lot lu avant d'écrire, comme pour les tags
+        for r in rows:
+            try:
+                done.append((_has_cover(root, r["path"], r["first"]), r["id"]))
+            except OSError as e:
+                log.warning("pochette non vérifiée, à refaire au prochain scan : %s (%s)", r["path"], e)
+        conn.executemany("UPDATE releases SET has_cover=? WHERE id=?", done)
+        conn.commit()
 
 
 INTERRUPTED = "scan interrompu pendant l'analyse des dossiers — à relancer"
@@ -414,7 +454,8 @@ class Runner:
             conn.execute("UPDATE scan_state SET status='idle', error=? WHERE status='structure'", (INTERRUPTED,))
             conn.execute("UPDATE scan_state SET status='idle' WHERE status='tags'")
             conn.commit()
-            pending = conn.execute("SELECT 1 FROM tracks WHERE tags_read=0 LIMIT 1").fetchone()
+            pending = (conn.execute("SELECT 1 FROM tracks WHERE tags_read=0 LIMIT 1").fetchone()
+                       or conn.execute("SELECT 1 FROM releases WHERE has_cover IS NULL LIMIT 1").fetchone())
         finally:
             conn.close()
         if pending:

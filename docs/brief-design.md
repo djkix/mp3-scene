@@ -97,6 +97,8 @@ frappe) affiche la même liste, filtrée.
 - **Tableau des pistes** : N°, Artiste - Titre (ou nom de fichier à défaut), Durée, Débit, Genre (colonnes centrées ; Débit en kbit/s,
   masqué sur téléphone), favori de la piste, téléchargement de la piste. Séparateurs « CD 1 », « CD 2 » pour
   les releases multi-disques. Clic sur une piste : lecture à partir de cette piste.
+- **Releases similaires** (si la release en a) : jusqu'à douze lignes compactes sous les pistes — vignette, nom,
+  détails sur une seconde ligne, actions + ♡ › — même artiste d'abord, puis même genre et même année.
 - **NFO** : bloc de texte en chasse fixe, art ASCII, centré ; sur téléphone la police est réduite pour que
   toute la largeur soit visible sans défilement horizontal.
 

@@ -119,6 +119,8 @@ export const EN = {
   'Pistes illisibles': 'Unreadable tracks',
   'Débit inférieur à 192 kbit/s': 'Bitrate below 192 kbit/s',
   'Sans année': 'No year',
+  'Sans pochette': 'No cover',
+  'Releases similaires': 'Similar releases',
   'Sans piste': 'No tracks',
   '{0} releases · {1} pistes · {2} · {3} jours de musique': '{0} releases · {1} tracks · {2} · {3} days of music',
   'Ajouts par mois': 'Added per month',

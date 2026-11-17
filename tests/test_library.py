@@ -152,6 +152,21 @@ def test_admin_library_and_quality(user_client, admin_client, library):
     names = [r["name"] for r in admin_client.get("/api/admin/quality?kind=no_nfo").json()["items"]]
     assert names == ["Bicep-Glue-(NT123)-WEB-2017-PWT", "VA-Big_Mix-2CD-2003-GRP"]
     assert admin_client.get("/api/admin/quality?kind=drop").status_code == 422
+    assert q["no_cover"] == 3                                                  # aucune image, aucun tag APIC
+
+
+def test_cover_check_and_similar(user_client, admin_client, library, settings):
+    from app import db
+    from app.scanner import scan_tags
+    (settings.music_root / "Singles/A" / A / "Cover.JPG").write_bytes(b"x")
+    c = db.connect(settings.data_dir)
+    c.execute("UPDATE releases SET has_cover=NULL"); c.commit()                # comme une base antérieure à la colonne
+    scan_tags(c, settings.music_root)
+    c.execute("UPDATE releases SET genre='House', year=2015 WHERE name LIKE 'Bicep%'"); c.commit(); c.close()
+    assert admin_client.get("/api/admin/quality").json()["no_cover"] == 2
+    rid = user_client.get("/api/release-by-name", params={"name": A}).json()["id"]
+    assert [r["name"] for r in user_client.get(f"/api/releases/{rid}/similar").json()] == ["Bicep-Glue-(NT123)-WEB-2017-PWT"]
+    assert user_client.get("/api/releases/999999/similar").status_code == 404
 
 
 def test_stats(user_client, admin_client, library):

@@ -2,7 +2,7 @@ import { api, fmtDuration } from '../api.js';
 import { t } from '../i18n.js';
 import { el } from '../dom.js';
 import { player } from '../player.js';
-import { favButton } from './releases.js';
+import { favButton, row } from './releases.js';
 import { infoRows } from './release-info.js';
 import { addButton } from '../playlist-add.js';
 import { offlineButton } from './offline.js';
@@ -18,8 +18,11 @@ export function render(container, params) {
   // adresse par nom ; un identifiant numérique (anciens liens, favoris du navigateur) reste accepté
   api(/^\d+$/.test(id) ? `/releases/${id}` : `/release-by-name?name=${encodeURIComponent(id)}`).then((rel) => {
     if (dead) return;
-    const nfo = el('div');
-    container.replaceChildren(el('div', { class: 'detail' }, header(rel), trackTable(rel), nfo));
+    const nfo = el('div'), sim = el('div');
+    container.replaceChildren(el('div', { class: 'detail' }, header(rel), trackTable(rel), sim, nfo));
+    api(`/releases/${rel.id}/similar`).then((list) => {
+      if (!dead && list.length) sim.replaceChildren(el('h2', { class: 'nfo-h' }, t('Releases similaires')), el('ul', { class: 'rel-list' }, list.map(row)));
+    }).catch(() => {}); // facultatif
     if (rel.has_nfo) loadNfo(rel.id, nfo, () => dead);
   }).catch((err) => {
     if (dead) return;

@@ -18,6 +18,9 @@ def init(data_dir: Path) -> None:
         conn.execute("PRAGMA journal_mode=WAL")  # persistant dans le fichier
         # base neuve, ou existante non marquée (0) : le schéma actuel est la version 1
         conn.executescript(SCHEMA.read_text(encoding="utf-8"))
+        # colonne ajoutée en 1.17.0 ; sans changer VERSION, pour qu'une image plus ancienne ouvre encore la base
+        if "has_cover" not in {r[1] for r in conn.execute("PRAGMA table_info(releases)")}:
+            conn.execute("ALTER TABLE releases ADD COLUMN has_cover INTEGER")
         conn.execute("INSERT OR IGNORE INTO scan_state(id) VALUES (1)")
         conn.execute(f"PRAGMA user_version = {VERSION}")
         conn.commit()

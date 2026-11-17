@@ -125,7 +125,6 @@ def library_stats(conn=Depends(get_conn)):
 
 
 # contrôles qualité : condition SQL sur la release r (jamais de texte du client dans le SQL)
-# ponytail: pas de contrôle « sans pochette » (il faudrait lire chaque dossier sur le NAS) ; colonne has_cover au scan si utile
 QUALITY = {
     "no_nfo": "r.has_nfo=0",
     "no_tracks": "r.track_count=0",
@@ -133,11 +132,12 @@ QUALITY = {
     "unreadable": "EXISTS (SELECT 1 FROM tracks WHERE release_id=r.id AND tags_read=1 AND duration IS NULL)",
     "low_bitrate": "(SELECT AVG(bitrate) FROM tracks WHERE release_id=r.id)<192000",
     "no_year": "r.year IS NULL",
+    "no_cover": "r.has_cover=0",  # NULL : pas encore vérifié par le scan
 }
 
 
 @router.get("/quality")
-def quality(kind: Literal["no_nfo", "no_tracks", "no_tags", "unreadable", "low_bitrate", "no_year"] | None = None,
+def quality(kind: Literal["no_nfo", "no_tracks", "no_tags", "unreadable", "low_bitrate", "no_year", "no_cover"] | None = None,
             sort: Sort | None = None, dir: Dir = "asc", offset: int = Query(0, ge=0, le=MAX_INT),
             limit: int = Query(50, ge=1, le=MAX_INT), user=Depends(require_admin), conn=Depends(get_conn)):
     """Sans `kind` : nombre de releases par contrôle. Avec : la page de releases concernées."""

@@ -203,6 +203,23 @@ def release_detail(rid: Id, user=Depends(current_user), conn=Depends(get_conn)):
     return d
 
 
+@router.get("/api/releases/{rid}/similar")
+def similar(rid: Id, user=Depends(current_user), conn=Depends(get_conn)):
+    """Jusqu'à 12 releases proches : même artiste d'abord, puis même genre la même année (même groupe en tête)."""
+    r = _release_row(conn, user["id"], rid)
+    # une compilation n'a pas d'artiste à suivre
+    artist = None if (r["artist"] or "").lower() in ("va", "various", "various artists") else r["artist"]
+    art = "COALESCE(r.tag_artist, r.artist)"
+    # identifiants d'abord : le débit moyen (sous-requête) n'est calculé que pour les lignes retenues
+    ids = [x[0] for x in conn.execute(
+        f"SELECT r.id FROM releases r WHERE r.id!=? AND ({art}=? OR (r.genre=? AND r.year=?))"
+        f" ORDER BY COALESCE({art}=?, 0) DESC, COALESCE(r.grp=?, 0) DESC, r.added_at DESC, r.id DESC LIMIT 12",
+        (rid, artist, r["genre"], r["year"], artist, r["grp"]))]
+    rows = {x["id"]: _release(x) for x in conn.execute(
+        f"SELECT {RELEASE_COLS} FROM {RELEASE_FROM} WHERE r.id IN ({','.join('?' * len(ids))})", (user["id"], *ids))}
+    return [rows[i] for i in ids]
+
+
 @router.get("/api/releases/{rid}/nfo")
 def release_nfo(rid: Id, request: Request, conn=Depends(get_conn)):
     settings = request.app.state.settings

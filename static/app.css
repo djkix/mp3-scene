@@ -316,6 +316,13 @@ td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-n
 tr.disc th { background: var(--hover); font-size: 12px; color: var(--muted); }
 .nfo-h { font-size: 15px; margin: 20px 0 8px; }
 .nfo-h { text-align: center; }
+/* releases similaires de la fiche : lignes compactes (nom, détails dessous), comme sur mobile, quelle que soit la largeur */
+.detail .rel { grid-template-columns: 40px minmax(0, 1fr) auto; gap: 2px 10px; grid-template-areas: "thumb name act" "thumb info act"; }
+.detail .rel-thumb { grid-area: thumb; }
+.detail .rel-name { grid-area: name; }
+.detail .rel-actions { grid-area: act; }
+.detail .rel-info { display: flex; flex-wrap: wrap; gap: 0 10px; grid-area: info; }
+.detail .unit { display: inline; }
 .nfo { width: fit-content; /* bloc centré, texte aligné à gauche : l'art ASCII reste en place */
   font: 11px/1 "Cascadia Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace; white-space: pre; overflow-x: auto;
   max-width: 100%; margin: 0 auto; padding: 8px; border: 1px solid var(--line); background: var(--hover); }

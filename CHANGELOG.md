@@ -4,6 +4,21 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.17.0](https://github.com/djkix/mp3-scene/compare/v1.16.0...v1.17.0) (2026-11-17)
+
+### Résumé
+
+**Releases similaires sur la fiche et contrôle « sans pochette ».**
+
+- **Releases similaires** : sous les pistes, la fiche propose jusqu'à douze releases proches — celles du même artiste
+  d'abord, puis celles du même genre sorties la même année (le même groupe en tête). Les compilations (VA) ne sont
+  rapprochées que par genre et année.
+- **Contrôle « sans pochette »** (administrateur, Compte › Bibliothèque › Contrôle qualité) : releases sans image
+  dans leur dossier ni dans les tags de leur première piste. La vérification se fait pendant le scan, et une fois
+  pour toute la bibliothèque au premier démarrage de cette version : le compteur monte au fil de ce passage.
+
+Une colonne est ajoutée à la base au démarrage : aucune migration manuelle.
+
 ## [1.16.0](https://github.com/djkix/mp3-scene/compare/v1.15.0...v1.16.0) (2026-11-16)
 
 ### Résumé

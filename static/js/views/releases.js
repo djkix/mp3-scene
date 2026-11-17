@@ -48,7 +48,7 @@ export function favButton(rel, kind = 'release') {
   return btn;
 }
 
-function row(rel) {
+export function row(rel) {
   const play = () => emit('play-release', { releaseId: rel.id });
   const queue = el('button', { type: 'button', class: 'icon', title: tr('Ajouter à la file'), 'aria-label': tr('Ajouter à la file'),
     onclick: () => emit('queue-release', { releaseId: rel.id }) }, '+');

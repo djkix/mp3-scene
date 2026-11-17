@@ -5,7 +5,7 @@ import { t as tr } from '../i18n.js';
 import { releaseList } from './releases.js';
 
 const KINDS = [['no_nfo', 'Sans NFO'], ['no_tags', 'Sans tags'], ['unreadable', 'Pistes illisibles'], ['low_bitrate', 'Débit inférieur à 192 kbit/s'],
-  ['no_year', 'Sans année'], ['no_tracks', 'Sans piste']];
+  ['no_year', 'Sans année'], ['no_cover', 'Sans pochette'], ['no_tracks', 'Sans piste']];
 const tabBtn = (label, on, hash) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(on),
   onclick: () => { location.hash = hash; } }, label);
 
