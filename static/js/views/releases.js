@@ -62,13 +62,13 @@ export function row(rel) {
   // vignette : chargée seulement quand la ligne approche de l'écran ; sans pochette, la place reste vide
   el('img', { class: 'rel-thumb', src: `/api/releases/${rel.id}/thumb`, alt: '', loading: 'lazy', width: 40, height: 40,
     onerror: (e) => { e.target.style.visibility = 'hidden'; } }),
-  el('span', { class: 'rel-name' }, rel.name, since() && rel.added_at > since() ? el('span', { class: 'new' }, tr('nouveau')) : null),
+  el('span', { class: 'rel-name' }, since() && rel.added_at > since() ? el('span', { class: 'new' }, tr('nouveau')) : null, rel.name),
   // même ordre que HEAD ; sur mobile, .rel-info devient une ligne de détails sous le nom
   el('span', { class: 'rel-info' },
-    el('span', { class: 'mid' }, rel.genre || ''),
+    el('span', { class: 'mid' }, rel.genre ? el('span', { class: 'chip' }, rel.genre) : ''),
     el('span', { class: 'mid' }, fmtDate(rel.added_at)),
     el('span', { class: 'mid' }, String(rel.track_count), el('span', { class: 'unit' }, ' ' + (rel.track_count > 1 ? tr('pistes') : tr('piste')))),
-    el('span', { class: 'mid' }, rel.bitrate ? `${Math.round(rel.bitrate / 1000)} kbit/s` : ''),
+    el('span', { class: 'mid rate' }, rel.bitrate ? `${Math.round(rel.bitrate / 1000)} kbit/s` : ''),
     el('span', { class: 'num' }, fmtSize(rel.size)),
     el('span', { class: 'rel-loc', title: rel.category || '' }, rel.category || '')),
   el('span', { class: 'rel-actions' }, queue, favButton(rel), detail));

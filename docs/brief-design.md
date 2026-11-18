@@ -57,7 +57,7 @@ Deux **bandeaux** peuvent apparaître sous la barre du haut :
 Liste des releases, la plus récente en premier.
 
 - En tête, quand il y en a : « 12 nouvelles releases depuis votre dernière visite. » Ces releases portent une
-  pastille **nouveau** après leur nom.
+  pastille **nouveau** avant leur nom.
 - **Filtres**, centrés au-dessus de la liste : **Localisations**, **Genres**, **Années** (listes déroulantes ;
   jusqu'à plusieurs dizaines de genres), suivis du bouton **Mix** (lit 50 pistes tirées au hasard parmi les releases
   qui passent les filtres).
@@ -67,7 +67,7 @@ Liste des releases, la plus récente en premier.
 | Colonne | Exemple | Remarques |
 |---|---|---|
 | Vignette | pochette 40 px | Sans libellé ; vide s'il n'y a pas de pochette |
-| Nom | `VA-Toolroom_Ibiza_2026-(TOOL142001Z)-WEB-2026-AOV` | Chasse fixe, peut passer sur deux lignes, jamais tronqué ; pastille « nouveau » éventuelle |
+| Nom | `VA-Toolroom_Ibiza_2026-(TOOL142001Z)-WEB-2026-AOV` | Chasse fixe, peut passer sur deux lignes, jamais tronqué ; pastille « nouveau » éventuelle, avant le nom |
 | Genre | House | Centré ; peut être vide tant que les tags ne sont pas lus |
 | Date | 26/05/2026 | Centré ; date d'ajout |
 | Pistes | 52 | Centré |
@@ -284,21 +284,27 @@ lecteur réduit **au-dessus** des onglets.
 
 ## 8. Habillage actuel (point de départ)
 
+Repris des maquettes Stitch de novembre 2026, décliné en clair et en sombre (selon le réglage du système).
+
 | Élément | Clair | Sombre |
 |---|---|---|
-| Fond | `#fafaf8` | `#0c0c0c` |
+| Fond | `#f4f4f0` | `#0c0c0d` |
+| Panneaux (barre du haut, lecteur, en-têtes, cartes) | `#ffffff` | `#141415` |
+| Survol, puces | `#eaeae4` | `#1c1c1e` |
+| Traits | `#d9d9d1` | `#262624` |
 | Texte | `#1a1a1a` | `#e8e8e4` |
-| Texte secondaire | `#6b6b66` | `#8e8e88` |
-| Traits | `#deded8` | `#242422` |
-| Survol | `#efefe9` | `#181817` |
-| Accent (bouton principal, progression) | `#1db954` | `#1db954` |
-| Accent en texte | `#0e7a35` | `#1db954` |
-| Erreur | `#b3261e` | `#f2766e` |
+| Texte secondaire | `#62625c` | `#8e8e88` |
+| Accent (bouton principal, onglet actif, progression) | `#22c55e` | `#22c55e` |
+| Accent en texte | `#0b7a34` | `#4be277` |
+| Information (débit) | `#0369a1` | `#7bd0ff` |
+| Erreur | `#b3261e` | `#ffb4ab` |
 
-- **Typographie** : police système sans empattement, 14 px ; noms de release en chasse fixe, 13 px ;
-  informations secondaires en 12 px.
-- **Style** : sobre et dense, traits fins horizontaux entre les lignes, angles peu arrondis (3 px),
-  aucune ombre hors bulles et panneaux.
+- **Typographie** : Inter pour l'interface, JetBrains Mono pour les noms de release, les valeurs et les libellés
+  (polices du système à défaut : aucune police n'est téléchargée). Libellés de colonnes, d'onglets et de sections en
+  capitales à chasse fixe de 11 px.
+- **Style** : dense et technique ; panneaux délimités par des filets fins, angles de 4 à 8 px, aucune ombre hors
+  bulles et panneaux ; genre en puce, débit en bleu, pastille « nouveau » verte **avant** le nom ; entrée de
+  navigation active en vert plein (bureau) ; sur téléphone, chaque release est une carte.
 
 ## 9. Maquettes attendues
 

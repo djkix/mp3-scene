@@ -4,6 +4,23 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.19.0](https://github.com/djkix/mp3-scene/compare/v1.18.0...v1.19.0) (2026-11-18)
+
+### Résumé
+
+**Nouvel habillage, en clair et en sombre.**
+
+- **Habillage** repris de maquettes : panneaux pour la barre du haut, les filtres, les en-têtes et le lecteur, filets
+  fins, libellés en petites capitales à chasse fixe, entrée de navigation active en vert plein.
+- **Liste** : genre en puce, débit en bleu, pastille « nouveau » avant le nom ; sur téléphone, chaque release est
+  une carte.
+- **Fiche** : informations dans un panneau sur deux colonnes, boutons d'action en capitales.
+- **Lecteur** : bouton lecture en carré arrondi ; en plein écran sur téléphone, outils regroupés dans un panneau.
+- Thème clair ou sombre selon le réglage du système, comme avant. Aucune police n'est téléchargée : Inter et
+  JetBrains Mono sont utilisées si l'appareil les a, sinon les polices du système.
+
+Aucune fonctionnalité n'est ajoutée ni retirée.
+
 ## [1.18.0](https://github.com/djkix/mp3-scene/compare/v1.17.0...v1.18.0) (2026-11-17)
 
 ### Résumé
