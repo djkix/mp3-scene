@@ -1,7 +1,7 @@
 import { api, fmtDuration } from '../api.js';
 import { t } from '../i18n.js';
 import { el } from '../dom.js';
-import { player } from '../player.js';
+import { player, watchPlaying } from '../player.js';
 import { favButton, row } from './releases.js';
 import { infoRows } from './release-info.js';
 import { addButton } from '../playlist-add.js';
@@ -13,6 +13,7 @@ const emit = (name, detail) => document.dispatchEvent(new CustomEvent(name, { de
 export function render(container, params) {
   const id = params.rest;
   let dead = false;
+  const watch = watchPlaying(container);
   container.replaceChildren(el('p', { class: 'status', role: 'status' }, t('Chargement…')));
 
   // adresse par nom ; un identifiant numérique (anciens liens, favoris du navigateur) reste accepté
@@ -20,6 +21,7 @@ export function render(container, params) {
     if (dead) return;
     const nfo = el('div'), sim = el('div');
     container.replaceChildren(el('div', { class: 'detail' }, header(rel), trackTable(rel), sim, nfo));
+    watch.mark();
     api(`/releases/${rel.id}/similar`).then((list) => {
       if (!dead && list.length) sim.replaceChildren(el('h2', { class: 'nfo-h' }, t('Releases similaires')), el('ul', { class: 'rel-list' }, list.map(row)));
     }).catch(() => {}); // facultatif
@@ -30,7 +32,7 @@ export function render(container, params) {
       err.status === 404 || err.status === 422 ? t('Release introuvable.') + ' ' : err.message + ' ',
       el('a', { href: '#/' }, t('Retour à la liste'))));
   });
-  return () => { dead = true; };
+  return () => { dead = true; watch.stop(); };
 }
 
 function header(rel) {
@@ -43,15 +45,15 @@ function header(rel) {
         el('img', { src: `/api/releases/${rel.id}/cover`, alt: t('Pochette'), onerror: (e) => e.target.parentNode.remove() })),
       el('dl', { class: 'detail-info' }, infoRows(rel, el))),
     el('div', { class: 'detail-actions' },
-      el('button', { type: 'button', class: 'primary', disabled: !rel.tracks.length, onclick: play }, t('Lire')),
-      el('button', { type: 'button', onclick: () => emit('queue-release', { releaseId: rel.id }) }, t('Ajouter à la file')),
-      el('button', { type: 'button', disabled: !rel.tracks.length, title: t('Lire cette release, puis sans fin des pistes proches'),
+      el('button', { type: 'button', class: 'primary', 'data-ico': 'play', disabled: !rel.tracks.length, onclick: play }, t('Lire')),
+      el('button', { type: 'button', 'data-ico': 'queue', onclick: () => emit('queue-release', { releaseId: rel.id }) }, t('Ajouter à la file')),
+      el('button', { type: 'button', 'data-ico': 'radio', disabled: !rel.tracks.length, title: t('Lire cette release, puis sans fin des pistes proches'),
         onclick: () => player.radio(rel.id, rel.tracks) }, t('Radio')),
       addButton({ release_id: rel.id }, t('Ajouter à une playlist')),
       offlineButton(rel),
       shareButton('release', rel.id),
       favButton(rel),
-      el('a', { class: 'btn', href: `/api/releases/${rel.id}/zip`, download: '' }, t('Télécharger (zip)'))));
+      el('a', { class: 'btn', 'data-ico': 'download', href: `/api/releases/${rel.id}/zip`, download: '' }, t('Télécharger (zip)'))));
 }
 
 function trackTable(rel) {
@@ -64,7 +66,7 @@ function trackTable(rel) {
     }
     disc = tk.disc;
     const label = tk.title ? (tk.artist ? `${tk.artist} - ${tk.title}` : tk.title) : tk.filename;
-    rows.push(el('tr', { class: 'trk', tabIndex: 0,
+    rows.push(el('tr', { class: 'trk', tabIndex: 0, 'data-track': tk.id,
       onclick: (e) => { if (!e.target.closest('button, a')) player.playTracks(rel.tracks, i); },
       onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) player.playTracks(rel.tracks, i); } },
     el('td', { class: 'num' }, String(i + 1)),

@@ -4,6 +4,22 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.20.0](https://github.com/djkix/mp3-scene/compare/v1.19.0...v1.20.0) (2026-11-18)
+
+### Résumé
+
+**Polices et icônes des maquettes, choix du thème, piste en cours mise en évidence, radio persistante.**
+
+- **Polices** : Inter et JetBrains Mono sont embarquées dans l'application (sous-ensemble latin, 90 Ko au total,
+  licence SIL OFL) ; plus rien ne dépend des polices installées sur l'appareil.
+- **Icônes** : devant les onglets du bas sur téléphone et devant les actions de la fiche (Lire, Ajouter à la file,
+  Radio, playlist, hors ligne, Partager, Télécharger).
+- **Thème** : nouveau réglage dans Compte — Système, Clair ou Sombre. Le choix est gardé sur l'appareil.
+- **Piste en cours** : sur la fiche et dans les listes de pistes (favoris, playlists, historique, recherche), la ligne
+  qui joue porte un trait vert, son titre passe en vert et ▶ remplace son numéro.
+- **Radio persistante** : la radio reprend après un rechargement de la page et sur un autre appareil. À chaque
+  regarnissage, seules les vingt dernières pistes lues restent dans la file (sauf en lecture aléatoire).
+
 ## [1.19.0](https://github.com/djkix/mp3-scene/compare/v1.18.0...v1.19.0) (2026-11-18)
 
 ### Résumé

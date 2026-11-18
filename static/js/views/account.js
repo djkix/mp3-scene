@@ -1,3 +1,4 @@
+import { theme, setTheme } from '../theme.js';
 import { offline } from '../offline.js';
 import { api, session } from '../api.js';
 import { el } from '../dom.js';
@@ -55,6 +56,9 @@ export function render(container) {
     el('h2', {}, t('Langue')),
     el('select', { 'aria-label': t('Langue'), onchange: (e) => setLang(e.target.value) },
       [['fr', 'Français'], ['en', 'English']].map(([v, l]) => el('option', { value: v, selected: v === lang }, l))),
+    el('h2', {}, t('Thème')),
+    el('select', { 'aria-label': t('Thème'), onchange: (e) => setTheme(e.target.value) },
+      [['', t('Système')], ['light', t('Clair')], ['dark', t('Sombre')]].map(([v, l]) => el('option', { value: v, selected: v === theme() }, l))),
     sharesBox,
     adminBox,
     el('h2', {}, t('Session')), logout));

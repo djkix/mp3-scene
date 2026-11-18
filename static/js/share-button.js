@@ -5,7 +5,7 @@ import { t as tr } from './i18n.js';
 import { player } from './player.js';
 
 export function shareButton(kind, id) {
-  const btn = el('button', { type: 'button', onclick: async () => {
+  const btn = el('button', { type: 'button', 'data-ico': 'share', onclick: async () => {
     btn.disabled = true;
     try {
       const { url } = await api('/share', { method: 'POST', body: { kind, id } });

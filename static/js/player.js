@@ -27,6 +27,17 @@ export const player = {
   attach, detach, refresh, tick, flash, pull, enqueue, move, radio,
 };
 
+// Marque la piste en cours (classe « playing ») parmi les lignes [data-track] de `root`, à chaque changement du lecteur.
+// Renvoie { mark, stop } : mark() après l'ajout de lignes, stop() quand la vue disparaît.
+export function watchPlaying(root) {
+  const mark = () => {
+    const id = String(player.queue.current()?.id ?? '');
+    for (const n of root.querySelectorAll('[data-track]')) n.classList.toggle('playing', n.dataset.track === id);
+  };
+  player.events.addEventListener('change', mark);
+  return { mark, stop: () => player.events.removeEventListener('change', mark) };
+}
+
 let ui = null;            // éléments du pied de page, créés par initPlayer
 let loadedId = null;      // id de la piste chargée dans audio.src
 let pendingPos = null;    // position à appliquer après loadedmetadata (restauration, déplacement avant chargement)
@@ -50,7 +61,7 @@ function save() {
   try {
     if (!player.queue.current()) return localStorage.removeItem(KEY);
     localStorage.setItem(KEY, JSON.stringify({
-      queue: player.queue, volume: userVol, position: position(),
+      queue: player.queue, volume: userVol, position: position(), radio: radioId,
     }));
   } catch { /* navigation privée, quota */ } finally { push(); }
 }
@@ -67,7 +78,7 @@ function push() {
   if (!synced || pushTimer) return;
   pushTimer = setTimeout(async () => { // au plus un envoi toutes les 10 s en lecture ; presque immédiat en pause
     pushTimer = null;
-    const state = { queue: player.queue.toJSON(), position: position() };
+    const state = { queue: player.queue.toJSON(), position: position(), radio: radioId };
     try {
       const r = await api('/player-state', { method: 'PUT', body: state });
       localStorage.setItem(SYNC, r.updated_at);
@@ -83,6 +94,7 @@ async function pull() {
       const q = Queue.fromJSON(state.queue);
       if (q.current()) {
         player.queue = q;
+        radioId = Number.isInteger(state.radio) ? state.radio : null;
         load(false, Number.isFinite(state.position) && state.position > 0 ? state.position : null);
       }
       localStorage.setItem(SYNC, at);
@@ -96,6 +108,7 @@ function restore() {
   try { s = JSON.parse(localStorage.getItem(KEY)); } catch { /* absent ou corrompu */ }
   if (!s || typeof s !== 'object') return;
   player.queue = Queue.fromJSON(s.queue);
+  radioId = Number.isInteger(s.radio) ? s.radio : null;
   if (player.queue.current()) load(false, Number.isFinite(s.position) && s.position > 0 ? s.position : null);
   if (Number.isFinite(s.volume)) setVolume(s.volume); // après load : la sauvegarde qu'il déclenche garde la position
 }
@@ -368,8 +381,8 @@ function load(play, pos = null) {
 
 // --- Radio ---------------------------------------------------------------------------------------
 // Lit `tracks`, puis sans fin des pistes proches de la release `rid` : la file est regarnie quand il en reste moins de 5.
-// ponytail: la radio n'est pas gardée au rechargement de la page (la file reste, elle ne se regarnit plus) et la file
-// grandit sans limite ; mémoriser `radioId` et élaguer les pistes lues si les longues sessions le demandent.
+// La radio est gardée avec l'état du lecteur (rechargement, autre appareil) ; à chaque regarnissage, seules les 20 dernières
+// pistes lues restent dans la file (sauf en aléatoire, où l'ordre de la file n'est pas celui de la lecture).
 let radioId = null, refilling = false;
 
 function radio(rid, tracks) {
@@ -389,6 +402,7 @@ async function refill() {
     const have = new Set(player.queue.tracks.map((t) => t.id));
     const fresh = items.filter((t) => !have.has(t.id));
     if (!fresh.length) { radioId = null; return; } // plus rien de proche à proposer
+    if (!player.queue.shuffle) for (let n = player.queue.index - 20; n > 0; n--) player.queue.remove(0);
     player.queue.append(fresh);
     backend?.sync(); update(); save();
   } catch { /* réseau : nouvel essai au prochain passage */ } finally { refilling = false; }

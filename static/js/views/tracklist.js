@@ -1,7 +1,7 @@
 // Liste de pistes à défilement infini : pistes favorites, historique, résultats de recherche, contenu d'une playlist.
 import { api, fmtDate, fmtDuration } from '../api.js';
 import { el } from '../dom.js';
-import { player } from '../player.js';
+import { player, watchPlaying } from '../player.js';
 import { t as tr, locale } from '../i18n.js';
 import { addButton } from '../playlist-add.js';
 
@@ -31,6 +31,7 @@ export function trackList(container, { path, empty, history = false, remove = nu
     [history ? tr('Date') : tr('Durée'), tr('Artiste'), tr('Titre'), tr('Release')].map((x) => el('span', {}, x)), el('span'));
   if (move) container.style.setProperty('--acts', '136px');
   container.replaceChildren(...(clear ? [clear] : []), head, list, status, sentinel);
+  const watch = watchPlaying(list);
   const tracks = []; // pistes chargées, dans l'ordre : file de lecture au clic
   let offset = 0, loading = false, done = false, dead = false;
   const observer = new IntersectionObserver((e) => { if (e.some((x) => x.isIntersecting)) load(); }, { rootMargin: '400px' });
@@ -64,7 +65,7 @@ export function trackList(container, { path, empty, history = false, remove = nu
           if (dir === 'up') li.previousSibling.before(li); else li.nextSibling.after(li);
         } catch (err) { if (!dead) status.textContent = err.message; }
       } }, dir === 'up' ? '▲' : '▼');
-    const li = el('li', { class: 'rel trk-fav', tabIndex: 0,
+    const li = el('li', { class: 'rel trk-fav', tabIndex: 0, 'data-track': t.id,
       onclick: (e) => { if (!e.target.closest('button, a')) play(); },
       onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) play(); } },
     el('span', { class: 'rel-date' }, history
@@ -87,6 +88,7 @@ export function trackList(container, { path, empty, history = false, remove = nu
       onPage?.(page);
       tracks.push(...page.items);
       list.append(...page.items.map(row));
+      watch.mark();
       offset += page.items.length;
       done = !page.has_more;
       status.textContent = done ? (tracks.length ? tr('Fin de la liste') : empty) : '';
@@ -100,5 +102,5 @@ export function trackList(container, { path, empty, history = false, remove = nu
     if (!done) { observer.unobserve(sentinel); observer.observe(sentinel); }
   }
   observer.observe(sentinel);
-  return () => { dead = true; observer.disconnect(); };
+  return () => { dead = true; observer.disconnect(); watch.stop(); };
 }

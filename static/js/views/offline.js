@@ -9,7 +9,7 @@ import { offline } from '../offline.js';
 // `rel` : {id, name, tracks, size?}. Sans `tracks`, `load()` les fournit au moment du clic (playlist, pistes favorites).
 export function offlineButton(rel, load = null) {
   if (!offline.supported || (!load && !rel.tracks.length)) return null;
-  const btn = el('button', { type: 'button', onclick: async () => {
+  const btn = el('button', { type: 'button', 'data-ico': 'offline', onclick: async () => {
     btn.disabled = true;
     try {
       if (offline.hasRelease(rel.id)) await offline.remove(rel.id);

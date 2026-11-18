@@ -10,7 +10,7 @@ let dlg = null;
 // `tracks` (pistes complètes) : la boîte propose aussi « Lire ensuite » et « Ajouter à la file ».
 export function addButton(payload, text, tracks = null) {
   const label = tracks ? tr('Plus d’actions') : tr('Ajouter à une playlist');
-  return el('button', { type: 'button', class: text ? '' : 'icon', title: label, 'aria-label': label,
+  return el('button', { type: 'button', class: text ? '' : 'icon', 'data-ico': text ? 'playlist' : null, title: label, 'aria-label': label,
     onclick: () => openDialog(payload, tracks) }, text || (tracks ? '⋯' : '♫'));
 }
 

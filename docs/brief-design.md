@@ -1,7 +1,7 @@
 # Mp3 Scene — descriptif pour maquette
 
 Document destiné à un designer ou à un outil de maquettage. Il décrit le produit **tel qu'il fonctionne aujourd'hui
-(version 1.18.0)** : à qui il sert, ses écrans, les données affichées, les états et les contraintes à respecter.
+(version 1.20.0)** : à qui il sert, ses écrans, les données affichées, les états et les contraintes à respecter.
 L'habillage visuel actuel est décrit à la fin ; il peut être remis en cause, les contraintes ne le peuvent pas.
 
 > **Règle pour la maquette : ce document est la liste complète des fonctionnalités.** Ne rien ajouter qui n'y figure
@@ -114,12 +114,14 @@ dossiers, les pages de groupe et d'artiste, les favoris et le contrôle qualité
   **Garder hors ligne** (devient « Téléchargement 3/12… » puis « Retirer du hors-ligne »), **Partager**,
   **Favori** (♡), **Télécharger (zip)**.
 - **Radio** : lit la release, puis enchaîne sans fin des pistes proches (même artiste, ou même genre à deux ans près).
-  Message « Radio lancée. ». Aucun écran ni réglage propre : les pistes arrivent dans la file d'attente.
+  Message « Radio lancée. ». Aucun écran ni réglage propre : les pistes arrivent dans la file d'attente. La radio reprend après un rechargement
+  de la page ou sur un autre appareil.
 - **Partager** : crée un lien public valable 7 jours et le copie (« Lien copié, valable 7 jours. »).
 - **Tableau des pistes** : N°, Artiste - Titre (ou nom de fichier à défaut), Durée, Débit, Genre (colonnes centrées),
   puis trois actions par piste : **⋯** (plus d'actions, voir 4.9), **♡** favori, **⤓** téléchargement. Sur téléphone,
   Débit, Genre et téléchargement sont masqués. Séparateurs « CD 1 », « CD 2 » pour les releases multi-disques.
-  Clic sur une piste : lecture à partir de cette piste. Message : « Aucune piste. »
+  Clic sur une piste : lecture à partir de cette piste. La **piste en cours** est mise en évidence (trait vert à
+  gauche, titre en vert, ▶ à la place du numéro), ici comme dans les listes de pistes. Message : « Aucune piste. »
 - **Releases similaires** (si la release en a) : jusqu'à douze lignes compactes sous les pistes — vignette, nom,
   détails sur une seconde ligne, actions + ♡ › — même artiste d'abord, puis même genre et même année.
 - **NFO** (si la release en a un) : bloc de texte en chasse fixe, art ASCII, centré ; sur téléphone la police est
@@ -168,6 +170,7 @@ Dans cet ordre :
 - **Changer le mot de passe** : mot de passe actuel, nouveau, confirmation, bouton, message de succès ou d'erreur
   (8 caractères au moins).
 - **Langue** : liste déroulante Français / English.
+- **Thème** : liste déroulante Système / Clair / Sombre.
 - **Liens de partage** : tableau **Nom**, **Expire le**, **Ouvertures**, avec **Copier** et **Révoquer** (confirmation)
   par ligne. Vide : « Aucun lien de partage en cours. »
 - **Administration** (administrateurs seulement) :
@@ -284,7 +287,8 @@ lecteur réduit **au-dessus** des onglets.
 
 ## 8. Habillage actuel (point de départ)
 
-Repris des maquettes Stitch de novembre 2026, décliné en clair et en sombre (selon le réglage du système).
+Repris des maquettes Stitch de novembre 2026, décliné en clair et en sombre (selon le réglage du système, ou le
+thème choisi dans Compte).
 
 | Élément | Clair | Sombre |
 |---|---|---|
@@ -300,11 +304,12 @@ Repris des maquettes Stitch de novembre 2026, décliné en clair et en sombre (s
 | Erreur | `#b3261e` | `#ffb4ab` |
 
 - **Typographie** : Inter pour l'interface, JetBrains Mono pour les noms de release, les valeurs et les libellés
-  (polices du système à défaut : aucune police n'est téléchargée). Libellés de colonnes, d'onglets et de sections en
+  (embarquées dans l'application, polices du système en repli). Libellés de colonnes, d'onglets et de sections en
   capitales à chasse fixe de 11 px.
 - **Style** : dense et technique ; panneaux délimités par des filets fins, angles de 4 à 8 px, aucune ombre hors
   bulles et panneaux ; genre en puce, débit en bleu, pastille « nouveau » verte **avant** le nom ; entrée de
   navigation active en vert plein (bureau) ; sur téléphone, chaque release est une carte.
+- **Icônes** : traits simples, devant les libellés des onglets du bas (téléphone) et des actions de la fiche.
 
 ## 9. Maquettes attendues
 
@@ -343,6 +348,6 @@ téléchargement hors ligne en cours.
 - Pas d'édition des tags, des noms ni des fichiers ; pas d'envoi de musique ; pas de suppression de release.
 - Pas de playlists intelligentes ni partagées entre comptes, pas d'import ou d'export de playlists.
 - Pas de détection de doublons, pas de scrobbling (Last.fm…).
-- Pas de choix de thème ni de couleur dans l'interface (clair ou sombre selon le système), pas de choix de qualité
+- Pas de choix de couleur dans l'interface (seulement le thème : système, clair ou sombre), pas de choix de qualité
   audio, pas de paroles ni de visualiseur autre que la forme d'onde.
 - Pas d'achat, d'abonnement ni de publicité.

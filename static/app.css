@@ -3,19 +3,27 @@
 :root {
   --bg: #f4f4f0; --panel: #ffffff; --hover: #eaeae4; --line: #d9d9d1; --fg: #1a1a1a; --muted: #62625c;
   --accent: #22c55e; --accent-text: #0b7a34; --on-accent: #04210f; --tint: rgb(34 197 94 / .16); --info: #0369a1; --err: #b3261e;
-  /* Inter et JetBrains Mono s'ils sont installés, sinon les polices du système : aucune police téléchargée */
+  /* Inter et JetBrains Mono embarquées (static/fonts, sous-ensemble latin) ; polices du système en repli */
   --sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
   --nav-h: 0px;
   color-scheme: light;
 }
+/* sombre : réglage du système, sauf thème clair choisi dans Compte ; ou thème sombre choisi (mêmes valeurs, à garder identiques) */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #0c0c0d; --panel: #141415; --hover: #1c1c1e; --line: #262624; --fg: #e8e8e4; --muted: #8e8e88;
     --accent-text: #4be277; --tint: rgb(34 197 94 / .15); --info: #7bd0ff; --err: #ffb4ab;
     color-scheme: dark;
   }
 }
+:root[data-theme="dark"] {
+    --bg: #0c0c0d; --panel: #141415; --hover: #1c1c1e; --line: #262624; --fg: #e8e8e4; --muted: #8e8e88;
+    --accent-text: #4be277; --tint: rgb(34 197 94 / .15); --info: #7bd0ff; --err: #ffb4ab;
+    color-scheme: dark;
+}
+@font-face { font-family: Inter; src: url("/fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "JetBrains Mono"; src: url("/fonts/jetbrains-mono.woff2") format("woff2"); font-weight: 100 800; font-display: swap; }
 /* libellé technique : petites capitales à chasse fixe */
 .rel-head, thead th, .tabs button, .detail-actions :is(button, .btn), .filters button, .detail-info dt, .nfo-h, .page h2, .stats h2,
 tr.disc th, .crumbs, .pl-count, .pl-q-head h2 {
@@ -226,7 +234,7 @@ google-cast-launcher:hover { background: var(--hover); }
   #nav { position: fixed; left: 0; right: 0; bottom: 0; height: var(--nav-h); gap: 0; overflow: visible;
     padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     background: var(--panel); border-top: 1px solid var(--line); }
-  #nav a { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 0 2px;
+  #nav a { flex: 1 1 0; min-width: 0; padding: 0 2px;
     font: 600 10px var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); border-radius: 0; }
   #nav a.active { background: none; color: var(--accent-text); box-shadow: inset 0 2px var(--accent); }
   #view { padding-bottom: calc(var(--player-h, 0px) + var(--nav-h) + 24px); }
@@ -376,3 +384,30 @@ td .actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .trk-fav .rel-meta { grid-area: meta; }
   .trk-fav .rel-cat { max-width: none; }
 }
+
+/* Icônes : masque SVG teinté par la couleur du texte, devant le libellé (attribut data-ico, ou onglet de navigation) */
+[data-ico], #nav a { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+[data-ico]::before, #nav a::before { content: ""; flex: none; width: 16px; height: 16px; background: currentColor;
+  -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }
+#nav a::before { display: none; } /* bureau : libellés seuls, comme sur la maquette */
+#nav a[data-route=""] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E"); }
+#nav a[data-route="folders"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'/%3E%3C/svg%3E"); }
+#nav a[data-route="groups"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 7h8M18 7h2M4 17h2M12 17h8'/%3E%3Ccircle cx='15' cy='7' r='2.5'/%3E%3Ccircle cx='9' cy='17' r='2.5'/%3E%3C/svg%3E"); }
+#nav a[data-route="favorites"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z'/%3E%3C/svg%3E"); }
+#nav a[data-route="account"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='8' r='4'/%3E%3Cpath d='M4 20c0-4 4-6 8-6s8 2 8 6'/%3E%3C/svg%3E"); }
+[data-ico="play"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8 5v14l11-7z'/%3E%3C/svg%3E"); }
+[data-ico="queue"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 7h12M4 12h12M4 17h7M17 14v6M14 17h6'/%3E%3C/svg%3E"); }
+[data-ico="radio"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='1.5' fill='%23000'/%3E%3Cpath d='M8.5 15.5a5 5 0 0 1 0-7M15.5 8.5a5 5 0 0 1 0 7M5.6 18.4a9 9 0 0 1 0-12.8M18.4 5.6a9 9 0 0 1 0 12.8'/%3E%3C/svg%3E"); }
+[data-ico="playlist"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 7h12M4 12h8M4 17h6M18 10v8'/%3E%3Ccircle cx='16' cy='18' r='2'/%3E%3C/svg%3E"); }
+[data-ico="offline"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 18a4 4 0 0 1-.7-7.9A6 6 0 0 1 18 9.5a4 4 0 0 1-1 8.5M12 11v8M9 16l3 3 3-3'/%3E%3C/svg%3E"); }
+[data-ico="share"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2'%3E%3Ccircle cx='18' cy='6' r='2.5'/%3E%3Ccircle cx='6' cy='12' r='2.5'/%3E%3Ccircle cx='18' cy='18' r='2.5'/%3E%3Cpath d='M8.2 10.9l7.6-3.8M8.2 13.1l7.6 3.8'/%3E%3C/svg%3E"); }
+[data-ico="download"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4v10M8 10l4 4 4-4M4 16v3h16v-3'/%3E%3C/svg%3E"); }
+@media (max-width: 699px) {
+  #nav a { flex-direction: column; gap: 3px; }
+  #nav a::before { display: block; width: 20px; height: 20px; }
+}
+/* piste en cours : trait vert, titre en vert, ▶ à la place du numéro */
+.playing .trk-title, .playing .rel-name { color: var(--accent-text); font-weight: 600; }
+tr.playing td:first-child, li.playing { box-shadow: inset 3px 0 var(--accent); }
+tr.playing td:first-child { font-size: 0; }
+tr.playing td:first-child::before { content: "▶"; font-size: 11px; color: var(--accent-text); }
