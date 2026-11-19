@@ -3,7 +3,7 @@ import sqlite3
 from pathlib import Path
 
 from app import genres
-from app.naming import album_like, group, kind
+from app.naming import album_like, group, kind, one_song
 
 SCHEMA = Path(__file__).with_name("schema.sql")
 VERSION = 1  # PRAGMA user_version ; à incrémenter avec une migration si le schéma change
@@ -67,9 +67,17 @@ def categorize(conn) -> None:
     target = {k: next((t for t in tops if re.search(p, t, re.I)), None) for k, p in _KIND_FOLDER.items()}
     # ponytail: toutes les releases sont réanalysées à chaque démarrage et à chaque scan (moins d'une seconde pour
     # 50 000) ; ne traiter que les nouvelles si cela devient sensible
+    titles = {}  # pistes des candidats albums : dix versions d'un même morceau restent un single
+    for rid, title in conn.execute(
+            "SELECT t.release_id, COALESCE(t.title, t.relpath) FROM tracks t JOIN releases r ON r.id=t.release_id"
+            " WHERE r.track_count>=10 AND r.path LIKE ? ESCAPE '!'",
+            (re.sub(r"([!%_])", r"!\1", target["single"] or "\0") + "/%",)):
+        titles.setdefault(rid, []).append(title)
+
     def category(r):
         top, k = r["path"].split("/", 1)[0], kind(r["name"])
-        if k is None and top == target["single"] and album_like(r["name"], r["track_count"]):
+        if k is None and top == target["single"] and album_like(r["name"], r["track_count"]) \
+                and not one_song(titles.get(r["id"], [])):
             return "Albums"
         return target.get(k) or top
 

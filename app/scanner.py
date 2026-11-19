@@ -393,6 +393,8 @@ def _scan_tags(conn, root, should_stop):
         # releases sans piste en attente mais pas agrégées (ex. piste supprimée par la phase structure)
         _aggregate(conn, [r[0] for r in conn.execute("SELECT id FROM releases WHERE tags_done=0")])
         conn.commit()
+    db.categorize(conn)  # les titres lus départagent album et single à nombreuses versions
+    conn.commit()
     _scan_covers(conn, root, should_stop)
     return read
 

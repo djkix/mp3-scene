@@ -4,6 +4,16 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.27.1](https://github.com/djkix/mp3-scene/compare/v1.27.0...v1.27.1) (2026-11-19)
+
+### Résumé
+
+**Albums : les singles à nombreuses versions et les concerts n'en sont plus.**
+
+- Une release dont au moins 60 % des pistes sont des versions d'un même morceau (« Crazy (Radio Edit) », « Crazy
+  (Club Mix) »…) reste un single, quel que soit le nombre de pistes.
+- « Concert » dans le nom compte comme « Live » : la release passe en Live & Radio (sauf VA ou indication de CD).
+
 ## [1.27.0](https://github.com/djkix/mp3-scene/compare/v1.26.1...v1.27.0) (2026-11-19)
 
 ### Résumé

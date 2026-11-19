@@ -76,8 +76,12 @@ def test_category_from_tags_then_folder(tmp_path):
         "Woodkid--Live_at_New_Fall_Festival-DVBC-10-31-2013-OMA", "Artist-Live_In_Paris-2CD-2006-SAW",
         "Art-One-CDM-2015-GRP", "Art-One-WEB-2015-GRP", "Justice-Live_And_Learn-(EP)-2008-BUTT",
         "Herve-How_Can_I_Live_Without_You_(Fire_Flowerz_Remix)-FREEWEB-2012-KPS_INT",
-        "Artificial_Funk-Sleep_Less_Live_More-2008-ADK", "Coldplay-Live_2012-2012-BriBerY")] \
-        == ["live", "live", "comp", "comp", "live", None, "single", None, None, None, None, "live"]
+        "Artificial_Funk-Sleep_Less_Live_More-2008-ADK", "Coldplay-Live_2012-2012-BriBerY",
+        "Nelly_Furtado-Loose_The_Concert-(DVD)-2007-OND", "Nelly_Furtado-Loose_The_Concert-(Bonus_CD)-2007-RETAiL")] \
+        == ["live", "live", "comp", "comp", "live", None, "single", None, None, None, None, "live", "live", None]
+    from app.naming import one_song
+    assert one_song(["Crazy (Radio Edit)", "Crazy (Club Mix)", "Crazy feat. X [Dub]", "Crazy", "Other"])
+    assert not one_song(["One More Time", "Aerodynamic", "Digital Love", "Harder Better"]) and not one_song([])
     db.init(tmp_path)
     conn = db.connect(tmp_path)
     rows = (("01.Singles/Pnau-Live_At_The_Wireless-FM-08-15-2011-OZM", "03.Live And Radio"),
@@ -88,9 +92,13 @@ def test_category_from_tags_then_folder(tmp_path):
             ("01.Singles/Daft_Punk-Discovery-CDA-2001-wAx", "Albums"),
             ("01.Singles/Rihanna-S_And_M_Remixes-WEB-2011-VAG", "01.Singles"),
             ("01.Singles/Freemasons-Uninvited-CDM-2007-USF", "01.Singles"),
-            ("02.Compilations/Moby-Ambient-Retail-1993-SW", "02.Compilations"))
+            ("02.Compilations/Moby-Ambient-Retail-1993-SW", "02.Compilations"),
+            ("01.Singles/Brooklyn_Bounce-Crazy__Electro_Edition-(MMR222)-WEB-2010-UKHx", "01.Singles"))
     for i, (path, _) in enumerate(rows):
         conn.execute("INSERT INTO releases(path,name,parent,category,mtime,added_at,size,track_count,has_nfo)"
                      " VALUES (?,?,'p',?,0,0,0,?,0)", (path, path.split("/")[1], path.split("/")[0], 12 if i > 3 else 3))
+    conn.executemany("INSERT INTO tracks(release_id, relpath, disc, size, title) VALUES (?,?,1,0,?)",  # 5 Discovery, 9 Crazy
+                     [(rid, f"{i}.mp3", t) for rid, mk in ((5, "Song {}"), (9, "Crazy (Mix {})")) for i in range(12)
+                      for t in [mk.format(i)]])
     db.categorize(conn)
     assert [r[0] for r in conn.execute("SELECT category FROM releases ORDER BY id")] == [w for _, w in rows]

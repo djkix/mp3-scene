@@ -1,6 +1,7 @@
 """Extraction des champs (artiste, titre, source, année, groupe) depuis un nom de release."""
 import datetime
 import re
+from collections import Counter
 
 SOURCES = frozenset(
     "WEB VINYL CDM CDS CD CDR CDA EP LP PROMO BOOTLEG SAT DAB CABLE TAPE DVD FM LINE LIVE MP3 SINGLE RETAIL".split()
@@ -65,6 +66,13 @@ def album_like(name: str, track_count: int) -> bool:
     return track_count >= ALBUM_TRACKS and not _SINGLE_TAG.search(name)
 
 
+def one_song(titles: list[str]) -> bool:
+    """Vrai si la plupart des pistes sont des versions d'un même morceau : un single, quel que soit leur nombre."""
+    def base(t):  # « Crazy (Electro Radio Edit) » et « Crazy feat. X [Club Mix] » -> « crazy »
+        return re.sub(r"\s+(feat|ft)\.?\s.*$", "", re.sub(r"\s*[(\[].*$", "", t).strip().lower())
+    return bool(titles) and Counter(map(base, titles)).most_common(1)[0][1] >= 0.6 * len(titles)
+
+
 # « Live » verbe dans un titre de morceau : « How_Can_I_Live_Without_You », « Live_And_Learn », « Live_More »
 _LIVE_VERB = re.compile(r"(?:^|[-_ ])(?:(?:I|we|you|to|gonna|wanna|let|lets)[_ ]live|live[_ ](?:and|without|more|for|your|my|it"
                         r"|forever|again|is|life))(?:[-_ ]|$)", re.I)
@@ -78,7 +86,9 @@ def kind(name: str) -> str | None:
         return "live"
     if re.match(r"(VA|Various(_Artists)?)(_?-|$)", name, re.I):
         return "comp"
-    if f["source"] == "LIVE" and not _CD.search(name) and not _LIVE_VERB.search(name):  # « Live » seul : pas un live si le nom parle aussi de CD
+    # « Live » ou « Concert » seul : pas un live si le nom parle aussi de CD
+    if (f["source"] == "LIVE" or re.search(r"(?:^|[-_ (])concerts?(?:[-_ )]|$)", name, re.I)) \
+            and not _CD.search(name) and not _LIVE_VERB.search(name):
         return "live"
     return "single" if f["source"] in ("CDS", "CDM", "SINGLE") else None
 
