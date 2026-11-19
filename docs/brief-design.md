@@ -1,7 +1,7 @@
 # Mp3 Scene — descriptif pour maquette
 
 Document destiné à un designer ou à un outil de maquettage. Il décrit le produit **tel qu'il fonctionne aujourd'hui
-(version 1.32.0)** : à qui il sert, ses écrans, les données affichées, les états et les contraintes à respecter.
+(version 1.33.0)** : à qui il sert, ses écrans, les données affichées, les états et les contraintes à respecter.
 L'habillage visuel actuel est décrit à la fin ; il peut être remis en cause, les contraintes ne le peuvent pas.
 
 > **Règle pour la maquette : ce document est la liste complète des fonctionnalités.** Ne rien ajouter qui n'y figure
@@ -99,7 +99,8 @@ dossiers, les pages de groupe et d'artiste, les favoris et le contrôle qualité
 ### 4.5 Explorer
 - Trois **onglets** : **Groupes**, **Artistes**, **Genres**.
 - Chaque onglet : un tableau **Nom**, **Releases** (nombre), **Poids** ; en-têtes cliquables pour trier ; au-dessus,
-  un champ « Filtrer la liste… » et les sélecteurs **Genres** et **Années** ; en bas, un total
+  un champ « Filtrer la liste… » et les sélecteurs **Genres** et **Années**, puis une rangée de lettres centrée
+  (**Tous**, **#**, **A** à **Z** ; la lettre active est en vert) qui limite la liste à une initiale ; en bas, un total
   (« 1 240 lignes · 46 012 releases · 3,2 To »). Au plus 1000 lignes affichées, avec la mention « seules les 1000
   premières sont affichées : filtrez pour affiner. »
 - **Page d'un groupe ou d'un artiste** : titre « Groupes › NOM » suivi du nombre de releases et du poids, puis la
@@ -249,13 +250,19 @@ Présent en bas de tous les écrans. C'est l'élément le plus utilisé.
 - Chromecast : le lecteur pilote l'appareil ; l'écran du téléviseur affiche pochette et titre.
 
 **Bureau** : une barre en trois colonnes — informations à gauche, commandes et progression au centre,
-outils à droite. Hauteur d'environ 76 px.
+outils à droite. Hauteur d'environ 76 px. À gauche, une vignette de 48 px (pochette, ou « ♪ » sur fond neutre). À
+droite, sur les écrans d'au moins 1000 px : le débit dans un cadre (« 320 kbps »), le bouton de volume suivi de son
+curseur horizontal ; sur le bouton de la file, une pastille verte avec le nombre de pistes.
 
 **Téléphone**, trois états :
 1. **Réduit**, au-dessus des onglets : fine ligne de progression, titre, lecture/pause, suivant.
-2. **Plein écran**, au toucher du titre : bouton pour réduire, titre et release en grand, progression,
-   commandes larges (bouton lecture de 72 px), outils. Un balayage vers la gauche passe à la piste suivante,
-   vers la droite à la précédente.
+2. **Plein écran**, au toucher du titre, de haut en bas : un bandeau (bouton rond pour réduire, « En cours de
+   lecture », Cast, bouton rond vers la fiche de la release) ; la pochette (280 px au plus, coins arrondis) ; le
+   titre centré sur une ligne ; le nom de la release en pastille ; la ligne source · débit · groupe
+   (« WEB · 320 KBPS · GROUP: AOV ») ; la forme d'onde avec le temps écoulé en vert à gauche et la durée à droite ;
+   les commandes larges (bouton lecture de 72 px) ; un bloc d'outils (**DSP/EQ**, **FAV** pour la piste en cours,
+   file d'attente en pastille avec le nombre de pistes) ; la mention « Balayez pour changer de piste ». Un balayage
+   vers la gauche passe à la piste suivante, vers la droite à la précédente.
 3. **File d'attente** en plein écran.
 
 ## 6. Bureau et téléphone

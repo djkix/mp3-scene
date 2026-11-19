@@ -45,6 +45,18 @@ export function render(container, params) {
   const setFilter = (name, value) => { location.hash = `#/${kind}` + qs({ genre, year, [name]: value }); };
   const HEAD = [[tr(label), 'name', 1], [tr('Releases'), 'releases', -1], [tr('Poids'), 'size', -1]]; // [libellé, clé, sens au premier clic]
   let rows = [], key = 'name', dir = 1, dead = false;
+  // Lettres sous les filtres : « # » réunit ce qui ne commence pas par une lettre. La lettre choisie est dans
+  // l'adresse (sans recharger la liste) pour la retrouver au retour d'une fiche.
+  let letter = /^([A-Z]|#)$/.test(params.letter || '') ? params.letter : '';
+  const initial = (name) => { const c = (name.normalize('NFD')[0] || '').toUpperCase(); return c >= 'A' && c <= 'Z' ? c : '#'; };
+  const letters = el('div', { class: 'letters', role: 'group', 'aria-label': tr('Initiale') },
+    ['', '#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'].map((l) => el('button', { type: 'button', 'aria-pressed': String(l === letter),
+      onclick: () => {
+        letter = l;
+        [...letters.children].forEach((b) => b.setAttribute('aria-pressed', String(b.textContent === (l || tr('Tous')))));
+        history.replaceState(null, '', `#/${kind}` + qs({ genre, year, letter }));
+        paint();
+      } }, l || tr('Tous'))));
   const find = el('input', { type: 'search', placeholder: tr('Filtrer la liste…'), 'aria-label': tr('Filtrer la liste…'), oninput: paint });
   const bar = el('div', { class: 'filters' }, find);
   const body = el('tbody');
@@ -55,13 +67,13 @@ export function render(container, params) {
     el('div', { class: 'tabs', role: 'tablist', 'aria-label': tr('Explorer') }, Object.entries(KINDS).map(([k, [tab]]) =>
       el('button', { type: 'button', role: 'tab', 'aria-selected': String(k === kind),
         onclick: () => { location.hash = `#/${k}` + qs({ genre: k === 'genres' ? '' : genre, year }); } }, tr(tab)))),
-    bar, el('div', { class: 'table-wrap' }, el('table', { class: 'groups' }, el('thead', {}, el('tr', {}, heads)), body)), status);
+    bar, letters, el('div', { class: 'table-wrap' }, el('table', { class: 'groups' }, el('thead', {}, el('tr', {}, heads)), body)), status);
 
   const href = (name) => (pin ? `#/${kind}/${encodeURIComponent(name)}` + qs({ genre, year }) : '#/' + qs({ genre: name, year }));
   function paint() {
     HEAD.forEach(([text, k], i) => { heads[i].firstChild.textContent = k === key ? `${text} ${dir > 0 ? '▲' : '▼'}` : text; });
     const needle = find.value.trim().toLowerCase();
-    const shown = rows.filter((g) => g.name.toLowerCase().includes(needle))
+    const shown = rows.filter((g) => g.name.toLowerCase().includes(needle) && (!letter || initial(g.name) === letter))
       .sort((a, b) => dir * (key === 'name' ? a.name.localeCompare(b.name) : a[key] - b[key]) || a.name.localeCompare(b.name));
     body.replaceChildren(...shown.slice(0, MAX_ROWS).map((g) => el('tr', {},
       el('td', {}, el('a', { href: href(g.name) }, g.name)),

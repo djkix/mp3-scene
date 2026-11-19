@@ -4,6 +4,22 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.33.0](https://github.com/djkix/mp3-scene/compare/v1.32.0...v1.33.0) (2026-11-19)
+
+### Résumé
+
+**Lecteur plein écran du téléphone refait d'après la maquette.**
+
+- Bandeau « En cours de lecture » avec réduire, Cast et un bouton vers la fiche de la release.
+- Pochette plus grande, titre centré, nom de la release en pastille, ligne source · débit · groupe.
+- Temps écoulé en vert sous la forme d'onde ; outils regroupés : DSP/EQ, **favori de la piste en cours**, file
+  d'attente avec le nombre de pistes ; mention « Balayez pour changer de piste ».
+- Le lecteur réduit du téléphone ne change pas.
+- Barre du lecteur sur bureau : vignette même sans pochette, débit de la piste, volume en curseur horizontal
+  (écrans d'au moins 1000 px), nombre de pistes en pastille sur le bouton de la file.
+- Explorer : une rangée de lettres (Tous, #, A à Z) sous les filtres des onglets Groupes, Artistes et Genres limite
+  la liste à une initiale.
+
 ## [1.32.0](https://github.com/djkix/mp3-scene/compare/v1.31.0...v1.32.0) (2026-11-19)
 
 ### Résumé

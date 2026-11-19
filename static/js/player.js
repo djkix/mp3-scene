@@ -702,7 +702,16 @@ function update() {
       ui.cover.hidden = true;
       if (cover) ui.cover.src = cover; else ui.cover.removeAttribute('src');
     }
-    ui.rel.href = t ? `#/release/${encodeURIComponent(t.release_name)}` : '#/';
+    ui.rel.href = ui.doc.href = t ? `#/release/${encodeURIComponent(t.release_name)}` : '#/';
+    // plein écran : source, débit et groupe de la release (absents d'une file enregistrée avant la 1.33.0)
+    ui.meta.replaceChildren(...!t ? [] : [t.source && el('span', { class: 'chip src' }, t.source),
+      t.bitrate && el('span', {}, `${Math.round(t.bitrate / 1000)} KBPS`),
+      t.grp && el('span', { class: 'chip' }, `GROUP: ${t.grp}`)].filter(Boolean));
+    ui.fav.textContent = t?.favorite ? '♥︎' : '♡︎';
+    ui.fav.setAttribute('aria-pressed', !!t?.favorite);
+    label(ui.fav, t?.favorite ? tr('Retirer des favoris') : tr('Ajouter aux favoris'));
+    ui.qbtn.dataset.n = q.tracks.length;
+    ui.rate.textContent = t?.bitrate ? `${Math.round(t.bitrate / 1000)} kbps` : '';
     ui.play.textContent = on ? '⏸︎' : '▶︎';
     label(ui.play, on ? tr('Pause') : tr('Lecture'));
     ui.cast.textContent = backend ? tr('Diffusion sur {0}', backend.name) : '';
@@ -763,6 +772,17 @@ export function initPlayer(footer) {
     } });
   ui.collapse = iconBtn('pl-collapse', '⌄', tr('Réduire le lecteur'), () => { expand(false); ui.title.focus(); });
   ui.rel = el('a', { class: 'pl-rel', href: '#/' });
+  // plein écran : fiche de la release (NFO), source · débit · groupe, favori de la piste en cours
+  ui.doc = el('a', { class: 'icon pl-doc', href: '#/', title: tr('Détail de la release'), 'aria-label': tr('Détail de la release') });
+  ui.meta = el('div', { class: 'pl-meta' });
+  ui.rate = el('span', { class: 'pl-rate' }); // débit de la piste, barre du bureau large
+  ui.fav = iconBtn('pl-fav', '♡︎', tr('Ajouter aux favoris'), async () => {
+    const t = q().current();
+    if (!t) return;
+    t.favorite = !t.favorite; // optimiste
+    update();
+    try { await api(`/favorites/track/${t.id}`, { method: t.favorite ? 'PUT' : 'DELETE' }); } catch { t.favorite = !t.favorite; update(); }
+  });
   // pochette : masquée tant qu'elle n'est pas chargée, et s'il n'y en a pas
   ui.cover = el('img', { class: 'pl-cover', alt: '', hidden: true,
     onload: () => { ui.cover.hidden = false; }, onerror: () => { ui.cover.hidden = true; } });
@@ -788,6 +808,11 @@ export function initPlayer(footer) {
   ui.vol = el('input', { type: 'range', class: 'pl-vol', min: 0, max: 1, step: 0.05, value: userVol,
     'aria-label': tr('Volume'), title: tr('Volume'), 'aria-orientation': 'vertical', oninput: () => player.setVolume(+ui.vol.value) });
   ui.volbtn = iconBtn('pl-volbtn', '', tr('Couper le son'), mute);
+  // bureau large : curseur horizontal à côté du bouton (CSS) ; sinon vertical dans une bulle
+  const wide = matchMedia('(min-width: 1000px) and (pointer: fine)');
+  const orient = () => ui.vol.setAttribute('aria-orientation', wide.matches ? 'horizontal' : 'vertical');
+  wide.addEventListener('change', orient);
+  orient();
   // Curseur vertical dans une bulle : visible au survol ou au focus clavier (CSS) ; la molette règle aussi le volume.
   const volwrap = el('div', { class: 'pl-volwrap',
     onwheel: (e) => { e.preventDefault(); player.setVolume(volume() + (e.deltaY < 0 ? 0.05 : -0.05)); } },
@@ -815,8 +840,8 @@ export function initPlayer(footer) {
 
   footer.replaceChildren(ui.panel, ui.msg, el('div', { class: 'pl-progress', 'aria-hidden': 'true' }),
     el('div', { class: 'pl-bar' },
-      ui.collapse,
-      el('div', { class: 'pl-info' }, ui.cover, ui.title, ui.rel, ui.cast),
+      el('div', { class: 'pl-top' }, ui.collapse, el('span', { class: 'pl-now' }, tr('En cours de lecture')), ui.doc),
+      el('div', { class: 'pl-info' }, ui.cover, ui.title, ui.rel, ui.meta, ui.cast),
       el('div', { class: 'pl-controls' },
         ui.shuffle,
         iconBtn('pl-prev', '⏮︎', tr('Précédent'), () => player.prev()),
@@ -824,8 +849,9 @@ export function initPlayer(footer) {
         iconBtn('pl-next', '⏭︎', tr('Suivant'), () => player.next()),
         ui.repeat),
       el('div', { class: 'pl-seek' }, ui.elapsed, ui.wave, ui.total),
-      el('div', { class: 'pl-tools' }, volwrap, ui.fx, ui.qbtn,
-        el('span', { id: 'cast-slot' })))); // emplacement du bouton cast (cast.js)
+      el('div', { class: 'pl-tools' }, ui.rate, volwrap, ui.fx, ui.fav, ui.qbtn,
+        el('span', { id: 'cast-slot' })), // emplacement du bouton cast (cast.js)
+      el('p', { class: 'pl-hint' }, tr('Balayez pour changer de piste'))));
 
   // Plein écran : balayage vers la gauche = piste suivante, vers la droite = précédente.
   // Ignoré s'il part de la barre de progression ou de la file, ou s'il est plutôt vertical (défilement).
