@@ -21,17 +21,33 @@ def _source(segs, skip):
     return weak
 
 
-_P2P = re.compile(r"(19\d\d|20\d\d)\)?|320")  # une année ou le débit à la place du groupe : pas une release de la scène
+_YEAR = re.compile(r"(19\d\d|20\d\d)\)?")
+# ce qui traîne après le groupe dans un nom abîmé : « WUS[rarbg] », « BPM.nz », « wWs.1 », « SOB_INT (1) »
+_TAIL = re.compile(r"(\[rarbg\]|\.rar_Music|\.(1|nz)|\s*\(\d+\))$", re.I)
+_REPAIRS = {"2008 MTC": "MTC", "2008_MTC": "MTC", "MonoPol": "MonoPoly", "EiTheL3P3": "EiTheLMP3", "MW3_iN": "MW3"}
+# dernier segment qui n'est pas un groupe : source, débit, numéro de disque, bout de titre
+_NOT_GROUPS = SOURCES | frozenset("VA INT HOUSE 320 200X THE_ULTIMATE_MILLENNIUM_MEGAMIX HOP_IN_60_MINUTES RECORDS ROCK"
+                                  " CLASSIC BANGERS VOUS DJ_ PROMO_CDS".split())
+_NOT_GROUP = re.compile(r"\d{1,2}|CD\d|\dCD", re.I)
 
 
 def group(raw: str | None) -> tuple[str | None, int | None]:
     """(groupe, année lue à sa place) du dernier segment d'un nom de release.
 
     Le suffixe de release interne est retiré : « AOV_INT », « XTC_iNT », « CBR_INT_INT » -> AOV, XTC, CBR.
-    Une année ou « 320 » n'est pas un groupe : la release est rangée dans P2P."""
-    grp = re.sub(r"(\s*_\s*int)+$", "", raw or "", flags=re.I).strip() or None
-    if grp and (m := _P2P.fullmatch(grp)):
-        return "P2P", int(m[1]) if m[1] else None
+    Un segment qui n'a pas la forme d'un nom de groupe (espaces, crochets, parenthèses : un bout de titre), une
+    année, une source ou un débit range la release dans P2P."""
+    grp = (raw or "").strip()
+    grp = _REPAIRS.get(grp) or re.sub(r"(\s*_\s*int)+$", "", _TAIL.sub("", grp), flags=re.I).strip()
+    grp = _REPAIRS.get(grp, grp)
+    if grp.startswith("_") and len(grp) < 8:  # « _XDS »
+        grp = grp.lstrip("_")
+    if not grp:
+        return None, None
+    if m := _YEAR.fullmatch(grp):
+        return "P2P", int(m[1])
+    if not re.fullmatch(r"[A-Za-z0-9_]+", grp) or grp.lstrip("_").upper() in _NOT_GROUPS or _NOT_GROUP.fullmatch(grp):
+        return "P2P", None
     return grp, None
 
 

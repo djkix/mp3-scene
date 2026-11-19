@@ -4,6 +4,19 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.24.0](https://github.com/djkix/mp3-scene/compare/v1.23.0...v1.24.0) (2026-11-19)
+
+### Résumé
+
+**Groupes triés : ce qui n'est pas un groupe passe en P2P. Releases similaires après le NFO.**
+
+- **P2P** : quand le dernier segment du nom n'a pas la forme d'un nom de groupe, la release est rangée dans P2P —
+  bout de titre (espaces, crochets, parenthèses : « Clubbers Guide Summer [2CD] », « 06) »), source ou étiquette
+  (WEB, VA, VINYL, CD1, 3CD, INT…), nombre d'un ou deux chiffres.
+- **Noms abîmés réparés** : « WUS[rarbg] », « BPM.nz », « wWs.1 », « SOB_INT (1) » rejoignent WUS, BPM, wWs, SOB.
+- Les groupes d'un seul mot sont gardés quelle que soit leur casse (UKHx, ZzZz, dh…).
+- **Fiche** : les releases similaires sont affichées après le NFO.
+
 ## [1.23.0](https://github.com/djkix/mp3-scene/compare/v1.22.0...v1.23.0) (2026-11-19)
 
 ### Résumé

@@ -20,7 +20,7 @@ export function render(container, params) {
   api(/^\d+$/.test(id) ? `/releases/${id}` : `/release-by-name?name=${encodeURIComponent(id)}`).then((rel) => {
     if (dead) return;
     const nfo = el('div'), sim = el('div');
-    container.replaceChildren(el('div', { class: 'detail' }, header(rel), trackTable(rel), sim, nfo));
+    container.replaceChildren(el('div', { class: 'detail' }, header(rel), trackTable(rel), nfo, sim));
     watch.mark();
     api(`/releases/${rel.id}/similar`).then((list) => {
       if (!dead && list.length) sim.replaceChildren(el('h2', { class: 'nfo-h' }, t('Releases similaires')), el('ul', { class: 'rel-list' }, list.map(row)));

@@ -30,8 +30,15 @@ def test_apply_rewrites_existing_rows(tmp_path):
 
 def test_group_int_suffix_merged(tmp_path):
     from app.naming import group, parse_release_name
-    assert [group(g)[0] for g in ("AOV_INT", "XTC_iNT", "dh_int", "CBR_INT_INT", "AOV", "iNT", "EOSiNT", "939", None)] \
-        == ["AOV", "XTC", "dh", "CBR", "AOV", "iNT", "EOSiNT", "939", None]
+    assert [group(g)[0] for g in ("AOV_INT", "XTC_iNT", "dh_int", "CBR_INT_INT", "AOV", "EOSiNT", "939", None)] \
+        == ["AOV", "XTC", "dh", "CBR", "AOV", "EOSiNT", "939", None]
+    # noms abîmés réparés ; bouts de titre, sources et numéros de disque rangés en P2P ; vrais groupes gardés
+    assert [group(g)[0] for g in ("WUS[rarbg]", "BPM.nz", "wWs.1", "SOB_INT (1)", "KPS_INT.rar_Music", "_XDS", "2008 MTC",
+                                  "MonoPol")] == ["WUS", "BPM", "wWs", "SOB", "KPS", "XDS", "MTC", "MonoPoly"]
+    assert {group(g)[0] for g in (" Clubbers Guide Summer [2CD]", "06)", "WEB", "VA", "CD1", "3CD", "iNT", "HOUSE", "20",
+                                  "Records", "_The_Ultimate_Millennium_Megamix", "www.0daymusic.org")} == {"P2P"}
+    assert [group(g)[0] for g in ("UKHx", "ZzZz", "dh", "BtR", "BZzYK", "TALiON", "DJ", "E", "BPM_HOUSE", "211", "P2P")] \
+        == ["UKHx", "ZzZz", "dh", "BtR", "BZzYK", "TALiON", "DJ", "E", "BPM_HOUSE", "211", "P2P"]
     assert parse_release_name("Art-One-WEB-2015-AOV_INT")["grp"] == "AOV"
     # une année ou 320 à la place du groupe : P2P, et l'année est gardée
     assert [group(g) for g in ("320", "320_ INT", "2010", "2008)", "2019_INT")] \

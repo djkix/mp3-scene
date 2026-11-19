@@ -1,7 +1,7 @@
 # Mp3 Scene — descriptif pour maquette
 
 Document destiné à un designer ou à un outil de maquettage. Il décrit le produit **tel qu'il fonctionne aujourd'hui
-(version 1.21.0)** : à qui il sert, ses écrans, les données affichées, les états et les contraintes à respecter.
+(version 1.24.0)** : à qui il sert, ses écrans, les données affichées, les états et les contraintes à respecter.
 L'habillage visuel actuel est décrit à la fin ; il peut être remis en cause, les contraintes ne le peuvent pas.
 
 > **Règle pour la maquette : ce document est la liste complète des fonctionnalités.** Ne rien ajouter qui n'y figure
@@ -122,7 +122,7 @@ dossiers, les pages de groupe et d'artiste, les favoris et le contrôle qualité
   Débit, Genre et téléchargement sont masqués. Séparateurs « CD 1 », « CD 2 » pour les releases multi-disques.
   Clic sur une piste : lecture à partir de cette piste. La **piste en cours** est mise en évidence (trait vert à
   gauche, titre en vert, ▶ à la place du numéro), ici comme dans les listes de pistes. Message : « Aucune piste. »
-- **Releases similaires** (si la release en a) : jusqu'à douze lignes compactes sous les pistes — vignette, nom,
+- **Releases similaires** (si la release en a) : jusqu'à douze lignes compactes sous le NFO (sous les pistes s'il n'y en a pas) — vignette, nom,
   détails sur une seconde ligne, actions + ♡ › — même artiste d'abord, puis même genre et même année.
 - **NFO** (si la release en a un) : bloc de texte en chasse fixe, art ASCII, centré ; sur téléphone la police est
   réduite pour que toute la largeur soit visible sans défilement horizontal.
