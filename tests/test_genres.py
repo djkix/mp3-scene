@@ -83,9 +83,14 @@ def test_category_from_tags_then_folder(tmp_path):
     rows = (("01.Singles/Pnau-Live_At_The_Wireless-FM-08-15-2011-OZM", "03.Live And Radio"),
             ("01.Singles/VA-Big_Mix-CD-2008-LiR", "02.Compilations"),
             ("02.Compilations/Art-One-WEB-2015-GRP", "02.Compilations"),  # aucun tag : le dossier décide
-            ("03.Live And Radio/Bad Boy Bill - Live At WBMX", "03.Live And Radio"))
+            ("03.Live And Radio/Bad Boy Bill - Live At WBMX", "03.Live And Radio"),
+            # douze pistes : album s'il n'a aucun tag de single, et seulement dans le dossier des singles
+            ("01.Singles/Daft_Punk-Discovery-CDA-2001-wAx", "Albums"),
+            ("01.Singles/Rihanna-S_And_M_Remixes-WEB-2011-VAG", "01.Singles"),
+            ("01.Singles/Freemasons-Uninvited-CDM-2007-USF", "01.Singles"),
+            ("02.Compilations/Moby-Ambient-Retail-1993-SW", "02.Compilations"))
     for i, (path, _) in enumerate(rows):
         conn.execute("INSERT INTO releases(path,name,parent,category,mtime,added_at,size,track_count,has_nfo)"
-                     " VALUES (?,?,'p',?,0,0,0,0,0)", (path, path.split("/")[1], path.split("/")[0]))
+                     " VALUES (?,?,'p',?,0,0,0,?,0)", (path, path.split("/")[1], path.split("/")[0], 12 if i > 3 else 3))
     db.categorize(conn)
     assert [r[0] for r in conn.execute("SELECT category FROM releases ORDER BY id")] == [w for _, w in rows]

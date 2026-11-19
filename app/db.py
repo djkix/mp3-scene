@@ -3,7 +3,7 @@ import sqlite3
 from pathlib import Path
 
 from app import genres
-from app.naming import group, kind
+from app.naming import album_like, group, kind
 
 SCHEMA = Path(__file__).with_name("schema.sql")
 VERSION = 1  # PRAGMA user_version ; à incrémenter avec une migration si le schéma change
@@ -57,16 +57,24 @@ _KIND_FOLDER = {"live": r"live|radio", "comp": r"compil", "single": r"single"}
 def categorize(conn) -> None:
     """Catégorie de chaque release : celle que les tags de son nom indiquent, sinon son dossier racine.
 
+    Dans le dossier des singles, une release sans tag de single et d'au moins dix pistes est rangée dans « Albums »,
+    seule catégorie sans dossier à elle.
+
     Une catégorie est toujours un dossier racine existant : « live » désigne celui dont le nom contient « live » ou
     « radio », etc. Sans dossier correspondant, la release garde le sien."""
-    rows = conn.execute("SELECT id, name, path, category FROM releases").fetchall()
+    rows = conn.execute("SELECT id, name, path, category, track_count FROM releases").fetchall()
     tops = sorted({r["path"].split("/", 1)[0] for r in rows})
     target = {k: next((t for t in tops if re.search(p, t, re.I)), None) for k, p in _KIND_FOLDER.items()}
     # ponytail: toutes les releases sont réanalysées à chaque démarrage et à chaque scan (moins d'une seconde pour
     # 50 000) ; ne traiter que les nouvelles si cela devient sensible
-    conn.executemany("UPDATE releases SET category=? WHERE id=?", [
-        (want, r["id"]) for r in rows
-        if (want := target.get(kind(r["name"])) or r["path"].split("/", 1)[0]) != r["category"]])
+    def category(r):
+        top, k = r["path"].split("/", 1)[0], kind(r["name"])
+        if k is None and top == target["single"] and album_like(r["name"], r["track_count"]):
+            return "Albums"
+        return target.get(k) or top
+
+    conn.executemany("UPDATE releases SET category=? WHERE id=?",
+                     [(want, r["id"]) for r in rows if (want := category(r)) != r["category"]])
 
 
 def connect(data_dir: Path) -> sqlite3.Connection:

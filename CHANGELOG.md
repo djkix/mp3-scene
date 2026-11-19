@@ -4,6 +4,17 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.27.0](https://github.com/djkix/mp3-scene/compare/v1.26.1...v1.27.0) (2026-11-19)
+
+### Résumé
+
+**Nouvelle catégorie : Albums.**
+
+- Une release du dossier des singles est rangée dans **Albums** quand elle compte au moins dix pistes et que son nom
+  ne porte aucun tag de single (CDM, CDS, CDR, VINYL, EP, PROMO, BOOTLEG, Remixes, Mixes…). La catégorie apparaît dans
+  le filtre, la colonne, la fiche et le tableau de bord.
+- Albums n'a pas de dossier à elle : l'onglet Catégories montre toujours ces releases dans Singles.
+
 ## [1.26.1](https://github.com/djkix/mp3-scene/compare/v1.26.0...v1.26.1) (2026-11-19)
 
 ### Résumé

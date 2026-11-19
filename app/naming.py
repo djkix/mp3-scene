@@ -54,6 +54,17 @@ def group(raw: str | None) -> tuple[str | None, int | None]:
 _CD = re.compile(r"(?:^|[-_ (])\d*x?CD[A-Z]?\d*(?:[-_ )]|$)", re.I)  # CD, 2CD, CDM, CD1…
 
 
+# tag qui dit « single » : format court, promo, ou série de remixes
+_SINGLE_TAG = re.compile(r"(?:^|[-_ (])(?:CDM|CDS|CDR|MCD|SINGLE|VINYL|VLS|EP|\d*x?12|BOOTLEG|PROMO|SAMPLER|REMIX|REMIXES"
+                         r"|REMIXED|MIXES|RMX|TOOLS|ACAPELLAS?)(?:[-_ ).]|$)", re.I)
+ALBUM_TRACKS = 10  # en dessous, trop de singles à remixes sans tag passeraient pour des albums
+
+
+def album_like(name: str, track_count: int) -> bool:
+    """Vrai si une release rangée avec les singles a tout d'un album : beaucoup de pistes, aucun tag de single."""
+    return track_count >= ALBUM_TRACKS and not _SINGLE_TAG.search(name)
+
+
 # « Live » verbe dans un titre de morceau : « How_Can_I_Live_Without_You », « Live_And_Learn », « Live_More »
 _LIVE_VERB = re.compile(r"(?:^|[-_ ])(?:(?:I|we|you|to|gonna|wanna|let|lets)[_ ]live|live[_ ](?:and|without|more|for|your|my|it"
                         r"|forever|again|is|life))(?:[-_ ]|$)", re.I)
