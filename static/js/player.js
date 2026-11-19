@@ -607,8 +607,9 @@ const REPEAT = {
 
 const NO_COVER = '/icons/cover-default.svg';
 
-function iconBtn(cls, glyph, label, onclick) {
-  return el('button', { type: 'button', class: 'icon ' + cls, title: label, 'aria-label': label, onclick }, glyph);
+// `ico` : icône dessinée en CSS (data-ico) à la place d'un caractère
+function iconBtn(cls, glyph, label, onclick, ico = null) {
+  return el('button', { type: 'button', class: 'icon ' + cls, title: label, 'aria-label': label, 'data-ico': ico, onclick }, glyph);
 }
 
 function label(btn, text) {
@@ -714,7 +715,7 @@ function update() {
     label(ui.fav, t?.favorite ? tr('Retirer des favoris') : tr('Ajouter aux favoris'));
     ui.qbtn.dataset.n = q.tracks.length;
     ui.rate.textContent = t?.bitrate ? `${Math.round(t.bitrate / 1000)} kbps` : '';
-    ui.play.textContent = on ? '⏸︎' : '▶︎';
+    ui.play.dataset.ico = on ? 'pause' : 'play'; // icônes dessinées (CSS) : ces caractères deviennent des emoji orange sur Android
     label(ui.play, on ? tr('Pause') : tr('Lecture'));
     ui.cast.textContent = backend ? tr('Diffusion sur {0}', backend.name) : '';
     volUI();
@@ -790,7 +791,7 @@ export function initPlayer(footer) {
     onload: () => { ui.cover.hidden = false; },
     onerror: () => { if (ui.cover.src.endsWith(NO_COVER)) ui.cover.hidden = true; else ui.cover.src = NO_COVER; } });
   ui.cast = el('span', { class: 'pl-cast' }); // « Diffusion sur <appareil> » (textContent : nom non fiable)
-  ui.play = iconBtn('pl-play', '▶︎', tr('Lecture'), () => player.toggle());
+  ui.play = iconBtn('pl-play', '', tr('Lecture'), () => player.toggle(), 'play');
   ui.shuffle = iconBtn('pl-shuffle', '⇄', tr('Aléatoire'), () => { q().shuffle = !q().shuffle; backend?.sync(); update(); save(); });
   ui.repeat = iconBtn('pl-repeat', '↻︎', '', () => {
     q().repeat = { off: 'all', all: 'one', one: 'off' }[q().repeat];
@@ -847,9 +848,9 @@ export function initPlayer(footer) {
       el('div', { class: 'pl-info' }, ui.cover, ui.title, ui.rel, ui.meta, ui.cast),
       el('div', { class: 'pl-controls' },
         ui.shuffle,
-        iconBtn('pl-prev', '⏮︎', tr('Précédent'), () => player.prev()),
+        iconBtn('pl-prev', '', tr('Précédent'), () => player.prev(), 'prev'),
         ui.play,
-        iconBtn('pl-next', '⏭︎', tr('Suivant'), () => player.next()),
+        iconBtn('pl-next', '', tr('Suivant'), () => player.next(), 'next'),
         ui.repeat),
       el('div', { class: 'pl-seek' }, ui.elapsed, ui.wave, ui.total),
       el('div', { class: 'pl-tools' }, ui.rate, volwrap, ui.fx, ui.fav, ui.qbtn,

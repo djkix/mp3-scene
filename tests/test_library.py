@@ -448,3 +448,24 @@ def test_admin_overview_classify_schedule(admin_client, user_client, library, ap
     assert admin_client.put("/api/admin/scan/schedule", json={"hour": None}).status_code == 204
     assert not runner.due(c, at(3) + 86400)
     c.close()
+
+
+def test_bulk_correction_and_artist_alias(admin_client, user_client, library):
+    rel = lambda: {x["name"]: x for x in admin_client.get("/api/releases").json()["items"]}
+    B = "Bicep-Glue-(NT123)-WEB-2017-PWT"
+    ids = [rel()[A]["id"], rel()[B]["id"]]
+    bulk = lambda body, c=admin_client: c.patch("/api/admin/releases", json=body).status_code
+    assert bulk({"ids": ids, "genre": "trance", "artist": " "}) == 204                 # champ vide : inchangé
+    assert bulk({"ids": ids, "genre": "x"}, user_client) == 403 and bulk({"ids": ids}) == 400
+    assert bulk({"ids": [], "genre": "x"}) == 422 and bulk({"ids": [ids[0], 99999], "genre": "x"}) == 404
+    assert [rel()[n]["genre"] for n in (A, B)] == ["Trance", "Trance"] and rel()[A]["artist"] == "A-Trak"
+    assert len(admin_client.get("/api/admin/overrides").json()) == 2
+    # rattachement manuel : Bicep rejoint A-Trak, et y reste après un reclassement
+    put = lambda body: admin_client.put("/api/admin/artists/aliases", json=body).status_code
+    assert put({"alias": "bicep", "target": "A-Trak"}) == 204 and put({"alias": "A-Trak", "target": "a-trak"}) == 400
+    assert rel()[B]["artist"] == "A-Trak"
+    assert admin_client.post("/api/admin/classify").status_code == 204 and rel()[B]["artist"] == "A-Trak"
+    assert admin_client.get("/api/admin/artists/aliases").json() == [{"alias": "bicep", "target": "A-Trak"}]
+    assert admin_client.delete("/api/admin/artists/aliases", params={"alias": "Bicep"}).status_code == 204
+    assert rel()[B]["artist"] == "Bicep" and rel()[A]["artist"] == "A-Trak"
+    assert admin_client.delete("/api/admin/artists/aliases", params={"alias": "Bicep"}).status_code == 404

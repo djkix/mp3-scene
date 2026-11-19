@@ -4,6 +4,7 @@ import { el } from '../dom.js';
 import { t as tr, catLabel } from '../i18n.js';
 import { releaseList } from './releases.js';
 import { navBar } from './admin.js';
+import { correct } from './release.js';
 
 const KINDS = [['no_nfo', 'Sans NFO'], ['no_tags', 'Sans tags'], ['unreadable', 'Pistes illisibles'], ['low_bitrate', 'Débit inférieur à 192 kbit/s'],
   ['no_year', 'Sans année'], ['no_cover', 'Sans pochette'], ['no_tracks', 'Sans piste'], ['no_artist', 'Sans artiste'],
@@ -47,8 +48,14 @@ export function render(container, params) {
       tabBtn(counts ? `${tr(label)} (${counts[k]})` : tr(label), k === kind, `#/library?tab=quality&kind=${k}`)));
     paint(null);
     api('/admin/quality').then((c) => { if (!dead) paint(c); }).catch(() => {});
-    dispose = releaseList(body, (offset, tri) => api(`/admin/quality?kind=${kind}&offset=${offset}&limit=50${tri}`),
-      { empty: tr('Aucune release concernée.'), sort: ['name', 'asc'] });
+    // correction en lot : cocher des releases, puis leur donner le même artiste, la même catégorie ou le même genre
+    const picked = new Set(), list = el('div');
+    const fix = el('button', { type: 'button', class: 'primary', disabled: true, onclick: () => correct(null, [...picked]) });
+    const onPick = () => { fix.disabled = !picked.size; fix.textContent = tr('Corriger la sélection ({0})', picked.size); };
+    onPick();
+    body.replaceChildren(el('p', { class: 'filters' }, fix), list);
+    dispose = releaseList(list, (offset, tri) => api(`/admin/quality?kind=${kind}&offset=${offset}&limit=50${tri}`),
+      { empty: tr('Aucune release concernée.'), sort: ['name', 'asc'], pick: picked, onPick });
   }
   return () => { dead = true; dispose?.(); };
 }

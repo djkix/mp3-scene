@@ -48,7 +48,8 @@ export function favButton(rel, kind = 'release') {
   return btn;
 }
 
-export function row(rel) {
+// `pick` (Set d'identifiants) ajoute une case à cocher devant le nom ; `onPick` est appelé à chaque changement.
+export function row(rel, pick = null, onPick = () => {}) {
   const play = () => emit('play-release', { releaseId: rel.id });
   const queue = el('button', { type: 'button', class: 'icon', title: tr('Ajouter à la file'), 'aria-label': tr('Ajouter à la file'),
     onclick: () => emit('queue-release', { releaseId: rel.id }) }, '+');
@@ -56,13 +57,16 @@ export function row(rel) {
     'aria-label': tr('Détail de la release') }, '›');
   return el('li', {
     class: 'rel', tabIndex: 0,
-    onclick: (e) => { if (!e.target.closest('button, a')) play(); },
+    onclick: (e) => { if (!e.target.closest('button, a, input')) play(); },
     onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) play(); },
   },
   // vignette : chargée seulement quand la ligne approche de l'écran ; sans pochette, la place reste vide
   el('img', { class: 'rel-thumb', src: `/api/releases/${rel.id}/thumb`, alt: '', loading: 'lazy', width: 40, height: 40,
     onerror: (e) => { e.target.style.visibility = 'hidden'; } }),
-  el('span', { class: 'rel-name' }, since() && rel.added_at > since() ? el('span', { class: 'new' }, tr('nouveau')) : null, relName(rel.name)),
+  el('span', { class: 'rel-name' },
+    pick && el('input', { type: 'checkbox', class: 'rel-pick', checked: pick.has(rel.id), 'aria-label': tr('Sélectionner {0}', rel.name),
+      onchange: (e) => { if (e.target.checked) pick.add(rel.id); else pick.delete(rel.id); onPick(); } }),
+    since() && rel.added_at > since() ? el('span', { class: 'new' }, tr('nouveau')) : null, relName(rel.name)),
   // même ordre que HEAD ; sur mobile, .rel-info devient une ligne de détails sous le nom
   el('span', { class: 'rel-info' },
     el('span', { class: 'mid' }, rel.genre ? el('span', { class: 'chip' }, rel.genre) : ''),
@@ -77,7 +81,7 @@ export function row(rel) {
 // Liste infinie par pages de 50. fetchPage(offset, tri) -> {items, has_more}, où `tri` vaut '&sort=…&dir=…'.
 // `sort` : tri affiché au départ, [clé, sens]. Retourne la fonction de nettoyage.
 // ponytail: le tri choisi n'est pas dans l'adresse (perdu au retour arrière) ; le passer en paramètre de hash si besoin.
-export function releaseList(container, fetchPage, { empty = tr('Aucun résultat'), sort = ['date', 'desc'] } = {}) {
+export function releaseList(container, fetchPage, { empty = tr('Aucun résultat'), sort = ['date', 'desc'], pick = null, onPick } = {}) {
   const list = el('ul', { class: 'rel-list' });
   const status = el('p', { class: 'status', role: 'status' });
   const sentinel = el('div', { class: 'sentinel' });
@@ -116,7 +120,7 @@ export function releaseList(container, fetchPage, { empty = tr('Aucun résultat'
     try {
       const page = await fetchPage(offset, `&sort=${sortKey}&dir=${sortDir}`);
       if (dead || g !== gen) return; // réponse d'une vue remplacée ou d'un tri abandonné
-      list.append(...page.items.map(row));
+      list.append(...page.items.map((r) => row(r, pick, onPick)));
       offset += page.items.length;
       done = !page.has_more;
       status.textContent = done ? (offset ? tr('Fin de la liste') : empty) : '';

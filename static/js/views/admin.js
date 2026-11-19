@@ -199,10 +199,26 @@ export function render(container, params = {}) {
     refreshScan();
   } else if (section === 'rules') {
     const counts = Object.fromEntries(RULES.map(([, key]) => [key, el('span', { class: 'chip' }, '…')]));
+    // artistes rattachés à la main depuis leur page (« Rattacher à… »)
+    const aliases = el('tbody'), aliasMsg = el('p', { class: 'status', role: 'status' });
+    const loadAliases = () => api('/admin/artists/aliases').then((list) => {
+      if (dead) return;
+      aliasMsg.textContent = list.length ? '' : t('Aucun artiste rattaché à la main.');
+      aliases.replaceChildren(...list.map((a) => el('tr', {}, el('th', { scope: 'row' }, a.alias), el('td', {}, a.target),
+        el('td', {}, el('button', { type: 'button', onclick: async (e) => {
+          e.target.disabled = true;
+          try { await api('/admin/artists/aliases?alias=' + encodeURIComponent(a.alias), { method: 'DELETE' }); } catch (err) { aliasMsg.textContent = err.message; }
+          loadAliases();
+        } }, t('Détacher'))))));
+    }).catch((err) => { if (!dead) aliasMsg.textContent = err.message; });
     body.replaceChildren(el('h1', {}, t('Règles de classement')),
       el('p', { class: 'hint' }, t('Appliquées à chaque scan et à chaque démarrage. Les corrections manuelles l’emportent toujours.')),
       ...RULES.map(([title, key, text]) => el('section', { class: 'ad-card' }, el('h3', {}, t(title), counts[key]), el('p', {}, t(text)))),
-      classBtn, classMsg);
+      classBtn, classMsg,
+      el('h2', {}, t('Artistes rattachés')),
+      el('div', { class: 'table-wrap' }, el('table', { class: 'users' },
+        el('thead', {}, el('tr', {}, th(t('Artiste')), th(t('Rattaché à')), th(t('Actions')))), aliases)), aliasMsg);
+    loadAliases();
     api('/admin/overview').then((o) => { if (alive()) RULES.forEach(([, key]) => { counts[key].textContent = o[key]; }); }).catch(() => {});
   } else if (section === 'corrections') {
     const rows = el('tbody');

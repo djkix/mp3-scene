@@ -53,7 +53,7 @@ function list(container) {
       el('td', {}, el('a', { href: `${HOME}&id=${p.id}` }, p.name)),
       el('td', { class: 'num' }, String(p.tracks)), el('td', { class: 'num' }, fmtDuration(p.duration)),
       el('td', {}, el('div', { class: 'actions' },
-        el('button', { type: 'button', class: 'icon', title: tr('Lire'), 'aria-label': tr('Lire'), onclick: () => play(p.id, status) }, '▶︎'),
+        el('button', { type: 'button', class: 'icon', 'data-ico': 'play', title: tr('Lire'), 'aria-label': tr('Lire'), onclick: () => play(p.id, status) }),
         el('button', { type: 'button', class: 'icon', title: tr('Renommer'), 'aria-label': tr('Renommer'), onclick: () => {
           const n = prompt(tr('Nouveau nom de la playlist'), p.name);
           if (n?.trim()) run(() => api(`/playlists/${p.id}`, { method: 'PUT', body: { name: n } }));

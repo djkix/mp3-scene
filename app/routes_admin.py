@@ -6,7 +6,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from . import db, genres, scanner, security
+from . import artists, db, genres, scanner, security
 from .deps import MAX_INT, Id, get_conn, require_admin
 from .routes_library import RELEASE_COLS, RELEASE_FROM, Dir, Sort, _order, _page, _release
 
@@ -177,26 +177,84 @@ class Correction(BaseModel):
     genre: str | None = Field(default=None, max_length=200)
 
 
-@router.patch("/releases/{rid}", status_code=204)
-def correct_release(rid: Id, body: Correction, conn=Depends(get_conn)):
-    """Corrige l'artiste, la catégorie ou le genre d'une release. Champ absent : inchangé ; vide : retour à la valeur
-    automatique. La correction est gardée par chemin et réappliquée après chaque scan."""
-    row = conn.execute("SELECT path FROM releases WHERE id=?", (rid,)).fetchone()
-    if row is None:
+def _correct(conn, rids, fields):
+    """Enregistre la correction `fields` (colonne -> valeur, None : retour à l'automatique) pour les releases `rids`."""
+    paths = [r["path"] for rid in rids for r in conn.execute("SELECT path FROM releases WHERE id=?", (rid,))]
+    if len(paths) != len(rids):
         raise HTTPException(404, "Release introuvable.")
-    fields = {k: (v or "").strip() or None for k, v in body.model_dump(exclude_unset=True).items()}
     if fields.get("category") and conn.execute("SELECT 1 FROM releases WHERE category=? LIMIT 1",
                                                (fields["category"],)).fetchone() is None:
         raise HTTPException(400, "Catégorie inconnue.")
     if fields.get("genre"):
         fields["genre"] = genres.normalize(fields["genre"]) or fields["genre"]
-    conn.execute("INSERT OR IGNORE INTO overrides(path) VALUES (?)", (row["path"],))
-    for col, val in fields.items():  # noms de colonnes issus du modèle, jamais du client
-        conn.execute(f"UPDATE overrides SET {col}=? WHERE path=?", (val, row["path"]))
-    conn.execute("DELETE FROM overrides WHERE path=? AND artist IS NULL AND category IS NULL AND genre IS NULL", (row["path"],))
+    for path in paths:
+        conn.execute("INSERT OR IGNORE INTO overrides(path) VALUES (?)", (path,))
+        for col, val in fields.items():  # noms de colonnes issus du modèle, jamais du client
+            conn.execute(f"UPDATE overrides SET {col}=? WHERE path=?", (val, path))
+    conn.execute("DELETE FROM overrides WHERE artist IS NULL AND category IS NULL AND genre IS NULL")
     # valeurs automatiques recalculées, puis corrections réappliquées (un artiste rendu à l'automatique n'est regroupé
     # avec les autres graphies qu'au prochain scan ou démarrage)
-    scanner._aggregate(conn, [rid])
+    scanner._aggregate(conn, rids)
+    db.categorize(conn)
+    conn.commit()
+
+
+@router.patch("/releases/{rid}", status_code=204)
+def correct_release(rid: Id, body: Correction, conn=Depends(get_conn)):
+    """Corrige l'artiste, la catégorie ou le genre d'une release. Champ absent : inchangé ; vide : retour à la valeur
+    automatique. La correction est gardée par chemin et réappliquée après chaque scan."""
+    _correct(conn, [rid], {k: (v or "").strip() or None for k, v in body.model_dump(exclude_unset=True).items()})
+
+
+class BulkCorrection(Correction):
+    ids: list[Id] = Field(min_length=1, max_length=500)
+
+
+@router.patch("/releases", status_code=204)
+def correct_releases(body: BulkCorrection, conn=Depends(get_conn)):
+    """Même correction pour plusieurs releases ; seuls les champs remplis sont modifiés."""
+    fields = {k: v.strip() for k, v in body.model_dump(exclude={"ids"}).items() if v and v.strip()}
+    if not fields:
+        raise HTTPException(400, "Aucun champ à corriger.")
+    _correct(conn, list(dict.fromkeys(body.ids)), fields)
+
+
+class Alias(BaseModel):
+    alias: str = Field(min_length=1, max_length=200)
+    target: str = Field(min_length=1, max_length=200)
+
+
+@router.get("/artists/aliases")
+def artist_aliases(conn=Depends(get_conn)):
+    """Artistes rattachés à la main."""
+    return [dict(r) for r in conn.execute("SELECT alias, target FROM artist_aliases ORDER BY alias COLLATE NOCASE")]
+
+
+@router.put("/artists/aliases", status_code=204)
+def attach_artist(body: Alias, conn=Depends(get_conn)):
+    """Rattache un artiste à un autre ; la règle est gardée et réappliquée à chaque regroupement."""
+    alias, target = body.alias.strip(), body.target.strip()
+    if not target or artists.fold(alias) == artists.fold(target):
+        raise HTTPException(400, "Choisissez un autre artiste que lui-même.")
+    conn.execute("INSERT OR REPLACE INTO artist_aliases(key, alias, target) VALUES (?,?,?)", (artists.fold(alias), alias, target))
+    artists.apply(conn)
+    db.categorize(conn)  # réapplique les corrections manuelles
+    conn.commit()
+
+
+@router.delete("/artists/aliases", status_code=204)
+def detach_artist(alias: str = Query(max_length=200), conn=Depends(get_conn)):
+    """Retire un rattachement : les releases de la cible retrouvent l'artiste de leur nom et de leurs tags, puis
+    sont regroupées à nouveau."""
+    row = conn.execute("SELECT target FROM artist_aliases WHERE key=?", (artists.fold(alias),)).fetchone()
+    if row is None:
+        raise HTTPException(404, "Rattachement introuvable.")
+    conn.execute("DELETE FROM artist_aliases WHERE key=?", (artists.fold(alias),))
+    shown = conn.execute("SELECT COALESCE(tag_artist, artist) FROM releases WHERE COALESCE(tag_artist, artist)=? COLLATE NOCASE"
+                         " LIMIT 1", (row["target"],)).fetchone()
+    if shown:
+        artists.reset(conn, shown[0])
+    artists.apply(conn)
     db.categorize(conn)
     conn.commit()
 

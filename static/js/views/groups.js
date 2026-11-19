@@ -1,7 +1,7 @@
 // Explorer : releases regroupées par groupe (#/groups), artiste (#/artists) ou genre (#/genres), avec le nombre de
 // releases et le poids. #/groups/<nom> et #/artists/<nom> ouvrent les releases correspondantes ; un genre ouvre la
 // liste « Derniers » filtrée. Les filtres Genre et Année sont dans l'adresse et suivent d'une page à l'autre.
-import { api, fmtSize } from '../api.js';
+import { api, fmtSize, session } from '../api.js';
 import { el } from '../dom.js';
 import { t as tr } from '../i18n.js';
 import * as releases from './releases.js';
@@ -26,8 +26,19 @@ function detail(container, kind, params) {
   const appears = !!other;
   const tabBtn = (label, on, hash) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(on),
     onclick: () => { location.hash = hash; } }, label);
+  // administrateur : rattacher cet artiste à un autre (règle gardée après les scans)
+  const attach = kind === 'artists' && session.user?.role === 'admin' && el('button', { type: 'button', onclick: async () => {
+    const target = (prompt(tr('Rattacher « {0} » à quel artiste ?', name)) || '').trim();
+    if (!target) return;
+    attach.disabled = true;
+    try {
+      await api('/admin/artists/aliases', { method: 'PUT', body: { alias: name, target } });
+      location.hash = `#/artists/${encodeURIComponent(target)}`;
+    } catch (err) { alert(err.message); attach.disabled = false; }
+  } }, tr('Rattacher à…'));
   container.replaceChildren(
-    el('h1', { class: 'grp-title' }, el('a', { href: `#/${kind}` + qs({ genre: params.genre, year: params.year }) }, tr(tab)), ' › ', name, ' ', total),
+    el('h1', { class: 'grp-title' }, el('a', { href: `#/${kind}` + qs({ genre: params.genre, year: params.year }) }, tr(tab)), ' › ', name, ' ', total,
+      ' ', attach),
     ...(kind === 'artists' ? [el('div', { class: 'tabs', role: 'tablist', 'aria-label': name },
       tabBtn(tr('Releases'), !other, base), tabBtn(tr('Avec'), other === 'collab', base + '?in=with'),
       tabBtn(tr('Apparitions'), other === 'appears', base + '?in=appears'))] : []),

@@ -1,7 +1,7 @@
 # Mp3 Scene — descriptif pour maquette
 
 Document destiné à un designer ou à un outil de maquettage. Il décrit le produit **tel qu'il fonctionne aujourd'hui
-(version 1.34.0)** : à qui il sert, ses écrans, les données affichées, les états et les contraintes à respecter.
+(version 1.35.0)** : à qui il sert, ses écrans, les données affichées, les états et les contraintes à respecter.
 L'habillage visuel actuel est décrit à la fin ; il peut être remis en cause, les contraintes ne le peuvent pas.
 
 > **Règle pour la maquette : ce document est la liste complète des fonctionnalités.** Ne rien ajouter qui n'y figure
@@ -105,7 +105,8 @@ dossiers, les pages de groupe et d'artiste, les favoris et le contrôle qualité
   premières sont affichées : filtrez pour affiner. »
 - **Page d'un groupe ou d'un artiste** : titre « Groupes › NOM » suivi du nombre de releases et du poids, puis la
   liste de releases avec ses filtres et le bouton Mix.
-- **Page d'un artiste** : trois onglets sous le titre, **Releases** (les siennes), **Avec** (releases dont le nom
+- **Page d'un artiste** : pour un administrateur, un bouton **Rattacher à…** après le titre (demande le nom de
+  l'artiste cible) ; trois onglets sous le titre, **Releases** (les siennes), **Avec** (releases dont le nom
   l'associe à un autre artiste : feat, vs, &) et **Apparitions** (releases d'un autre artiste, compilations surtout,
   où il signe une piste).
 - Un clic sur un **genre** ouvre la liste Derniers filtrée sur ce genre.
@@ -191,8 +192,8 @@ bandeau « Serveur injoignable : mode hors ligne. » (bouton « Réessayer »), 
 (celle de l'onglet Hors ligne) et le lecteur. Rien d'autre n'est accessible.
 
 ### 4.12 Administration (administrateurs)
-Page ouverte depuis Compte. À gauche, une **navigation par type d'action** (colonne fixe sur bureau, rangée
-défilante sur téléphone) ; la section active est sur fond vert pâle :
+Page ouverte depuis Compte. À gauche, une **navigation par type d'action** (colonne fixe à partir de 1100 px de
+large, rangée défilante au-dessus du contenu en dessous) ; la section active est sur fond vert pâle :
 **Vue d'ensemble** · *Bibliothèque* : **Scan**, **Contrôle qualité**, **Corrections** · *Classement* : **Règles** ·
 *Accès* : **Utilisateurs**, **Partages** (mène à Compte) · *Système* : **Statistiques**.
 
@@ -211,12 +212,15 @@ défilante sur téléphone) ; la section active est sur fond vert pâle :
 - **Corrections** : tableau Release, Artiste, Catégorie, Genre, bouton **Retour à l'automatique**. Vide : « Aucune
   correction manuelle. »
 - **Règles** : quatre cartes (Catégories, Artistes, Groupes, Genres) avec leur nombre et la règle en une phrase,
-  puis **Relancer le classement**.
+  puis **Relancer le classement** ; puis **Artistes rattachés** : tableau Artiste, Rattaché à, bouton **Détacher**.
+  Vide : « Aucun artiste rattaché à la main. »
 - **Utilisateurs** : tableau Identifiant, Rôle (liste déroulante), Actions (Réinitialiser le mot de passe,
   Supprimer avec confirmation), message par ligne ; puis **Créer un utilisateur**. Le dernier administrateur ne
   peut être ni rétrogradé ni supprimé.
 
-Les deux écrans suivants gardent la même navigation à gauche.
+Les deux écrans suivants gardent la même navigation à gauche. Dans le contrôle qualité, chaque ligne porte une
+**case à cocher** devant le nom, et un bouton vert **Corriger la sélection (n)** au-dessus de la liste ouvre la boîte
+de correction pour toutes les releases cochées (« Corriger 12 releases », champs vides au départ).
 
 - **Statistiques** : une ligne de totaux (« 46 012 releases · 512 300 pistes · 3,2 To · 1 420 jours de musique »),
   puis six tableaux à barres horizontales (libellé, barre, nombre) : **Ajouts par mois**, **Par année**, **Par genre**,

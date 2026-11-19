@@ -62,31 +62,34 @@ function header(rel) {
 }
 
 // Correction manuelle (administrateur) : artiste, catégorie, genre. Un champ vidé revient à la valeur automatique.
+// Avec `ids` (contrôle qualité), la même correction pour plusieurs releases : seuls les champs remplis comptent.
 let dlg = null;
-async function correct(rel) {
+export async function correct(rel, ids = null) {
   dlg ??= document.body.appendChild(el('dialog', { class: 'pl-add' }));
   const f = await loadFilters().catch(() => ({ categories: [], genres: [] }));
   const msg = el('p', { class: 'status', role: 'status' });
-  const artist = el('input', { value: rel.artist || '', maxLength: 200 });
-  const genre = el('input', { value: rel.genre || '', maxLength: 200, list: 'fix-genres' });
-  const category = el('select', {}, f.categories.map((c) => el('option', { value: c }, catLabel(c))));
-  category.value = rel.category || '';
+  const artist = el('input', { value: rel?.artist || '', maxLength: 200 });
+  const genre = el('input', { value: rel?.genre || '', maxLength: 200, list: 'fix-genres' });
+  const category = el('select', {}, ids && el('option', { value: '' }, '—'), f.categories.map((c) => el('option', { value: c }, catLabel(c))));
+  category.value = rel?.category || '';
   const was = { artist: artist.value, category: category.value, genre: genre.value };
   const field = (label, input) => el('label', {}, label, input);
-  dlg.replaceChildren(el('h2', {}, t('Corriger la release')),
+  dlg.replaceChildren(el('h2', {}, ids ? t('Corriger {0} releases', ids.length) : t('Corriger la release')),
     el('form', { class: 'stack', onsubmit: async (e) => {
       e.preventDefault();
       const now = { artist: artist.value.trim(), category: category.value, genre: genre.value.trim() };
       const body = Object.fromEntries(Object.entries(now).filter(([k, v]) => v !== was[k])); // seuls les champs modifiés
       try {
-        if (Object.keys(body).length) await api(`/admin/releases/${rel.id}`, { method: 'PATCH', body });
+        if (ids && Object.keys(body).length) await api('/admin/releases', { method: 'PATCH', body: { ...body, ids } });
+        else if (Object.keys(body).length) await api(`/admin/releases/${rel.id}`, { method: 'PATCH', body });
         dlg.close();
         dispatchEvent(new HashChangeEvent('hashchange')); // recharge la fiche
       } catch (err) { msg.textContent = err.message; }
     } },
     field(t('Artiste'), artist), field(t('Catégorie'), category), field(t('Genre'), genre),
     el('datalist', { id: 'fix-genres' }, f.genres.map((g) => el('option', { value: g }))),
-    el('p', { class: 'status' }, t('Un champ vidé revient à la valeur automatique. La correction est gardée après les scans.')),
+    el('p', { class: 'status' }, ids ? t('Seuls les champs remplis sont modifiés. La correction est gardée après les scans.')
+      : t('Un champ vidé revient à la valeur automatique. La correction est gardée après les scans.')),
     msg,
     el('div', { class: 'inline-form' }, el('button', { type: 'submit', class: 'primary' }, t('Enregistrer')),
       el('button', { type: 'button', onclick: () => dlg.close() }, t('Annuler')))));

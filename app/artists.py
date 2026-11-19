@@ -35,8 +35,9 @@ def _clean(artist):
     return main(artist)
 
 
-def _step(pairs: dict) -> dict:
-    """Un passage du regroupement sur {id: (artiste du nom, artiste des tags)}."""
+def _step(pairs: dict, aliases: dict) -> dict:
+    """Un passage du regroupement sur {id: (artiste du nom, artiste des tags)} ; `aliases` : rattachements manuels
+    {clé de l'artiste rattaché: artiste cible}."""
     out = {}
     for i, (name, tag) in pairs.items():
         name, tag = _clean(name), _clean(tag)
@@ -54,7 +55,8 @@ def _step(pairs: dict) -> dict:
         # liste d'exceptions si cela gêne
         return a and next((a[:m.start()] for m in _AMP.finditer(a) if count[fold(a[:m.start()])] > count[fold(a)]), a)
 
-    out = {i: (lead(n), lead(t)) for i, (n, t) in out.items()}
+    manual = lambda a: a and aliases.get(fold(a), a)
+    out = {i: (manual(lead(n)), manual(lead(t))) for i, (n, t) in out.items()}
     spellings = defaultdict(Counter)
     for pair in out.values():
         for a in {*pair} - {None}:
@@ -71,14 +73,26 @@ def apply(conn) -> int:
     # les artistes des pistes ne sont pas touchés, un invité y a son sens
     start = {r["id"]: (r["artist"], r["tag_artist"]) for r in conn.execute(
         "SELECT id, artist, tag_artist FROM releases WHERE artist IS NOT NULL OR tag_artist IS NOT NULL")}
+    aliases = dict(conn.execute("SELECT key, target FROM artist_aliases").fetchall())
     pairs = start
     for _ in range(8):  # un regroupement peut en permettre un autre : jusqu'à stabilité
-        pairs, before = _step(pairs), pairs
+        pairs, before = _step(pairs, aliases), pairs
         if pairs == before:
             break
     changed = [(*pair, i) for i, pair in pairs.items() if pair != start[i]]
     conn.executemany("UPDATE releases SET artist=?, tag_artist=? WHERE id=?", changed)
     return len(changed)
+
+
+def reset(conn, artist: str) -> None:
+    """Rend aux releases de cet artiste l'artiste de leur nom et de leurs tags, avant un nouveau regroupement
+    (rattachement manuel retiré)."""
+    from app.naming import parse_release_name  # import tardif : naming n'a pas besoin de ce module
+    for r in conn.execute("SELECT id, name FROM releases WHERE COALESCE(tag_artist, artist)=?", (artist,)).fetchall():
+        conn.execute(
+            "UPDATE releases SET artist=:a, tag_artist=(SELECT CASE WHEN count(DISTINCT artist)=1 AND count(artist)=count(*)"
+            " THEN max(artist) END FROM tracks WHERE release_id=:r) WHERE id=:r",
+            {"r": r["id"], "a": parse_release_name(r["name"])["artist"]})
 
 
 _GUEST = r"(?:feat|ft|featuring|vs|versus|and|with|&|\+)"

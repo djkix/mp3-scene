@@ -369,6 +369,7 @@ dialog.pl-add h2 { margin: 0 0 10px; font-size: 15px; }
 .pl-add-list button { text-align: left; overflow-wrap: anywhere; }
 dialog.pl-add .inline-form input { flex: 1 1 120px; min-width: 0; }
 dialog.pl-add .status { padding: 8px 0; min-height: 1em; }
+.rel-pick { margin: 0 8px 0 0; vertical-align: middle; accent-color: var(--accent); min-height: 0; }
 .letters { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin: 8px 0; }
 .letters button { min-width: 28px; padding: 3px 6px; font: 600 11px var(--mono); }
 .letters button[aria-pressed="true"]:not(:disabled) { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
@@ -394,7 +395,8 @@ dialog.pl-add .status { padding: 8px 0; min-height: 1em; }
 .ad-card dd { text-align: right; font-variant-numeric: tabular-nums; }
 .ad-card .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .ad-card .actions:empty { display: none; }
-@media (max-width: 699px) {
+/* sous 1100 px la navigation passe en rangée : la colonne écraserait le nom des releases du contrôle qualité */
+@media (max-width: 1099px) {
   .admin { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .ad-nav { position: static; flex-direction: row; align-items: center; overflow-x: auto; padding: 10px 0 0; }
   .ad-nav p { display: none; }
@@ -471,6 +473,11 @@ td .actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 #nav a[data-route="groups"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 7h8M18 7h2M4 17h2M12 17h8'/%3E%3Ccircle cx='15' cy='7' r='2.5'/%3E%3Ccircle cx='9' cy='17' r='2.5'/%3E%3C/svg%3E"); }
 #nav a[data-route="favorites"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z'/%3E%3C/svg%3E"); }
 #nav a[data-route="account"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='8' r='4'/%3E%3Cpath d='M4 20c0-4 4-6 8-6s8 2 8 6'/%3E%3C/svg%3E"); }
+[data-ico="pause"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 5h4v14H7zM13 5h4v14h-4z'/%3E%3C/svg%3E"); }
+[data-ico="prev"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 5h2.5v14H6zM20 5v14l-10.5-7z'/%3E%3C/svg%3E"); }
+[data-ico="next"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M15.5 5H18v14h-2.5zM4 5v14l10.5-7z'/%3E%3C/svg%3E"); }
+/* lecteur : l'icône suit la taille du bouton (38 px sur bureau, 72 px en plein écran) */
+#player .icon[data-ico]::before, .icon[data-ico]::before { width: 1.2em; height: 1.2em; }
 [data-ico="play"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8 5v14l11-7z'/%3E%3C/svg%3E"); }
 [data-ico="queue"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 7h12M4 12h12M4 17h7M17 14v6M14 17h6'/%3E%3C/svg%3E"); }
 [data-ico="radio"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='1.5' fill='%23000'/%3E%3Cpath d='M8.5 15.5a5 5 0 0 1 0-7M15.5 8.5a5 5 0 0 1 0 7M5.6 18.4a9 9 0 0 1 0-12.8M18.4 5.6a9 9 0 0 1 0 12.8'/%3E%3C/svg%3E"); }

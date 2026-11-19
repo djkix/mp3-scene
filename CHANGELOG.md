@@ -4,6 +4,21 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.35.0](https://github.com/djkix/mp3-scene/compare/v1.34.0...v1.35.0) (2026-11-19)
+
+### Résumé
+
+**Correction en lot, rattachement manuel d'artistes, icônes du lecteur dessinées.**
+
+- Contrôle qualité : des cases à cocher et **Corriger la sélection** donnent d'un coup le même artiste, la même
+  catégorie ou le même genre à plusieurs releases (500 au plus) ; seuls les champs remplis sont modifiés.
+- Page d'un artiste (administrateur) : **Rattacher à…** réunit cet artiste à un autre. La règle est gardée après les
+  scans ; Administration › Règles liste les artistes rattachés et permet de les détacher.
+- Lecteur : lecture, pause, précédent et suivant sont des icônes dessinées. C'étaient des caractères que certains
+  téléphones, Android surtout, affichaient en emoji orange.
+- Administration : sous 1100 px de large, la navigation passe en rangée au-dessus du contenu (la colonne écrasait le
+  nom des releases du contrôle qualité).
+
 ## [1.34.0](https://github.com/djkix/mp3-scene/compare/v1.33.0...v1.34.0) (2026-11-19)
 
 ### Résumé
