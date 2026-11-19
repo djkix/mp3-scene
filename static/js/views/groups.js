@@ -35,7 +35,7 @@ export function render(container, params) {
   const { genre = '', year = '' } = params;
   const setFilter = (name, value) => { location.hash = `#/${kind}` + qs({ genre, year, [name]: value }); };
   const HEAD = [[tr(label), 'name', 1], [tr('Releases'), 'releases', -1], [tr('Poids'), 'size', -1]]; // [libellé, clé, sens au premier clic]
-  let rows = [], key = 'releases', dir = -1, dead = false;
+  let rows = [], key = 'name', dir = 1, dead = false;
   const find = el('input', { type: 'search', placeholder: tr('Filtrer la liste…'), 'aria-label': tr('Filtrer la liste…'), oninput: paint });
   const bar = el('div', { class: 'filters' }, find);
   const body = el('tbody');

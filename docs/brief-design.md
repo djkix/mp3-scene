@@ -1,7 +1,7 @@
 # Mp3 Scene — descriptif pour maquette
 
 Document destiné à un designer ou à un outil de maquettage. Il décrit le produit **tel qu'il fonctionne aujourd'hui
-(version 1.24.0)** : à qui il sert, ses écrans, les données affichées, les états et les contraintes à respecter.
+(version 1.25.0)** : à qui il sert, ses écrans, les données affichées, les états et les contraintes à respecter.
 L'habillage visuel actuel est décrit à la fin ; il peut être remis en cause, les contraintes ne le peuvent pas.
 
 > **Règle pour la maquette : ce document est la liste complète des fonctionnalités.** Ne rien ajouter qui n'y figure
@@ -58,7 +58,7 @@ Liste des releases, la plus récente en premier.
 
 - En tête, quand il y en a : « 12 nouvelles releases depuis votre dernière visite. » Ces releases portent une
   pastille **nouveau** avant leur nom.
-- **Filtres**, centrés au-dessus de la liste : **Localisations**, **Genres**, **Années** (listes déroulantes ;
+- **Filtres**, centrés au-dessus de la liste : **Catégories**, **Genres**, **Années** (listes déroulantes ;
   jusqu'à plusieurs dizaines de genres), suivis du bouton **Mix** (lit 50 pistes tirées au hasard parmi les releases
   qui passent les filtres).
 - **Colonnes**, dans cet ordre, avec libellé en tête, séparées par de l'espace sans trait vertical. Un clic sur un
@@ -73,7 +73,7 @@ Liste des releases, la plus récente en premier.
 | Pistes | 52 | Centré |
 | Débit | 320 kbit/s | Centré ; moyenne des pistes, vide tant que les tags ne sont pas lus |
 | Poids | 934 Mo | Aligné à droite |
-| Localisation | Compilations | Dossier de premier niveau sous un nom court (Singles, Compilations, Live / Cable / Sat / Radio) ; info-bulle : nom du dossier |
+| Catégorie | Compilations | Dossier de premier niveau sous un nom court (Singles, Compilations, Live) ; info-bulle : libellé complet (Live / Cable / Sat / Radio) |
 | Actions | + ♡ › | Ajouter à la file, favori (plein quand actif), ouvrir la fiche |
 
 - **Clic sur une ligne** : lance la lecture de la release. Les trois actions sont des cibles distinctes.
@@ -108,7 +108,7 @@ dossiers, les pages de groupe et d'artiste, les favoris et le contrôle qualité
 - **Nom** de la release en titre.
 - **Pochette** à gauche des informations (au-dessus sur téléphone), quand la release en a une ; un clic l'ouvre en grand.
 - **Informations** (les champs absents ne s'affichent pas) : Artiste, Titre, Source (WEB, CD, VINYL, SAT…),
-  Année, Groupe, Localisation, Genre, Taille, Durée. Artiste, Année, Groupe et Genre sont des liens vers la liste
+  Année, Groupe, Catégorie, Genre, Taille, Durée. Artiste, Année, Groupe et Genre sont des liens vers la liste
   correspondante.
 - **Actions**, dans cet ordre : **Lire** (principale), **Ajouter à la file**, **Radio**, **Ajouter à une playlist**,
   **Garder hors ligne** (devient « Téléchargement 3/12… » puis « Retirer du hors-ligne »), **Partager**,
@@ -194,7 +194,7 @@ Page à deux onglets, ouverte depuis Compte.
 
 - **Tableau de bord** : une ligne de totaux (« 46 012 releases · 512 300 pistes · 3,2 To · 1 420 jours de musique »),
   puis six tableaux à barres horizontales (libellé, barre, nombre) : **Ajouts par mois**, **Par année**, **Par genre**,
-  **Par source**, **Par localisation**, **Pistes par débit**.
+  **Par source**, **Par catégorie**, **Pistes par débit**.
 - **Contrôle qualité** : une rangée d'onglets, chacun avec son nombre — **Sans NFO**, **Sans tags**, **Pistes
   illisibles**, **Débit inférieur à 192 kbit/s**, **Sans année**, **Sans pochette**, **Sans piste** — puis la liste de
   releases concernées. Vide : « Aucune release concernée. »

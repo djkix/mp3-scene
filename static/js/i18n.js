@@ -21,10 +21,11 @@ export function t(fr, ...args) {
   return s.replace(/\{(\d+)\}/g, (m, i) => (i < args.length ? args[i] : m));
 }
 
-// Libellé d'une localisation (dossier racine) : « 02.Various Artists - Compilations » -> « Compilations ».
-export const catLabel = (c) => {
+// Libellé d'une catégorie (dossier racine) : « 02.Various Artists - Compilations » -> « Compilations ».
+// `short` : forme courte pour la colonne des listes (« Live »).
+export const catLabel = (c, short = false) => {
   const s = String(c ?? '').replace(/^\d+\.\s*/, '').replace(/^Various Artists - /i, '');
-  return /^live and radio$/i.test(s) ? 'Live / Cable / Sat / Radio' : s;
+  return /^live and radio$/i.test(s) ? (short ? 'Live' : 'Live / Cable / Sat / Radio') : s;
 };
 
 export function setLang(l) {

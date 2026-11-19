@@ -4,6 +4,20 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.25.0](https://github.com/djkix/mp3-scene/compare/v1.24.0...v1.25.0) (2026-11-19)
+
+### Résumé
+
+**Ordre alphabétique par défaut, hors derniers ajouts. Plus de place pour le nom des releases.**
+
+- Les listes de groupes, d'artistes et de genres s'ouvrent triées par nom (et non plus par nombre de releases).
+- Les releases d'un groupe, d'un artiste, d'un filtre (localisation, genre, année) ou d'une recherche s'ouvrent
+  triées par nom. L'accueil sans filtre reste « derniers ajouts », du plus récent au plus ancien.
+- Un clic sur un en-tête change toujours le tri.
+- **Catégorie** remplace « Localisation » partout (colonne, filtre, fiche, tableau de bord). Dans les listes, la
+  colonne affiche un libellé court : Singles, Compilations, Live.
+- Sur ordinateur, les colonnes de la liste sont resserrées : le nom de la release gagne environ 200 pixels.
+
 ## [1.24.0](https://github.com/djkix/mp3-scene/compare/v1.23.0...v1.24.0) (2026-11-19)
 
 ### Résumé

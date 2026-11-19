@@ -23,7 +23,7 @@ function dashboard(body, status, isDead) {
     status.textContent = tr('{0} releases · {1} pistes · {2} · {3} jours de musique', s.releases, s.tracks, fmtSize(s.size), Math.round(s.duration / 8640) / 10);
     body.className = 'stats';
     body.replaceChildren(block(tr('Ajouts par mois'), s.months), block(tr('Par année'), s.years), block(tr('Par genre'), s.genres),
-      block(tr('Par source'), s.sources), block(tr('Par localisation'), s.categories, (r) => catLabel(r.name)),
+      block(tr('Par source'), s.sources), block(tr('Par catégorie'), s.categories, (r) => catLabel(r.name)),
       block(tr('Pistes par débit'), s.bitrates, (r) => `${r.name} kbit/s`));
   }).catch((err) => { if (!isDead()) status.textContent = err.message; });
 }

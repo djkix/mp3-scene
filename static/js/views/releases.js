@@ -23,7 +23,7 @@ export function since() {
 }
 // [libellé, clé de tri côté serveur, sens au premier clic]
 const HEAD = [[tr('Nom'), 'name', 'asc'], [tr('Genre'), 'genre', 'asc'], [tr('Date'), 'date', 'desc'], [tr('Pistes'), 'tracks', 'desc'],
-  [tr('Débit'), 'bitrate', 'desc'],  [tr('Poids'), 'size', 'desc'], [tr('Localisation'), 'category', 'asc']];
+  [tr('Débit'), 'bitrate', 'desc'],  [tr('Poids'), 'size', 'desc'], [tr('Catégorie'), 'category', 'asc']];
 
 export function favButton(rel, kind = 'release') {
   const btn = el('button', { type: 'button', class: 'icon fav' });
@@ -70,7 +70,7 @@ export function row(rel) {
     el('span', { class: 'mid' }, String(rel.track_count), el('span', { class: 'unit' }, ' ' + (rel.track_count > 1 ? tr('pistes') : tr('piste')))),
     el('span', { class: 'mid rate' }, rel.bitrate ? `${Math.round(rel.bitrate / 1000)} kbit/s` : ''),
     el('span', { class: 'num' }, fmtSize(rel.size)),
-    el('span', { class: 'rel-loc', title: rel.category || '' }, catLabel(rel.category))),
+    el('span', { class: 'rel-loc', title: catLabel(rel.category) }, catLabel(rel.category, true))),
   el('span', { class: 'rel-actions' }, queue, favButton(rel), detail));
 }
 
@@ -170,7 +170,7 @@ export function render(container, params) {
   let dead = false;
   loadFilters().then((f) => {
     if (dead) return;
-    bar.replaceChildren(select(tr('Localisation'), tr('Localisations'), 'category', f.categories, category, setFilter, catLabel),
+    bar.replaceChildren(select(tr('Catégorie'), tr('Catégories'), 'category', f.categories, category, setFilter, catLabel),
       select(tr('Genre'), tr('Genres'), 'genre', f.genres, genre, setFilter), select(tr('Année'), tr('Années'), 'year', f.years, year, setFilter),
       ...(q ? [] : [mix]));
   }).catch(() => {});
@@ -198,6 +198,7 @@ export function render(container, params) {
     query.set('offset', offset);
     query.set('limit', PAGE);
     return api('/releases?' + query + tri);
-  }, { empty: tr('Aucun résultat') });
+  // derniers ajouts (accueil sans filtre) par date ; recherche, filtre, groupe ou artiste par ordre alphabétique
+  }, { empty: tr('Aucun résultat'), sort: q || pin || category || genre || year ? ['name', 'asc'] : ['date', 'desc'] });
   return () => { dead = true; dispose(); };
 }
