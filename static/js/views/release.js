@@ -19,8 +19,12 @@ export function render(container, params) {
   // adresse par nom ; un identifiant numérique (anciens liens, favoris du navigateur) reste accepté
   api(/^\d+$/.test(id) ? `/releases/${id}` : `/release-by-name?name=${encodeURIComponent(id)}`).then((rel) => {
     if (dead) return;
-    const nfo = el('div'), sim = el('div');
-    container.replaceChildren(el('div', { class: 'detail' }, header(rel), trackTable(rel), nfo, sim));
+    const nfo = el('div'), sim = el('div'), vers = el('div');
+    container.replaceChildren(el('div', { class: 'detail' }, header(rel), trackTable(rel), vers, nfo, sim));
+    // même artiste et même titre, sortis par un autre groupe ou d'une autre source : débit et pistes pour comparer
+    api(`/releases/${rel.id}/versions`).then((list) => {
+      if (!dead && list.length) vers.replaceChildren(el('h2', { class: 'nfo-h' }, t('Autres versions')), el('ul', { class: 'rel-list' }, list.map(row)));
+    }).catch(() => {}); // facultatif
     watch.mark();
     api(`/releases/${rel.id}/similar`).then((list) => {
       if (!dead && list.length) sim.replaceChildren(el('h2', { class: 'nfo-h' }, t('Releases similaires')), el('ul', { class: 'rel-list' }, list.map(row)));

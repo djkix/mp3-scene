@@ -70,13 +70,20 @@ def _page(conn, cols, source, where, params, order, uid, offset, limit, build):
     return {"items": [build(r) for r in rows[:limit]], "has_more": len(rows) > limit}
 
 
-def _release_conds(category=None, genre=None, year=None, grp=None, artist=None):
+def _release_conds(category=None, genre=None, year=None, grp=None, artist=None, source=None, decade=None, appears=None):
     """Conditions SQL (et leurs paramètres) des filtres de release communs aux listes et au mix."""
     conds, params = [], []
-    for col, val in (("category", category), ("genre", genre), ("year", year), ("grp", grp)):
+    for col, val in (("category", category), ("genre", genre), ("year", year), ("grp", grp), ("source", source)):
         if val is not None:
             conds.append(f"r.{col}=?")
             params.append(val)
+    if decade is not None:
+        conds.append("r.year BETWEEN ? AND ?")
+        params += [decade, decade + 9]
+    if appears is not None:  # releases d'un autre artiste (compilations surtout) où celui-ci signe une piste
+        # ponytail: égalité stricte sur le tag de la piste ; « X feat. Y » n'est pas une apparition de X
+        conds.append("COALESCE(r.tag_artist, r.artist, '')!=? AND r.id IN (SELECT release_id FROM tracks WHERE artist=?)")
+        params += [appears, appears]
     if artist is not None:
         conds.append("COALESCE(r.tag_artist, r.artist)=?")
         params.append(artist)
@@ -85,10 +92,11 @@ def _release_conds(category=None, genre=None, year=None, grp=None, artist=None):
 
 @router.get("/api/mix")
 def mix(category: str | None = None, genre: str | None = None, year: int | None = Query(None, ge=0, le=MAX_INT),
-        grp: str | None = None, artist: str | None = None, limit: int = Query(50, ge=1, le=MAX_LIMIT),
-        user=Depends(current_user), conn=Depends(get_conn)):
+        grp: str | None = None, artist: str | None = None, source: str | None = None,
+        decade: int | None = Query(None, ge=0, le=MAX_INT), appears: str | None = None,
+        limit: int = Query(50, ge=1, le=MAX_LIMIT), user=Depends(current_user), conn=Depends(get_conn)):
     """Pistes tirées au hasard parmi les releases qui passent les filtres."""
-    conds, params = _release_conds(category, genre, year, grp, artist)
+    conds, params = _release_conds(category, genre, year, grp, artist, source, decade, appears)
     where = "WHERE " + " AND ".join(conds) if conds else ""
     # ponytail: ORDER BY RANDOM() trie tous les identifiants candidats (rapide jusqu'au million de pistes)
     rows = conn.execute(
@@ -105,12 +113,13 @@ def new_count(since: float = Query(ge=0, le=1e12), conn=Depends(get_conn)):
 
 @router.get("/api/releases")
 def list_releases(q: str = "", category: str | None = None, genre: str | None = None, grp: str | None = None,
-                  artist: str | None = None,
+                  artist: str | None = None, source: str | None = None, appears: str | None = None,
+                  decade: int | None = Query(None, ge=0, le=MAX_INT),
                   year: int | None = Query(None, ge=0, le=MAX_INT), favorites: int = Query(0, ge=0, le=1),
                   sort: Sort | None = None, dir: Dir = "asc",
                   offset: int = Query(0, ge=0, le=MAX_INT), limit: int = Query(50, ge=1, le=MAX_INT),
                   user=Depends(current_user), conn=Depends(get_conn)):
-    conds, params = _release_conds(category, genre, year, grp, artist)
+    conds, params = _release_conds(category, genre, year, grp, artist, source, decade, appears)
     if match := _fts_query(q):
         conds.append("r.id IN (SELECT rowid FROM releases_fts WHERE releases_fts MATCH ?)")
         params.append(match)
@@ -126,6 +135,7 @@ def filters(conn=Depends(get_conn)):
     col = lambda sql: [r[0] for r in conn.execute(sql)]
     return {"categories": col("SELECT DISTINCT category FROM releases WHERE category IS NOT NULL ORDER BY category"),
             "genres": col("SELECT DISTINCT genre FROM releases WHERE genre IS NOT NULL ORDER BY genre"),
+            "sources": col("SELECT DISTINCT source FROM releases WHERE source IS NOT NULL ORDER BY source"),
             "years": col("SELECT DISTINCT year FROM releases WHERE year IS NOT NULL ORDER BY year DESC")}
 
 
@@ -135,7 +145,8 @@ GROUP_BY = {"grp": "grp", "artist": "COALESCE(tag_artist, artist)", "genre": "ge
 
 @router.get("/api/groups")
 def groups(by: Literal["grp", "artist", "genre"] = "grp", name: str | None = None, genre: str | None = None,
-           year: int | None = Query(None, ge=0, le=MAX_INT), conn=Depends(get_conn)):
+           year: int | None = Query(None, ge=0, le=MAX_INT), decade: int | None = Query(None, ge=0, le=MAX_INT),
+           conn=Depends(get_conn)):
     """Releases regroupées par groupe, artiste ou genre : nombre et poids total, restreints au genre / à l'année."""
     col = GROUP_BY[by]
     conds, params = [f"{col} IS NOT NULL"], []
@@ -143,6 +154,9 @@ def groups(by: Literal["grp", "artist", "genre"] = "grp", name: str | None = Non
         if val is not None:
             conds.append(f"{c}=?")
             params.append(val)
+    if decade is not None:
+        conds.append("year BETWEEN ? AND ?")
+        params += [decade, decade + 9]
     # ponytail: liste entière sans pagination (l'interface n'affiche que les 1000 premières lignes) ; paginer si lourd
     return [dict(r) for r in conn.execute(
         f"SELECT {col} AS name, COUNT(*) AS releases, SUM(size) AS size FROM releases WHERE " + " AND ".join(conds)
@@ -172,7 +186,9 @@ def folders(path: str = "", sort: Sort | None = None, dir: Dir = "asc", offset: 
     if offset == 0:
         subs = [{"path": r["path"], "name": r["path"].rsplit("/", 1)[-1]} for r in conn.execute(
             "SELECT path FROM folders WHERE parent=? ORDER BY path COLLATE NOCASE", (path,))]
-    rels = _page(conn, RELEASE_COLS, RELEASE_FROM, "WHERE r.parent=?", [path],
+    # sous une catégorie, seules ses releases : un album ou un live rangé avec les singles se trouve dans la sienne
+    where, params = ("WHERE r.parent=? AND r.category=?", [path, path.split("/", 1)[0]]) if path else ("WHERE r.parent=?", [path])
+    rels = _page(conn, RELEASE_COLS, RELEASE_FROM, where, params,
                  _order(sort, dir, "r.name COLLATE NOCASE, r.id"), user["id"], offset, limit, _release)
     return {"path": path, "folders": subs, "releases": rels}
 
@@ -235,6 +251,16 @@ def similar(rid: Id, user=Depends(current_user), conn=Depends(get_conn)):
     rows = {x["id"]: _release(x) for x in conn.execute(
         f"SELECT {RELEASE_COLS} FROM {RELEASE_FROM} WHERE r.id IN ({','.join('?' * len(ids))})", (user["id"], *ids))}
     return [rows[i] for i in ids]
+
+
+@router.get("/api/releases/{rid}/versions")
+def versions(rid: Id, user=Depends(current_user), conn=Depends(get_conn)):
+    """Autres sorties du même titre : même artiste et même titre dans le nom (autre groupe, autre source, réédition)."""
+    # ponytail: rapprochement sur le nom seul, à la casse près ; « Title » et « Title_(Remixes) » sont réunis exprès
+    return [_release(x) for x in conn.execute(
+        f"SELECT {RELEASE_COLS} FROM {RELEASE_FROM} JOIN releases o ON o.id=? AND r.id!=o.id"
+        " AND lower(r.artist)=lower(o.artist) AND lower(r.title)=lower(o.title) ORDER BY r.name COLLATE NOCASE LIMIT 50",
+        (user["id"], rid))]
 
 
 @router.get("/api/releases/{rid}/nfo")

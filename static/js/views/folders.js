@@ -13,6 +13,8 @@ export function render(container, params) {
     crumbs.push(' › ', el('a', { href: '#/folders/' + encodePath(acc) }, acc === seg ? catLabel(seg) : seg)); // premier niveau : la catégorie
   }
   const page = (offset, tri = '') => api(`/folders?path=${encodeURIComponent(path)}&offset=${offset}&limit=50${tri}`);
+  // un dossier ne montre que les releases de sa catégorie rangées là ; ce lien les donne toutes, où qu'elles soient
+  if (path && !path.includes('/')) crumbs.push(' · ', el('a', { href: '#/?category=' + encodeURIComponent(path) }, t('Toute la catégorie')));
   container.replaceChildren(el('nav', { class: 'crumbs', 'aria-label': t("Fil d'Ariane") }, ...crumbs),
     el('p', { class: 'status' }, t('Chargement…')));
 

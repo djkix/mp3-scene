@@ -343,3 +343,27 @@ def test_out_of_range_integers_never_500(admin_client, library, method, url, cod
     url = url.format(n=n, exp=exp, sig=sign_track("test", n, exp))
     kw = {"json": {"track_ids": [n]}} if method == "post" else {"json": {"role": "user"}} if method == "patch" else {}
     assert admin_client.request(method.upper(), url, **kw).status_code == code, url
+
+
+def test_source_decade_appears_versions(user_client, admin_client, library, settings):
+    from app import db
+    names = lambda qs: sorted(x["name"] for x in user_client.get(f"/api/releases?{qs}").json()["items"])
+    B, V = "Bicep-Glue-(NT123)-WEB-2017-PWT", "VA-Big_Mix-2CD-2003-GRP"
+    assert user_client.get("/api/filters").json()["sources"] == ["WEB"]
+    assert names("source=WEB") == [A, B] and names("decade=2010") == [A, B] and names("decade=2000") == [V]
+    assert [x["name"] for x in user_client.get("/api/groups?decade=2000").json()] == ["GRP"]
+    # apparitions : piste signée dans la release d'un autre ; ses propres releases n'en sont pas
+    assert names("appears=X") == [V] and names("appears=A-Trak") == []
+    assert all(t["artist"] == "X" for t in user_client.get("/api/mix?appears=X&source=WEB").json()["items"])
+    rid = {x["name"]: x["id"] for x in user_client.get("/api/releases").json()["items"]}
+    assert user_client.get(f"/api/releases/{rid[A]}/versions").json() == []
+    assert admin_client.get("/api/admin/quality").json()["dupes"] == 0
+    c = db.connect(settings.data_dir)
+    c.execute("UPDATE releases SET artist='a-trak', title='IBANEZ', category='Albums' WHERE name=?", (B,))
+    c.commit()
+    c.close()
+    assert [x["name"] for x in user_client.get(f"/api/releases/{rid[A]}/versions").json()] == [B]
+    assert admin_client.get("/api/admin/quality").json()["dupes"] == 2
+    # un dossier ne montre que les releases de sa catégorie
+    assert user_client.get("/api/folders?path=Singles/B").json()["releases"]["items"] == []
+    assert len(user_client.get("/api/folders?path=Singles/A").json()["releases"]["items"]) == 1

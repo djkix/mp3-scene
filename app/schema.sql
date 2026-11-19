@@ -56,6 +56,8 @@ CREATE INDEX IF NOT EXISTS idx_releases_category ON releases(category);
 CREATE INDEX IF NOT EXISTS idx_releases_genre ON releases(genre);
 CREATE INDEX IF NOT EXISTS idx_releases_year ON releases(year);
 CREATE INDEX IF NOT EXISTS idx_releases_name ON releases(name);
+CREATE INDEX IF NOT EXISTS idx_releases_dupe ON releases(lower(artist), lower(title));
+CREATE INDEX IF NOT EXISTS idx_tracks_artist ON tracks(artist);
 CREATE INDEX IF NOT EXISTS idx_tracks_release ON tracks(release_id);
 CREATE INDEX IF NOT EXISTS idx_tracks_tags_read ON tracks(tags_read);
 CREATE INDEX IF NOT EXISTS idx_folders_parent ON folders(parent);

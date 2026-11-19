@@ -133,11 +133,13 @@ QUALITY = {
     "low_bitrate": "(SELECT AVG(bitrate) FROM tracks WHERE release_id=r.id)<192000",
     "no_year": "r.year IS NULL",
     "no_cover": "r.has_cover=0",  # NULL : pas encore vérifié par le scan
+    # même artiste et même titre dans le nom qu'une autre release (index idx_releases_dupe)
+    "dupes": "EXISTS (SELECT 1 FROM releases d WHERE lower(d.artist)=lower(r.artist) AND lower(d.title)=lower(r.title) AND d.id!=r.id)",
 }
 
 
 @router.get("/quality")
-def quality(kind: Literal["no_nfo", "no_tracks", "no_tags", "unreadable", "low_bitrate", "no_year", "no_cover"] | None = None,
+def quality(kind: Literal["no_nfo", "no_tracks", "no_tags", "unreadable", "low_bitrate", "no_year", "no_cover", "dupes"] | None = None,
             sort: Sort | None = None, dir: Dir = "asc", offset: int = Query(0, ge=0, le=MAX_INT),
             limit: int = Query(50, ge=1, le=MAX_INT), user=Depends(require_admin), conn=Depends(get_conn)):
     """Sans `kind` : nombre de releases par contrôle. Avec : la page de releases concernées."""

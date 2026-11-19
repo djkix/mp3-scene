@@ -138,6 +138,12 @@ let filtersCache = null;
 export const invalidateFilters = () => { filtersCache = null; }; // après un scan : nouveaux genres/années/catégories
 export const loadFilters = () => (filtersCache ??= api('/filters').catch((e) => { filtersCache = null; throw e; }));
 
+// Filtre Année : les décennies (valeur « 1990s ») puis les années ; yearQuery() en fait le paramètre de l'API.
+export const yearQuery = (year) => (/s$/.test(year) ? { decade: parseInt(year, 10) } : { year });
+export const yearSelect = (f, year, onChange) => select(tr('Année'), tr('Années'), 'year',
+  [...new Set(f.years.map((y) => `${Math.floor(y / 10) * 10}s`)), ...f.years], year, onChange,
+  (v) => (/s$/.test(v) ? tr('Années {0}', v.slice(0, 4)) : String(v)));
+
 export function select(label, all, name, values, current, onChange, text = String) {
   const sel = el('select', { 'aria-label': label, onchange: () => onChange(name, sel.value) },
     el('option', { value: '' }, all),
@@ -149,7 +155,7 @@ export function select(label, all, name, values, current, onChange, text = Strin
 // Vue « derniers ajouts » (#/), « recherche » (#/search?q=, onglet Pistes avec &in=tracks) et releases épinglées
 // sur un groupe ou un artiste (params.pin = {key, value, base}, voir groups.js).
 export function render(container, params) {
-  const { q = '', category = '', genre = '', year = '', pin = null } = params;
+  const { q = '', category = '', genre = '', year = '', source = '', pin = null } = params;
   const bar = el('div', { class: 'filters' });
   const list = el('div');
   const inTracks = q && params.in === 'tracks';
@@ -162,7 +168,7 @@ export function render(container, params) {
   if (inTracks) return trackList(list, { path: `/tracks?q=${encodeURIComponent(q)}`, empty: tr('Aucun résultat') });
 
   function setFilter(name, value) {
-    const next = { q, category, genre, year, [name]: value };
+    const next = { q, category, genre, year, source, ...pin?.extra, [name]: value };
     const qs = Object.entries(next).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
     location.hash = (pin ? pin.base : q ? '#/search' : '#/') + (qs ? '?' + qs : ''); // nouvelle entrée d'historique, pagination remise à zéro
   }
@@ -171,20 +177,22 @@ export function render(container, params) {
   loadFilters().then((f) => {
     if (dead) return;
     bar.replaceChildren(select(tr('Catégorie'), tr('Catégories'), 'category', f.categories, category, setFilter, catLabel),
-      select(tr('Genre'), tr('Genres'), 'genre', f.genres, genre, setFilter), select(tr('Année'), tr('Années'), 'year', f.years, year, setFilter),
+      select(tr('Genre'), tr('Genres'), 'genre', f.genres, genre, setFilter), yearSelect(f, year, setFilter),
+      select(tr('Source'), tr('Sources'), 'source', f.sources, source, setFilter),
       ...(q ? [] : [mix]));
   }).catch(() => {});
   // Mix : 50 pistes au hasard parmi les releases qui passent les filtres affichés.
+  const filters = { category, genre, ...yearQuery(year), source, ...(pin && { [pin.key]: pin.value }) };
   const mix = el('button', { type: 'button', title: tr('Lire 50 pistes au hasard parmi ces releases'), onclick: async () => {
     mix.disabled = true;
     try {
-      const { items } = await api('/mix?' + new URLSearchParams(Object.entries({ category, genre, year, ...(pin && { [pin.key]: pin.value }) }).filter(([, v]) => v)));
+      const { items } = await api('/mix?' + new URLSearchParams(Object.entries(filters).filter(([, v]) => v)));
       if (items.length) player.playTracks(items, 0); else player.flash(tr('Aucun résultat'));
     } catch (err) { player.flash(err.message); }
     mix.disabled = false;
   } }, tr('Mix'));
   const fresh = el('p', { class: 'status', role: 'status', hidden: true });
-  if (!q && !pin && !category && !genre && !year && since()) {
+  if (!q && !pin && !category && !genre && !year && !source && since()) {
     container.insertBefore(fresh, list);
     api(`/new-count?since=${since()}`).then(({ count }) => {
       if (dead || !count) return;
@@ -193,12 +201,12 @@ export function render(container, params) {
     }).catch(() => {});
   }
 
-  const query = new URLSearchParams(Object.entries({ q, category, genre, year, ...(pin && { [pin.key]: pin.value }) }).filter(([, v]) => v));
+  const query = new URLSearchParams(Object.entries({ q, ...filters }).filter(([, v]) => v));
   const dispose = releaseList(list, (offset, tri) => {
     query.set('offset', offset);
     query.set('limit', PAGE);
     return api('/releases?' + query + tri);
   // derniers ajouts (accueil sans filtre) par date ; recherche, filtre, groupe ou artiste par ordre alphabétique
-  }, { empty: tr('Aucun résultat'), sort: q || pin || category || genre || year ? ['name', 'asc'] : ['date', 'desc'] });
+  }, { empty: tr('Aucun résultat'), sort: q || pin || category || genre || year || source ? ['name', 'asc'] : ['date', 'desc'] });
   return () => { dead = true; dispose(); };
 }

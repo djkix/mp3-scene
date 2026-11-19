@@ -1,7 +1,7 @@
 # Mp3 Scene — descriptif pour maquette
 
 Document destiné à un designer ou à un outil de maquettage. Il décrit le produit **tel qu'il fonctionne aujourd'hui
-(version 1.26.0)** : à qui il sert, ses écrans, les données affichées, les états et les contraintes à respecter.
+(version 1.28.0)** : à qui il sert, ses écrans, les données affichées, les états et les contraintes à respecter.
 L'habillage visuel actuel est décrit à la fin ; il peut être remis en cause, les contraintes ne le peuvent pas.
 
 > **Règle pour la maquette : ce document est la liste complète des fonctionnalités.** Ne rien ajouter qui n'y figure
@@ -58,7 +58,7 @@ Liste des releases, la plus récente en premier.
 
 - En tête, quand il y en a : « 12 nouvelles releases depuis votre dernière visite. » Ces releases portent une
   pastille **nouveau** avant leur nom.
-- **Filtres**, centrés au-dessus de la liste : **Catégories**, **Genres**, **Années** (listes déroulantes ;
+- **Filtres**, centrés au-dessus de la liste : **Catégories**, **Genres**, **Années** (décennies puis années), **Sources** (listes déroulantes ;
   jusqu'à plusieurs dizaines de genres), suivis du bouton **Mix** (lit 50 pistes tirées au hasard parmi les releases
   qui passent les filtres).
 - **Colonnes**, dans cet ordre, avec libellé en tête, séparées par de l'espace sans trait vertical. Un clic sur un
@@ -92,7 +92,8 @@ dossiers, les pages de groupe et d'artiste, les favoris et le contrôle qualité
 ### 4.4 Catégories
 - **Fil d'Ariane** : Catégories › Compilations › -=Kontor=- (premier niveau : Singles, Compilations, Live & Radio ; les
   sous-dossiers gardent leur nom)
-- Liste des **sous-dossiers**, puis la **liste des releases** du dossier.
+- Au premier niveau, le fil d'Ariane se termine par le lien **Toute la catégorie** (liste filtrée).
+- Liste des **sous-dossiers**, puis la **liste des releases** du dossier qui sont de cette catégorie.
 - Messages : « Dossier vide. », « Dossier introuvable. »
 
 ### 4.5 Explorer
@@ -103,13 +104,15 @@ dossiers, les pages de groupe et d'artiste, les favoris et le contrôle qualité
   premières sont affichées : filtrez pour affiner. »
 - **Page d'un groupe ou d'un artiste** : titre « Groupes › NOM » suivi du nombre de releases et du poids, puis la
   liste de releases avec ses filtres et le bouton Mix.
+- **Page d'un artiste** : deux onglets sous le titre, **Releases** (les siennes) et **Apparitions** (releases d'un
+  autre artiste, compilations surtout, où il signe une piste).
 - Un clic sur un **genre** ouvre la liste Derniers filtrée sur ce genre.
 
 ### 4.6 Fiche d'une release
 - **Nom** de la release en titre.
 - **Pochette** à gauche des informations (au-dessus sur téléphone), quand la release en a une ; un clic l'ouvre en grand.
 - **Informations** (les champs absents ne s'affichent pas) : Artiste, Titre, Source (WEB, CD, VINYL, SAT…),
-  Année, Groupe, Catégorie, Genre, Taille, Durée. Artiste, Année, Groupe et Genre sont des liens vers la liste
+  Année, Groupe, Catégorie, Genre, Taille, Durée. Artiste, Source, Année, Groupe et Genre sont des liens vers la liste
   correspondante.
 - **Actions**, dans cet ordre : **Lire** (principale), **Ajouter à la file**, **Radio**, **Ajouter à une playlist**,
   **Garder hors ligne** (devient « Téléchargement 3/12… » puis « Retirer du hors-ligne »), **Partager**,
@@ -123,6 +126,7 @@ dossiers, les pages de groupe et d'artiste, les favoris et le contrôle qualité
   Débit, Genre et téléchargement sont masqués. Séparateurs « CD 1 », « CD 2 » pour les releases multi-disques.
   Clic sur une piste : lecture à partir de cette piste. La **piste en cours** est mise en évidence (trait vert à
   gauche, titre en vert, ▶ à la place du numéro), ici comme dans les listes de pistes. Message : « Aucune piste. »
+- **Autres versions** (si la release en a) : sous les pistes, avant le NFO, les releases de même artiste et de même titre, en lignes compactes.
 - **Releases similaires** (si la release en a) : jusqu'à douze lignes compactes sous le NFO (sous les pistes s'il n'y en a pas) — vignette, nom,
   détails sur une seconde ligne, actions + ♡ › — même artiste d'abord, puis même genre et même année.
 - **NFO** (si la release en a un) : bloc de texte en chasse fixe, art ASCII, centré ; sur téléphone la police est
@@ -197,7 +201,7 @@ Page à deux onglets, ouverte depuis Compte.
   puis six tableaux à barres horizontales (libellé, barre, nombre) : **Ajouts par mois**, **Par année**, **Par genre**,
   **Par source**, **Par catégorie**, **Pistes par débit**.
 - **Contrôle qualité** : une rangée d'onglets, chacun avec son nombre — **Sans NFO**, **Sans tags**, **Pistes
-  illisibles**, **Débit inférieur à 192 kbit/s**, **Sans année**, **Sans pochette**, **Sans piste** — puis la liste de
+  illisibles**, **Débit inférieur à 192 kbit/s**, **Sans année**, **Sans pochette**, **Sans piste**, **Doublons possibles** — puis la liste de
   releases concernées. Vide : « Aucune release concernée. »
 
 ### 4.13 Page de partage (publique, sans compte)

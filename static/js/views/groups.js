@@ -20,12 +20,18 @@ function detail(container, kind, params) {
   const name = params.rest, base = `#/${kind}/${encodeURIComponent(name)}`;
   const total = el('span', { class: 'muted' });
   const list = el('div');
+  // artiste : ses releases, ou celles des autres (compilations) où il signe une piste
+  const appears = kind === 'artists' && params.in === 'appears';
+  const tabBtn = (label, on, hash) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(on),
+    onclick: () => { location.hash = hash; } }, label);
   container.replaceChildren(
     el('h1', { class: 'grp-title' }, el('a', { href: `#/${kind}` + qs({ genre: params.genre, year: params.year }) }, tr(tab)), ' › ', name, ' ', total),
+    ...(kind === 'artists' ? [el('div', { class: 'tabs', role: 'tablist', 'aria-label': name },
+      tabBtn(tr('Releases'), !appears, base), tabBtn(tr('Apparitions'), appears, base + '?in=appears'))] : []),
     list);
-  api('/groups' + qs({ by, name, genre: params.genre, year: params.year }))
+  if (!appears) api('/groups' + qs({ by, name, genre: params.genre, ...releases.yearQuery(params.year || '') }))
     .then(([g]) => { total.textContent = g ? `${count(g.releases)} · ${fmtSize(g.size)}` : ''; }).catch(() => {});
-  return releases.render(list, { ...params, q: '', pin: { key: pin, value: name, base } });
+  return releases.render(list, { ...params, q: '', pin: appears ? { key: 'appears', value: name, base, extra: { in: 'appears' } } : { key: pin, value: name, base } });
 }
 
 export function render(container, params) {
@@ -65,9 +71,9 @@ export function render(container, params) {
   releases.loadFilters().then((f) => {
     if (dead) return;
     if (kind !== 'genres') bar.append(releases.select(tr('Genre'), tr('Genres'), 'genre', f.genres, genre, setFilter));
-    bar.append(releases.select(tr('Année'), tr('Années'), 'year', f.years, year, setFilter));
+    bar.append(releases.yearSelect(f, year, setFilter));
   }).catch(() => {});
-  api('/groups' + qs({ by, genre: kind === 'genres' ? '' : genre, year })).then((g) => { if (!dead) { rows = g; paint(); } })
+  api('/groups' + qs({ by, genre: kind === 'genres' ? '' : genre, ...releases.yearQuery(year) })).then((g) => { if (!dead) { rows = g; paint(); } })
     .catch((err) => { if (!dead) status.textContent = err.message; });
   return () => { dead = true; };
 }

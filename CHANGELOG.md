@@ -4,6 +4,22 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.28.0](https://github.com/djkix/mp3-scene/compare/v1.27.2...v1.28.0) (2026-11-19)
+
+### Résumé
+
+**Autres versions d'une release, filtres Source et décennie, apparitions d'un artiste, catégories sans mélange.**
+
+- Fiche : **Autres versions** liste, sous les pistes, les releases de même artiste et de même titre (autre groupe,
+  autre source, réédition), avec leur débit et leur nombre de pistes pour comparer.
+- Contrôle qualité : nouvel onglet **Doublons possibles**, toutes les releases qui ont une autre version.
+- Listes : nouveau filtre **Sources** (WEB, VINYL, CDM, CDS…) ; le filtre Années propose aussi les **décennies**.
+  La source de la fiche mène à la liste filtrée.
+- Page d'un artiste : onglet **Apparitions**, les releases d'un autre artiste (compilations surtout) où il signe
+  une piste.
+- Onglet Catégories : un dossier ne montre plus que les releases de sa catégorie (les albums et les lives rangés
+  avec les singles n'y figurent plus) ; le lien **Toute la catégorie** donne la liste complète.
+
 ## [1.27.2](https://github.com/djkix/mp3-scene/compare/v1.27.1...v1.27.2) (2026-11-19)
 
 ### Résumé
