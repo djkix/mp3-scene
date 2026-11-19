@@ -4,7 +4,7 @@
 
 **Collection de releases MP3 « scene » — bibliothèque · lecteur web · Chromecast · PWA**
 
-[![Version](https://img.shields.io/badge/version-1.33.0-purple?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.34.0-purple?style=for-the-badge)](CHANGELOG.md)
 [![Stack](https://img.shields.io/badge/stack-FastAPI_·_SQLite_·_JavaScript_pur-blue?style=for-the-badge)](#stack-technique)
 [![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
 
@@ -374,7 +374,6 @@ git tag v1.2.0 && git push origin v1.2.0
 - Pas de playlists ni de reprise entre appareils.
 - Pas d'AirPlay dédié, de Sonos ni de DLNA (le Bluetooth est géré par le téléphone).
 - Pas de transcodage : les MP3 sont servis tels quels.
-- Scan manuel uniquement, pas de scan planifié.
 - Pas d'édition de tags, de vérification SFV, ni de suppression ou déplacement de fichiers.
 - Interface en français et en anglais uniquement ; la page « hors ligne » reste en français.
 - Cast : Chrome/Edge uniquement, pas depuis un iPhone.
@@ -384,6 +383,11 @@ git tag v1.2.0 && git push origin v1.2.0
 ## Historique des versions
 
 Le détail est dans le [journal des modifications](CHANGELOG.md).
+
+### 1.34.0 — 19 novembre 2026
+
+Page **Administration** rangée par type d'action, avec scan quotidien ; **pochette par défaut** dans le lecteur et
+**nouvelle icône** de l'application.
 
 ### 1.33.0 — 19 novembre 2026
 

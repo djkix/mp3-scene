@@ -1,7 +1,7 @@
 # Mp3 Scene — descriptif pour maquette
 
 Document destiné à un designer ou à un outil de maquettage. Il décrit le produit **tel qu'il fonctionne aujourd'hui
-(version 1.33.0)** : à qui il sert, ses écrans, les données affichées, les états et les contraintes à respecter.
+(version 1.34.0)** : à qui il sert, ses écrans, les données affichées, les états et les contraintes à respecter.
 L'habillage visuel actuel est décrit à la fin ; il peut être remis en cause, les contraintes ne le peuvent pas.
 
 > **Règle pour la maquette : ce document est la liste complète des fonctionnalités.** Ne rien ajouter qui n'y figure
@@ -182,15 +182,7 @@ Dans cet ordre :
 - **Thème** : liste déroulante Système / Clair / Sombre.
 - **Liens de partage** : tableau **Nom**, **Expire le**, **Ouvertures**, avec **Copier** et **Révoquer** (confirmation)
   par ligne. Vide : « Aucun lien de partage en cours. »
-- **Administration** (administrateurs seulement) :
-  - **Utilisateurs** : tableau Identifiant, Rôle (liste déroulante), Actions (Réinitialiser le mot de passe,
-    Supprimer avec confirmation). Message par ligne. Le dernier administrateur ne peut être ni rétrogradé ni supprimé.
-  - **Créer un utilisateur** : identifiant, mot de passe, rôle, bouton **Créer**.
-  - **Scan de la bibliothèque** : bouton **Lancer le scan** (désactivé pendant un scan, qui peut durer des heures),
-    puis État (Au repos, Analyse des dossiers…, Lecture des tags…, Erreur), Releases trouvées, Pistes restant à
-    lire, Début, Fin, Avertissement éventuel.
-  - **Bibliothèque** : deux liens, **Tableau de bord** et **Contrôle qualité** (voir 4.12).
-  - **Version** : « Version installée : 1.18.0 — à jour. » ou annonce de la nouvelle version, lien « Voir les nouveautés ».
+- **Administration** (administrateurs seulement) : bouton **Ouvrir l'administration** (voir 4.12).
 - **Session** : bouton **Se déconnecter**.
 
 ### 4.11 Mode hors ligne
@@ -198,14 +190,39 @@ Quand le serveur est injoignable et que des releases sont gardées sur l'apparei
 bandeau « Serveur injoignable : mode hors ligne. » (bouton « Réessayer »), la liste des releases et playlists gardées
 (celle de l'onglet Hors ligne) et le lecteur. Rien d'autre n'est accessible.
 
-### 4.12 Bibliothèque (administrateurs)
-Page à deux onglets, ouverte depuis Compte.
+### 4.12 Administration (administrateurs)
+Page ouverte depuis Compte. À gauche, une **navigation par type d'action** (colonne fixe sur bureau, rangée
+défilante sur téléphone) ; la section active est sur fond vert pâle :
+**Vue d'ensemble** · *Bibliothèque* : **Scan**, **Contrôle qualité**, **Corrections** · *Classement* : **Règles** ·
+*Accès* : **Utilisateurs**, **Partages** (mène à Compte) · *Système* : **Statistiques**.
 
-- **Tableau de bord** : une ligne de totaux (« 46 012 releases · 512 300 pistes · 3,2 To · 1 420 jours de musique »),
+- **Vue d'ensemble** : quatre totaux (Releases, Pistes, Stocké, Artistes), puis des blocs titrés par groupe. Chaque
+  bloc est une carte : titre, pastille d'état éventuelle, lignes libellé / valeur, boutons.
+  - Bibliothèque : **Scan** (état, dernier scan, pistes restant à lire, scan quotidien ; « Gérer le scan »),
+    **Contrôle qualité** (Doublons possibles, Sans NFO, Sans année, Sans artiste ; « Tout voir »), **Corrections**
+    (nombre par champ ; « Gérer »).
+  - Classement : **Règles** (nombre de catégories, artistes, groupes, genres ; « Relancer le classement », « Voir
+    les règles »).
+  - Accès : **Utilisateurs** (nombre ; « Gérer les utilisateurs »), **Liens de partage** (actifs, ouvertures).
+  - Système : **Version** (installée, « À jour » ou « Mise à jour disponible », taille de la base et des vignettes).
+- **Scan** : bouton **Lancer le scan** (désactivé pendant un scan), État, Releases trouvées, Pistes restant à lire,
+  Début, Fin, Avertissement éventuel ; puis **Scan quotidien** : liste « Jamais », 00:00 à 23:00, et « Heure du
+  serveur : 21:40 ».
+- **Corrections** : tableau Release, Artiste, Catégorie, Genre, bouton **Retour à l'automatique**. Vide : « Aucune
+  correction manuelle. »
+- **Règles** : quatre cartes (Catégories, Artistes, Groupes, Genres) avec leur nombre et la règle en une phrase,
+  puis **Relancer le classement**.
+- **Utilisateurs** : tableau Identifiant, Rôle (liste déroulante), Actions (Réinitialiser le mot de passe,
+  Supprimer avec confirmation), message par ligne ; puis **Créer un utilisateur**. Le dernier administrateur ne
+  peut être ni rétrogradé ni supprimé.
+
+Les deux écrans suivants gardent la même navigation à gauche.
+
+- **Statistiques** : une ligne de totaux (« 46 012 releases · 512 300 pistes · 3,2 To · 1 420 jours de musique »),
   puis six tableaux à barres horizontales (libellé, barre, nombre) : **Ajouts par mois**, **Par année**, **Par genre**,
   **Par source**, **Par catégorie**, **Pistes par débit**.
 - **Contrôle qualité** : une rangée d'onglets, chacun avec son nombre — **Sans NFO**, **Sans tags**, **Pistes
-  illisibles**, **Débit inférieur à 192 kbit/s**, **Sans année**, **Sans pochette**, **Sans piste**, **Doublons possibles** — puis la liste de
+  illisibles**, **Débit inférieur à 192 kbit/s**, **Sans année**, **Sans pochette**, **Sans piste**, **Sans artiste**, **Doublons possibles** — puis la liste de
   releases concernées. Vide : « Aucune release concernée. »
 
 ### 4.13 Page de partage (publique, sans compte)
@@ -250,7 +267,8 @@ Présent en bas de tous les écrans. C'est l'élément le plus utilisé.
 - Chromecast : le lecteur pilote l'appareil ; l'écran du téléviseur affiche pochette et titre.
 
 **Bureau** : une barre en trois colonnes — informations à gauche, commandes et progression au centre,
-outils à droite. Hauteur d'environ 76 px. À gauche, une vignette de 48 px (pochette, ou « ♪ » sur fond neutre). À
+outils à droite. Hauteur d'environ 76 px. À gauche, une vignette de 48 px : la pochette, ou la pochette par défaut (disque vinyle sombre à étiquette verte,
+« No embedded artwork ») quand la release n'a pas d'image, sur bureau comme sur téléphone. À
 droite, sur les écrans d'au moins 1000 px : le débit dans un cadre (« 320 kbps »), le bouton de volume suivi de son
 curseur horizontal ; sur le bouton de la file, une pastille verte avec le nombre de pistes.
 

@@ -10,6 +10,7 @@ import * as release from './views/release.js';
 import * as favorites from './views/favorites.js';
 import * as account from './views/account.js';
 import * as library from './views/library.js';
+import * as admin from './views/admin.js';
 import * as offlineView from './views/offline.js';
 import { offline } from './offline.js';
 import { initPlayer, player } from './player.js';
@@ -30,6 +31,7 @@ const ROUTES = {
   favorites,
   account,
   library,
+  admin,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -63,7 +65,6 @@ async function route() {
   const parsed = parseHash();
   if (!parsed) return location.replace('#/');
   const { name, params } = parsed;
-  if (name === 'admin') return location.replace('#/account'); // ancienne adresse : l'administration est dans Compte
   dispose?.();
   dispose = null;
   if (name === 'login') player.reset(); // déconnexion / session expirée : la file n'est pas transmise au suivant
@@ -104,7 +105,7 @@ async function route() {
   document.querySelectorAll('#nav a').forEach((a) =>
     a.classList.toggle('active', a.dataset.route === name || (name === 'search' && a.dataset.route === '')
       || (['artists', 'genres'].includes(name) && a.dataset.route === 'groups')
-      || (name === 'library' && a.dataset.route === 'account')));
+      || (['library', 'admin'].includes(name) && a.dataset.route === 'account')));
   const search = $('search');
   if (name !== 'search' && search.value) search.value = '';
   else if (name === 'search' && document.activeElement !== search) search.value = params.q || '';

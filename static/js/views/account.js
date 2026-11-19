@@ -4,7 +4,6 @@ import { api, session } from '../api.js';
 import { el } from '../dom.js';
 import { player } from '../player.js';
 import { t, lang, setLang } from '../i18n.js';
-import * as admin from './admin.js';
 import * as shares from './shares.js';
 
 export function render(container) {
@@ -47,7 +46,7 @@ export function render(container) {
     location.hash = '#/login';
   } }, t('Se déconnecter'));
 
-  const adminBox = el('div'), sharesBox = el('div');
+  const sharesBox = el('div');
   container.replaceChildren(el('div', { class: 'page' },
     el('h1', {}, t('Compte')),
     el('p', {}, t('Identifiant :') + ' ', el('strong', {}, u.username || ''), ' · ' + t('Rôle :') + ' ',
@@ -60,9 +59,9 @@ export function render(container) {
     el('select', { 'aria-label': t('Thème'), onchange: (e) => setTheme(e.target.value) },
       [['', t('Système')], ['light', t('Clair')], ['dark', t('Sombre')]].map(([v, l]) => el('option', { value: v, selected: v === theme() }, l))),
     sharesBox,
-    adminBox,
+    u.role === 'admin' ? [el('h2', {}, t('Administration')),
+      el('p', {}, el('a', { class: 'btn', href: '#/admin' }, t('Ouvrir l’administration')))] : null,
     el('h2', {}, t('Session')), logout));
   const disposeShares = shares.render(sharesBox);
-  const disposeAdmin = u.role === 'admin' ? admin.render(adminBox) : null; // utilisateurs, scan, version
-  return () => { dead = true; disposeAdmin?.(); disposeShares(); };
+  return () => { dead = true; disposeShares(); };
 }

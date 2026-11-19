@@ -478,6 +478,7 @@ class Runner:
         self.settings = settings
         self._lock = threading.Lock()
         self._stop = threading.Event()
+        self._quit = threading.Event()  # arrêt de l'application : fin de la veille du scan quotidien
         self._thread = None
 
     def start(self) -> bool:
@@ -497,8 +498,29 @@ class Runner:
             conn.close()
         if pending:
             self._launch(structure=False)
+        threading.Thread(target=self._watch, daemon=True, name="scan-quotidien").start()
+
+    def due(self, conn, now: float) -> bool:
+        """Vrai si le scan quotidien est à lancer : heure choisie atteinte, aucun scan démarré depuis deux heures."""
+        row = conn.execute("SELECT daily_at, started_at FROM scan_state WHERE id=1").fetchone()
+        return (row["daily_at"] is not None and time.localtime(now).tm_hour == row["daily_at"]
+                and now - (row["started_at"] or 0) > 2 * 3600)
+
+    def _watch(self):
+        # ponytail: une lecture de scan_state par minute ; l'heure est celle du serveur (variable TZ du conteneur)
+        while not self._quit.wait(60):
+            try:
+                conn = db.connect(self.settings.data_dir)
+                try:
+                    if self.due(conn, time.time()):
+                        self.start()
+                finally:
+                    conn.close()
+            except Exception:
+                log.exception("veille du scan quotidien")
 
     def stop(self) -> None:
+        self._quit.set()
         self._stop.set()
         t = self._thread
         if t is not None:
@@ -507,6 +529,7 @@ class Runner:
     def status(self, conn) -> dict:
         s = dict(conn.execute("SELECT * FROM scan_state WHERE id=1").fetchone())
         s["tracks_pending"] = conn.execute("SELECT count(*) FROM tracks WHERE tags_read=0").fetchone()[0]
+        s["server_time"] = time.strftime("%H:%M")  # l'heure du scan quotidien est celle du serveur
         return s
 
     def _launch(self, structure):

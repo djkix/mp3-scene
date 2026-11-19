@@ -27,22 +27,29 @@ def init(data_dir: Path) -> None:
             conn.execute("ALTER TABLE releases ADD COLUMN has_cover INTEGER")
         if "released_at" not in {r[1] for r in conn.execute("PRAGMA table_info(releases)")}:  # ajoutée en 1.29.0
             conn.execute("ALTER TABLE releases ADD COLUMN released_at REAL")
-        genres.apply(conn)  # genres lus avant la 1.21.0 : même regroupement que le scanner
-        # groupes analysés avant la 1.22.0 : « AOV_INT » rejoint AOV, une année ou « 320 » passe en P2P, comme à
-        # l'analyse du nom
-        for (g,) in conn.execute("SELECT DISTINCT grp FROM releases WHERE grp IS NOT NULL").fetchall():
-            new, year = group(g)
-            if new != g:
-                conn.execute("UPDATE releases SET grp=?, year=COALESCE(year, ?) WHERE grp=?", (new, year, g))
-        merge_group_case(conn)
-        year_from_nfo(conn)
-        artists.apply(conn)  # artistes lus avant la 1.30.0 : casse, ponctuation et featuring regroupés
-        categorize(conn)
+        if "daily_at" not in {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}:  # ajoutée en 1.34.0
+            conn.execute("ALTER TABLE scan_state ADD COLUMN daily_at INTEGER")
+        classify(conn)  # données rangées par une version antérieure : mêmes règles que le scanner d'aujourd'hui
         conn.execute("INSERT OR IGNORE INTO scan_state(id) VALUES (1)")
         conn.execute(f"PRAGMA user_version = {VERSION}")
         conn.commit()
     finally:
         conn.close()
+
+
+def classify(conn) -> None:
+    """Réapplique toutes les règles de classement aux releases en base : genres, groupes, année, artistes,
+    catégories, puis corrections manuelles. Sans effet au second passage."""
+    genres.apply(conn)
+    # « AOV_INT » rejoint AOV, une année ou « 320 » passe en P2P, comme à l'analyse du nom
+    for (g,) in conn.execute("SELECT DISTINCT grp FROM releases WHERE grp IS NOT NULL").fetchall():
+        new, year = group(g)
+        if new != g:
+            conn.execute("UPDATE releases SET grp=?, year=COALESCE(year, ?) WHERE grp=?", (new, year, g))
+    merge_group_case(conn)
+    year_from_nfo(conn)
+    artists.apply(conn)
+    categorize(conn)
 
 
 def merge_group_case(conn) -> None:

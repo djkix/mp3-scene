@@ -48,10 +48,11 @@ CREATE TABLE IF NOT EXISTS shares(
 -- forme d'onde : 800 crêtes (un octet chacune), calculées à la première écoute
 CREATE TABLE IF NOT EXISTS waveforms(
   track_id INTEGER PRIMARY KEY REFERENCES tracks ON DELETE CASCADE, peaks BLOB NOT NULL);
+-- daily_at : heure (0-23, heure du serveur) du scan quotidien ; NULL : scan manuel seulement
 CREATE TABLE IF NOT EXISTS scan_state(
   id INTEGER PRIMARY KEY CHECK(id=1), status TEXT NOT NULL DEFAULT 'idle',
   started_at REAL, finished_at REAL, releases_found INTEGER NOT NULL DEFAULT 0,
-  error TEXT, first_scan_done INTEGER NOT NULL DEFAULT 0);
+  error TEXT, first_scan_done INTEGER NOT NULL DEFAULT 0, daily_at INTEGER);
 
 CREATE INDEX IF NOT EXISTS idx_releases_added ON releases(added_at DESC);
 CREATE INDEX IF NOT EXISTS idx_releases_parent ON releases(parent);

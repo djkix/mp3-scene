@@ -122,11 +122,8 @@ a.icon:hover { background: var(--hover); }
 .pl-info { grid-area: info; min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); justify-items: start;
   align-content: center; row-gap: 2px; }
 .pl-info > :not(.pl-cover) { grid-column: 2; }
-.pl-cover, .pl-info::before { grid-area: 1 / 1 / span 3; align-self: center; width: 48px; height: 48px; margin-right: 10px;
-  object-fit: cover; border-radius: 3px; }
-/* vignette vide sous la pochette : elle reste visible quand la release n'a pas d'image */
-.pl-info::before { content: "♪"; display: grid; place-items: center; background: var(--hover); color: var(--muted); font-size: 18px; }
-.pl-cover { position: relative; }
+.pl-cover { grid-row: 1 / span 3; align-self: center; width: 48px; height: 48px; margin-right: 10px; object-fit: cover;
+  border-radius: 3px; }
 .pl-rate { display: none; }
 #player .pl-title { border: 0; padding: 0; min-height: 0; background: none; text-align: left; font: 600 13px/1.3 var(--mono);
   cursor: pointer; max-width: 100%; overflow: hidden; overflow-wrap: anywhere;
@@ -264,7 +261,6 @@ google-cast-launcher:hover { background: var(--hover); }
   .pl-bar { display: flex; gap: 2px; min-height: 60px; padding: 4px 4px 4px 12px; }
   .pl-info { flex: 1 1 0; }
   .pl-cover { width: 40px; height: 40px; }
-  .pl-info::before { display: none; } /* vignette vide : bureau seulement */
   .pl-rel, .pl-seek, .pl-qbtn, .pl-fx, .pl-volwrap, .pl-controls :is(.pl-shuffle, .pl-prev, .pl-repeat) { display: none; }
   #player .icon { min-width: 44px; height: 44px; font-size: 16px; }
 
@@ -288,7 +284,7 @@ google-cast-launcher:hover { background: var(--hover); }
   #player.expanded #cast-slot:empty { display: none; }
   #player.expanded .pl-info { flex: none; grid-template-columns: minmax(0, 1fr); justify-items: center; row-gap: 8px; }
   #player.expanded .pl-info > * { grid-column: 1; }
-  #player.expanded .pl-cover { grid-area: auto; width: min(72vw, 280px); height: auto; aspect-ratio: 1; margin: 0 0 8px;
+  #player.expanded .pl-cover { grid-row: auto; width: min(72vw, 280px); height: auto; aspect-ratio: 1; margin: 0 0 8px;
     border-radius: 8px; box-shadow: 0 12px 32px rgb(0 0 0 / .45); }
   #player.expanded .pl-title { display: block; max-width: 100%; text-align: center; font: 600 22px/1.3 var(--sans);
     letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -375,7 +371,35 @@ dialog.pl-add .inline-form input { flex: 1 1 120px; min-width: 0; }
 dialog.pl-add .status { padding: 8px 0; min-height: 1em; }
 .letters { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin: 8px 0; }
 .letters button { min-width: 28px; padding: 3px 6px; font: 600 11px var(--mono); }
-.letters button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.letters button[aria-pressed="true"]:not(:disabled) { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+/* Administration : navigation par type d'action à gauche, blocs à droite */
+.admin { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 24px; max-width: 1200px; }
+.ad-nav { position: sticky; top: 12px; align-self: start; display: flex; flex-direction: column; gap: 2px; padding-top: 16px; }
+.ad-nav p { margin: 14px 10px 4px; color: var(--muted); font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.ad-nav a { padding: 7px 10px; border-radius: 4px; color: var(--muted); font: 13px var(--mono); }
+.ad-nav a:hover { background: var(--hover); color: var(--fg); }
+.ad-nav a[aria-current="page"] { background: var(--tint); color: var(--accent-text); font-weight: 600; }
+.ad-metrics, .ad-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.ad-metrics { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.ad-metric, .ad-card { padding: 12px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+.ad-metric span { display: block; color: var(--muted); font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.ad-metric b { font: 600 22px var(--mono); font-variant-numeric: tabular-nums; }
+.ad-main > .ad-card { margin-bottom: 12px; }
+.ad-card h3 { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 8px; font-size: 14px; }
+.ad-card h3 .chip { color: var(--accent-text); font-weight: 400; }
+.ad-card p { margin: 0; color: var(--muted); }
+.ad-card dl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0; margin: 0; }
+.ad-card dt, .ad-card dd { margin: 0; padding: 5px 0; border-top: 1px solid var(--line); font: 12px var(--mono); }
+.ad-card dt { color: var(--muted); }
+.ad-card dd { text-align: right; font-variant-numeric: tabular-nums; }
+.ad-card .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.ad-card .actions:empty { display: none; }
+@media (max-width: 699px) {
+  .admin { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .ad-nav { position: static; flex-direction: row; align-items: center; overflow-x: auto; padding: 10px 0 0; }
+  .ad-nav p { display: none; }
+  .ad-nav a { flex: none; }
+}
 .detail-info a:hover, .groups td a:hover, .grp-title a:hover { text-decoration: underline; }
 .new { margin-right: 8px; padding: 2px 6px; border-radius: 3px; background: var(--tint); color: var(--accent-text);
   font: 600 10px var(--mono); letter-spacing: .05em; text-transform: uppercase; vertical-align: middle; white-space: nowrap; }
@@ -416,7 +440,8 @@ tr.disc th { background: var(--hover); color: var(--fg); padding-block: 8px; }
   max-width: 100%; margin: 0 auto; padding: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); }
 .tabs { display: flex; gap: 4px; padding: 10px 12px; overflow-x: auto; }
 .tabs button { flex: none; padding: 7px 12px; }
-.tabs [aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+/* :not(:disabled) : passe devant le fond de survol des boutons, sinon l'onglet actif survolé est illisible */
+.tabs button[aria-selected="true"]:not(:disabled) { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
 /* date | artiste | titre | release | action : artiste et release passent à la ligne plutôt que d'être coupés */
 .trk-fav { grid-template-columns: 8rem minmax(0, 2fr) minmax(0, 3fr) minmax(0, 4fr) var(--acts, 72px); gap: 0 16px; }
 .trk-fav .rel-cat, .trk-fav .rel-meta { white-space: normal; overflow-wrap: anywhere; }

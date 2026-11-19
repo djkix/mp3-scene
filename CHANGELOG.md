@@ -4,6 +4,26 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.34.0](https://github.com/djkix/mp3-scene/compare/v1.33.0...v1.34.0) (2026-11-19)
+
+### Résumé
+
+**Page Administration, pochette par défaut dans le lecteur, nouvelle icône de l'application.**
+
+- Nouvelle page **Administration** (ouverte depuis Compte), rangée par type d'action : Vue d'ensemble, Bibliothèque
+  (Scan, Contrôle qualité, Corrections), Classement (Règles), Accès (Utilisateurs, Partages), Système (Statistiques).
+  Compte ne garde que ce qui concerne chaque utilisateur.
+- **Scan quotidien** : une heure au choix (celle du serveur), ou jamais.
+- **Corrections manuelles** : la liste des corrections en vigueur, avec retour à l'automatique.
+- **Relancer le classement** sans redémarrer, et une page qui résume les règles.
+- Contrôle qualité : nouvel onglet **Sans artiste**.
+- Corrigé : un onglet actif survolé devenait illisible en thème sombre.
+
+- Lecteur (bureau et téléphone) : une release sans image affiche une pochette par défaut, un disque vinyle
+  « No embedded artwork ».
+- Nouvelle icône : le même disque, avec « MP3Z / SCENE » en lettres de blocs ; favicon simplifié (disque seul).
+  `scripts/make_icons.py` régénère les fichiers.
+
 ## [1.33.0](https://github.com/djkix/mp3-scene/compare/v1.32.0...v1.33.0) (2026-11-19)
 
 ### Résumé

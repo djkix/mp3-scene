@@ -3,9 +3,11 @@ import { api, fmtSize } from '../api.js';
 import { el } from '../dom.js';
 import { t as tr, catLabel } from '../i18n.js';
 import { releaseList } from './releases.js';
+import { navBar } from './admin.js';
 
 const KINDS = [['no_nfo', 'Sans NFO'], ['no_tags', 'Sans tags'], ['unreadable', 'Pistes illisibles'], ['low_bitrate', 'Débit inférieur à 192 kbit/s'],
-  ['no_year', 'Sans année'], ['no_cover', 'Sans pochette'], ['no_tracks', 'Sans piste'], ['dupes', 'Doublons possibles']];
+  ['no_year', 'Sans année'], ['no_cover', 'Sans pochette'], ['no_tracks', 'Sans piste'], ['no_artist', 'Sans artiste'],
+  ['dupes', 'Doublons possibles']];
 const tabBtn = (label, on, hash) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(on),
   onclick: () => { location.hash = hash; } }, label);
 
@@ -35,10 +37,10 @@ export function render(container, params) {
   const status = el('p', { class: 'status', role: 'status' }, tr('Chargement…'));
   const body = el('div');
   const kinds = el('div', { class: 'tabs', role: 'tablist', 'aria-label': tr('Contrôle qualité') });
-  container.replaceChildren(
-    el('div', { class: 'tabs', role: 'tablist', 'aria-label': tr('Bibliothèque') },
-      tabBtn(tr('Tableau de bord'), !quality, '#/library'), tabBtn(tr('Contrôle qualité'), quality, '#/library?tab=quality')),
-    ...(quality ? [kinds] : [status]), body);
+  // même navigation que la page Administration, dont ces deux écrans sont des sections
+  container.replaceChildren(el('div', { class: 'page admin' }, navBar(quality ? '#/library?tab=quality' : '#/library'),
+    el('div', { class: 'ad-main' }, el('h1', {}, quality ? tr('Contrôle qualité') : tr('Statistiques')),
+      ...(quality ? [kinds] : [status]), body)));
   if (!quality) dashboard(body, status, () => dead);
   else {
     const paint = (counts) => kinds.replaceChildren(...KINDS.map(([k, label]) =>

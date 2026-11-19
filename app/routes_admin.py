@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import time
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -98,6 +99,52 @@ def start_scan(request: Request):
     return {"started": True}
 
 
+class Schedule(BaseModel):
+    hour: int | None = Field(default=None, ge=0, le=23)
+
+
+@router.put("/scan/schedule", status_code=204)
+def schedule_scan(body: Schedule, conn=Depends(get_conn)):
+    """Heure (du serveur) du scan quotidien ; null : scan manuel seulement."""
+    conn.execute("UPDATE scan_state SET daily_at=? WHERE id=1", (body.hour,))
+    conn.commit()
+
+
+@router.post("/classify", status_code=204)
+def classify(conn=Depends(get_conn)):
+    """Réapplique les règles de classement (genres, groupes, artistes, catégories) à toute la bibliothèque."""
+    db.classify(conn)
+    conn.commit()
+
+
+@router.get("/overrides")
+def overrides(conn=Depends(get_conn)):
+    """Corrections manuelles en vigueur, avec la release concernée."""
+    return [dict(r) for r in conn.execute(
+        "SELECT r.id, r.name, o.artist, o.category, o.genre FROM overrides o JOIN releases r ON r.path=o.path"
+        " ORDER BY r.name COLLATE NOCASE")]
+
+
+@router.get("/overview")
+def overview(request: Request, conn=Depends(get_conn)):
+    """Chiffres de la page Administration que les autres routes ne donnent pas."""
+    one = lambda sql, *args: conn.execute(sql, args).fetchone()[0]
+    data = request.app.state.settings.data_dir
+    size = lambda paths: sum(p.stat().st_size for p in paths if p.is_file())
+    now = time.time()
+    return {"artists": one("SELECT COUNT(DISTINCT COALESCE(tag_artist, artist)) FROM releases"),
+            "groups": one("SELECT COUNT(DISTINCT grp) FROM releases"), "genres": one("SELECT COUNT(DISTINCT genre) FROM releases"),
+            "categories": one("SELECT COUNT(DISTINCT category) FROM releases"),
+            "overrides": dict(conn.execute("SELECT COUNT(*) AS total, COUNT(artist) AS artist, COUNT(category) AS category,"
+                                           " COUNT(genre) AS genre FROM overrides").fetchone()),
+            "shares": one("SELECT COUNT(*) FROM shares WHERE expires_at>?", now),
+            "share_opens": one("SELECT COALESCE(SUM(opens), 0) FROM shares WHERE expires_at>?", now),
+            "users": one("SELECT COUNT(*) FROM users"),
+            "db_size": size(data.glob("mp3scene.db*")),
+            # ponytail: parcourt data/thumbs/ à chaque appel (une entrée par release, ~0,1 s pour 45 000)
+            "thumbs_size": size((data / "thumbs").glob("*")) if (data / "thumbs").is_dir() else 0}
+
+
 @router.get("/scan")
 def scan_status(request: Request, conn=Depends(get_conn)):
     return request.app.state.runner.status(conn)
@@ -163,13 +210,14 @@ QUALITY = {
     "low_bitrate": "(SELECT AVG(bitrate) FROM tracks WHERE release_id=r.id)<192000",
     "no_year": "r.year IS NULL",
     "no_cover": "r.has_cover=0",  # NULL : pas encore vérifié par le scan
+    "no_artist": "COALESCE(r.tag_artist, r.artist) IS NULL",
     # même artiste et même titre dans le nom qu'une autre release (index idx_releases_dupe)
     "dupes": "EXISTS (SELECT 1 FROM releases d WHERE lower(d.artist)=lower(r.artist) AND lower(d.title)=lower(r.title) AND d.id!=r.id)",
 }
 
 
 @router.get("/quality")
-def quality(kind: Literal["no_nfo", "no_tracks", "no_tags", "unreadable", "low_bitrate", "no_year", "no_cover", "dupes"] | None = None,
+def quality(kind: Literal["no_nfo", "no_tracks", "no_tags", "unreadable", "low_bitrate", "no_year", "no_cover", "no_artist", "dupes"] | None = None,
             sort: Sort | None = None, dir: Dir = "asc", offset: int = Query(0, ge=0, le=MAX_INT),
             limit: int = Query(50, ge=1, le=MAX_INT), user=Depends(require_admin), conn=Depends(get_conn)):
     """Sans `kind` : nombre de releases par contrôle. Avec : la page de releases concernées."""

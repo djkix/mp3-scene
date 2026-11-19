@@ -1,8 +1,9 @@
-import { api, session } from '../api.js';
+import { api, session, fmtSize } from '../api.js';
 import { el } from '../dom.js';
 import { invalidateFilters } from './releases.js';
 import { versionInfo } from '../version.js';
-import { t, locale } from '../i18n.js';
+import { t, locale, catLabel } from '../i18n.js';
+import { relName } from '../dom.js';
 
 const ROLES = [['user', t('Utilisateur')], ['admin', t('Administrateur')]];
 const PHASES = { idle: t('Au repos'), structure: t('Analyse des dossiers…'), tags: t('Lecture des tags…'), error: t('Erreur') };
@@ -10,12 +11,31 @@ const fmtTime = (ts) => (ts ? new Date(ts * 1000).toLocaleString(locale) : '—'
 const roleSelect = (value, props = {}) => el('select', props,
   ROLES.map(([v, l]) => el('option', { value: v, selected: v === value }, l)));
 
-export function render(container) {
+// Sections de la page, regroupées par type d'action : [titre du groupe, [[adresse, libellé], …]]
+const NAV = [['', [['#/admin', 'Vue d’ensemble']]],
+  ['Bibliothèque', [['#/admin/scan', 'Scan'], ['#/library?tab=quality', 'Contrôle qualité'], ['#/admin/corrections', 'Corrections']]],
+  ['Classement', [['#/admin/rules', 'Règles']]],
+  ['Accès', [['#/admin/users', 'Utilisateurs'], ['#/account', 'Partages']]],
+  ['Système', [['#/library', 'Statistiques']]]];
+const QUALITY = [['dupes', 'Doublons possibles'], ['no_nfo', 'Sans NFO'], ['no_year', 'Sans année'], ['no_artist', 'Sans artiste']];
+const RULES = [['Catégories', 'categories', 'Les tags du nom décident (SAT, DVBS, date complète : Live & Radio ; VA : Compilations ; CDM, CDS : Singles), sinon le dossier. Dans Singles, dix pistes sans tag de single font un album.'],
+  ['Artistes', 'artists', 'Casse, accents, espaces et ponctuation sont ignorés. Un featuring ou un « vs » rejoint l’artiste principal ; un « & » aussi, sauf si le duo a au moins autant de releases que son premier membre.'],
+  ['Groupes', 'groups', 'Le suffixe _INT est retiré et la casse unifiée. Ce qui n’a pas la forme d’un nom de groupe (année, source, bout de titre) est rangé dans P2P.'],
+  ['Genres', 'genres', 'Les genres qui ne diffèrent que par l’orthographe, la casse ou la mise en forme sont réunis ; une liste de genres est réduite au premier.']];
+
+export function navBar(current) {
+  return el('nav', { class: 'ad-nav', 'aria-label': t('Administration') }, NAV.map(([group, links]) => [
+    group && el('p', {}, t(group)),
+    ...links.map(([href, label]) => el('a', { href, 'aria-current': href === current ? 'page' : null }, t(label)))]).flat());
+}
+
+export function render(container, params = {}) {
   if (session.user?.role !== 'admin') {
     container.replaceChildren(el('p', { class: 'status', role: 'alert' }, t('Accès réservé aux administrateurs')));
     return;
   }
-  let dead = false, pollTimer = null, lastStatus = null;
+  let dead = false, pollTimer = null;
+  const section = ['scan', 'corrections', 'rules', 'users'].includes(params.rest) ? params.rest : '';
   const alive = () => !dead;
 
   // --- Utilisateurs ---
@@ -118,6 +138,8 @@ export function render(container) {
       if (running) scanning = true;
       else if (scanning && !pending) { scanning = false; invalidateFilters(); } // scan terminé
       scanBtn.disabled = scanning;
+      if (document.activeElement !== daily) daily.value = s.daily_at ?? '';
+      serverTime.textContent = t('Heure du serveur : {0}', s.server_time);
       const rows = [[t('État'), PHASES[s.status] || s.status], [t('Releases trouvées'), s.releases_found],
         [t('Pistes restant à lire'), s.tracks_pending], [t('Début'), fmtTime(s.started_at)], [t('Fin'), fmtTime(s.finished_at)]];
       // hors état « error », le message est un avertissement (dossiers ignorés, scan interrompu)
@@ -129,31 +151,112 @@ export function render(container) {
     }
   }
 
-  // --- Version ---
-  const verOut = el('p', { role: 'status' }, t('Vérification…'));
-  versionInfo().then((v) => {
-    if (dead) return;
-    const state = v.update ? t(' — nouvelle version {0} disponible : dans Dockge, cliquez sur « Mettre à jour ».', v.latest)
-      : v.latest ? t(' — à jour.') : t(' — impossible de vérifier la dernière version.');
-    verOut.replaceChildren(t('Version installée : {0}', v.version), state,
-      v.update && el('a', { href: v.url, target: '_blank', rel: 'noopener' }, ' ' + t('Voir les nouveautés')));
-  }).catch((err) => { if (!dead) verOut.textContent = err.message; });
+  // scan quotidien : heure du serveur, « Jamais » pour rester en manuel
+  const serverTime = el('span', { class: 'hint' });
+  const daily = el('select', { 'aria-label': t('Scan quotidien'), onchange: async () => {
+    try {
+      await api('/admin/scan/schedule', { method: 'PUT', body: { hour: daily.value === '' ? null : +daily.value } });
+      if (alive()) { scanMsg.className = 'form-ok'; scanMsg.textContent = t('Scan quotidien enregistré.'); }
+    } catch (err) { if (alive()) { scanMsg.className = 'form-error'; scanMsg.textContent = err.message; } }
+  } }, el('option', { value: '' }, t('Jamais')),
+  Array.from({ length: 24 }, (_, h) => el('option', { value: h }, `${String(h).padStart(2, '0')}:00`)));
+
+  // --- Reclassement ---
+  const classMsg = el('p', { class: 'form-error', role: 'status' });
+  const classBtn = el('button', { type: 'button', onclick: async () => {
+    classBtn.disabled = true;
+    show(classMsg, t('Classement en cours…'), true);
+    try {
+      await api('/admin/classify', { method: 'POST' });
+      invalidateFilters();
+      if (alive()) show(classMsg, t('Classement terminé.'), true);
+    } catch (err) { if (alive()) show(classMsg, err.message); }
+    classBtn.disabled = false;
+  } }, t('Relancer le classement'));
 
   const th = (t) => el('th', { scope: 'col' }, t);
-  // sections d'administration, incluses dans la page Compte (account.js)
-  container.replaceChildren(el('div', {},
-    el('h2', {}, t('Utilisateurs')),
+  const card = (title, badge, rows, ...actions) => el('section', { class: 'ad-card' },
+    el('h3', {}, title, badge && el('span', { class: 'chip' }, badge)),
+    el('dl', {}, rows.map(([k, v]) => [el('dt', {}, k), el('dd', {}, String(v ?? '—'))]).flat()),
+    el('div', { class: 'actions' }, actions));
+  const link = (href, label) => el('a', { class: 'btn', href }, label);
+  const usersBlock = () => [
     el('div', { class: 'table-wrap' }, el('table', { class: 'users' },
       el('thead', {}, el('tr', {}, th(t('Identifiant')), th(t('Rôle')), th(t('Actions')))), tbody)), listMsg,
-    el('h3', {}, t('Créer un utilisateur')), createForm, createMsg,
-    el('h2', {}, t('Scan de la bibliothèque')),
-    el('p', { class: 'hint' }, t('Le genre et la durée apparaissent au fur et à mesure de la lecture des tags.')),
-    scanBtn, scanOut, scanMsg,
-    el('h2', {}, t('Bibliothèque')),
-    el('p', {}, el('a', { class: 'btn', href: '#/library' }, t('Tableau de bord')), ' ',
-      el('a', { class: 'btn', href: '#/library?tab=quality' }, t('Contrôle qualité'))),
-    el('h2', {}, t('Version')), verOut));
-  loadUsers();
-  refreshScan();
+    el('h3', {}, t('Créer un utilisateur')), createForm, createMsg];
+  const body = el('div', { class: 'ad-main' });
+  container.replaceChildren(el('div', { class: 'page admin' }, navBar(section ? `#/admin/${section}` : '#/admin'), body));
+
+  if (section === 'users') {
+    body.replaceChildren(el('h1', {}, t('Utilisateurs')), ...usersBlock());
+    loadUsers();
+  } else if (section === 'scan') {
+    body.replaceChildren(el('h1', {}, t('Scan de la bibliothèque')),
+      el('p', { class: 'hint' }, t('Le genre et la durée apparaissent au fur et à mesure de la lecture des tags.')),
+      scanBtn, scanOut, scanMsg,
+      el('h2', {}, t('Scan quotidien')),
+      el('p', { class: 'inline-form' }, el('label', {}, t('Lancer chaque jour à'), daily), serverTime));
+    refreshScan();
+  } else if (section === 'rules') {
+    const counts = Object.fromEntries(RULES.map(([, key]) => [key, el('span', { class: 'chip' }, '…')]));
+    body.replaceChildren(el('h1', {}, t('Règles de classement')),
+      el('p', { class: 'hint' }, t('Appliquées à chaque scan et à chaque démarrage. Les corrections manuelles l’emportent toujours.')),
+      ...RULES.map(([title, key, text]) => el('section', { class: 'ad-card' }, el('h3', {}, t(title), counts[key]), el('p', {}, t(text)))),
+      classBtn, classMsg);
+    api('/admin/overview').then((o) => { if (alive()) RULES.forEach(([, key]) => { counts[key].textContent = o[key]; }); }).catch(() => {});
+  } else if (section === 'corrections') {
+    const rows = el('tbody');
+    const msg = el('p', { class: 'status', role: 'status' }, t('Chargement…'));
+    const load = () => api('/admin/overrides').then((list) => {
+      if (dead) return;
+      msg.textContent = list.length ? '' : t('Aucune correction manuelle.');
+      rows.replaceChildren(...list.map((o) => el('tr', {},
+        el('th', { scope: 'row' }, el('a', { href: `#/release/${encodeURIComponent(o.name)}` }, relName(o.name))),
+        el('td', {}, o.artist || '—'), el('td', {}, o.category ? catLabel(o.category) : '—'), el('td', {}, o.genre || '—'),
+        el('td', {}, el('button', { type: 'button', onclick: async (e) => {
+          e.target.disabled = true;
+          try { await api(`/admin/releases/${o.id}`, { method: 'PATCH', body: { artist: '', category: '', genre: '' } }); } catch (err) { msg.textContent = err.message; }
+          load();
+        } }, t('Retour à l’automatique'))))));
+    }).catch((err) => { if (!dead) msg.textContent = err.message; });
+    body.replaceChildren(el('h1', {}, t('Corrections manuelles')),
+      el('p', { class: 'hint' }, t('Faites depuis la fiche d’une release, bouton Corriger. Elles sont gardées après les scans.')),
+      el('div', { class: 'table-wrap' }, el('table', { class: 'users' },
+        el('thead', {}, el('tr', {}, th(t('Release')), th(t('Artiste')), th(t('Catégorie')), th(t('Genre')), th(t('Actions')))), rows)), msg);
+    load();
+  } else {
+    // Vue d'ensemble : les totaux, puis un bloc par type d'action
+    const totals = el('div', { class: 'ad-metrics' });
+    const lib = el('div', { class: 'ad-grid' }), cls = el('div', { class: 'ad-grid' }), acc = el('div', { class: 'ad-grid' }),
+      sys = el('div', { class: 'ad-grid' });
+    const status = el('p', { class: 'status', role: 'status' }, t('Chargement…'));
+    body.replaceChildren(el('h1', {}, t('Administration')), totals, status,
+      el('h2', {}, t('Bibliothèque')), lib, el('h2', {}, t('Classement')), cls, classMsg,
+      el('h2', {}, t('Accès')), acc, el('h2', {}, t('Système')), sys);
+    Promise.all([api('/admin/library'), api('/admin/overview'), api('/admin/scan'), api('/admin/quality'), versionInfo().catch(() => null)])
+      .then(([l, o, s, q, v]) => {
+        if (dead) return;
+        status.textContent = '';
+        const n = (x) => x.toLocaleString(locale);
+        totals.replaceChildren(...[[t('Releases'), n(l.releases)], [t('Pistes'), n(l.tracks)], [t('Stocké'), fmtSize(l.size)],
+          [t('Artistes'), n(o.artists)]].map(([k, val]) => el('div', { class: 'ad-metric' }, el('span', {}, k), el('b', {}, val))));
+        lib.replaceChildren(
+          card(t('Scan'), PHASES[s.status] || s.status, [[t('Dernier scan'), fmtTime(s.finished_at)],
+            [t('Pistes restant à lire'), n(s.tracks_pending)],
+            [t('Scan quotidien'), s.daily_at == null ? t('Jamais') : `${String(s.daily_at).padStart(2, '0')}:00`]],
+          link('#/admin/scan', t('Gérer le scan'))),
+          card(t('Contrôle qualité'), null, QUALITY.map(([k, label]) => [t(label), n(q[k])]), link('#/library?tab=quality', t('Tout voir'))),
+          card(t('Corrections'), o.overrides.total ? String(o.overrides.total) : null, [[t('Artiste'), o.overrides.artist],
+            [t('Catégorie'), o.overrides.category], [t('Genre'), o.overrides.genre]], link('#/admin/corrections', t('Gérer'))));
+        cls.replaceChildren(card(t('Règles'), null, [[t('Catégories'), n(o.categories)], [t('Artistes'), n(o.artists)],
+          [t('Groupes'), n(o.groups)], [t('Genres'), n(o.genres)]], classBtn, link('#/admin/rules', t('Voir les règles'))));
+        acc.replaceChildren(
+          card(t('Utilisateurs'), String(o.users), [], link('#/admin/users', t('Gérer les utilisateurs'))),
+          card(t('Liens de partage'), null, [[t('Actifs'), o.shares], [t('Ouvertures'), o.share_opens]], link('#/account', t('Gérer les liens'))));
+        sys.replaceChildren(card(t('Version'), v && (v.update ? t('Mise à jour disponible') : v.latest ? t('À jour') : null),
+          [[t('Version installée'), v ? v.version : '—'], [t('Base de données'), fmtSize(o.db_size)], [t('Vignettes'), fmtSize(o.thumbs_size)]],
+          link('#/library', t('Statistiques')), v?.update && el('a', { class: 'btn', href: v.url, target: '_blank', rel: 'noopener' }, t('Voir les nouveautés'))));
+      }).catch((err) => { if (!dead) status.textContent = err.message; });
+  }
   return () => { dead = true; clearTimeout(pollTimer); };
 }

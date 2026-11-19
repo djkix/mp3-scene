@@ -605,6 +605,8 @@ const REPEAT = {
   one: ['↻︎¹', tr('Répéter la piste')],
 };
 
+const NO_COVER = '/icons/cover-default.svg';
+
 function iconBtn(cls, glyph, label, onclick) {
   return el('button', { type: 'button', class: 'icon ' + cls, title: label, 'aria-label': label, onclick }, glyph);
 }
@@ -783,9 +785,10 @@ export function initPlayer(footer) {
     update();
     try { await api(`/favorites/track/${t.id}`, { method: t.favorite ? 'PUT' : 'DELETE' }); } catch { t.favorite = !t.favorite; update(); }
   });
-  // pochette : masquée tant qu'elle n'est pas chargée, et s'il n'y en a pas
+  // pochette : masquée tant qu'elle n'est pas chargée ; sans image, la pochette par défaut
   ui.cover = el('img', { class: 'pl-cover', alt: '', hidden: true,
-    onload: () => { ui.cover.hidden = false; }, onerror: () => { ui.cover.hidden = true; } });
+    onload: () => { ui.cover.hidden = false; },
+    onerror: () => { if (ui.cover.src.endsWith(NO_COVER)) ui.cover.hidden = true; else ui.cover.src = NO_COVER; } });
   ui.cast = el('span', { class: 'pl-cast' }); // « Diffusion sur <appareil> » (textContent : nom non fiable)
   ui.play = iconBtn('pl-play', '▶︎', tr('Lecture'), () => player.toggle());
   ui.shuffle = iconBtn('pl-shuffle', '⇄', tr('Aléatoire'), () => { q().shuffle = !q().shuffle; backend?.sync(); update(); save(); });

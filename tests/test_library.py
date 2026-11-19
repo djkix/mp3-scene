@@ -414,3 +414,37 @@ def test_corrections_collab_and_nfo_year(user_client, admin_client, library, set
     db.year_from_nfo(c); c.commit(); c.close()
     assert [x["name"] for x in user_client.get("/api/releases?collab=A-Trak").json()["items"]] == ["Bicep_Feat_A-Trak-Glue-WEB-2017-PWT"]
     assert rel()[A]["year"] == 2015
+
+
+def test_admin_overview_classify_schedule(admin_client, user_client, library, app, settings):
+    from app import db
+    assert user_client.get("/api/admin/overview").status_code == 403
+    o = admin_client.get("/api/admin/overview").json()
+    assert o["artists"] >= 2 and o["groups"] == 3 and o["users"] == 2 and o["db_size"] > 0 and o["thumbs_size"] == 0
+    assert o["overrides"] == {"total": 0, "artist": 0, "category": 0, "genre": 0} and o["shares"] == 0
+    rid = admin_client.get("/api/releases?grp=WUS").json()["items"][0]["id"]
+    admin_client.patch(f"/api/admin/releases/{rid}", json={"genre": "Techno"})
+    assert admin_client.get("/api/admin/overrides").json() == [{"id": rid, "name": A, "artist": None, "category": None, "genre": "Techno"}]
+    assert admin_client.get("/api/admin/overview").json()["overrides"]["genre"] == 1
+    # reclassement à la demande : une graphie isolée rejoint la majorité, la correction manuelle tient
+    c = db.connect(settings.data_dir)
+    c.execute("UPDATE releases SET grp='wus_INT', artist=NULL, tag_artist=NULL WHERE id=?", (rid,)); c.commit()
+    assert admin_client.get("/api/admin/quality").json()["no_artist"] == 1
+    assert admin_client.post("/api/admin/classify").status_code == 204
+    r = admin_client.get(f"/api/releases/{rid}").json()
+    assert r["grp"] == "wus" and r["genre"] == "Techno"
+    # scan quotidien : heure du serveur, pas deux fois de suite
+    runner = app.state.runner
+    assert admin_client.put("/api/admin/scan/schedule", json={"hour": 24}).status_code == 422
+    assert admin_client.put("/api/admin/scan/schedule", json={"hour": 3}).status_code == 204
+    s = admin_client.get("/api/admin/scan").json()
+    assert s["daily_at"] == 3 and len(s["server_time"]) == 5
+    import time
+    at = lambda h: time.mktime((2026, 11, 20, h, 30, 0, 0, 0, -1))
+    c.execute("UPDATE scan_state SET started_at=?", (at(3) - 86400,)); c.commit()
+    assert runner.due(c, at(3)) and not runner.due(c, at(4))
+    c.execute("UPDATE scan_state SET started_at=?", (at(3) - 600,)); c.commit()
+    assert not runner.due(c, at(3))
+    assert admin_client.put("/api/admin/scan/schedule", json={"hour": None}).status_code == 204
+    assert not runner.due(c, at(3) + 86400)
+    c.close()
