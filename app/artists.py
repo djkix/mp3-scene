@@ -13,10 +13,10 @@ def main(artist: str) -> str:
 
 
 def fold(artist: str) -> str:
-    """Clé de rapprochement : sans casse, accents, points ni apostrophes ; « and » vaut « & », « pres. » « presents »."""
+    """Clé de rapprochement : sans casse, accents, espaces, points ni apostrophes ; « and » vaut « & », « pres. » « presents »."""
     a = "".join(c for c in unicodedata.normalize("NFKD", artist) if not unicodedata.combining(c)).casefold()
     a = re.sub(r"\b(?:pres|present|presents)\b", "presents", re.sub(r"\band\b|\+", "&", re.sub(r"['’`´.]", "", a)))
-    return " ".join(re.sub(r"\bversus\b", "vs", a).split())
+    return "".join(re.sub(r"\bversus\b", "vs", a).split())  # sans espaces : « 2ManyDJs » vaut « 2 Many DJs »
 
 
 def apply(conn) -> int:

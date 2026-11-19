@@ -144,6 +144,7 @@ def test_artists_are_grouped(conn):
     assert artists.main("Daft Punk") == "Daft Punk" and artists.main("Lifted") == "Lifted"
     assert artists.fold("Block And Crown") == artists.fold("block & crown") and artists.fold("R.I.O.") == artists.fold("RIO")
     assert artists.fold("Tiësto") == artists.fold("tiesto") and artists.fold("2 Many DJ's") == artists.fold("2 many djs")
+    assert artists.fold("2ManyDJs") == artists.fold("2 Many DJs") != artists.fold("2 Many DJs & X")
     names = ["Daft Punk", "Daft Punk", "daft punk", "Daft_Punk", "Daft Punk feat. X", "pete moss", "Tristan_Garner"]
     for i, a in enumerate(names):
         conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, artist,"

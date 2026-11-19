@@ -4,6 +4,14 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.30.1](https://github.com/djkix/mp3-scene/compare/v1.30.0...v1.30.1) (2026-11-19)
+
+### Résumé
+
+**Artistes : les espaces ne séparent plus deux graphies.**
+
+- « 2ManyDJs » et « 2 Many DJs », « Fat Boy Slim » et « Fatboy Slim », « W&W » et « W & W » sont réunis.
+
 ## [1.30.0](https://github.com/djkix/mp3-scene/compare/v1.29.1...v1.30.0) (2026-11-19)
 
 ### Résumé
