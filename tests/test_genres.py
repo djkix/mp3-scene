@@ -74,8 +74,10 @@ def test_category_from_tags_then_folder(tmp_path):
         "Pete_Tong-Essential_Selection-SAT-02-12-2010-TALiON", "VA-Live_at_EDC-READNFO-SAT-06-10-2012-TALiON",
         "VA-Slam_FM_Presents_Clubbin_Vol_1-2CD-2009-KTMP3", "VA-MC_Mario_Live_At_1234-2010-C4",
         "Woodkid--Live_at_New_Fall_Festival-DVBC-10-31-2013-OMA", "Artist-Live_In_Paris-2CD-2006-SAW",
-        "Art-One-CDM-2015-GRP", "Art-One-WEB-2015-GRP")] \
-        == ["live", "live", "comp", "comp", "live", None, "single", None]
+        "Art-One-CDM-2015-GRP", "Art-One-WEB-2015-GRP", "Justice-Live_And_Learn-(EP)-2008-BUTT",
+        "Herve-How_Can_I_Live_Without_You_(Fire_Flowerz_Remix)-FREEWEB-2012-KPS_INT",
+        "Artificial_Funk-Sleep_Less_Live_More-2008-ADK", "Coldplay-Live_2012-2012-BriBerY")] \
+        == ["live", "live", "comp", "comp", "live", None, "single", None, None, None, None, "live"]
     db.init(tmp_path)
     conn = db.connect(tmp_path)
     rows = (("01.Singles/Pnau-Live_At_The_Wireless-FM-08-15-2011-OZM", "03.Live And Radio"),

@@ -54,6 +54,11 @@ def group(raw: str | None) -> tuple[str | None, int | None]:
 _CD = re.compile(r"(?:^|[-_ (])\d*x?CD[A-Z]?\d*(?:[-_ )]|$)", re.I)  # CD, 2CD, CDM, CD1…
 
 
+# « Live » verbe dans un titre de morceau : « How_Can_I_Live_Without_You », « Live_And_Learn », « Live_More »
+_LIVE_VERB = re.compile(r"(?:^|[-_ ])(?:(?:I|we|you|to|gonna|wanna|let|lets)[_ ]live|live[_ ](?:and|without|more|for|your|my|it"
+                        r"|forever|again|is|life))(?:[-_ ]|$)", re.I)
+
+
 def kind(name: str) -> str | None:
     """Catégorie que les tags du nom indiquent : 'live', 'comp', 'single', ou None (le dossier décide alors)."""
     f = parse_release_name(name)
@@ -62,7 +67,7 @@ def kind(name: str) -> str | None:
         return "live"
     if re.match(r"(VA|Various(_Artists)?)(_?-|$)", name, re.I):
         return "comp"
-    if f["source"] == "LIVE" and not _CD.search(name):  # « Live » seul : pas un live si le nom parle aussi de CD
+    if f["source"] == "LIVE" and not _CD.search(name) and not _LIVE_VERB.search(name):  # « Live » seul : pas un live si le nom parle aussi de CD
         return "live"
     return "single" if f["source"] in ("CDS", "CDM", "SINGLE") else None
 

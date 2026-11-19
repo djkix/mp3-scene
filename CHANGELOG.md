@@ -4,6 +4,15 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.26.1](https://github.com/djkix/mp3-scene/compare/v1.26.0...v1.26.1) (2026-11-19)
+
+### Résumé
+
+**Catégorie : « Live » verbe dans un titre ne fait plus un live.**
+
+- « Live_And_Learn », « How_Can_I_Live_Without_You », « Sleep_Less_Live_More » ne rangent plus la release dans
+  Live & Radio : elle garde la catégorie de son dossier.
+
 ## [1.26.0](https://github.com/djkix/mp3-scene/compare/v1.25.0...v1.26.0) (2026-11-19)
 
 ### Résumé
