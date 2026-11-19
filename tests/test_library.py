@@ -367,3 +367,19 @@ def test_source_decade_appears_versions(user_client, admin_client, library, sett
     # un dossier ne montre que les releases de sa catégorie
     assert user_client.get("/api/folders?path=Singles/B").json()["releases"]["items"] == []
     assert len(user_client.get("/api/folders?path=Singles/A").json()["releases"]["items"]) == 1
+
+
+def test_date_from_nfo(user_client, library, settings):
+    from app import db
+    from app.scanner import scan_tags
+    rel = lambda: {x["name"]: x for x in user_client.get("/api/releases").json()["items"]}
+    assert all(x["date"] == x["added_at"] for x in rel().values())               # NFO sans date, ou pas de NFO
+    (settings.music_root / "Singles/A" / A / "a-trak--ibanez.nfo").write_bytes(b"Rip Date: Mar-04-2015")
+    c = db.connect(settings.data_dir)
+    c.execute("UPDATE releases SET released_at=NULL"); c.commit()                  # comme une base antérieure à la colonne
+    scan_tags(c, settings.music_root)
+    c.close()
+    r = rel()
+    assert r[A]["date"] == 1425470400 != r[A]["added_at"]
+    assert user_client.get("/api/releases?sort=date&dir=asc").json()["items"][0]["name"] == A  # 2015 avant les ajouts du jour
+    assert user_client.get("/api/releases?sort=added&dir=desc").status_code == 200

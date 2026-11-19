@@ -108,3 +108,17 @@ def test_album_year_2012_is_not_a_12_inch():
     from app.naming import album_like
     assert album_like("Vitalics-Rave_Age-REPACK-(Advance)-2012-404", 12)
     assert not album_like("Artist-Title-12-2009-GRP", 12) and not album_like("Artist-Title-2x12-2009-GRP", 12)
+
+
+def test_nfo_release_date():
+    import datetime
+    from app.nfo import release_date
+    day = lambda text: (t := release_date(text)) and datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime("%Y-%m-%d")
+    assert day("  RiP DATE....: Sep-11-2007\n STORE DATE..: 00-00-2008") == "2007-09-11"
+    assert day("Store Date: 2011-05-17   Rel.Date : 2011-09-25") == "2011-09-25"     # la release avant la mise en vente
+    assert day("RELEASE DATE: 17-06-2008") == "2008-06-17" and day("reldate ▓ 06.24.2012") == "2012-06-24"
+    assert day("Rls Date: 05-06-2008") == "2008-06-05"                                # ambigu : jour d'abord
+    assert day("Rls Date: 05-06-2008\nStreet Date: 05-31-2008") == "2008-05-06"       # l'autre date tranche
+    assert day("Updated: 07/July/2000") is None and day("street date : 07/July/2000") == "2000-07-07"
+    assert day("Store Date: 00/00/0000") is None and day("NFO Updated: 29-05-2007") is None
+    assert day("Street Date: Out Now") is None and day("rip date: 2099-01-01") is None and day("") is None

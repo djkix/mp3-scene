@@ -1,4 +1,4 @@
-import { fmtDuration, fmtSize } from '../api.js';
+import { fmtDate, fmtDuration, fmtSize } from '../api.js';
 import { t, catLabel } from '../i18n.js';
 
 const enc = encodeURIComponent;
@@ -7,7 +7,7 @@ const enc = encodeURIComponent;
 // correspondante. `el` est injecté pour pouvoir tester sans navigateur.
 export function infoRows(rel, el) {
   return [[t('Artiste'), rel.artist, (v) => `#/artists/${enc(v)}`], [t('Titre'), rel.title], [t('Source'), rel.source, (v) => `#/?source=${enc(v)}`],
-    [t('Année'), rel.year, (v) => `#/?year=${enc(v)}`], [t('Groupe'), rel.grp, (v) => `#/groups/${enc(v)}`],
+    [t('Année'), rel.year, (v) => `#/?year=${enc(v)}`], [t('Date'), rel.date == null ? null : fmtDate(rel.date)], [t('Groupe'), rel.grp, (v) => `#/groups/${enc(v)}`],
     [t('Catégorie'), rel.category && catLabel(rel.category)], [t('Genre'), rel.genre, (v) => `#/?genre=${enc(v)}`],
     [t('Taille'), rel.size == null ? null : fmtSize(rel.size)],
     [t('Durée'), rel.duration == null ? null : fmtDuration(rel.duration)]]

@@ -25,6 +25,8 @@ def init(data_dir: Path) -> None:
         # colonne ajoutée en 1.17.0 ; sans changer VERSION, pour qu'une image plus ancienne ouvre encore la base
         if "has_cover" not in {r[1] for r in conn.execute("PRAGMA table_info(releases)")}:
             conn.execute("ALTER TABLE releases ADD COLUMN has_cover INTEGER")
+        if "released_at" not in {r[1] for r in conn.execute("PRAGMA table_info(releases)")}:  # ajoutée en 1.29.0
+            conn.execute("ALTER TABLE releases ADD COLUMN released_at REAL")
         genres.apply(conn)  # genres lus avant la 1.21.0 : même regroupement que le scanner
         # groupes analysés avant la 1.22.0 : « AOV_INT » rejoint AOV, une année ou « 320 » passe en P2P, comme à
         # l'analyse du nom

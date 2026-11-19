@@ -1,7 +1,7 @@
 # Mp3 Scene — descriptif pour maquette
 
 Document destiné à un designer ou à un outil de maquettage. Il décrit le produit **tel qu'il fonctionne aujourd'hui
-(version 1.28.0)** : à qui il sert, ses écrans, les données affichées, les états et les contraintes à respecter.
+(version 1.29.0)** : à qui il sert, ses écrans, les données affichées, les états et les contraintes à respecter.
 L'habillage visuel actuel est décrit à la fin ; il peut être remis en cause, les contraintes ne le peuvent pas.
 
 > **Règle pour la maquette : ce document est la liste complète des fonctionnalités.** Ne rien ajouter qui n'y figure
@@ -69,7 +69,7 @@ Liste des releases, la plus récente en premier.
 | Vignette | pochette 40 px | Sans libellé ; vide s'il n'y a pas de pochette |
 | Nom | `VA-Toolroom_Ibiza_2026-(TOOL142001Z)-WEB-2026-AOV` | Chasse fixe, peut passer sur deux lignes, jamais tronqué ; pastille « nouveau » éventuelle, avant le nom |
 | Genre | House | Centré ; peut être vide tant que les tags ne sont pas lus |
-| Date | 26/05/2026 | Centré ; date d'ajout |
+| Date | 26/05/2026 | Centré ; date de sortie lue dans le NFO, sinon date d'ajout |
 | Pistes | 52 | Centré |
 | Débit | 320 kbit/s | Centré ; moyenne des pistes, vide tant que les tags ne sont pas lus |
 | Poids | 934 Mo | Aligné à droite |
@@ -112,7 +112,7 @@ dossiers, les pages de groupe et d'artiste, les favoris et le contrôle qualité
 - **Nom** de la release en titre.
 - **Pochette** à gauche des informations (au-dessus sur téléphone), quand la release en a une ; un clic l'ouvre en grand.
 - **Informations** (les champs absents ne s'affichent pas) : Artiste, Titre, Source (WEB, CD, VINYL, SAT…),
-  Année, Groupe, Catégorie, Genre, Taille, Durée. Artiste, Source, Année, Groupe et Genre sont des liens vers la liste
+  Année, Date, Groupe, Catégorie, Genre, Taille, Durée. Artiste, Source, Année, Groupe et Genre sont des liens vers la liste
   correspondante.
 - **Actions**, dans cet ordre : **Lire** (principale), **Ajouter à la file**, **Radio**, **Ajouter à une playlist**,
   **Garder hors ligne** (devient « Téléchargement 3/12… » puis « Retirer du hors-ligne »), **Partager**,

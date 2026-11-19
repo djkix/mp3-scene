@@ -16,8 +16,10 @@ _WORDS = re.compile(r"[\W_]+")
 # débit moyen des pistes lues (NULL tant qu'aucun tag n'est lu)
 # ponytail: sous-requête par ligne ; le tri par débit parcourt toutes les pistes — colonne releases.bitrate si trop lent
 BITRATE = "(SELECT CAST(AVG(bitrate) AS INTEGER) FROM tracks WHERE release_id=r.id)"
+# date affichée : celle du NFO, sinon celle de l'ajout
+DATE = "COALESCE(NULLIF(r.released_at, 0), r.added_at)"
 # artiste : tag commun s'il existe, sinon celui extrait du nom
-RELEASE_COLS = """r.id, r.name, r.path, r.category, r.added_at, r.size, r.track_count, r.has_nfo,
+RELEASE_COLS = """r.id, r.name, r.path, r.category, r.added_at, """ + DATE + """ AS date, r.size, r.track_count, r.has_nfo,
   COALESCE(r.tag_artist, r.artist) AS artist, r.title, r.source, r.year, r.grp, r.genre, r.duration,
   """ + BITRATE + """ AS bitrate, (f.item_id IS NOT NULL) AS favorite"""
 RELEASE_FROM = "releases r LEFT JOIN favorites f ON f.user_id=? AND f.kind='release' AND f.item_id=r.id"
@@ -28,10 +30,10 @@ TRACK_FROM = ("tracks t JOIN releases r ON r.id=t.release_id "
 
 
 # tri des listes : colonnes autorisées (jamais de texte du client dans le SQL)
-SORTS = {"name": "r.name COLLATE NOCASE", "genre": "r.genre COLLATE NOCASE", "date": "r.added_at",
+SORTS = {"name": "r.name COLLATE NOCASE", "genre": "r.genre COLLATE NOCASE", "date": DATE, "added": "r.added_at",
          "tracks": "r.track_count", "size": "r.size", "category": "r.category COLLATE NOCASE",
          "bitrate": BITRATE}
-Sort = Literal["name", "genre", "date", "tracks", "size", "category", "bitrate"]
+Sort = Literal["name", "genre", "date", "added", "tracks", "size", "category", "bitrate"]
 Dir = Literal["asc", "desc"]
 
 

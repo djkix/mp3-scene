@@ -13,7 +13,7 @@ from typing import Callable
 import mutagen
 from mutagen.id3 import ID3
 
-from app import db, genres
+from app import db, genres, nfo
 from app.naming import parse_release_name
 
 DISC_RE = re.compile(r"^(cd|disc|disk)[ _-]?(\d+)$", re.IGNORECASE)
@@ -148,7 +148,7 @@ def _scan_structure(conn, root, now):
         if rel in known:
             rid = known[rel][0]
             seen.add(rel)
-            conn.execute("UPDATE releases SET mtime=?, size=?, track_count=?, has_nfo=?, tags_done=0, has_cover=NULL WHERE id=?",
+            conn.execute("UPDATE releases SET mtime=?, size=?, track_count=?, has_nfo=?, tags_done=0, has_cover=NULL, released_at=NULL WHERE id=?",
                          (mtime, size, len(tracks), nfo, rid))
             old = {(r["relpath"], r["size"]): r["id"]
                    for r in conn.execute("SELECT id, relpath, size FROM tracks WHERE release_id=?", (rid,))}
@@ -396,7 +396,36 @@ def _scan_tags(conn, root, should_stop):
     db.categorize(conn)  # les titres lus départagent album et single à nombreuses versions
     conn.commit()
     _scan_covers(conn, root, should_stop)
+    _scan_dates(conn, root, should_stop)
     return read
+
+
+def _nfo_date(root, path):
+    """Date de sortie du premier NFO du dossier (le même que celui de la fiche) ; 0 s'il n'en donne pas."""
+    names = sorted(n for n in os.listdir(Path(root, path)) if n.lower().endswith(".nfo"))
+    if not names:
+        return 0
+    with open(Path(root, path, names[0]), "rb") as fh:  # lecture seule
+        return nfo.release_date(fh.read(1024 * 1024).decode("cp437")) or 0
+
+
+def _scan_dates(conn, root, should_stop):
+    """Renseigne released_at des releases à NFO jamais lu (nouvelles, modifiées, ou antérieures à la colonne)."""
+    last = 0
+    while not should_stop():
+        rows = conn.execute("SELECT id, path FROM releases WHERE has_nfo=1 AND released_at IS NULL AND id>?"
+                            " ORDER BY id LIMIT ?", (last, TAG_BATCH)).fetchall()
+        if not rows:
+            break
+        last = rows[-1]["id"]
+        done = []  # lot lu avant d'écrire, comme pour les tags
+        for r in rows:
+            try:
+                done.append((_nfo_date(root, r["path"]), r["id"]))
+            except OSError as e:
+                log.warning("NFO illisible, relu au prochain scan : %s (%s)", r["path"], e)
+        conn.executemany("UPDATE releases SET released_at=? WHERE id=?", done)
+        conn.commit()
 
 
 def _has_cover(root, path, first):
@@ -459,7 +488,8 @@ class Runner:
             conn.execute("UPDATE scan_state SET status='idle' WHERE status='tags'")
             conn.commit()
             pending = (conn.execute("SELECT 1 FROM tracks WHERE tags_read=0 LIMIT 1").fetchone()
-                       or conn.execute("SELECT 1 FROM releases WHERE has_cover IS NULL LIMIT 1").fetchone())
+                       or conn.execute("SELECT 1 FROM releases WHERE has_cover IS NULL LIMIT 1").fetchone()
+                       or conn.execute("SELECT 1 FROM releases WHERE has_nfo=1 AND released_at IS NULL LIMIT 1").fetchone())
         finally:
             conn.close()
         if pending:

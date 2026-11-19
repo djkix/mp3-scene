@@ -4,6 +4,17 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.29.0](https://github.com/djkix/mp3-scene/compare/v1.28.1...v1.29.0) (2026-11-19)
+
+### Résumé
+
+**La colonne Date montre la date de sortie lue dans le NFO.**
+
+- La date d'une release est celle que son NFO annonce (date de release, sinon de rip, de diffusion, puis de mise en
+  vente) ; sans NFO ou sans date lisible, la date d'ajout reste affichée. Elle figure aussi sur la fiche.
+- Les NFO sont lus par le scan ; ceux des releases déjà en base le sont en tâche de fond au premier démarrage.
+- Trier par Date suit la date affichée ; l'accueil « Derniers » reste classé par date d'ajout.
+
 ## [1.28.1](https://github.com/djkix/mp3-scene/compare/v1.28.0...v1.28.1) (2026-11-19)
 
 ### Résumé

@@ -66,7 +66,7 @@ export function row(rel) {
   // même ordre que HEAD ; sur mobile, .rel-info devient une ligne de détails sous le nom
   el('span', { class: 'rel-info' },
     el('span', { class: 'mid' }, rel.genre ? el('span', { class: 'chip' }, rel.genre) : ''),
-    el('span', { class: 'mid' }, fmtDate(rel.added_at)),
+    el('span', { class: 'mid' }, fmtDate(rel.date)),
     el('span', { class: 'mid' }, String(rel.track_count), el('span', { class: 'unit' }, ' ' + (rel.track_count > 1 ? tr('pistes') : tr('piste')))),
     el('span', { class: 'mid rate' }, rel.bitrate ? `${Math.round(rel.bitrate / 1000)} kbit/s` : ''),
     el('span', { class: 'num' }, fmtSize(rel.size)),
@@ -206,7 +206,7 @@ export function render(container, params) {
     query.set('offset', offset);
     query.set('limit', PAGE);
     return api('/releases?' + query + tri);
-  // derniers ajouts (accueil sans filtre) par date ; recherche, filtre, groupe ou artiste par ordre alphabétique
-  }, { empty: tr('Aucun résultat'), sort: q || pin || category || genre || year || source ? ['name', 'asc'] : ['date', 'desc'] });
+  // derniers ajouts (accueil sans filtre) par date d'ajout, même si la colonne Date montre celle du NFO ; recherche, filtre, groupe ou artiste par ordre alphabétique
+  }, { empty: tr('Aucun résultat'), sort: q || pin || category || genre || year || source ? ['name', 'asc'] : ['added', 'desc'] });
   return () => { dead = true; dispose(); };
 }
