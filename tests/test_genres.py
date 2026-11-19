@@ -128,9 +128,28 @@ def test_dated_and_broadcast_names_are_live():
     from app.naming import kind
     for n in ("Daft_Punk_-_Essential_Selection_Hotmix_12-31-1999-MS", "Space_Ibiza_Opening_Fiesta_Vol.5-04.06.2006-Eric_Prydz-SAM",
               "Coldcut_-_Solid_Steel-DVBS-06-01-2012-ZZGlive", "Vitalic_VTLZR-Rock_En_Seine-DVBS-2013-JUST",
-              "VA-JimTV_Hitmix_2009-DVBC-28-12-2009-HB", "Dinka_-_Helvetic_Nerds_March_(Pure_FM)-SBD-2010-B2R_INT"):
+              "Dinka_-_Helvetic_Nerds_March_(Pure_FM)-SBD-2010-B2R_INT"):
         assert kind(n) == "live", n
+    assert kind("VA-JimTV_Hitmix_2009-DVBC-28-12-2009-HB") == "comp" and kind("VA-TMF_Yearmix-DVB-2007-MB") == "comp"
     assert kind("VA-Blanco_Y_Negro_Hits_10-07-2010-SPM") == "comp" and kind("VA-Nova_Tunes_2.7-2013-H5N1") == "comp"
     for n in ("Natalie_Imbruglia-Glorious_The_Singles_97-07-2007-SAW", "The_Best_Remixes_01.03.2012",
               "Shaft_-_Saturday_The_Best_Of_Retro_House-CDR-12-09-2006-SKiTEX", "Artist-Title-WEB-2012-GRP"):
         assert kind(n) is None, n
+
+
+def test_artists_are_grouped(conn):
+    from app import artists
+    assert artists.main("Zedd Feat Bright Lights") == "Zedd" and artists.main("Argy (feat. Bajka)") == "Argy"
+    assert artists.main("Paul Oakenfold ft. Tiff Lacey") == "Paul Oakenfold" and artists.main("Feat. X") == "Feat. X"
+    assert artists.main("Daft Punk") == "Daft Punk" and artists.main("Lifted") == "Lifted"
+    assert artists.fold("Block And Crown") == artists.fold("block & crown") and artists.fold("R.I.O.") == artists.fold("RIO")
+    assert artists.fold("Tiësto") == artists.fold("tiesto") and artists.fold("2 Many DJ's") == artists.fold("2 many djs")
+    names = ["Daft Punk", "Daft Punk", "daft punk", "Daft_Punk", "Daft Punk feat. X", "pete moss", "Tristan_Garner"]
+    for i, a in enumerate(names):
+        conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, artist,"
+                     " tag_artist) VALUES (?,?,'','S',0,0,0,0,0,?,?)", (f"S/r{i}", f"r{i}", a, a if i % 2 else None))
+    assert artists.apply(conn) == 5
+    got = [tuple(r) for r in conn.execute("SELECT artist, tag_artist FROM releases ORDER BY id")]
+    assert [a for a, _ in got] == ["Daft Punk"] * 5 + ["Pete Moss", "Tristan Garner"]
+    assert got[1] == ("Daft Punk", "Daft Punk") and got[2] == ("Daft Punk", None)
+    assert artists.apply(conn) == 0  # sans effet au second passage

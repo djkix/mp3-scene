@@ -2,7 +2,7 @@ import re
 import sqlite3
 from pathlib import Path
 
-from app import genres
+from app import artists, genres
 from app.naming import album_like, group, kind, one_song
 
 SCHEMA = Path(__file__).with_name("schema.sql")
@@ -35,6 +35,7 @@ def init(data_dir: Path) -> None:
             if new != g:
                 conn.execute("UPDATE releases SET grp=?, year=COALESCE(year, ?) WHERE grp=?", (new, year, g))
         merge_group_case(conn)
+        artists.apply(conn)  # artistes lus avant la 1.30.0 : casse, ponctuation et featuring regroupés
         categorize(conn)
         conn.execute("INSERT OR IGNORE INTO scan_state(id) VALUES (1)")
         conn.execute(f"PRAGMA user_version = {VERSION}")

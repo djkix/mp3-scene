@@ -4,6 +4,20 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.30.0](https://github.com/djkix/mp3-scene/compare/v1.29.1...v1.30.0) (2026-11-19)
+
+### Résumé
+
+**Artistes regroupés : casse, ponctuation et featuring.**
+
+- Les artistes des releases qui ne diffèrent que par la casse, les accents, les points, les apostrophes, les
+  soulignés ou « and » / « & » sont réunis sous la graphie la plus répandue (« daft punk », « Daft_Punk » → Daft
+  Punk ; « Block And Crown » → Block & Crown ; « Tiësto » → Tiesto).
+- Un featuring rejoint l'artiste principal : « Zedd Feat Bright Lights » → Zedd. Les artistes des pistes ne changent
+  pas.
+- Le regroupement est refait à chaque scan et au démarrage ; la page Artistes et les « Autres versions » en profitent.
+- Un nom en « VA- » avec un tag DVB, DVBC, DVBS, DVBT ou SBD (« VA-TMF_Yearmix-DVB-2007 ») reste dans Compilations.
+
 ## [1.29.1](https://github.com/djkix/mp3-scene/compare/v1.29.0...v1.29.1) (2026-11-19)
 
 ### Résumé

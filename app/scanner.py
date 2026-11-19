@@ -13,7 +13,7 @@ from typing import Callable
 import mutagen
 from mutagen.id3 import ID3
 
-from app import db, genres, nfo
+from app import artists, db, genres, nfo
 from app.naming import parse_release_name
 
 DISC_RE = re.compile(r"^(cd|disc|disk)[ _-]?(\d+)$", re.IGNORECASE)
@@ -278,6 +278,7 @@ def _scan_structure(conn, root, now):
     conn.executemany("INSERT INTO folders(path, parent) VALUES (?,?)",
                      [(f, f.rpartition("/")[0]) for f in folders])
     db.merge_group_case(conn)  # une release ajoutée rejoint la graphie majoritaire de son groupe
+    artists.apply(conn)
     db.categorize(conn)
     conn.execute("UPDATE scan_state SET first_scan_done=1 WHERE id=1")
     conn.commit()
@@ -393,6 +394,7 @@ def _scan_tags(conn, root, should_stop):
         # releases sans piste en attente mais pas agrégées (ex. piste supprimée par la phase structure)
         _aggregate(conn, [r[0] for r in conn.execute("SELECT id FROM releases WHERE tags_done=0")])
         conn.commit()
+    artists.apply(conn)  # les artistes des tags rejoignent la graphie majoritaire
     db.categorize(conn)  # les titres lus départagent album et single à nombreuses versions
     conn.commit()
     _scan_covers(conn, root, should_stop)

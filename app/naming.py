@@ -97,10 +97,13 @@ def kind(name: str) -> str | None:
     """Catégorie que les tags du nom indiquent : 'live', 'comp', 'single', ou None (le dossier décide alors)."""
     f = parse_release_name(name)
     # tag de diffusion : un segment entier (« -SAT- »), pas un mot du titre (« Slam_FM_Presents »)
-    if {s.upper() for s in name.split("-")} & {"SAT", "CABLE", "DAB", "FM", "LINE", "DVB", "DVBC", "DVBS", "DVBT", "SBD"}:
+    tags = {s.upper() for s in name.split("-")}
+    if tags & {"SAT", "CABLE", "DAB", "FM", "LINE"}:
         return "live"
     if re.match(r"(VA|Various(_Artists)?)(_?-|$)", name, re.I):
         return "comp"
+    if tags & {"DVB", "DVBC", "DVBS", "DVBT", "SBD"}:  # après VA : un « VA-…Yearmix-DVB » reste une compilation
+        return "live"
     # nom daté au jour près, sans CD ni tag de single ailleurs que dans la date (« 12-31 » n'est pas un maxi 12 pouces)
     if (m := _full_date(name)) and not _CD.search(name) and not _SINGLE_TAG.search(name[:m.start()] + "-" + name[m.end():]):
         return "live"
