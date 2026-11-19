@@ -4,6 +4,16 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.29.1](https://github.com/djkix/mp3-scene/compare/v1.29.0...v1.29.1) (2026-11-19)
+
+### Résumé
+
+**Live & Radio : les émissions datées et les captations DVB ou SBD y sont rangées.**
+
+- Un nom qui porte une date complète (« Essential_Selection_Hotmix_12-31-1999 », « -25-07-2009- ») désigne une
+  émission ou un set : la release va dans Live & Radio, sauf compilation, CD ou tag de single.
+- Les tags DVB, DVBC, DVBS, DVBT et SBD comptent comme SAT, CABLE ou FM.
+
 ## [1.29.0](https://github.com/djkix/mp3-scene/compare/v1.28.1...v1.29.0) (2026-11-19)
 
 ### Résumé

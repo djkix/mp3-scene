@@ -78,14 +78,32 @@ _LIVE_VERB = re.compile(r"(?:^|[-_ ])(?:(?:I|we|you|to|gonna|wanna|let|lets)[_ ]
                         r"|forever|again|is|life))(?:[-_ ]|$)", re.I)
 
 
+# date complète dans le nom : une émission ou un set daté (« Hotmix_12-31-1999 », « -25-07-2009- », « 04.06.2006 »)
+_FULL_DATE = re.compile(r"(?:^|[-_ (])(?:(\d{1,2})([-.])(\d{1,2})\2(?:19|20)\d\d|(?:19|20)\d\d([-.])(\d{1,2})\4(\d{1,2}))"
+                        r"(?:[-_ )]|$)")
+
+
+def _full_date(name):
+    """Correspondance de la date complète du nom, ou None ; « Singles_97-07-2007 » n'en est pas une."""
+    m = _FULL_DATE.search(name)
+    if m:
+        a, b = sorted(int(x) for x in (m[1] and (m[1], m[3]) or (m[5], m[6])))
+        if not (1 <= a <= 12 and b <= 31):
+            return None
+    return m
+
+
 def kind(name: str) -> str | None:
     """Catégorie que les tags du nom indiquent : 'live', 'comp', 'single', ou None (le dossier décide alors)."""
     f = parse_release_name(name)
     # tag de diffusion : un segment entier (« -SAT- »), pas un mot du titre (« Slam_FM_Presents »)
-    if {s.upper() for s in name.split("-")} & {"SAT", "CABLE", "DAB", "FM", "LINE"}:
+    if {s.upper() for s in name.split("-")} & {"SAT", "CABLE", "DAB", "FM", "LINE", "DVB", "DVBC", "DVBS", "DVBT", "SBD"}:
         return "live"
     if re.match(r"(VA|Various(_Artists)?)(_?-|$)", name, re.I):
         return "comp"
+    # nom daté au jour près, sans CD ni tag de single ailleurs que dans la date (« 12-31 » n'est pas un maxi 12 pouces)
+    if (m := _full_date(name)) and not _CD.search(name) and not _SINGLE_TAG.search(name[:m.start()] + "-" + name[m.end():]):
+        return "live"
     # « Live » ou « Concert » seul : pas un live si le nom parle aussi de CD
     if (f["source"] == "LIVE" or re.search(r"(?:^|[-_ (])concerts?(?:[-_ )]|$)", name, re.I)) \
             and not _CD.search(name) and not _LIVE_VERB.search(name):

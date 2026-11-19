@@ -122,3 +122,15 @@ def test_nfo_release_date():
     assert day("Updated: 07/July/2000") is None and day("street date : 07/July/2000") == "2000-07-07"
     assert day("Store Date: 00/00/0000") is None and day("NFO Updated: 29-05-2007") is None
     assert day("Street Date: Out Now") is None and day("rip date: 2099-01-01") is None and day("") is None
+
+
+def test_dated_and_broadcast_names_are_live():
+    from app.naming import kind
+    for n in ("Daft_Punk_-_Essential_Selection_Hotmix_12-31-1999-MS", "Space_Ibiza_Opening_Fiesta_Vol.5-04.06.2006-Eric_Prydz-SAM",
+              "Coldcut_-_Solid_Steel-DVBS-06-01-2012-ZZGlive", "Vitalic_VTLZR-Rock_En_Seine-DVBS-2013-JUST",
+              "VA-JimTV_Hitmix_2009-DVBC-28-12-2009-HB", "Dinka_-_Helvetic_Nerds_March_(Pure_FM)-SBD-2010-B2R_INT"):
+        assert kind(n) == "live", n
+    assert kind("VA-Blanco_Y_Negro_Hits_10-07-2010-SPM") == "comp" and kind("VA-Nova_Tunes_2.7-2013-H5N1") == "comp"
+    for n in ("Natalie_Imbruglia-Glorious_The_Singles_97-07-2007-SAW", "The_Best_Remixes_01.03.2012",
+              "Shaft_-_Saturday_The_Best_Of_Retro_House-CDR-12-09-2006-SKiTEX", "Artist-Title-WEB-2012-GRP"):
+        assert kind(n) is None, n
