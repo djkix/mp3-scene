@@ -4,6 +4,14 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.30.2](https://github.com/djkix/mp3-scene/compare/v1.30.1...v1.30.2) (2026-11-19)
+
+### Résumé
+
+**Artistes : une année seule devient VA.**
+
+- Les compilations nommées « 2009 - Hed Kandi - … » avaient l'année pour artiste ; elles sont rangées sous VA.
+
 ## [1.30.1](https://github.com/djkix/mp3-scene/compare/v1.30.0...v1.30.1) (2026-11-19)
 
 ### Résumé

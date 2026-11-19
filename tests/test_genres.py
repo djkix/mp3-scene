@@ -144,6 +144,7 @@ def test_artists_are_grouped(conn):
     assert artists.main("Daft Punk") == "Daft Punk" and artists.main("Lifted") == "Lifted"
     assert artists.fold("Block And Crown") == artists.fold("block & crown") and artists.fold("R.I.O.") == artists.fold("RIO")
     assert artists.fold("Tiësto") == artists.fold("tiesto") and artists.fold("2 Many DJ's") == artists.fold("2 many djs")
+    assert artists.main("2009") == "VA" and artists.main("2009 Rewind") == "2009 Rewind" and artists.main("2000 And One") == "2000 And One"
     assert artists.fold("2ManyDJs") == artists.fold("2 Many DJs") != artists.fold("2 Many DJs & X")
     names = ["Daft Punk", "Daft Punk", "daft punk", "Daft_Punk", "Daft Punk feat. X", "pete moss", "Tristan_Garner"]
     for i, a in enumerate(names):

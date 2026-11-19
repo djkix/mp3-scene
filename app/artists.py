@@ -9,7 +9,8 @@ _FEAT = re.compile(r"\s*[(\[]?\s*\b(?:feat|ft|featuring)\b\.?\s.*$", re.I)
 def main(artist: str) -> str:
     """Artiste principal : « Zedd Feat Bright Lights », « Argy (feat. Bajka) » -> Zedd, Argy."""
     artist = " ".join(artist.replace("_", " ").split())  # « Tristan_Garner », « Daft  Punk »
-    return _FEAT.sub("", artist).strip(" -,(") or artist
+    artist = _FEAT.sub("", artist).strip(" -,(") or artist
+    return "VA" if re.fullmatch(r"(19|20)\d\d", artist) else artist  # une année seule n'est pas un artiste
 
 
 def fold(artist: str) -> str:
