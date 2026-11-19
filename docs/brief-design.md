@@ -1,7 +1,7 @@
 # Mp3 Scene — descriptif pour maquette
 
 Document destiné à un designer ou à un outil de maquettage. Il décrit le produit **tel qu'il fonctionne aujourd'hui
-(version 1.20.0)** : à qui il sert, ses écrans, les données affichées, les états et les contraintes à respecter.
+(version 1.21.0)** : à qui il sert, ses écrans, les données affichées, les états et les contraintes à respecter.
 L'habillage visuel actuel est décrit à la fin ; il peut être remis en cause, les contraintes ne le peuvent pas.
 
 > **Règle pour la maquette : ce document est la liste complète des fonctionnalités.** Ne rien ajouter qui n'y figure
@@ -73,7 +73,7 @@ Liste des releases, la plus récente en premier.
 | Pistes | 52 | Centré |
 | Débit | 320 kbit/s | Centré ; moyenne des pistes, vide tant que les tags ne sont pas lus |
 | Poids | 934 Mo | Aligné à droite |
-| Localisation | 02.Various Artists - Compilations | Dossier de premier niveau ; tronqué avec info-bulle |
+| Localisation | Compilations | Dossier de premier niveau sous un nom court (Singles, Compilations, Live / Cable / Sat / Radio) ; info-bulle : nom du dossier |
 | Actions | + ♡ › | Ajouter à la file, favori (plein quand actif), ouvrir la fiche |
 
 - **Clic sur une ligne** : lance la lecture de la release. Les trois actions sont des cibles distinctes.

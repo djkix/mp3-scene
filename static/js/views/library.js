@@ -1,7 +1,7 @@
 // Administration de la bibliothèque (#/library) : tableau de bord et contrôle qualité (#/library?tab=quality&kind=…).
 import { api, fmtSize } from '../api.js';
 import { el } from '../dom.js';
-import { t as tr } from '../i18n.js';
+import { t as tr, catLabel } from '../i18n.js';
 import { releaseList } from './releases.js';
 
 const KINDS = [['no_nfo', 'Sans NFO'], ['no_tags', 'Sans tags'], ['unreadable', 'Pistes illisibles'], ['low_bitrate', 'Débit inférieur à 192 kbit/s'],
@@ -23,7 +23,7 @@ function dashboard(body, status, isDead) {
     status.textContent = tr('{0} releases · {1} pistes · {2} · {3} jours de musique', s.releases, s.tracks, fmtSize(s.size), Math.round(s.duration / 8640) / 10);
     body.className = 'stats';
     body.replaceChildren(block(tr('Ajouts par mois'), s.months), block(tr('Par année'), s.years), block(tr('Par genre'), s.genres),
-      block(tr('Par source'), s.sources), block(tr('Par localisation'), s.categories),
+      block(tr('Par source'), s.sources), block(tr('Par localisation'), s.categories, (r) => catLabel(r.name)),
       block(tr('Pistes par débit'), s.bitrates, (r) => `${r.name} kbit/s`));
   }).catch((err) => { if (!isDead()) status.textContent = err.message; });
 }

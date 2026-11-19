@@ -21,6 +21,12 @@ export function t(fr, ...args) {
   return s.replace(/\{(\d+)\}/g, (m, i) => (i < args.length ? args[i] : m));
 }
 
+// Libellé d'une localisation (dossier racine) : « 02.Various Artists - Compilations » -> « Compilations ».
+export const catLabel = (c) => {
+  const s = String(c ?? '').replace(/^\d+\.\s*/, '').replace(/^Various Artists - /i, '');
+  return /^live and radio$/i.test(s) ? 'Live / Cable / Sat / Radio' : s;
+};
+
 export function setLang(l) {
   try { localStorage.setItem('lang', l); } catch { /* idem */ }
   location.reload();

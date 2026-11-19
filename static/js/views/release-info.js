@@ -1,5 +1,5 @@
 import { fmtDuration, fmtSize } from '../api.js';
-import { t } from '../i18n.js';
+import { t, catLabel } from '../i18n.js';
 
 const enc = encodeURIComponent;
 
@@ -8,7 +8,7 @@ const enc = encodeURIComponent;
 export function infoRows(rel, el) {
   return [[t('Artiste'), rel.artist, (v) => `#/artists/${enc(v)}`], [t('Titre'), rel.title], [t('Source'), rel.source],
     [t('Année'), rel.year, (v) => `#/?year=${enc(v)}`], [t('Groupe'), rel.grp, (v) => `#/groups/${enc(v)}`],
-    [t('Localisation'), rel.category], [t('Genre'), rel.genre, (v) => `#/?genre=${enc(v)}`],
+    [t('Localisation'), rel.category && catLabel(rel.category)], [t('Genre'), rel.genre, (v) => `#/?genre=${enc(v)}`],
     [t('Taille'), rel.size == null ? null : fmtSize(rel.size)],
     [t('Durée'), rel.duration == null ? null : fmtDuration(rel.duration)]]
     .filter(([, v]) => v != null && v !== '')

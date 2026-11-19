@@ -4,6 +4,21 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.21.0](https://github.com/djkix/mp3-scene/compare/v1.20.0...v1.21.0) (2026-11-19)
+
+### Résumé
+
+**Genres regroupés, localisations renommées.**
+
+- **Genres** : les genres qui ne diffèrent que par l'orthographe, la casse ou la mise en forme sont regroupés
+  (« house », « Hosue », « HOuse » → House ; « Club House » → Club-House ; « Drum_&_Bass » → Drum & Bass…). Une liste
+  de genres (« House, Tech House, Deep House ») est réduite au premier. « Unknown », « Other », « Genre » et les
+  adresses de sites deviennent « sans genre ». Les genres réellement différents (Disco, House) restent distincts.
+- La base existante est regroupée au démarrage, les prochains ajouts à la lecture de leurs étiquettes. Les fichiers
+  ne sont pas modifiés. La table de correspondance est dans `app/genres.py`.
+- **Localisations** : les dossiers racine s'affichent sous un nom court — Singles, Compilations,
+  Live / Cable / Sat / Radio — dans le filtre, la liste, la fiche et le tableau de bord.
+
 ## [1.20.0](https://github.com/djkix/mp3-scene/compare/v1.19.0...v1.20.0) (2026-11-18)
 
 ### Résumé

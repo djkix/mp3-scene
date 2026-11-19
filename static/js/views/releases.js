@@ -1,6 +1,6 @@
 import { api, fmtDate, fmtSize } from '../api.js';
 import { el } from '../dom.js';
-import { t as tr } from '../i18n.js';
+import { t as tr, catLabel } from '../i18n.js';
 import { trackList } from './tracklist.js';
 import { player } from '../player.js';
 
@@ -70,7 +70,7 @@ export function row(rel) {
     el('span', { class: 'mid' }, String(rel.track_count), el('span', { class: 'unit' }, ' ' + (rel.track_count > 1 ? tr('pistes') : tr('piste')))),
     el('span', { class: 'mid rate' }, rel.bitrate ? `${Math.round(rel.bitrate / 1000)} kbit/s` : ''),
     el('span', { class: 'num' }, fmtSize(rel.size)),
-    el('span', { class: 'rel-loc', title: rel.category || '' }, rel.category || '')),
+    el('span', { class: 'rel-loc', title: rel.category || '' }, catLabel(rel.category))),
   el('span', { class: 'rel-actions' }, queue, favButton(rel), detail));
 }
 
@@ -138,10 +138,10 @@ let filtersCache = null;
 export const invalidateFilters = () => { filtersCache = null; }; // après un scan : nouveaux genres/années/catégories
 export const loadFilters = () => (filtersCache ??= api('/filters').catch((e) => { filtersCache = null; throw e; }));
 
-export function select(label, all, name, values, current, onChange) {
+export function select(label, all, name, values, current, onChange, text = String) {
   const sel = el('select', { 'aria-label': label, onchange: () => onChange(name, sel.value) },
     el('option', { value: '' }, all),
-    values.map((v) => el('option', { value: String(v) }, String(v))));
+    values.map((v) => el('option', { value: String(v) }, text(v))));
   sel.value = current || '';
   return sel;
 }
@@ -170,7 +170,7 @@ export function render(container, params) {
   let dead = false;
   loadFilters().then((f) => {
     if (dead) return;
-    bar.replaceChildren(select(tr('Localisation'), tr('Localisations'), 'category', f.categories, category, setFilter),
+    bar.replaceChildren(select(tr('Localisation'), tr('Localisations'), 'category', f.categories, category, setFilter, catLabel),
       select(tr('Genre'), tr('Genres'), 'genre', f.genres, genre, setFilter), select(tr('Année'), tr('Années'), 'year', f.years, year, setFilter),
       ...(q ? [] : [mix]));
   }).catch(() => {});

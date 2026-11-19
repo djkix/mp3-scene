@@ -1,6 +1,8 @@
 import sqlite3
 from pathlib import Path
 
+from app import genres
+
 SCHEMA = Path(__file__).with_name("schema.sql")
 VERSION = 1  # PRAGMA user_version ; à incrémenter avec une migration si le schéma change
 
@@ -21,6 +23,7 @@ def init(data_dir: Path) -> None:
         # colonne ajoutée en 1.17.0 ; sans changer VERSION, pour qu'une image plus ancienne ouvre encore la base
         if "has_cover" not in {r[1] for r in conn.execute("PRAGMA table_info(releases)")}:
             conn.execute("ALTER TABLE releases ADD COLUMN has_cover INTEGER")
+        genres.apply(conn)  # genres lus avant la 1.21.0 : même regroupement que le scanner
         conn.execute("INSERT OR IGNORE INTO scan_state(id) VALUES (1)")
         conn.execute(f"PRAGMA user_version = {VERSION}")
         conn.commit()

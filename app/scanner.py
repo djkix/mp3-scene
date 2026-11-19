@@ -13,7 +13,7 @@ from typing import Callable
 import mutagen
 from mutagen.id3 import ID3
 
-from app import db
+from app import db, genres
 from app.naming import parse_release_name
 
 DISC_RE = re.compile(r"^(cd|disc|disk)[ _-]?(\d+)$", re.IGNORECASE)
@@ -341,7 +341,7 @@ def _read_tags(path):
     if m is None:
         return None, None, None, None, None
     info = getattr(m, "info", None)
-    return (_first(m.tags, "title"), _first(m.tags, "artist"), _first(m.tags, "genre"),
+    return (_first(m.tags, "title"), _first(m.tags, "artist"), genres.normalize(_first(m.tags, "genre")),
             getattr(info, "length", None), getattr(info, "bitrate", None))
 
 
