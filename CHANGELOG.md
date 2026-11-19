@@ -4,6 +4,19 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.31.0](https://github.com/djkix/mp3-scene/compare/v1.30.2...v1.31.0) (2026-11-19)
+
+### Résumé
+
+**Artistes : les « vs » et les « & » rejoignent l'artiste principal.**
+
+- « Daft Punk Vs Madonna » est rangé sous Daft Punk.
+- « Chocolate Puma & Firebeatz » est rangé sous Chocolate Puma. Un duo reste entier tant qu'il a au moins autant de
+  releases que son premier membre seul : Block & Crown, Dimitri Vegas & Like Mike, Above & Beyond ne bougent pas.
+- Un artiste vide dans les tags (« . », « Unknown », « Unknown Artist ») laisse la place à celui du nom de la
+  release ; « Various » et « Various Artists » deviennent VA.
+- Un tag d'une ou deux lettres qui tronque l'artiste du nom (« A » pour A-Trak) est ignoré.
+
 ## [1.30.2](https://github.com/djkix/mp3-scene/compare/v1.30.1...v1.30.2) (2026-11-19)
 
 ### Résumé

@@ -146,6 +146,7 @@ def test_artists_are_grouped(conn):
     assert artists.fold("Tiësto") == artists.fold("tiesto") and artists.fold("2 Many DJ's") == artists.fold("2 many djs")
     assert artists.main("2009") == "VA" and artists.main("2009 Rewind") == "2009 Rewind" and artists.main("2000 And One") == "2000 And One"
     assert artists.fold("2ManyDJs") == artists.fold("2 Many DJs") != artists.fold("2 Many DJs & X")
+    assert artists.main("Daft Punk Vs. Madonna") == "Daft Punk" and artists.main("Various Artists") == "VA"
     names = ["Daft Punk", "Daft Punk", "daft punk", "Daft_Punk", "Daft Punk feat. X", "pete moss", "Tristan_Garner"]
     for i, a in enumerate(names):
         conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, artist,"
@@ -155,3 +156,19 @@ def test_artists_are_grouped(conn):
     assert [a for a, _ in got] == ["Daft Punk"] * 5 + ["Pete Moss", "Tristan Garner"]
     assert got[1] == ("Daft Punk", "Daft Punk") and got[2] == ("Daft Punk", None)
     assert artists.apply(conn) == 0  # sans effet au second passage
+
+
+def test_artist_guests_junk_and_truncated_tags(conn):
+    from app import artists
+    rows = [("Chocolate Puma", None), ("Chocolate Puma", None), ("Chocolate Puma & Firebeatz", None),
+            ("Block & Crown", None), ("Block And Crown", None), ("2000 And One", None), ("2000 And One", None),
+            ("2000 And One & Y", None), ("G", None), ("G & G", None), ("G & G", None),
+            ("VA", "."), ("A-Trak", "A"), ("W&W", "Unknown Artist"), (None, "Various"), ("DJ Sneak", "DJ")]
+    for i, (a, t) in enumerate(rows):
+        conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, artist,"
+                     " tag_artist) VALUES (?,?,'','S',0,0,0,0,0,?,?)", (f"S/g{i}", f"g{i}", a, t))
+    artists.apply(conn)
+    got = [r[0] for r in conn.execute("SELECT COALESCE(tag_artist, artist) FROM releases WHERE path LIKE 'S/g%' ORDER BY id")]
+    assert got == ["Chocolate Puma"] * 3 + ["Block & Crown"] * 2 + ["2000 And One"] * 3 + ["G", "G & G", "G & G"] \
+        + ["VA", "A-Trak", "W&W", "VA", "DJ Sneak"]
+    assert artists.apply(conn) == 0
