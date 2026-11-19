@@ -102,3 +102,9 @@ def test_category_from_tags_then_folder(tmp_path):
                       for t in [mk.format(i)]])
     db.categorize(conn)
     assert [r[0] for r in conn.execute("SELECT category FROM releases ORDER BY id")] == [w for _, w in rows]
+
+
+def test_album_year_2012_is_not_a_12_inch():
+    from app.naming import album_like
+    assert album_like("Vitalics-Rave_Age-REPACK-(Advance)-2012-404", 12)
+    assert not album_like("Artist-Title-12-2009-GRP", 12) and not album_like("Artist-Title-2x12-2009-GRP", 12)

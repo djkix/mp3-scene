@@ -4,6 +4,15 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.28.1](https://github.com/djkix/mp3-scene/compare/v1.28.0...v1.28.1) (2026-11-19)
+
+### Résumé
+
+**Albums : l'année 2012 n'est plus prise pour un maxi 12 pouces.**
+
+- Le tag « 12 » (maxi vinyle) était reconnu dans l'année « 2012 » : les albums de 2012 restaient en Singles. Seuls
+  « 12 » et « 2x12 » isolés comptent désormais ; les releases concernées sont reclassées au démarrage.
+
 ## [1.28.0](https://github.com/djkix/mp3-scene/compare/v1.27.2...v1.28.0) (2026-11-19)
 
 ### Résumé

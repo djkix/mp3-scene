@@ -56,7 +56,7 @@ _CD = re.compile(r"(?:^|[-_ (])\d*x?CD[A-Z]?\d*(?:[-_ )]|$)", re.I)  # CD, 2CD, 
 
 
 # tag qui dit « single » : format court, promo, ou série de remixes
-_SINGLE_TAG = re.compile(r"(?:^|[-_ (])(?:CDM|CDS|CDR|MCD|SINGLE|VINYL|VLS|EP|\d*x?12|BOOTLEG|PROMO|SAMPLER|REMIX|REMIXES"
+_SINGLE_TAG = re.compile(r"(?:^|[-_ (])(?:CDM|CDS|CDR|MCD|SINGLE|VINYL|VLS|EP|(?:\d+x)?12|BOOTLEG|PROMO|SAMPLER|REMIX|REMIXES"
                          r"|REMIXED|MIXES|RMX|TOOLS|ACAPELLAS?)(?:[-_ ).]|$)", re.I)
 ALBUM_TRACKS = 10  # en dessous, trop de singles à remixes sans tag passeraient pour des albums
 
