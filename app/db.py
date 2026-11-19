@@ -31,11 +31,22 @@ def init(data_dir: Path) -> None:
             new, year = group(g)
             if new != g:
                 conn.execute("UPDATE releases SET grp=?, year=COALESCE(year, ?) WHERE grp=?", (new, year, g))
+        merge_group_case(conn)
         conn.execute("INSERT OR IGNORE INTO scan_state(id) VALUES (1)")
         conn.execute(f"PRAGMA user_version = {VERSION}")
         conn.commit()
     finally:
         conn.close()
+
+
+def merge_group_case(conn) -> None:
+    """Réunit les groupes qui ne diffèrent que par la casse (« dh » / « DH ») sous la graphie la plus répandue."""
+    # ponytail: lower() de SQLite, donc ASCII seulement ; suffisant pour des noms de groupes de la scène
+    for (k,) in conn.execute("SELECT lower(grp) FROM releases WHERE grp IS NOT NULL GROUP BY 1"
+                             " HAVING COUNT(DISTINCT grp)>1").fetchall():
+        best = conn.execute("SELECT grp FROM releases WHERE lower(grp)=? GROUP BY grp ORDER BY COUNT(*) DESC, grp"
+                            " LIMIT 1", (k,)).fetchone()[0]
+        conn.execute("UPDATE releases SET grp=? WHERE lower(grp)=? AND grp!=?", (best, k, best))
 
 
 def connect(data_dir: Path) -> sqlite3.Connection:

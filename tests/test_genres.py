@@ -49,3 +49,13 @@ def test_group_int_suffix_merged(tmp_path):
     db.init(tmp_path)
     assert [r[:] for r in db.connect(tmp_path).execute("SELECT grp, year FROM releases ORDER BY id")] \
         == [("AOV", None), ("AOV", None), ("PRINT", None), ("P2P", 2010), ("P2P", None)]
+
+
+def test_group_case_merged_to_most_common(tmp_path):
+    db.init(tmp_path)
+    conn = db.connect(tmp_path)
+    for i, g in enumerate(("dh", "dh", "DH", "WiTF", "Solo", None)):
+        conn.execute("INSERT INTO releases(path,name,parent,category,mtime,added_at,size,track_count,has_nfo,grp)"
+                     " VALUES (?,?,'p','c',0,0,0,0,0,?)", (f"p{i}", f"n{i}", g))
+    db.merge_group_case(conn)
+    assert [r[0] for r in conn.execute("SELECT grp FROM releases ORDER BY id")] == ["dh", "dh", "dh", "WiTF", "Solo", None]

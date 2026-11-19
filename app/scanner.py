@@ -277,6 +277,7 @@ def _scan_structure(conn, root, now):
     conn.execute("DELETE FROM folders")
     conn.executemany("INSERT INTO folders(path, parent) VALUES (?,?)",
                      [(f, f.rpartition("/")[0]) for f in folders])
+    db.merge_group_case(conn)  # une release ajoutée rejoint la graphie majoritaire de son groupe
     conn.execute("UPDATE scan_state SET first_scan_done=1 WHERE id=1")
     conn.commit()
     return {"found": found, "added": len(new), "moved": moved, "removed": removed, "skipped": skipped,

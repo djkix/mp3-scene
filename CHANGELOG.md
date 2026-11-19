@@ -4,6 +4,15 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.23.0](https://github.com/djkix/mp3-scene/compare/v1.22.0...v1.23.0) (2026-11-19)
+
+### Résumé
+
+**Groupes : la casse ne sépare plus.**
+
+- Les groupes qui ne diffèrent que par la casse (« dh » / « DH », « WITF » / « WiTF ») sont réunis sous la graphie
+  la plus répandue, au démarrage puis à chaque scan.
+
 ## [1.22.0](https://github.com/djkix/mp3-scene/compare/v1.21.0...v1.22.0) (2026-11-19)
 
 ### Résumé
