@@ -4,6 +4,18 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.22.0](https://github.com/djkix/mp3-scene/compare/v1.21.0...v1.22.0) (2026-11-19)
+
+### Résumé
+
+**Groupes : les releases internes rejoignent leur groupe, les releases sans groupe passent en P2P.**
+
+- Le suffixe `_INT` (quelle que soit sa casse : `_iNT`, `_int`) est retiré du nom du groupe : « AOV_INT » et « AOV »
+  ne font plus qu'un groupe, AOV. La base existante est corrigée au démarrage, les prochains ajouts à l'analyse de
+  leur nom. Le nom de la release, lui, ne change pas.
+- Quand le nom se termine par une année (« …-sat-02-12-2010 ») ou par « 320 » au lieu d'un groupe, la release est
+  rangée dans le groupe **P2P** ; l'année est alors reprise comme année de la release si elle manquait.
+
 ## [1.21.0](https://github.com/djkix/mp3-scene/compare/v1.20.0...v1.21.0) (2026-11-19)
 
 ### Résumé

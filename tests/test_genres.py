@@ -26,3 +26,26 @@ def test_apply_rewrites_existing_rows(tmp_path):
                      " VALUES (?,?,'p','c',0,0,0,0,0,?)", (f"p{i}", f"n{i}", g))
     assert apply(conn) == 2 and apply(conn) == 0
     assert [r[0] for r in conn.execute("SELECT genre FROM releases ORDER BY id")] == ["House", "House", None, "Nu Disco"]
+
+
+def test_group_int_suffix_merged(tmp_path):
+    from app.naming import group, parse_release_name
+    assert [group(g)[0] for g in ("AOV_INT", "XTC_iNT", "dh_int", "CBR_INT_INT", "AOV", "iNT", "EOSiNT", "939", None)] \
+        == ["AOV", "XTC", "dh", "CBR", "AOV", "iNT", "EOSiNT", "939", None]
+    assert parse_release_name("Art-One-WEB-2015-AOV_INT")["grp"] == "AOV"
+    # une année ou 320 à la place du groupe : P2P, et l'année est gardée
+    assert [group(g) for g in ("320", "320_ INT", "2010", "2008)", "2019_INT")] \
+        == [("P2P", None), ("P2P", None), ("P2P", 2010), ("P2P", 2008), ("P2P", 2019)]
+    p = parse_release_name("pete_tong_-_the_essential_selection-sat-02-12-2010")
+    assert (p["grp"], p["year"], p["source"]) == ("P2P", 2010, "SAT")
+    p = parse_release_name("VA-Four_Points-(YRD09)-WEB-2008-320")
+    assert (p["grp"], p["year"]) == ("P2P", 2008)
+    db.init(tmp_path)
+    conn = db.connect(tmp_path)
+    for i, g in enumerate(("AOV_INT", "AOV", "PRINT", "2010", "320")):
+        conn.execute("INSERT INTO releases(path,name,parent,category,mtime,added_at,size,track_count,has_nfo,grp)"
+                     " VALUES (?,?,'p','c',0,0,0,0,0,?)", (f"p{i}", f"n{i}", g))
+    conn.commit(); conn.close()
+    db.init(tmp_path)
+    assert [r[:] for r in db.connect(tmp_path).execute("SELECT grp, year FROM releases ORDER BY id")] \
+        == [("AOV", None), ("AOV", None), ("PRINT", None), ("P2P", 2010), ("P2P", None)]

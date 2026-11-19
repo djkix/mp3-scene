@@ -2,6 +2,7 @@ import sqlite3
 from pathlib import Path
 
 from app import genres
+from app.naming import group
 
 SCHEMA = Path(__file__).with_name("schema.sql")
 VERSION = 1  # PRAGMA user_version ; à incrémenter avec une migration si le schéma change
@@ -24,6 +25,12 @@ def init(data_dir: Path) -> None:
         if "has_cover" not in {r[1] for r in conn.execute("PRAGMA table_info(releases)")}:
             conn.execute("ALTER TABLE releases ADD COLUMN has_cover INTEGER")
         genres.apply(conn)  # genres lus avant la 1.21.0 : même regroupement que le scanner
+        # groupes analysés avant la 1.22.0 : « AOV_INT » rejoint AOV, une année ou « 320 » passe en P2P, comme à
+        # l'analyse du nom
+        for (g,) in conn.execute("SELECT DISTINCT grp FROM releases WHERE grp IS NOT NULL").fetchall():
+            new, year = group(g)
+            if new != g:
+                conn.execute("UPDATE releases SET grp=?, year=COALESCE(year, ?) WHERE grp=?", (new, year, g))
         conn.execute("INSERT OR IGNORE INTO scan_state(id) VALUES (1)")
         conn.execute(f"PRAGMA user_version = {VERSION}")
         conn.commit()
