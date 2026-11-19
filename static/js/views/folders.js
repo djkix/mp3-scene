@@ -1,16 +1,16 @@
 import { api, ApiError } from '../api.js';
-import { t } from '../i18n.js';
+import { t, catLabel } from '../i18n.js';
 import { el, encodePath } from '../dom.js';
 import { releaseList } from './releases.js';
 
 export function render(container, params) {
   const path = params.rest || '';
   let dead = false, disposeList = null;
-  const crumbs = [el('a', { href: '#/folders' }, t('Dossiers'))];
+  const crumbs = [el('a', { href: '#/folders' }, t('Catégories'))];
   let acc = '';
   for (const seg of path ? path.split('/') : []) {
     acc = acc ? acc + '/' + seg : seg;
-    crumbs.push(' › ', el('a', { href: '#/folders/' + encodePath(acc) }, seg));
+    crumbs.push(' › ', el('a', { href: '#/folders/' + encodePath(acc) }, acc === seg ? catLabel(seg) : seg)); // premier niveau : la catégorie
   }
   const page = (offset, tri = '') => api(`/folders?path=${encodeURIComponent(path)}&offset=${offset}&limit=50${tri}`);
   container.replaceChildren(el('nav', { class: 'crumbs', 'aria-label': t("Fil d'Ariane") }, ...crumbs),
@@ -21,7 +21,7 @@ export function render(container, params) {
     if (dead) return;
     first = data;
     const subs = el('ul', { class: 'sub-list' }, data.folders.map((f) =>
-      el('li', {}, el('a', { href: '#/folders/' + encodePath(f.path) }, '▸ ', f.name))));
+      el('li', {}, el('a', { href: '#/folders/' + encodePath(f.path) }, '▸ ', path ? f.name : catLabel(f.name)))));
     const list = el('div');
     container.lastChild.replaceWith(...(data.folders.length ? [subs] : []), list);
     disposeList = releaseList(list, async (offset, tri) => {

@@ -38,7 +38,6 @@ export const EN = {
   'Rechercher': 'Search',
   'Navigation principale': 'Main navigation',
   'Derniers': 'Latest',
-  'Dossiers': 'Folders',
   'Groupes': 'Groups',
   'release': 'release',
   'releases': 'releases',

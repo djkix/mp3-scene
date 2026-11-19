@@ -1,6 +1,6 @@
 // Liste de pistes à défilement infini : pistes favorites, historique, résultats de recherche, contenu d'une playlist.
 import { api, fmtDate, fmtDuration } from '../api.js';
-import { el } from '../dom.js';
+import { el, relName } from '../dom.js';
 import { player, watchPlaying } from '../player.js';
 import { t as tr, locale } from '../i18n.js';
 import { addButton } from '../playlist-add.js';
@@ -73,7 +73,7 @@ export function trackList(container, { path, empty, history = false, remove = nu
       : (t.duration == null ? '—' : fmtDuration(t.duration))),
     el('span', { class: 'rel-cat' }, t.artist || ''),
     el('span', { class: 'rel-name' }, t.title || t.filename),
-    el('a', { class: 'rel-meta', href: `#/release/${encodeURIComponent(t.release_name)}` }, t.release_name),
+    el('a', { class: 'rel-meta', href: `#/release/${encodeURIComponent(t.release_name)}` }, relName(t.release_name)),
     el('span', { class: 'rel-actions' }, shift('up'), shift('down'), addButton({ track_ids: [t.id] }, null, [t]), del));
     return li;
   }

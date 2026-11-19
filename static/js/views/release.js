@@ -1,6 +1,6 @@
 import { api, fmtDuration } from '../api.js';
 import { t } from '../i18n.js';
-import { el } from '../dom.js';
+import { el, relName } from '../dom.js';
 import { player, watchPlaying } from '../player.js';
 import { favButton, row } from './releases.js';
 import { infoRows } from './release-info.js';
@@ -38,7 +38,7 @@ export function render(container, params) {
 function header(rel) {
   const play = () => player.playTracks(rel.tracks, 0);
   return el('header', { class: 'detail-head' },
-    el('h1', { class: 'detail-name' }, rel.name),
+    el('h1', { class: 'detail-name' }, relName(rel.name)),
     el('div', { class: 'detail-top' },
       // pochette facultative : sans image (404), le lien disparaît
       el('a', { class: 'cover', href: `/api/releases/${rel.id}/cover`, target: '_blank', rel: 'noopener' },

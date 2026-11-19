@@ -4,7 +4,7 @@
 // attach/detach) remplace l'<audio> local pour le transport et l'état lu (lecture, position, durée, volume).
 import { api, fmtDuration } from './api.js';
 import { t as tr } from './i18n.js';
-import { el } from './dom.js';
+import { el, relName } from './dom.js';
 import { Queue } from './queue.js';
 import { offline } from './offline.js';
 
@@ -694,7 +694,7 @@ function update() {
     ui.footer.classList.toggle('is-empty', !t);
     ui.title.textContent = !t ? '' : t.title && t.artist ? `${t.artist} - ${t.title}` : title(t);
     ui.title.title = ui.title.textContent;
-    ui.rel.textContent = t?.release_name || '';
+    ui.rel.textContent = relName(t?.release_name);
     loadWave(t);
     const cover = t ? `/api/releases/${t.release_id}/cover` : '';
     if (ui.cover.dataset.src !== cover) { // même release : l'image n'est pas rechargée à chaque piste
@@ -728,7 +728,7 @@ function renderPanel() {
     el('button', { type: 'button', class: 'pl-q-track', 'aria-current': i === q.index ? 'true' : null,
       onclick: () => player.jump(i) },
     el('span', { class: 'pl-q-title' }, title(t)),
-    el('span', { class: 'pl-q-rel' }, [t.artist, t.release_name].filter(Boolean).join(' · '))),
+    el('span', { class: 'pl-q-rel' }, [t.artist, relName(t.release_name)].filter(Boolean).join(' · '))),
     el('span', { class: 'pl-time' }, fmtDuration(t.duration)),
     iconBtn('pl-q-up', '▲', tr('Monter'), () => player.move(i, i - 1)),
     iconBtn('pl-q-down', '▼', tr('Descendre'), () => player.move(i, i + 1)),

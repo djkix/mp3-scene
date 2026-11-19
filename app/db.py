@@ -1,8 +1,9 @@
+import re
 import sqlite3
 from pathlib import Path
 
 from app import genres
-from app.naming import group
+from app.naming import group, kind
 
 SCHEMA = Path(__file__).with_name("schema.sql")
 VERSION = 1  # PRAGMA user_version ; à incrémenter avec une migration si le schéma change
@@ -32,6 +33,7 @@ def init(data_dir: Path) -> None:
             if new != g:
                 conn.execute("UPDATE releases SET grp=?, year=COALESCE(year, ?) WHERE grp=?", (new, year, g))
         merge_group_case(conn)
+        categorize(conn)
         conn.execute("INSERT OR IGNORE INTO scan_state(id) VALUES (1)")
         conn.execute(f"PRAGMA user_version = {VERSION}")
         conn.commit()
@@ -47,6 +49,24 @@ def merge_group_case(conn) -> None:
         best = conn.execute("SELECT grp FROM releases WHERE lower(grp)=? GROUP BY grp ORDER BY COUNT(*) DESC, grp"
                             " LIMIT 1", (k,)).fetchone()[0]
         conn.execute("UPDATE releases SET grp=? WHERE lower(grp)=? AND grp!=?", (best, k, best))
+
+
+_KIND_FOLDER = {"live": r"live|radio", "comp": r"compil", "single": r"single"}
+
+
+def categorize(conn) -> None:
+    """Catégorie de chaque release : celle que les tags de son nom indiquent, sinon son dossier racine.
+
+    Une catégorie est toujours un dossier racine existant : « live » désigne celui dont le nom contient « live » ou
+    « radio », etc. Sans dossier correspondant, la release garde le sien."""
+    rows = conn.execute("SELECT id, name, path, category FROM releases").fetchall()
+    tops = sorted({r["path"].split("/", 1)[0] for r in rows})
+    target = {k: next((t for t in tops if re.search(p, t, re.I)), None) for k, p in _KIND_FOLDER.items()}
+    # ponytail: toutes les releases sont réanalysées à chaque démarrage et à chaque scan (moins d'une seconde pour
+    # 50 000) ; ne traiter que les nouvelles si cela devient sensible
+    conn.executemany("UPDATE releases SET category=? WHERE id=?", [
+        (want, r["id"]) for r in rows
+        if (want := target.get(kind(r["name"])) or r["path"].split("/", 1)[0]) != r["category"]])
 
 
 def connect(data_dir: Path) -> sqlite3.Connection:

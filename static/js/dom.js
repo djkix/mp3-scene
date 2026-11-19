@@ -14,3 +14,7 @@ export function el(tag, props = {}, ...children) {
 
 // Chemin de dossier -> segment de hash ('Singles/A' -> 'Singles/A' avec chaque partie encodée)
 export const encodePath = (p) => p.split('/').map(encodeURIComponent).join('/');
+
+// Nom de release tel qu'affiché : les espaces deviennent des « _ », comme dans les noms de la scène. L'adresse et la
+// recherche gardent le vrai nom.
+export const relName = (name) => String(name ?? '').replace(/ /g, '_');

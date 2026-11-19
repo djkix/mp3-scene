@@ -1,7 +1,7 @@
 // Releases gardées hors ligne : bouton de la fiche release, et liste (Favoris › Hors ligne, ou seule page affichée
 // quand le serveur est injoignable). La liste ne fait aucun appel réseau.
 import { fmtSize } from '../api.js';
-import { el } from '../dom.js';
+import { el, relName } from '../dom.js';
 import { player } from '../player.js';
 import { t as tr } from '../i18n.js';
 import { offline } from '../offline.js';
@@ -37,7 +37,7 @@ export function render(container) {
     body.replaceChildren(...all.map((r) => el('tr', { class: 'trk', tabIndex: 0,
       onclick: (e) => { if (!e.target.closest('button')) player.playTracks(r.tracks, 0); },
       onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) player.playTracks(r.tracks, 0); } },
-    el('td', {}, r.name), el('td', { class: 'num' }, String(r.tracks.length)), el('td', { class: 'num' }, fmtSize(r.size)),
+    el('td', {}, relName(r.name)), el('td', { class: 'num' }, String(r.tracks.length)), el('td', { class: 'num' }, fmtSize(r.size)),
     el('td', {}, el('div', { class: 'actions' },
       el('button', { type: 'button', class: 'icon', title: tr('Retirer du hors-ligne'), 'aria-label': tr('Retirer du hors-ligne'),
         onclick: async () => { await offline.remove(r.id).catch(() => {}); paint(); } }, '✕'))))));

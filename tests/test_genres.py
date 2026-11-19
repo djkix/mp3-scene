@@ -66,3 +66,24 @@ def test_group_case_merged_to_most_common(tmp_path):
                      " VALUES (?,?,'p','c',0,0,0,0,0,?)", (f"p{i}", f"n{i}", g))
     db.merge_group_case(conn)
     assert [r[0] for r in conn.execute("SELECT grp FROM releases ORDER BY id")] == ["dh", "dh", "dh", "WiTF", "Solo", None]
+
+
+def test_category_from_tags_then_folder(tmp_path):
+    from app.naming import kind
+    assert [kind(n) for n in (
+        "Pete_Tong-Essential_Selection-SAT-02-12-2010-TALiON", "VA-Live_at_EDC-READNFO-SAT-06-10-2012-TALiON",
+        "VA-Slam_FM_Presents_Clubbin_Vol_1-2CD-2009-KTMP3", "VA-MC_Mario_Live_At_1234-2010-C4",
+        "Woodkid--Live_at_New_Fall_Festival-DVBC-10-31-2013-OMA", "Artist-Live_In_Paris-2CD-2006-SAW",
+        "Art-One-CDM-2015-GRP", "Art-One-WEB-2015-GRP")] \
+        == ["live", "live", "comp", "comp", "live", None, "single", None]
+    db.init(tmp_path)
+    conn = db.connect(tmp_path)
+    rows = (("01.Singles/Pnau-Live_At_The_Wireless-FM-08-15-2011-OZM", "03.Live And Radio"),
+            ("01.Singles/VA-Big_Mix-CD-2008-LiR", "02.Compilations"),
+            ("02.Compilations/Art-One-WEB-2015-GRP", "02.Compilations"),  # aucun tag : le dossier décide
+            ("03.Live And Radio/Bad Boy Bill - Live At WBMX", "03.Live And Radio"))
+    for i, (path, _) in enumerate(rows):
+        conn.execute("INSERT INTO releases(path,name,parent,category,mtime,added_at,size,track_count,has_nfo)"
+                     " VALUES (?,?,'p',?,0,0,0,0,0)", (path, path.split("/")[1], path.split("/")[0]))
+    db.categorize(conn)
+    assert [r[0] for r in conn.execute("SELECT category FROM releases ORDER BY id")] == [w for _, w in rows]

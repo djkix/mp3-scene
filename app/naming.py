@@ -51,6 +51,22 @@ def group(raw: str | None) -> tuple[str | None, int | None]:
     return grp, None
 
 
+_CD = re.compile(r"(?:^|[-_ (])\d*x?CD[A-Z]?\d*(?:[-_ )]|$)", re.I)  # CD, 2CD, CDM, CD1…
+
+
+def kind(name: str) -> str | None:
+    """Catégorie que les tags du nom indiquent : 'live', 'comp', 'single', ou None (le dossier décide alors)."""
+    f = parse_release_name(name)
+    # tag de diffusion : un segment entier (« -SAT- »), pas un mot du titre (« Slam_FM_Presents »)
+    if {s.upper() for s in name.split("-")} & {"SAT", "CABLE", "DAB", "FM", "LINE"}:
+        return "live"
+    if re.match(r"(VA|Various(_Artists)?)(_?-|$)", name, re.I):
+        return "comp"
+    if f["source"] == "LIVE" and not _CD.search(name):  # « Live » seul : pas un live si le nom parle aussi de CD
+        return "live"
+    return "single" if f["source"] in ("CDS", "CDM", "SINGLE") else None
+
+
 def _clean(s):
     return s.replace("_", " ").strip() or None
 

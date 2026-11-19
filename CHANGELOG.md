@@ -4,6 +4,21 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.26.0](https://github.com/djkix/mp3-scene/compare/v1.25.0...v1.26.0) (2026-11-19)
+
+### Résumé
+
+**Catégories : onglet renommé, catégorie déduite des tags. Noms de releases affichés avec des « _ ».**
+
+- L'onglet et le fil d'Ariane s'appellent Catégories ; le premier niveau affiche Singles, Compilations et
+  Live & Radio au lieu du nom des dossiers. Les sous-dossiers gardent leur nom, les adresses ne changent pas.
+- La catégorie des lives s'appelle **Live & Radio** partout (colonne, filtre, fiche, tableau de bord).
+- **Catégorie déduite des tags du nom**, à défaut seulement du dossier : un tag de diffusion (SAT, CABLE, DAB, FM,
+  LINE) donne Live & Radio ; « VA » donne Compilations ; « Live » sans VA ni indication de CD donne Live & Radio ;
+  CDS, CDM ou SINGLE donnent Singles. L'onglet Catégories, lui, montre toujours le rangement réel des dossiers.
+- **Noms de releases** : à l'affichage, les espaces deviennent des « _ » (listes, fiche, lecteur), comme dans les
+  noms de la scène. Les dossiers et les adresses ne changent pas.
+
 ## [1.25.0](https://github.com/djkix/mp3-scene/compare/v1.24.0...v1.25.0) (2026-11-19)
 
 ### Résumé

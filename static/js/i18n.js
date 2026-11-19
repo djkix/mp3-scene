@@ -22,11 +22,9 @@ export function t(fr, ...args) {
 }
 
 // Libellé d'une catégorie (dossier racine) : « 02.Various Artists - Compilations » -> « Compilations ».
-// `short` : forme courte pour la colonne des listes (« Live »).
-export const catLabel = (c, short = false) => {
-  const s = String(c ?? '').replace(/^\d+\.\s*/, '').replace(/^Various Artists - /i, '');
-  return /^live and radio$/i.test(s) ? (short ? 'Live' : 'Live / Cable / Sat / Radio') : s;
-};
+// « 03.Various Artists - Live And Radio » -> « Live & Radio ».
+export const catLabel = (c) => String(c ?? '').replace(/^\d+\.\s*/, '').replace(/^Various Artists - /i, '')
+  .replace(/^live and radio$/i, 'Live & Radio');
 
 export function setLang(l) {
   try { localStorage.setItem('lang', l); } catch { /* idem */ }

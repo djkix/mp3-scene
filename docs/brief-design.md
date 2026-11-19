@@ -1,7 +1,7 @@
 # Mp3 Scene — descriptif pour maquette
 
 Document destiné à un designer ou à un outil de maquettage. Il décrit le produit **tel qu'il fonctionne aujourd'hui
-(version 1.25.0)** : à qui il sert, ses écrans, les données affichées, les états et les contraintes à respecter.
+(version 1.26.0)** : à qui il sert, ses écrans, les données affichées, les états et les contraintes à respecter.
 L'habillage visuel actuel est décrit à la fin ; il peut être remis en cause, les contraintes ne le peuvent pas.
 
 > **Règle pour la maquette : ce document est la liste complète des fonctionnalités.** Ne rien ajouter qui n'y figure
@@ -39,7 +39,7 @@ Trois zones permanentes, une fois connecté :
 2. **Contenu** : l'écran courant.
 3. **Lecteur** : fixé en bas, visible dès qu'une piste a été lancée, sur tous les écrans.
 
-Navigation, cinq entrées : **Derniers** (accueil), **Dossiers**, **Explorer**, **Favoris**, **Compte**. L'entrée active est marquée.
+Navigation, cinq entrées : **Derniers** (accueil), **Catégories**, **Explorer**, **Favoris**, **Compte**. L'entrée active est marquée.
 
 Deux **bandeaux** peuvent apparaître sous la barre du haut :
 - pour les administrateurs : « Nouvelle version 1.19.0 disponible (installée : 1.18.0). Voir les nouveautés » ;
@@ -73,7 +73,7 @@ Liste des releases, la plus récente en premier.
 | Pistes | 52 | Centré |
 | Débit | 320 kbit/s | Centré ; moyenne des pistes, vide tant que les tags ne sont pas lus |
 | Poids | 934 Mo | Aligné à droite |
-| Catégorie | Compilations | Dossier de premier niveau sous un nom court (Singles, Compilations, Live) ; info-bulle : libellé complet (Live / Cable / Sat / Radio) |
+| Catégorie | Compilations | Dossier de premier niveau sous un nom court (Singles, Compilations, Live & Radio) ; info-bulle : nom du dossier |
 | Actions | + ♡ › | Ajouter à la file, favori (plein quand actif), ouvrir la fiche |
 
 - **Clic sur une ligne** : lance la lecture de la release. Les trois actions sont des cibles distinctes.
@@ -89,8 +89,9 @@ dossiers, les pages de groupe et d'artiste, les favoris et le contrôle qualité
 - **Pistes** : les pistes dont le titre ou l'artiste contient les mots cherchés, dans la liste de pistes décrite en 4.7.
 - Message : « Aucun résultat ».
 
-### 4.4 Dossiers
-- **Fil d'Ariane** : Dossiers › 02.Various Artists - Compilations › -=Kontor=-
+### 4.4 Catégories
+- **Fil d'Ariane** : Catégories › Compilations › -=Kontor=- (premier niveau : Singles, Compilations, Live & Radio ; les
+  sous-dossiers gardent leur nom)
 - Liste des **sous-dossiers**, puis la **liste des releases** du dossier.
 - Messages : « Dossier vide. », « Dossier introuvable. »
 
@@ -318,7 +319,7 @@ Pour chaque écran, en **bureau (1440 px)** et **téléphone (375 px)**, thèmes
 1. Connexion
 2. Derniers, avec filtres, bouton Mix, pastilles « nouveau » et lecteur actif
 3. Recherche : onglet Releases sans résultat, onglet Pistes avec résultats
-4. Dossiers, à deux niveaux de profondeur
+4. Catégories, à deux niveaux de profondeur
 5. Explorer : onglet Groupes, puis page d'un groupe
 6. Fiche d'une release multi-disques, avec releases similaires et NFO
 7. Favoris : les six onglets (Releases, Pistes, Playlists, Hors ligne, Historique, Statistiques)
