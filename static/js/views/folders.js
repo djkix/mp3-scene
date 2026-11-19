@@ -1,7 +1,7 @@
 import { api, ApiError } from '../api.js';
 import { t, catLabel } from '../i18n.js';
 import { el, encodePath } from '../dom.js';
-import { releaseList } from './releases.js';
+import { releaseList, loadFilters } from './releases.js';
 
 export function render(container, params) {
   const path = params.rest || '';
@@ -22,6 +22,11 @@ export function render(container, params) {
     first = data;
     const subs = el('ul', { class: 'sub-list' }, data.folders.map((f) =>
       el('li', {}, el('a', { href: '#/folders/' + encodePath(f.path) }, '▸ ', path ? f.name : catLabel(f.name)))));
+    // catégories sans dossier à elles (Albums) : à la racine, elles mènent à la liste filtrée
+    if (!path) loadFilters().then((f) => {
+      if (!dead) subs.append(...f.categories.filter((c) => !data.folders.some((d) => d.name === c)).map((c) =>
+        el('li', {}, el('a', { href: '#/?category=' + encodeURIComponent(c) }, '▸ ', catLabel(c)))));
+    }).catch(() => {});
     const list = el('div');
     container.lastChild.replaceWith(...(data.folders.length ? [subs] : []), list);
     disposeList = releaseList(list, async (offset, tri) => {

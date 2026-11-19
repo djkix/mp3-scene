@@ -70,7 +70,7 @@ export function row(rel) {
     el('span', { class: 'mid' }, String(rel.track_count), el('span', { class: 'unit' }, ' ' + (rel.track_count > 1 ? tr('pistes') : tr('piste')))),
     el('span', { class: 'mid rate' }, rel.bitrate ? `${Math.round(rel.bitrate / 1000)} kbit/s` : ''),
     el('span', { class: 'num' }, fmtSize(rel.size)),
-    el('span', { class: 'rel-loc', title: rel.category || '' }, catLabel(rel.category))),
+    el('span', { class: 'rel-loc mid', title: rel.category || '' }, catLabel(rel.category))),
   el('span', { class: 'rel-actions' }, queue, favButton(rel), detail));
 }
 

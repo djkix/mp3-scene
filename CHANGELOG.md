@@ -4,6 +4,16 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.27.2](https://github.com/djkix/mp3-scene/compare/v1.27.1...v1.27.2) (2026-11-19)
+
+### Résumé
+
+**Albums apparaît dans l'onglet Catégories.**
+
+- La catégorie Albums, qui n'a pas de dossier, est listée à la racine de l'onglet Catégories ; elle ouvre la liste
+  des releases filtrée sur Albums.
+- Dans les listes, la colonne Catégorie est centrée, comme les autres.
+
 ## [1.27.1](https://github.com/djkix/mp3-scene/compare/v1.27.0...v1.27.1) (2026-11-19)
 
 ### Résumé
