@@ -298,7 +298,9 @@ google-cast-launcher:hover { background: var(--hover); }
 .detail-info { flex: 1 1 320px; display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr); align-items: baseline;
   gap: 8px 14px; margin: 0; padding: 14px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
 .detail-info dt { color: var(--muted); font-size: 10px; }
-.detail-info dd { margin: 0; font: 13px var(--mono); overflow-wrap: anywhere; }
+/* valeurs alignées à droite de leur colonne ; la colonne de gauche garde un écart avant le libellé suivant */
+.detail-info dd { margin: 0; font: 13px var(--mono); overflow-wrap: anywhere; text-align: right; }
+.detail-info dd:nth-of-type(odd) { padding-right: 24px; }
 .detail-info dd a { color: var(--accent-text); }
 .detail-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0; }
 .detail-actions :is(button, .btn):not(.icon) { padding: 8px 14px; }

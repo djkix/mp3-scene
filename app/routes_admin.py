@@ -5,7 +5,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from . import security
+from . import db, genres, scanner, security
 from .deps import MAX_INT, Id, get_conn, require_admin
 from .routes_library import RELEASE_COLS, RELEASE_FROM, Dir, Sort, _order, _page, _release
 
@@ -122,6 +122,36 @@ def library_stats(conn=Depends(get_conn)):
                              " SUM(size) AS size FROM tracks WHERE bitrate IS NOT NULL GROUP BY 1 ORDER BY MIN(bitrate) DESC"),
             "months": rows("SELECT strftime('%Y-%m', added_at, 'unixepoch') AS name, COUNT(*) AS n, SUM(size) AS size"
                            " FROM releases GROUP BY 1 ORDER BY 1 DESC LIMIT 24")}
+
+
+class Correction(BaseModel):
+    artist: str | None = Field(default=None, max_length=200)
+    category: str | None = Field(default=None, max_length=200)
+    genre: str | None = Field(default=None, max_length=200)
+
+
+@router.patch("/releases/{rid}", status_code=204)
+def correct_release(rid: Id, body: Correction, conn=Depends(get_conn)):
+    """Corrige l'artiste, la catégorie ou le genre d'une release. Champ absent : inchangé ; vide : retour à la valeur
+    automatique. La correction est gardée par chemin et réappliquée après chaque scan."""
+    row = conn.execute("SELECT path FROM releases WHERE id=?", (rid,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "Release introuvable.")
+    fields = {k: (v or "").strip() or None for k, v in body.model_dump(exclude_unset=True).items()}
+    if fields.get("category") and conn.execute("SELECT 1 FROM releases WHERE category=? LIMIT 1",
+                                               (fields["category"],)).fetchone() is None:
+        raise HTTPException(400, "Catégorie inconnue.")
+    if fields.get("genre"):
+        fields["genre"] = genres.normalize(fields["genre"]) or fields["genre"]
+    conn.execute("INSERT OR IGNORE INTO overrides(path) VALUES (?)", (row["path"],))
+    for col, val in fields.items():  # noms de colonnes issus du modèle, jamais du client
+        conn.execute(f"UPDATE overrides SET {col}=? WHERE path=?", (val, row["path"]))
+    conn.execute("DELETE FROM overrides WHERE path=? AND artist IS NULL AND category IS NULL AND genre IS NULL", (row["path"],))
+    # valeurs automatiques recalculées, puis corrections réappliquées (un artiste rendu à l'automatique n'est regroupé
+    # avec les autres graphies qu'au prochain scan ou démarrage)
+    scanner._aggregate(conn, [rid])
+    db.categorize(conn)
+    conn.commit()
 
 
 # contrôles qualité : condition SQL sur la release r (jamais de texte du client dans le SQL)

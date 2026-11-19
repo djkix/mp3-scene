@@ -427,6 +427,7 @@ def _scan_dates(conn, root, should_stop):
             except OSError as e:
                 log.warning("NFO illisible, relu au prochain scan : %s (%s)", r["path"], e)
         conn.executemany("UPDATE releases SET released_at=? WHERE id=?", done)
+        db.year_from_nfo(conn)
         conn.commit()
 
 

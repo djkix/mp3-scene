@@ -383,3 +383,34 @@ def test_date_from_nfo(user_client, library, settings):
     assert r[A]["date"] == 1425470400 != r[A]["added_at"]
     assert user_client.get("/api/releases?sort=date&dir=asc").json()["items"][0]["name"] == A  # 2015 avant les ajouts du jour
     assert user_client.get("/api/releases?sort=added&dir=desc").status_code == 200
+
+
+def test_corrections_collab_and_nfo_year(user_client, admin_client, library, settings):
+    from app import artists, db
+    from app.scanner import scan_structure, scan_tags
+    B = "Bicep-Glue-(NT123)-WEB-2017-PWT"
+    rel = lambda: {x["name"]: x for x in user_client.get("/api/releases").json()["items"]}
+    rid = rel()[A]["id"]
+    fix = lambda body, c=admin_client: c.patch(f"/api/admin/releases/{rid}", json=body).status_code
+    assert fix({"artist": "A-Trak & Friends", "genre": "techno", "category": "Albums"}) == 204
+    assert fix({"artist": "X"}, user_client) == 403 and fix({"category": "Nope"}) == 400
+    assert admin_client.patch("/api/admin/releases/99999", json={"genre": "x"}).status_code == 404
+    want = ("A-Trak & Friends", "Techno", "Albums")
+    assert (rel()[A]["artist"], rel()[A]["genre"], rel()[A]["category"]) == want
+    c = db.connect(settings.data_dir)
+    scan_structure(c, settings.music_root, now=2000.0); scan_tags(c, settings.music_root)   # la correction survit au scan
+    db.init(settings.data_dir)                                                               # et au redémarrage
+    assert (rel()[A]["artist"], rel()[A]["genre"], rel()[A]["category"]) == want
+    assert fix({"artist": "", "genre": " ", "category": None}) == 204                        # retour à l'automatique
+    assert (rel()[A]["artist"], rel()[A]["genre"], rel()[A]["category"]) == ("A-Trak", "House", "Singles")
+    assert c.execute("SELECT COUNT(*) FROM overrides").fetchone()[0] == 0
+    # « Avec » : le nom associe l'artiste à un autre
+    assert artists.collab("Zedd_Feat_Bright_Lights-Title-WEB-2012-GRP", "Bright Lights")
+    assert artists.collab("Daft_Punk_Vs_Madonna-Title-2005-GRP", "daft punk") and artists.collab("X_and_Bicep-T-2017-G", "Bicep")
+    assert not artists.collab(A, "A-Trak") and not artists.collab("Bicepology_and_X-T-2017-G", "Bicep") and not artists.collab(A, " ")
+    c.execute("UPDATE releases SET name='Bicep_Feat_A-Trak-Glue-WEB-2017-PWT' WHERE name=?", (B,))
+    # année : sans année dans le nom, celle du NFO
+    c.execute("UPDATE releases SET year=NULL, released_at=1425470400 WHERE id=?", (rid,)); c.commit()
+    db.year_from_nfo(c); c.commit(); c.close()
+    assert [x["name"] for x in user_client.get("/api/releases?collab=A-Trak").json()["items"]] == ["Bicep_Feat_A-Trak-Glue-WEB-2017-PWT"]
+    assert rel()[A]["year"] == 2015

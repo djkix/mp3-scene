@@ -4,6 +4,19 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.32.0](https://github.com/djkix/mp3-scene/compare/v1.31.0...v1.32.0) (2026-11-19)
+
+### Résumé
+
+**Corrections manuelles d'une release, onglet « Avec » d'un artiste, année déduite du NFO.**
+
+- Fiche : un administrateur peut **Corriger** l'artiste, la catégorie ou le genre d'une release. La correction est
+  gardée après les scans ; un champ vidé revient à la valeur automatique.
+- Page d'un artiste : nouvel onglet **Avec**, les releases dont le nom l'associe à un autre artiste (feat, vs, &),
+  remixes compris.
+- Une release sans année dans son nom prend celle de la date de son NFO.
+- Fiche : artiste, source, date, catégorie, etc. sont alignés à droite de leur colonne au lieu d'être collés au libellé.
+
 ## [1.31.0](https://github.com/djkix/mp3-scene/compare/v1.30.2...v1.31.0) (2026-11-19)
 
 ### Résumé

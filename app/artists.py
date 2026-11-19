@@ -2,6 +2,7 @@
 import re
 import unicodedata
 from collections import Counter, defaultdict
+from functools import lru_cache
 
 _FEAT = re.compile(r"\s*[(\[]?\s*\b(?:feat|ft|featuring)\b\.?\s.*$", re.I)
 _VS = re.compile(r"\s+(?:vs|versus)\b\.?\s.*$", re.I)
@@ -78,3 +79,19 @@ def apply(conn) -> int:
     changed = [(*pair, i) for i, pair in pairs.items() if pair != start[i]]
     conn.executemany("UPDATE releases SET artist=?, tag_artist=? WHERE id=?", changed)
     return len(changed)
+
+
+_GUEST = r"(?:feat|ft|featuring|vs|versus|and|with|&|\+)"
+
+
+@lru_cache(maxsize=64)
+def _collab_re(artist):
+    a = r"[\W_]+".join(map(re.escape, re.split(r"[\W_]+", artist.strip())))
+    return re.compile(rf"(?<![^\W_]){_GUEST}[\W_]+{a}(?![^\W_])|(?<![^\W_]){a}[\W_]+{_GUEST}(?![^\W_])", re.I)
+
+
+def collab(name: str, artist: str) -> bool:
+    """Vrai si le nom de la release associe l'artiste à un autre : « X_Feat_Artiste », « Artiste_Vs_Y », « Artiste_and_Y »."""
+    # ponytail: cherche la graphie exacte de l'artiste dans le nom (« Tiesto » ne trouve pas « Tiësto ») ; garder le
+    # crédit complet en base si cela manque
+    return bool(artist.strip()) and _collab_re(artist).search(name) is not None

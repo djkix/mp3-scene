@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS releases(
   tag_artist TEXT, genre TEXT, duration REAL, tags_done INTEGER NOT NULL DEFAULT 0,
   has_cover INTEGER,  -- NULL : pas encore vérifié par le scan
   released_at REAL);  -- date de sortie lue dans le NFO ; NULL : pas encore lu, 0 : aucune
+-- corrections manuelles d'un administrateur, par chemin de release : elles survivent aux scans (NULL : valeur automatique)
+CREATE TABLE IF NOT EXISTS overrides(path TEXT PRIMARY KEY, artist TEXT, category TEXT, genre TEXT);
 CREATE TABLE IF NOT EXISTS tracks(
   id INTEGER PRIMARY KEY, release_id INTEGER NOT NULL REFERENCES releases ON DELETE CASCADE,
   relpath TEXT NOT NULL, disc INTEGER NOT NULL DEFAULT 1, size INTEGER NOT NULL,

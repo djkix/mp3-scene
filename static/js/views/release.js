@@ -1,8 +1,8 @@
-import { api, fmtDuration } from '../api.js';
-import { t } from '../i18n.js';
+import { api, fmtDuration, session } from '../api.js';
+import { t, catLabel } from '../i18n.js';
 import { el, relName } from '../dom.js';
 import { player, watchPlaying } from '../player.js';
-import { favButton, row } from './releases.js';
+import { favButton, row, loadFilters } from './releases.js';
 import { infoRows } from './release-info.js';
 import { addButton } from '../playlist-add.js';
 import { offlineButton } from './offline.js';
@@ -57,7 +57,40 @@ function header(rel) {
       offlineButton(rel),
       shareButton('release', rel.id),
       favButton(rel),
+      session.user?.role === 'admin' ? el('button', { type: 'button', onclick: () => correct(rel) }, t('Corriger')) : null,
       el('a', { class: 'btn', 'data-ico': 'download', href: `/api/releases/${rel.id}/zip`, download: '' }, t('Télécharger (zip)'))));
+}
+
+// Correction manuelle (administrateur) : artiste, catégorie, genre. Un champ vidé revient à la valeur automatique.
+let dlg = null;
+async function correct(rel) {
+  dlg ??= document.body.appendChild(el('dialog', { class: 'pl-add' }));
+  const f = await loadFilters().catch(() => ({ categories: [], genres: [] }));
+  const msg = el('p', { class: 'status', role: 'status' });
+  const artist = el('input', { value: rel.artist || '', maxLength: 200 });
+  const genre = el('input', { value: rel.genre || '', maxLength: 200, list: 'fix-genres' });
+  const category = el('select', {}, f.categories.map((c) => el('option', { value: c }, catLabel(c))));
+  category.value = rel.category || '';
+  const was = { artist: artist.value, category: category.value, genre: genre.value };
+  const field = (label, input) => el('label', {}, label, input);
+  dlg.replaceChildren(el('h2', {}, t('Corriger la release')),
+    el('form', { class: 'stack', onsubmit: async (e) => {
+      e.preventDefault();
+      const now = { artist: artist.value.trim(), category: category.value, genre: genre.value.trim() };
+      const body = Object.fromEntries(Object.entries(now).filter(([k, v]) => v !== was[k])); // seuls les champs modifiés
+      try {
+        if (Object.keys(body).length) await api(`/admin/releases/${rel.id}`, { method: 'PATCH', body });
+        dlg.close();
+        dispatchEvent(new HashChangeEvent('hashchange')); // recharge la fiche
+      } catch (err) { msg.textContent = err.message; }
+    } },
+    field(t('Artiste'), artist), field(t('Catégorie'), category), field(t('Genre'), genre),
+    el('datalist', { id: 'fix-genres' }, f.genres.map((g) => el('option', { value: g }))),
+    el('p', { class: 'status' }, t('Un champ vidé revient à la valeur automatique. La correction est gardée après les scans.')),
+    msg,
+    el('div', { class: 'inline-form' }, el('button', { type: 'submit', class: 'primary' }, t('Enregistrer')),
+      el('button', { type: 'button', onclick: () => dlg.close() }, t('Annuler')))));
+  dlg.showModal();
 }
 
 function trackTable(rel) {

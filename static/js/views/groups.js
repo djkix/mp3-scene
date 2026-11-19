@@ -20,18 +20,21 @@ function detail(container, kind, params) {
   const name = params.rest, base = `#/${kind}/${encodeURIComponent(name)}`;
   const total = el('span', { class: 'muted' });
   const list = el('div');
-  // artiste : ses releases, ou celles des autres (compilations) où il signe une piste
-  const appears = kind === 'artists' && params.in === 'appears';
+  // artiste : ses releases, celles dont le nom l'associe à un autre (feat, vs, &), ou celles des autres
+  // (compilations) où il signe une piste
+  const other = kind === 'artists' && { with: 'collab', appears: 'appears' }[params.in];
+  const appears = !!other;
   const tabBtn = (label, on, hash) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(on),
     onclick: () => { location.hash = hash; } }, label);
   container.replaceChildren(
     el('h1', { class: 'grp-title' }, el('a', { href: `#/${kind}` + qs({ genre: params.genre, year: params.year }) }, tr(tab)), ' › ', name, ' ', total),
     ...(kind === 'artists' ? [el('div', { class: 'tabs', role: 'tablist', 'aria-label': name },
-      tabBtn(tr('Releases'), !appears, base), tabBtn(tr('Apparitions'), appears, base + '?in=appears'))] : []),
+      tabBtn(tr('Releases'), !other, base), tabBtn(tr('Avec'), other === 'collab', base + '?in=with'),
+      tabBtn(tr('Apparitions'), other === 'appears', base + '?in=appears'))] : []),
     list);
   if (!appears) api('/groups' + qs({ by, name, genre: params.genre, ...releases.yearQuery(params.year || '') }))
     .then(([g]) => { total.textContent = g ? `${count(g.releases)} · ${fmtSize(g.size)}` : ''; }).catch(() => {});
-  return releases.render(list, { ...params, q: '', pin: appears ? { key: 'appears', value: name, base, extra: { in: 'appears' } } : { key: pin, value: name, base } });
+  return releases.render(list, { ...params, q: '', pin: appears ? { key: other, value: name, base, extra: { in: params.in } } : { key: pin, value: name, base } });
 }
 
 export function render(container, params) {

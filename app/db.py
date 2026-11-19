@@ -35,6 +35,7 @@ def init(data_dir: Path) -> None:
             if new != g:
                 conn.execute("UPDATE releases SET grp=?, year=COALESCE(year, ?) WHERE grp=?", (new, year, g))
         merge_group_case(conn)
+        year_from_nfo(conn)
         artists.apply(conn)  # artistes lus avant la 1.30.0 : casse, ponctuation et featuring regroupés
         categorize(conn)
         conn.execute("INSERT OR IGNORE INTO scan_state(id) VALUES (1)")
@@ -86,6 +87,24 @@ def categorize(conn) -> None:
 
     conn.executemany("UPDATE releases SET category=? WHERE id=?",
                      [(want, r["id"]) for r in rows if (want := category(r)) != r["category"]])
+    apply_overrides(conn)
+
+
+def apply_overrides(conn) -> None:
+    """Corrections manuelles : elles l'emportent sur l'artiste, la catégorie et le genre calculés.
+
+    Appelée en fin de categorize(), donc après chaque regroupement d'artistes et chaque lecture de tags."""
+    conn.execute(
+        "UPDATE releases SET tag_artist=COALESCE((SELECT artist FROM overrides WHERE path=releases.path), tag_artist),"
+        " category=COALESCE((SELECT category FROM overrides WHERE path=releases.path), category),"
+        " genre=COALESCE((SELECT genre FROM overrides WHERE path=releases.path), genre)"
+        " WHERE path IN (SELECT path FROM overrides)")
+
+
+def year_from_nfo(conn) -> None:
+    """Sans année dans le nom, celle de la date du NFO."""
+    conn.execute("UPDATE releases SET year=CAST(strftime('%Y', released_at, 'unixepoch') AS INTEGER)"
+                 " WHERE year IS NULL AND released_at>0")
 
 
 def connect(data_dir: Path) -> sqlite3.Connection:
@@ -94,4 +113,5 @@ def connect(data_dir: Path) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys=ON")
     conn.execute("PRAGMA busy_timeout=5000")
+    conn.create_function("collab", 2, artists.collab, deterministic=True)  # filtre « Avec » de la page d'un artiste
     return conn

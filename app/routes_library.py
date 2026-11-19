@@ -72,7 +72,8 @@ def _page(conn, cols, source, where, params, order, uid, offset, limit, build):
     return {"items": [build(r) for r in rows[:limit]], "has_more": len(rows) > limit}
 
 
-def _release_conds(category=None, genre=None, year=None, grp=None, artist=None, source=None, decade=None, appears=None):
+def _release_conds(category=None, genre=None, year=None, grp=None, artist=None, source=None, decade=None, appears=None,
+                   collab=None):
     """Conditions SQL (et leurs paramètres) des filtres de release communs aux listes et au mix."""
     conds, params = [], []
     for col, val in (("category", category), ("genre", genre), ("year", year), ("grp", grp), ("source", source)):
@@ -86,6 +87,10 @@ def _release_conds(category=None, genre=None, year=None, grp=None, artist=None, 
         # ponytail: égalité stricte sur le tag de la piste ; « X feat. Y » n'est pas une apparition de X
         conds.append("COALESCE(r.tag_artist, r.artist, '')!=? AND r.id IN (SELECT release_id FROM tracks WHERE artist=?)")
         params += [appears, appears]
+    if collab is not None:  # releases dont le nom associe cet artiste à un autre (feat, vs, &)
+        # ponytail: fonction Python appelée pour chaque release (~0,1 s pour 45 000)
+        conds.append("collab(r.name, ?)")
+        params.append(collab)
     if artist is not None:
         conds.append("COALESCE(r.tag_artist, r.artist)=?")
         params.append(artist)
@@ -96,9 +101,9 @@ def _release_conds(category=None, genre=None, year=None, grp=None, artist=None, 
 def mix(category: str | None = None, genre: str | None = None, year: int | None = Query(None, ge=0, le=MAX_INT),
         grp: str | None = None, artist: str | None = None, source: str | None = None,
         decade: int | None = Query(None, ge=0, le=MAX_INT), appears: str | None = None,
-        limit: int = Query(50, ge=1, le=MAX_LIMIT), user=Depends(current_user), conn=Depends(get_conn)):
+        collab: str | None = Query(None, max_length=200), limit: int = Query(50, ge=1, le=MAX_LIMIT), user=Depends(current_user), conn=Depends(get_conn)):
     """Pistes tirées au hasard parmi les releases qui passent les filtres."""
-    conds, params = _release_conds(category, genre, year, grp, artist, source, decade, appears)
+    conds, params = _release_conds(category, genre, year, grp, artist, source, decade, appears, collab)
     where = "WHERE " + " AND ".join(conds) if conds else ""
     # ponytail: ORDER BY RANDOM() trie tous les identifiants candidats (rapide jusqu'au million de pistes)
     rows = conn.execute(
@@ -116,12 +121,12 @@ def new_count(since: float = Query(ge=0, le=1e12), conn=Depends(get_conn)):
 @router.get("/api/releases")
 def list_releases(q: str = "", category: str | None = None, genre: str | None = None, grp: str | None = None,
                   artist: str | None = None, source: str | None = None, appears: str | None = None,
-                  decade: int | None = Query(None, ge=0, le=MAX_INT),
+                  decade: int | None = Query(None, ge=0, le=MAX_INT), collab: str | None = Query(None, max_length=200),
                   year: int | None = Query(None, ge=0, le=MAX_INT), favorites: int = Query(0, ge=0, le=1),
                   sort: Sort | None = None, dir: Dir = "asc",
                   offset: int = Query(0, ge=0, le=MAX_INT), limit: int = Query(50, ge=1, le=MAX_INT),
                   user=Depends(current_user), conn=Depends(get_conn)):
-    conds, params = _release_conds(category, genre, year, grp, artist, source, decade, appears)
+    conds, params = _release_conds(category, genre, year, grp, artist, source, decade, appears, collab)
     if match := _fts_query(q):
         conds.append("r.id IN (SELECT rowid FROM releases_fts WHERE releases_fts MATCH ?)")
         params.append(match)
