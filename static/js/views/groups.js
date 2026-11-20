@@ -10,6 +10,11 @@ const MAX_ROWS = 1000; // au-delà, on demande d'affiner (des dizaines de millie
 // route -> [onglet, en-tête de colonne, valeur de `by` côté serveur, paramètre de /releases qui épingle la liste]
 const KINDS = { groups: ['Groupes', 'Groupe', 'grp', 'grp'], artists: ['Artistes', 'Artiste', 'artist', 'artist'],
   labels: ['Labels', 'Label', 'label', 'label'], genres: ['Genres', 'Genre', 'genre', null] };
+// Onglets d'Explorer, dans l'ordre affiché ; « Catégories » (dossiers de la bibliothèque) est rendu par folders.js.
+const TABS = [['artists', 'Artistes'], ['genres', 'Genres'], ['folders', 'Catégories'], ['labels', 'Labels'], ['groups', 'Groupes']];
+export const tabs = (current, genre = '', year = '') => el('div', { class: 'tabs', role: 'tablist', 'aria-label': tr('Explorer') },
+  TABS.map(([k, label]) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(k === current),
+    onclick: () => { location.hash = `#/${k}` + (k === 'folders' ? '' : qs({ genre: k === 'genres' ? '' : genre, year })); } }, tr(label))));
 
 const qs = (o) => { const s = String(new URLSearchParams(Object.entries(o).filter(([, v]) => v))); return s ? '?' + s : ''; };
 const count = (n) => `${n} ${n > 1 ? tr('releases') : tr('release')}`;
@@ -75,9 +80,7 @@ export function render(container, params) {
   const heads = HEAD.map(([text, k, first], i) => el('th', { scope: 'col', class: i ? 'num' : '' },
     el('button', { type: 'button', onclick: () => { dir = key === k ? -dir : first; key = k; paint(); } }, text)));
   container.replaceChildren(
-    el('div', { class: 'tabs', role: 'tablist', 'aria-label': tr('Explorer') }, Object.entries(KINDS).map(([k, [tab]]) =>
-      el('button', { type: 'button', role: 'tab', 'aria-selected': String(k === kind),
-        onclick: () => { location.hash = `#/${k}` + qs({ genre: k === 'genres' ? '' : genre, year }); } }, tr(tab)))),
+    tabs(kind, genre, year),
     bar, letters, el('div', { class: 'table-wrap' }, el('table', { class: 'groups' }, el('thead', {}, el('tr', {}, heads)), body)), status);
 
   const href = (name) => (pin ? `#/${kind}/${encodeURIComponent(name)}` + qs({ genre, year }) : '#/' + qs({ genre: name, year }));

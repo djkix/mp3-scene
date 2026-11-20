@@ -2,6 +2,7 @@ import { api, ApiError } from '../api.js';
 import { t, catLabel } from '../i18n.js';
 import { el, encodePath } from '../dom.js';
 import { releaseList, loadFilters } from './releases.js';
+import { tabs } from './groups.js';
 
 export function render(container, params) {
   const path = params.rest || '';
@@ -15,7 +16,7 @@ export function render(container, params) {
   const page = (offset, tri = '') => api(`/folders?path=${encodeURIComponent(path)}&offset=${offset}&limit=50${tri}`);
   // un dossier ne montre que les releases de sa catégorie rangées là ; ce lien les donne toutes, où qu'elles soient
   if (path && !path.includes('/')) crumbs.push(' · ', el('a', { href: '#/?category=' + encodeURIComponent(path) }, t('Toute la catégorie')));
-  container.replaceChildren(el('nav', { class: 'crumbs', 'aria-label': t("Fil d'Ariane") }, ...crumbs),
+  container.replaceChildren(tabs('folders'), el('nav', { class: 'crumbs', 'aria-label': t("Fil d'Ariane") }, ...crumbs),
     el('p', { class: 'status' }, t('Chargement…')));
 
   let first = null;

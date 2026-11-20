@@ -4,6 +4,16 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.38.0](https://github.com/djkix/mp3-scene/compare/v1.37.4...v1.38.0) (2026-11-20)
+
+### Résumé
+
+**Catégories devient un onglet d'Explorer.**
+
+- Menu : « Catégories » n'y est plus ; il reste Derniers, Explorer, Favoris et Admin (ou Compte).
+- Explorer : onglets dans l'ordre Artistes, Genres, Catégories, Labels, Groupes ; il s'ouvre sur Artistes.
+- Les anciennes adresses `#/folders` fonctionnent toujours.
+
 ## [1.37.4](https://github.com/djkix/mp3-scene/compare/v1.37.3...v1.37.4) (2026-11-20)
 
 ### Résumé
