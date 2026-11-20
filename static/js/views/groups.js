@@ -5,6 +5,7 @@ import { api, fmtSize } from '../api.js';
 import { el } from '../dom.js';
 import { t as tr, catLabel } from '../i18n.js';
 import * as releases from './releases.js';
+import { trackList } from './tracklist.js';
 
 const MAX_ROWS = 1000; // au-delà, on demande d'affiner (des dizaines de milliers d'artistes figeraient la page)
 // route -> [onglet, en-tête de colonne, valeur de `by` côté serveur, paramètre de /releases qui épingle la liste]
@@ -28,7 +29,7 @@ function detail(container, kind, params) {
   const years = el('div', { class: 'letters years' });
   // artiste : ses releases, celles dont le nom l'associe à un autre (feat, vs, &), ou celles des autres
   // (compilations) où il signe une piste
-  const other = kind === 'artists' && { with: 'collab', appears: 'appears' }[params.in];
+  const other = kind === 'artists' && { with: 'collab', appears: 'appears', mixes: 'mixes' }[params.in];
   const appears = !!other;
   const tabBtn = (label, on, hash) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(on),
     onclick: () => { location.hash = hash; } }, label);
@@ -36,7 +37,7 @@ function detail(container, kind, params) {
     el('h1', { class: 'grp-title' }, el('a', { href: `#/${kind}` + qs({ genre: params.genre, year: params.year }) }, tr(tab)), ' › ', name, ' ', total),
     ...(kind === 'artists' ? [el('div', { class: 'tabs', role: 'tablist', 'aria-label': name },
       tabBtn(tr('Releases'), !other, base), tabBtn(tr('Avec'), other === 'collab', base + '?in=with'),
-      tabBtn(tr('Apparitions'), other === 'appears', base + '?in=appears'))] : []),
+      tabBtn(tr('Apparitions'), other === 'appears', base + '?in=appears'), tabBtn(tr('Mixes'), other === 'mixes', base + '?in=mixes'))] : []),
     ...(kind === 'artists' && !other ? [years] : []), list);
   // chronologie : une pastille par année avec son nombre de releases ; un clic filtre la liste sur cette année
   if (kind === 'artists' && !other) api('/groups?' + new URLSearchParams({ by: 'year', artist: name })).then((rows) => {
@@ -47,6 +48,9 @@ function detail(container, kind, params) {
       onclick: () => { location.hash = base + qs({ genre: params.genre, year: picked.includes(String(y.name)) ? '' : y.name }); } },
     `${y.name} `, el('small', {}, String(y.releases)))));
   }).catch(() => {});
+  // longs mixes où un chapitre (fichier .cue) est de cet artiste : la lecture démarre à son morceau
+  if (other === 'mixes') return trackList(list, { path: '/tracks?mixes=' + encodeURIComponent(name),
+    empty: tr('Aucun mix où cet artiste figure dans un chapitre.') });
   const one = releases.multiQuery({ genre: params.genre, year: params.year });
   one.set('by', by);
   one.set('name', name);
@@ -72,7 +76,24 @@ function categories(container, params) {
   return () => { dead = true; dispose(); };
 }
 
+// Série (#/series/<nom>) : ses volumes dans l'ordre de leur numéro, et les numéros absents de la bibliothèque.
+function series(container, params) {
+  const name = params.rest;
+  const total = el('span', { class: 'muted' }), miss = el('p', { class: 'status', role: 'status' }, tr('Chargement…'));
+  const list = el('ul', { class: 'rel-list' });
+  container.replaceChildren(el('h1', { class: 'grp-title' }, tr('Série'), ' › ', name, ' ', total), miss, list);
+  let dead = false;
+  api('/series?' + new URLSearchParams({ name })).then((s) => {
+    if (dead) return;
+    total.textContent = count(s.items.length);
+    miss.textContent = !s.items.length ? tr('Aucun résultat') : s.missing.length ? tr('Volumes absents : {0}', s.missing.join(', ')) : '';
+    list.replaceChildren(...s.items.map((x) => releases.row(x)));
+  }).catch((err) => { if (!dead) miss.textContent = err.message; });
+  return () => { dead = true; };
+}
+
 export function render(container, params) {
+  if (params.kind === 'series') return series(container, params);
   if (params.kind === 'categories') return categories(container, params);
   const kind = KINDS[params.kind] ? params.kind : 'groups';
   const [, label, by, pin] = KINDS[kind];

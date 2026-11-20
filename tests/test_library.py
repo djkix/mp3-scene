@@ -783,6 +783,10 @@ def test_chapters_tech_artist_years_and_activity(admin_client, user_client, libr
     ch = user_client.get(f"/api/releases/{rel['id']}/chapters").json()
     assert list(ch) == [str(rel["tracks"][0]["id"])] and [c["title"] for c in ch[str(rel["tracks"][0]["id"])]] == ["Intro", "Mediate"]
     assert user_client.get("/api/releases/99999/chapters").status_code == 404
+    # page d'un artiste : les mixes où un chapitre est de lui, à la casse près, avec l'endroit où il commence
+    hit = user_client.get("/api/tracks?mixes=inxs").json()["items"]
+    assert [x["id"] for x in hit] == [tid] and hit[0]["chapter"]["title"] == "Mediate"
+    assert user_client.get("/api/tracks?mixes=Personne").json()["items"] == []
     # détails techniques lus dans le fichier
     tech = user_client.get(f"/api/tracks/{rel['tracks'][0]['id']}/tech").json()
     assert tech["format"] == "MP3" and tech["sample_rate"] == 44100 and tech["bitrate"] == 128000 and tech["size"] > 0
@@ -804,6 +808,7 @@ def test_similar_follows_series_and_label_for_compilations(user_client, library,
     from app import db
     from app.routes_library import _series
     assert _series("Global Underground 47 Joseph Capriati Montreal") == "Global Underground"
+    assert _series("Kontor Top Of The Clubs Vol. 63") == "Kontor Top Of The Clubs" and _series("Hits Vol 3") == "Hits Vol"
     assert _series("Ibanez") is None and _series("Big Mix") is None and _series("Hed Kandi 2005") == "Hed Kandi" and _series(None) is None
     names = lambda rid: [x["name"] for x in user_client.get(f"/api/releases/{rid}/similar").json()]
     rel = {x["name"]: x for x in user_client.get("/api/releases").json()["items"]}
@@ -813,6 +818,18 @@ def test_similar_follows_series_and_label_for_compilations(user_client, library,
     c.execute("UPDATE releases SET title='Global Underground 47 Montreal' WHERE id=?", (va,))
     c.execute("UPDATE releases SET title='Global Underground 12 Ibiza' WHERE id=?", (b,)); c.commit()
     assert names(va) == ["Bicep-Glue-(NT123)-WEB-2017-PWT"]              # même série
+    # page de la série : volumes dans l'ordre, numéros absents à partir de trois volumes, autre série écartée
+    assert user_client.get(f"/api/releases/{va}").json()["series"] == "Global Underground"
+    got = user_client.get("/api/series?name=global underground").json()
+    assert [(x["id"], x["volume"]) for x in got["items"]] == [(b, 12), (va, 47)] and got["missing"] == []
+    a = rel[A]["id"]
+    c.execute("UPDATE releases SET title='Global Underground 010 Athens' WHERE id=?", (a,)); c.commit()
+    got = user_client.get("/api/series?name=Global Underground").json()
+    assert [x["volume"] for x in got["items"]] == [10, 12, 47] and got["missing"] == [11, *range(13, 47)]
+    c.execute("UPDATE releases SET title='Global Underground Nubreed 8' WHERE id=?", (a,)); c.commit()
+    assert [x["volume"] for x in user_client.get("/api/series?name=Global Underground").json()["items"]] == [12, 47]
+    assert user_client.get("/api/series?name=Ibanez").json()["items"] == []
+    c.execute("UPDATE releases SET title='Ibanez' WHERE id=?", (a,)); c.commit()
     c.execute("UPDATE releases SET title='Glue', label='Ninja Tune' WHERE id=?", (b,))
     c.execute("UPDATE releases SET label='Ninja Tune' WHERE id=?", (va,)); c.commit(); c.close()
     assert names(va) == ["Bicep-Glue-(NT123)-WEB-2017-PWT"]              # même label

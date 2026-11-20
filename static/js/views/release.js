@@ -1,6 +1,6 @@
 import { api, fmtDuration, session } from '../api.js';
 import { t, catLabel } from '../i18n.js';
-import { el, relName } from '../dom.js';
+import { el, relName, relHref } from '../dom.js';
 import { player, watchPlaying } from '../player.js';
 import { favButton, row, loadFilters } from './releases.js';
 import { infoRows } from './release-info.js';
@@ -21,8 +21,18 @@ export function render(container, params) {
   const byName = () => api(/^\d+$/.test(id) ? `/releases/${id}` : `/release-by-name?name=${encodeURIComponent(id)}`);
   (/^\d+$/.test(params.id || '') ? api(`/releases/${params.id}`).catch((err) => { if (err.status === 404) return byName(); throw err; }) : byName()).then((rel) => {
     if (dead) return;
-    const nfo = el('div'), sim = el('div'), vers = el('div'), chap = el('div');
-    container.replaceChildren(el('div', { class: 'detail' }, header(rel), trackTable(rel), chap, vers, nfo, sim));
+    const nfo = el('div'), sim = el('div'), vers = el('div'), chap = el('div'), ser = el('div');
+    container.replaceChildren(el('div', { class: 'detail' }, header(rel), ser, trackTable(rel), chap, vers, nfo, sim));
+    // série (« Global Underground 47 ») : volume précédent, page de la série, volume suivant
+    if (rel.series) api('/series?' + new URLSearchParams({ name: rel.series })).then((s) => {
+      if (dead || s.items.length < 2) return;
+      const i = s.items.findIndex((x) => x.id === rel.id);
+      const step = (x, text) => x && el('a', { class: 'btn', href: relHref(x.name, x.id), title: relName(x.name) }, text);
+      ser.replaceChildren(el('nav', { class: 'series-nav', 'aria-label': t('Série') },
+        i > 0 && step(s.items[i - 1], `‹ ${t('Volume {0}', s.items[i - 1].volume)}`),
+        el('a', { href: `#/series/${encodeURIComponent(s.name)}` }, t('Série : {0} ({1})', s.name, s.items.length)),
+        i >= 0 && step(s.items[i + 1], `${t('Volume {0}', s.items[i + 1]?.volume)} ›`)));
+    }).catch(() => {}); // facultatif
     // chapitres d'un long mix, lus dans le fichier .cue de la release : un clic lance la piste à cet endroit
     api(`/releases/${rel.id}/chapters`).then((byTrack) => {
       if (dead) return;

@@ -212,12 +212,13 @@ def groups(by: Literal["grp", "artist", "genre", "label", "category", "year"] = 
 
 @router.get("/api/tracks")
 def search_tracks(q: str = Query("", max_length=200), category: Many = None, genre: Many = None, year: Years = None,
-                  decade: Years = None, source: Many = None, offset: int = Query(0, ge=0, le=MAX_INT),
+                  decade: Years = None, source: Many = None, mixes: str | None = Query(None, min_length=1, max_length=200),
+                  offset: int = Query(0, ge=0, le=MAX_INT),
                   limit: int = Query(50, ge=1, le=MAX_INT), user=Depends(current_user), conn=Depends(get_conn)):
     """Recherche dans les tags : chaque mot doit figurer dans le titre ou l'artiste de la piste. Les filtres sont
     ceux des listes de releases, appliqués à la release de la piste."""
     words = [w for w in _WORDS.split(q) if w][:8]
-    if not words:
+    if not words and not mixes:
         return {"items": [], "has_more": False}
     # ponytail: LIKE parcourt toutes les pistes (~0,1 s pour 500 000) ; index FTS sur les pistes si trop lent
     # un titre ou un artiste de 30 caractères est peut-être coupé (ID3v1) : sa suite est dans le nom du fichier
@@ -229,6 +230,10 @@ def search_tracks(q: str = Query("", max_length=200), category: Many = None, gen
     conds = f"(({conds}) OR t.id IN (SELECT c.track_id FROM chapters c WHERE {in_chapter}))"
     likes = [f"%{w}%" for w in words for _ in range(2)]
     params += likes
+    if mixes:  # page d'un artiste : les longs mixes où un chapitre est de lui
+        # ponytail: égalité à la casse près sur l'artiste du chapitre ; « X feat. Y » n'est pas une apparition de X
+        in_chapter, likes = "c.artist=? COLLATE NOCASE", [mixes]
+        conds, params = f"t.id IN (SELECT c.track_id FROM chapters c WHERE {in_chapter})", [mixes]
     more, extra = _release_conds(category, genre, year, source=source, decade=decade)
     conds, params = " AND ".join([conds, *more]), params + extra
     page = _page(conn, TRACK_COLS, TRACK_FROM, "WHERE " + conds, params,
@@ -278,6 +283,7 @@ def release_by_name(name: str = Query(max_length=1024), user=Depends(current_use
 @router.get("/api/releases/{rid}")
 def release_detail(rid: Id, user=Depends(current_user), conn=Depends(get_conn)):
     d = _release(_release_row(conn, user["id"], rid))
+    d["series"] = _series(d["title"])  # la fiche demande les autres volumes à /api/series
     d["custom_cover"] = conn.execute("SELECT 1 FROM overrides WHERE path=? AND cover=1", (d["path"],)).fetchone() is not None
     d["tracks"] = [_track(r) for r in conn.execute(
         f"SELECT {TRACK_COLS} FROM {TRACK_FROM} WHERE t.release_id=? ORDER BY t.disc, t.relpath",
@@ -304,6 +310,9 @@ def radio(rid: Id, limit: int = Query(50, ge=1, le=MAX_LIMIT), user=Depends(curr
     return {"items": [_track(x) for x in rows]}
 
 
+_VOL = {"vol", "volume", "issue", "part", "pt", "no", "nr", "episode", "#"}
+
+
 def _series(title: str | None) -> str | None:
     """Début du titre commun à une série : « Global Underground 47 Joseph Capriati » -> « Global Underground ».
     Les mots avant le premier qui contient un chiffre ; None s'il y en a moins de deux ou moins de huit caractères."""
@@ -312,8 +321,31 @@ def _series(title: str | None) -> str | None:
         if any(c.isdigit() for c in w):
             break
         words.append(w)
-    prefix = " ".join(words)
-    return prefix if len(words) >= 2 and len(prefix) >= 8 and len(words) < len((title or "").split()) else None
+    ok = lambda ws: len(ws) >= 2 and len(" ".join(ws)) >= 8
+    if not ok(words) or len(words) == len((title or "").split()):
+        return None
+    # « Kontor Top Of The Clubs Vol 63 » et « Kontor Top Of The Clubs 64 » : la même série
+    short = words[:-1] if words[-1].rstrip(".").lower() in _VOL else words
+    return " ".join(short if ok(short) else words)
+
+
+@router.get("/api/series")
+def series(name: str = Query(min_length=1, max_length=200), user=Depends(current_user), conn=Depends(get_conn)):
+    """Volumes d'une série, dans l'ordre de leur numéro, et les numéros absents de la bibliothèque."""
+    like = re.sub(r"([!%_])", r"!\1", name) + " %"
+    items = [_release(x) for x in conn.execute(
+        f"SELECT {RELEASE_COLS} FROM {RELEASE_FROM} WHERE r.hidden=0 AND r.title LIKE ? ESCAPE '!'", (user["id"], like))]
+    # « Global Underground Nubreed 8 » commence comme « Global Underground » : c'est une autre série
+    items = [x for x in items if (_series(x["title"]) or "").casefold() == name.casefold()] if _series(name + " 1") else []
+    for x in items:
+        x["volume"] = int(re.search(r"\d+", x["title"][len(name):])[0])
+    items.sort(key=lambda x: (x["volume"], x["year"] or 0, x["name"].lower()))
+    vols = {x["volume"] for x in items}
+    vols = {v for v in vols if v < 1000}  # une année (« Hed Kandi 2005 ») n'est pas un numéro de volume
+    # ponytail: numéros absents entre le plus petit et le plus grand présents, à partir de trois volumes ; rien au-delà
+    # de 60 trous, où le nombre n'est sans doute pas un volume
+    missing = sorted(set(range(min(vols), max(vols))) - vols) if len(vols) >= 3 else []
+    return {"name": name, "items": items, "missing": missing if len(missing) <= 60 else []}
 
 
 @router.get("/api/releases/{rid}/similar")

@@ -4,6 +4,22 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.48.0](https://github.com/djkix/mp3-scene/compare/v1.47.1...v1.48.0) (2026-11-20)
+
+### Résumé
+
+**Page d'une série, volumes absents, mixes où figure un artiste.**
+
+- **Page d'une série** (`#/series/<nom>`) : tous les volumes d'une série (« Global Underground », « Kontor Top Of The
+  Clubs »…) dans l'ordre de leur numéro. Sur la fiche d'une release, une ligne mène au volume précédent, à la page de
+  la série et au volume suivant.
+- **Volumes absents** : la page d'une série indique les numéros qui manquent entre le plus petit et le plus grand
+  volume présents, à partir de trois volumes. Rien pour une série datée (« Hed Kandi 2005 ») ni au-delà de 60 trous.
+- **Onglet « Mixes » d'un artiste** : les longs mixes où un chapitre (fichier `.cue`) est de lui ; un clic lance la
+  piste à son morceau.
+- « Vol », « Volume », « Issue », « Part » en fin de nom de série sont ignorés : « … Vol 63 » et « … 64 » forment la
+  même série, y compris pour les releases proposées en bas de fiche.
+
 ## [1.47.1](https://github.com/djkix/mp3-scene/compare/v1.47.0...v1.47.1) (2026-11-20)
 
 ### Résumé

@@ -439,6 +439,8 @@ a.pill:hover { filter: brightness(1.12); }
 .tech dt { color: var(--muted); }
 .tech dd { margin: 0; overflow-wrap: anywhere; text-align: right; }
 .years button small { color: var(--muted); font-weight: 400; }
+.series-nav { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px 16px; margin: 14px 0 0; font-size: 13px; }
+.series-nav .btn { min-height: 0; padding: 4px 12px; font-size: 12px; }
 .detail-admin { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 0; }
 .detail-admin button { min-height: 0; padding: 4px 10px; font-size: 12px; }
 .detail-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; margin: 12px 0; }
