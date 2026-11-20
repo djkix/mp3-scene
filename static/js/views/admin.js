@@ -4,6 +4,8 @@ import { invalidateFilters } from './releases.js';
 import { versionInfo } from '../version.js';
 import { t, locale, catLabel } from '../i18n.js';
 import { relName } from '../dom.js';
+import * as account from './account.js';
+import * as shares from './shares.js';
 
 const ROLES = [['user', t('Utilisateur')], ['admin', t('Administrateur')]];
 const PHASES = { idle: t('Au repos'), structure: t('Analyse des dossiers…'), tags: t('Lecture des tags…'), error: t('Erreur') };
@@ -13,10 +15,11 @@ const roleSelect = (value, props = {}) => el('select', props,
 
 // Sections de la page, regroupées par type d'action : [titre du groupe, [[adresse, libellé], …]]
 const NAV = [['', [['#/admin', 'Vue d’ensemble']]],
-  ['Bibliothèque', [['#/admin/scan', 'Scan'], ['#/library?tab=quality', 'Contrôle qualité'], ['#/admin/corrections', 'Corrections']]],
+  ['Bibliothèque', [['#/admin/scan', 'Scan'], ['#/library?tab=quality', 'Contrôle qualité'], ['#/admin/corrections', 'Corrections'],
+    ['#/library', 'Statistiques']]],
   ['Classement', [['#/admin/rules', 'Règles']]],
-  ['Accès', [['#/admin/users', 'Utilisateurs'], ['#/account', 'Partages']]],
-  ['Système', [['#/library', 'Statistiques']]]];
+  ['Accès', [['#/admin/users', 'Utilisateurs'], ['#/admin/shares', 'Partages']]],
+  ['Mon compte', [['#/admin/account', 'Mot de passe et préférences']]]];
 const QUALITY = [['dupes', 'Doublons possibles'], ['no_nfo', 'Sans NFO'], ['no_year', 'Sans année'], ['no_artist', 'Sans artiste']];
 const RULES = [['Catégories', 'categories', 'Les tags du nom décident (SAT, DVBS, date complète : Live & Radio ; VA : Compilations ; CDM, CDS : Singles), sinon le dossier. Dans Singles, dix pistes sans tag de single font un album.'],
   ['Artistes', 'artists', 'Casse, accents, espaces et ponctuation sont ignorés. Un featuring ou un « vs » rejoint l’artiste principal ; un « & » aussi, sauf si le duo a au moins autant de releases que son premier membre.'],
@@ -35,7 +38,8 @@ export function render(container, params = {}) {
     return;
   }
   let dead = false, pollTimer = null;
-  const section = ['scan', 'corrections', 'rules', 'users'].includes(params.rest) ? params.rest : '';
+  const section = ['scan', 'corrections', 'rules', 'users', 'shares', 'account'].includes(params.rest) ? params.rest : '';
+  let disposeSub = null; // nettoyage de la section Partages ou Mon compte, rendues par leur propre module
   const alive = () => !dead;
 
   // --- Utilisateurs ---
@@ -264,39 +268,56 @@ export function render(container, params = {}) {
       el('div', { class: 'table-wrap' }, el('table', { class: 'users' },
         el('thead', {}, el('tr', {}, th(t('Release')), th(t('Artiste')), th(t('Catégorie')), th(t('Genre')), th(t('Année')), th(t('Masquée')), th(t('Actions')))), rows)), msg);
     load();
+  } else if (section === 'shares') {
+    const box = el('div');
+    body.replaceChildren(el('h1', {}, t('Partages')), box);
+    disposeSub = shares.render(box);
+  } else if (section === 'account') {
+    disposeSub = account.render(body, {}, true);
   } else {
     // Vue d'ensemble : les totaux, puis un bloc par type d'action
     const totals = el('div', { class: 'ad-metrics' });
     const lib = el('div', { class: 'ad-grid' }), cls = el('div', { class: 'ad-grid' }), acc = el('div', { class: 'ad-grid' }),
       sys = el('div', { class: 'ad-grid' });
-    const status = el('p', { class: 'status', role: 'status' }, t('Chargement…'));
+    const status = el('p', { class: 'status', role: 'status' });
     body.replaceChildren(el('h1', {}, t('Administration')), totals, status,
       el('h2', {}, t('Bibliothèque')), lib, el('h2', {}, t('Classement')), cls, classMsg,
       el('h2', {}, t('Accès')), acc, el('h2', {}, t('Système')), sys);
-    Promise.all([api('/admin/library'), api('/admin/overview'), api('/admin/scan'), api('/admin/quality'), versionInfo().catch(() => null)])
-      .then(([l, o, s, q, v]) => {
-        if (dead) return;
-        status.textContent = '';
-        const n = (x) => x.toLocaleString(locale);
-        totals.replaceChildren(...[[t('Releases'), n(l.releases)], [t('Pistes'), n(l.tracks)], [t('Stocké'), fmtSize(l.size)],
-          [t('Artistes'), n(o.artists)]].map(([k, val]) => el('div', { class: 'ad-metric' }, el('span', {}, k), el('b', {}, val))));
-        lib.replaceChildren(
-          card(t('Scan'), PHASES[s.status] || s.status, [[t('Dernier scan'), fmtTime(s.finished_at)],
-            [t('Pistes restant à lire'), n(s.tracks_pending)],
-            [t('Scan quotidien'), s.daily_at == null ? t('Jamais') : `${String(s.daily_at).padStart(2, '0')}:00`]],
-          link('#/admin/scan', t('Gérer le scan'))),
-          card(t('Contrôle qualité'), null, QUALITY.map(([k, label]) => [t(label), n(q[k])]), link('#/library?tab=quality', t('Tout voir'))),
-          card(t('Corrections'), o.overrides.total ? String(o.overrides.total) : null, [[t('Artiste'), o.overrides.artist],
-            [t('Catégorie'), o.overrides.category], [t('Genre'), o.overrides.genre], [t('Année'), o.overrides.year], [t('Masquées'), o.overrides.hidden]], link('#/admin/corrections', t('Gérer'))));
-        cls.replaceChildren(card(t('Règles'), null, [[t('Catégories'), n(o.categories)], [t('Artistes'), n(o.artists)],
-          [t('Groupes'), n(o.groups)], [t('Genres'), n(o.genres)]], classBtn, link('#/admin/rules', t('Voir les règles'))));
-        acc.replaceChildren(
-          card(t('Utilisateurs'), String(o.users), [], link('#/admin/users', t('Gérer les utilisateurs'))),
-          card(t('Liens de partage'), null, [[t('Actifs'), o.shares], [t('Ouvertures'), o.share_opens]], link('#/account', t('Gérer les liens'))));
-        sys.replaceChildren(card(t('Version'), v && (v.update ? t('Mise à jour disponible') : v.latest ? t('À jour') : null),
-          [[t('Version installée'), v ? v.version : '—'], [t('Base de données'), fmtSize(o.db_size)], [t('Vignettes'), fmtSize(o.thumbs_size)]],
-          link('#/library', t('Statistiques')), v?.update && el('a', { class: 'btn', href: v.url, target: '_blank', rel: 'noopener' }, t('Voir les nouveautés'))));
-      }).catch((err) => { if (!dead) status.textContent = err.message; });
+    // Chaque chiffre s'affiche dès que sa requête répond (« … » en attendant) : la page n'attend pas la plus lente.
+    const d = {};
+    const n = (x) => x.toLocaleString(locale);
+    const v = (key, f) => (d[key] ? f(d[key]) : '…');
+    function paint() {
+      if (dead) return;
+      const { s, o, ver } = d;
+      totals.replaceChildren(...[[t('Releases'), v('l', (l) => n(l.releases))], [t('Pistes'), v('l', (l) => n(l.tracks))],
+        [t('Stocké'), v('l', (l) => fmtSize(l.size))], [t('Artistes'), v('o', (x) => n(x.artists))]]
+        .map(([k, val]) => el('div', { class: 'ad-metric' }, el('span', {}, k), el('b', {}, val))));
+      lib.replaceChildren(
+        card(t('Scan'), s && (PHASES[s.status] || s.status), [[t('Dernier scan'), v('s', (x) => fmtTime(x.finished_at))],
+          [t('Pistes restant à lire'), v('s', (x) => n(x.tracks_pending))],
+          [t('Scan quotidien'), v('s', (x) => (x.daily_at == null ? t('Jamais') : `${String(x.daily_at).padStart(2, '0')}:00`))]],
+        link('#/admin/scan', t('Gérer le scan'))),
+        card(t('Contrôle qualité'), null, QUALITY.map(([k, label]) => [t(label), v('q', (q) => n(q[k]))]), link('#/library?tab=quality', t('Tout voir'))),
+        card(t('Corrections'), o?.overrides.total ? String(o.overrides.total) : null, [['artist', 'Artiste'], ['category', 'Catégorie'],
+          ['genre', 'Genre'], ['year', 'Année'], ['hidden', 'Masquées']].map(([k, label]) => [t(label), v('o', (x) => x.overrides[k])]),
+        link('#/admin/corrections', t('Gérer'))));
+      cls.replaceChildren(card(t('Règles'), null, [['categories', 'Catégories'], ['artists', 'Artistes'], ['groups', 'Groupes'],
+        ['genres', 'Genres']].map(([k, label]) => [t(label), v('o', (x) => n(x[k]))]), classBtn, link('#/admin/rules', t('Voir les règles'))));
+      acc.replaceChildren(
+        card(t('Utilisateurs'), o && String(o.users), [], link('#/admin/users', t('Gérer les utilisateurs'))),
+        card(t('Liens de partage'), null, [[t('Actifs'), v('o', (x) => x.shares)], [t('Ouvertures'), v('o', (x) => x.share_opens)]],
+          link('#/admin/shares', t('Gérer les liens'))));
+      sys.replaceChildren(card(t('Version'), ver && (ver.update ? t('Mise à jour disponible') : ver.latest ? t('À jour') : null),
+        [[t('Version installée'), ver ? ver.version : '…'], [t('Base de données'), v('o', (x) => fmtSize(x.db_size))],
+          [t('Vignettes'), v('o', (x) => fmtSize(x.thumbs_size))]],
+        link('#/library', t('Statistiques')), ver?.update && el('a', { class: 'btn', href: ver.url, target: '_blank', rel: 'noopener' }, t('Voir les nouveautés'))));
+    }
+    paint();
+    for (const [key, call] of [['s', () => api('/admin/scan')], ['o', () => api('/admin/overview')], ['l', () => api('/admin/library')],
+      ['q', () => api('/admin/quality')], ['ver', versionInfo]]) {
+      call().then((x) => { d[key] = x; paint(); }).catch((err) => { if (!dead && key !== 'ver') status.textContent = err.message; });
+    }
   }
-  return () => { dead = true; clearTimeout(pollTimer); };
+  return () => { dead = true; clearTimeout(pollTimer); disposeSub?.(); };
 }

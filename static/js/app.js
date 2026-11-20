@@ -96,6 +96,10 @@ async function route() {
   const loggedIn = !!session.user && name !== 'login';
   $('topbar').hidden = $('player').hidden = !loggedIn;
   const isAdmin = loggedIn && session.user.role === 'admin';
+  // un administrateur n'a qu'une entrée pour ses réglages et ceux du serveur : Admin (son compte en est une section)
+  const own = document.querySelector('#nav a[data-route="account"]');
+  own.textContent = isAdmin ? t('Admin') : t('Compte');
+  own.href = isAdmin ? '#/admin' : '#/account';
   if (!isAdmin) $('update').hidden = true;
   else versionInfo().then((v) => { // bandeau réservé aux administrateurs : eux seuls peuvent mettre à jour
     if (!v.update || session.user?.role !== 'admin') return;

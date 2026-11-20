@@ -336,7 +336,9 @@ QUALITY = {
     "no_nfo": "r.has_nfo=0",
     "no_tracks": "r.track_count=0",
     "no_tags": "r.tags_done=1 AND r.track_count>0 AND NOT EXISTS (SELECT 1 FROM tracks WHERE release_id=r.id AND title IS NOT NULL)",
-    "unreadable": "EXISTS (SELECT 1 FROM tracks WHERE release_id=r.id AND tags_read=1 AND duration IS NULL)",
+    # sous-requête non corrélée : une seule passe sur les pistes. En EXISTS corrélé, SQLite prenait l'index de
+    # tags_read (toutes les pistes) pour chaque release, soit plusieurs minutes sur 340 000 pistes
+    "unreadable": "r.id IN (SELECT release_id FROM tracks WHERE tags_read=1 AND duration IS NULL)",
     "low_bitrate": "(SELECT AVG(bitrate) FROM tracks WHERE release_id=r.id)<192000",
     "no_year": "r.year IS NULL",
     "no_cover": "r.has_cover=0",  # NULL : pas encore vérifié par le scan

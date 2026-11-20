@@ -204,7 +204,12 @@ google-cast-launcher:hover { background: var(--hover); }
   /* lecteur du bureau : barre plus haute, de l'air entre le titre et la release, entre les boutons et la forme
      d'onde, et des boutons plus grands (le téléphone garde ses tailles, plus bas) */
   .pl-bar { min-height: 96px; padding: 10px 20px; gap: 8px 28px; }
-  .pl-info { row-gap: 7px; }
+  /* titre et release centrés en hauteur sur la pochette : deux rangées souples les encadrent */
+  .pl-info { row-gap: 0; grid-template-rows: 1fr auto auto auto 1fr; }
+  .pl-cover { grid-row: 1 / -1; }
+  #player .pl-title { grid-row: 2; }
+  .pl-rel { grid-row: 3; margin-top: 7px; }
+  .pl-cast { grid-row: 4; }
   .pl-cover { width: 60px; height: 60px; margin-right: 14px; }
   #player .pl-title { font-size: 14px; }
   .pl-rel { font-size: 12px; }

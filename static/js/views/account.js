@@ -6,7 +6,10 @@ import { player } from '../player.js';
 import { t, lang, setLang } from '../i18n.js';
 import * as shares from './shares.js';
 
-export function render(container) {
+// `embedded` : rendue comme section « Mon compte » de l'administration (sans cadre de page, ni partages, qui y ont
+// leur propre section). Un administrateur n'a qu'un endroit pour ses réglages : #/account l'y renvoie.
+export function render(container, params = {}, embedded = false) {
+  if (!embedded && session.user?.role === 'admin') { location.replace('#/admin/account'); return undefined; }
   let dead = false;
   const u = session.user || {};
   const field = (label, name, auto) => {
@@ -47,8 +50,8 @@ export function render(container) {
   } }, t('Se déconnecter'));
 
   const sharesBox = el('div');
-  container.replaceChildren(el('div', { class: 'page' },
-    el('h1', {}, t('Compte')),
+  const page = el('div', { class: embedded ? '' : 'page' },
+    el('h1', {}, embedded ? t('Mon compte') : t('Compte')),
     el('p', {}, t('Identifiant :') + ' ', el('strong', {}, u.username || ''), ' · ' + t('Rôle :') + ' ',
       el('strong', {}, u.role === 'admin' ? t('administrateur') : t('utilisateur'))),
     el('h2', {}, t('Changer le mot de passe')), form,
@@ -58,10 +61,9 @@ export function render(container) {
     el('h2', {}, t('Thème')),
     el('select', { 'aria-label': t('Thème'), onchange: (e) => setTheme(e.target.value) },
       [['', t('Système')], ['light', t('Clair')], ['dark', t('Sombre')]].map(([v, l]) => el('option', { value: v, selected: v === theme() }, l))),
-    sharesBox,
-    u.role === 'admin' ? [el('h2', {}, t('Administration')),
-      el('p', {}, el('a', { class: 'btn', href: '#/admin' }, t('Ouvrir l’administration')))] : null,
-    el('h2', {}, t('Session')), logout));
-  const disposeShares = shares.render(sharesBox);
+    embedded ? null : sharesBox,
+    el('h2', {}, t('Session')), logout);
+  container.replaceChildren(page);
+  const disposeShares = embedded ? () => {} : shares.render(sharesBox);
   return () => { dead = true; disposeShares(); };
 }

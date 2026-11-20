@@ -4,6 +4,20 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.37.2](https://github.com/djkix/mp3-scene/compare/v1.37.1...v1.37.2) (2026-11-20)
+
+### Résumé
+
+**Une seule navigation Admin, vue d'ensemble qui ne reste plus bloquée, titre du lecteur centré.**
+
+- Menu : pour un administrateur, « Compte » devient **Admin** et ouvre l'administration, dont la colonne de gauche
+  réunit tout : Partages (Accès) et Mon compte (mot de passe, langue, thème, déconnexion) en sont des sections.
+  Statistiques est rangé sous Bibliothèque. Un utilisateur garde sa page Compte.
+- Contrôle qualité : le comptage des pistes illisibles prenait plusieurs minutes sur une grande bibliothèque et
+  bloquait la vue d'ensemble ; il répond en quelques centièmes de seconde.
+- Vue d'ensemble : chaque chiffre s'affiche dès que sa requête répond, au lieu d'attendre la plus lente.
+- Lecteur (bureau) : titre et nom de la release centrés en hauteur sur la pochette.
+
 ## [1.37.1](https://github.com/djkix/mp3-scene/compare/v1.37.0...v1.37.1) (2026-11-20)
 
 ### Résumé
