@@ -722,6 +722,7 @@ function update() {
     ui.shuffle.setAttribute('aria-pressed', q.shuffle);
     const [glyph, text] = REPEAT[q.repeat];
     ui.repeat.textContent = glyph;
+    ui.repeat.dataset.mode = q.repeat; // bureau : icône dessinée, « 1 » en pastille (CSS)
     ui.repeat.setAttribute('aria-pressed', q.repeat !== 'off');
     label(ui.repeat, text);
     if (!ui.panel.hidden) renderPanel();

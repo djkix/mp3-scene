@@ -4,6 +4,18 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.37.1](https://github.com/djkix/mp3-scene/compare/v1.37.0...v1.37.1) (2026-11-20)
+
+### Résumé
+
+**Lecteur du bureau aéré, boutons en pastilles.**
+
+- Barre du lecteur (bureau) : plus haute, de l'air entre le titre et la release et entre les boutons et la forme
+  d'onde, pochette de 60 px.
+- Boutons : chacun dans un rond de 40 px, lecture en rond vert plein de 52 px ; aléatoire, répéter, réglages audio et
+  file sont des icônes dessinées. « Répéter une piste » porte un « 1 » en pastille.
+- Le lecteur du téléphone ne change pas.
+
 ## [1.37.0](https://github.com/djkix/mp3-scene/compare/v1.36.0...v1.37.0) (2026-11-20)
 
 ### Résumé
