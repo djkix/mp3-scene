@@ -623,3 +623,15 @@ def test_filters_accept_several_values(user_client, library):
     assert grp("genre=House&genre=Techno") == ["A-Trak", "Bicep"] and grp("year=2015&decade=2000") == ["A-Trak", "VA"]
     pid = user_client.post("/api/playlists", json={"name": "Deux genres", "rules": {"genre": ["House", "Techno"], "year": [2015, 2017]}}).json()["id"]
     assert len(user_client.get(f"/api/playlists/{pid}").json()["items"]) == 3
+
+
+def test_truncated_id3v1_title_is_completed_from_filename():
+    from app.naming import complete_title as ct
+    cut = "Dajae\u00b0-\u00b0Everyday My Life (Cevi"
+    assert len(cut) == 30
+    assert ct(cut, "01-dajae-everyday_my_life_(cevin_fisher_mix).mp3") == cut + "n fisher mix)"
+    assert ct(cut, "track01.mp3") == cut and ct("Short title", "01-short_title_extended.mp3") == "Short title"
+    assert ct("Only If I (Alex Megane Radio E", "02-foo-only_if_i_(alex_megane_radio_edit)-etlmp3.mp3") == "Only If I (Alex Megane Radio Edit)"
+    assert ct("The Black Lodge (Original Mix)", "01-x-the_black_lodge_(original_mix)-eithel.mp3") == "The Black Lodge (Original Mix)"
+    assert ct("Hotel St Tropez La Suite (Cd1)", "01-hotel_st_tropez_la_suite_(cd1)_jimmys_bar.mp3") == "Hotel St Tropez La Suite (Cd1)"
+    assert ct(None, "x.mp3") is None and ct("A" * 30, "01-" + "a" * 30 + ".mp3") == "A" * 30

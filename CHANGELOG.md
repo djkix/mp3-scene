@@ -4,6 +4,16 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.40.1](https://github.com/djkix/mp3-scene/compare/v1.40.0...v1.40.1) (2026-11-20)
+
+### Résumé
+
+**Titres coupés à 30 caractères complétés par le nom du fichier.**
+
+- Un titre de piste de 30 caractères exactement (limite des tags ID3v1) est complété à l'affichage par la suite lue
+  dans le nom du fichier : « Always (Muthafunkaz Extended V » devient « Always (Muthafunkaz Extended Vocal mix) ».
+  Sans correspondance dans le nom du fichier, ou si le titre est entier, rien ne change.
+
 ## [1.40.0](https://github.com/djkix/mp3-scene/compare/v1.39.1...v1.40.0) (2026-11-20)
 
 ### Résumé

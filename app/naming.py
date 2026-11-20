@@ -147,3 +147,25 @@ def parse_release_name(name: str) -> dict:
     else:
         artist = title = ""
     return dict(artist=_clean(artist), title=_clean(title), source=source, year=year, grp=grp)
+
+
+def complete_title(title: str | None, filename: str) -> str | None:
+    """Titre coupé à 30 caractères par un tag ID3v1, complété par la suite lue dans le nom du fichier :
+    « Everyday My Life (Cevi » + « 01-dajae-everyday_my_life_(cevin_fisher_mix).mp3 » -> « Everyday My Life (Cevin fisher mix) ».
+
+    Inchangé si le titre ne fait pas exactement 30 caractères ou si le nom du fichier ne le contient pas."""
+    if not title or len(title) != 30:
+        return title
+    if title.endswith(")") and title.count("(") == title.count(")"):  # parenthèses refermées : titre entier
+        return title
+    stem = filename.rsplit(".", 1)[0]
+    letters = [(i, c.casefold()) for i, c in enumerate(stem) if c.isalnum()]  # lettres et chiffres seuls, avec leur place
+    key = "".join(c.casefold() for c in title if c.isalnum())
+    at = "".join(c for _, c in letters).rfind(key) if key else -1
+    if at < 0:
+        return title
+    tail = re.sub(r"-[^-\s()\[\]]+$", "", stem[letters[at + len(key) - 1][0] + 1:])  # sans le groupe final (« -etlmp3 »)
+    tail = " ".join(tail.replace("_", " ").split(" ")) if tail else ""
+    # ponytail: la suite garde la casse du nom du fichier (souvent en minuscules) ; relire un tag ID3v2 si elle existe
+    # sans lettre dans la suite, le titre faisait 30 caractères sans être coupé
+    return re.sub(r" {2,}", " ", title + tail).strip() if any(c.isalnum() for c in tail) else title

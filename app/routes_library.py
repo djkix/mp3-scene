@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 from pydantic import Field
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
+from .naming import complete_title
 from .deps import MAX_INT, Id, current_user, get_conn
 from .security import safe_path
 
@@ -64,6 +65,7 @@ def _release(row) -> dict:
 def _track(row) -> dict:
     d = dict(row)
     d["filename"] = d.pop("relpath").rsplit("/", 1)[-1]
+    d["title"] = complete_title(d.get("title"), d["filename"])  # tag ID3v1 coupé à 30 caractères
     d["favorite"] = bool(d["favorite"])
     return d
 
