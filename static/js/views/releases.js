@@ -197,21 +197,22 @@ export function render(container, params) {
   const inTracks = q && params.in === 'tracks';
   const tab = (label, on, hash) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(on),
     onclick: () => { location.hash = hash; } }, label);
+  // les deux onglets de la recherche partagent les mêmes filtres, qui suivent quand on passe de l'un à l'autre
+  const kept = Object.entries({ category, genre, year, source }).filter(([, v]) => v).map(([k, v]) => `&${k}=${encodeURIComponent(v)}`).join('');
   const tabs = q && el('div', { class: 'tabs', role: 'tablist', 'aria-label': tr('Rechercher') },
-    tab(tr('Releases'), !inTracks, `#/search?q=${encodeURIComponent(q)}`),
-    tab(tr('Pistes'), inTracks, `#/search?q=${encodeURIComponent(q)}&in=tracks`));
-  container.replaceChildren(...(tabs ? [tabs] : []), ...(inTracks ? [] : [bar]), list);
-  if (inTracks) return trackList(list, { path: `/tracks?q=${encodeURIComponent(q)}`, empty: tr('Aucun résultat') });
+    tab(tr('Releases'), !inTracks, `#/search?q=${encodeURIComponent(q)}${kept}`),
+    tab(tr('Pistes'), inTracks, `#/search?q=${encodeURIComponent(q)}&in=tracks${kept}`));
+  container.replaceChildren(...(tabs ? [tabs] : []), bar, list);
 
   function setFilter(name, value) {
-    const next = { q, category, genre, year, source, ...pin?.extra, ...(name ? { [name]: value } : { category: '', genre: '', year: '', source: '' }) };
+    const next = { q, in: inTracks ? 'tracks' : '', category, genre, year, source, ...pin?.extra, ...(name ? { [name]: value } : { category: '', genre: '', year: '', source: '' }) };
     const qs = Object.entries(next).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
     location.hash = (pin ? pin.base : params.base || (q ? '#/search' : '#/')) + (qs ? '?' + qs : ''); // nouvelle entrée d'historique, pagination remise à zéro
   }
 
   // administrateur, sur une recherche ou la page d'un artiste ou d'un groupe : cocher des releases pour les corriger
   // ensemble (des releases rangées à tort sous cet artiste, par exemple)
-  const sel = session.user?.role === 'admin' && (q || pin) ? picker() : null;
+  const sel = session.user?.role === 'admin' && (q || pin) && !inTracks ? picker() : null;
   let dead = false;
   loadFilters().then((f) => {
     if (dead) return;
@@ -255,7 +256,8 @@ export function render(container, params) {
   }
 
   const query = toQuery({ q });
-  const dispose = releaseList(list, (offset, tri) => {
+  // onglet Pistes de la recherche : mêmes filtres, appliqués à la release de chaque piste
+  const dispose = inTracks ? trackList(list, { path: `/tracks?${query}`, empty: tr('Aucun résultat') }) : releaseList(list, (offset, tri) => {
     query.set('offset', offset);
     query.set('limit', PAGE);
     return api('/releases?' + query + tri);

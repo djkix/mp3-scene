@@ -635,3 +635,10 @@ def test_truncated_id3v1_title_is_completed_from_filename():
     assert ct("The Black Lodge (Original Mix)", "01-x-the_black_lodge_(original_mix)-eithel.mp3") == "The Black Lodge (Original Mix)"
     assert ct("Hotel St Tropez La Suite (Cd1)", "01-hotel_st_tropez_la_suite_(cd1)_jimmys_bar.mp3") == "Hotel St Tropez La Suite (Cd1)"
     assert ct(None, "x.mp3") is None and ct("A" * 30, "01-" + "a" * 30 + ".mp3") == "A" * 30
+
+
+def test_track_search_filters_and_title_order(user_client, library):
+    titles = lambda qs: [t["title"] for t in user_client.get("/api/tracks?" + qs).json()["items"]]
+    assert titles("q=e") == ["Glue", "Ibanez", "Ibanez Dub", "One"]                       # par titre
+    assert titles("q=e&genre=House") == ["Ibanez", "Ibanez Dub"] and titles("q=e&year=2017&year=2003") == ["Glue", "One"]
+    assert titles("q=e&category=Albums&genre=House") == [] and titles("q=e&decade=2010") == ["Glue", "Ibanez", "Ibanez Dub"]

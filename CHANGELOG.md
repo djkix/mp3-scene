@@ -4,6 +4,15 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.41.1](https://github.com/djkix/mp3-scene/compare/v1.41.0...v1.41.1) (2026-11-20)
+
+### Résumé
+
+**Filtres sur l'onglet Pistes de la recherche.**
+
+- L'onglet Pistes a les mêmes filtres que l'onglet Releases (Catégories, Genres, Années, Sources, à choix multiples,
+  avec Réinitialiser) ; ils s'appliquent à la release de chaque piste et suivent d'un onglet à l'autre.
+
 ## [1.41.0](https://github.com/djkix/mp3-scene/compare/v1.40.1...v1.41.0) (2026-11-20)
 
 ### Résumé

@@ -198,15 +198,19 @@ def groups(by: Literal["grp", "artist", "genre", "label", "category"] = "grp", n
 
 
 @router.get("/api/tracks")
-def search_tracks(q: str = Query("", max_length=200), offset: int = Query(0, ge=0, le=MAX_INT),
+def search_tracks(q: str = Query("", max_length=200), category: Many = None, genre: Many = None, year: Years = None,
+                  decade: Years = None, source: Many = None, offset: int = Query(0, ge=0, le=MAX_INT),
                   limit: int = Query(50, ge=1, le=MAX_INT), user=Depends(current_user), conn=Depends(get_conn)):
-    """Recherche dans les tags : chaque mot doit figurer dans le titre ou l'artiste de la piste."""
+    """Recherche dans les tags : chaque mot doit figurer dans le titre ou l'artiste de la piste. Les filtres sont
+    ceux des listes de releases, appliqués à la release de la piste."""
     words = [w for w in _WORDS.split(q) if w][:8]
     if not words:
         return {"items": [], "has_more": False}
     # ponytail: LIKE parcourt toutes les pistes (~0,1 s pour 500 000) ; index FTS sur les pistes si trop lent
     conds = " AND ".join("(t.title LIKE ? OR t.artist LIKE ?)" for _ in words)
     params = [f"%{w}%" for w in words for _ in range(2)]  # mots sans % ni _ : _WORDS les a retirés
+    more, extra = _release_conds(category, genre, year, source=source, decade=decade)
+    conds, params = " AND ".join([conds, *more]), params + extra
     return _page(conn, TRACK_COLS, TRACK_FROM, "WHERE " + conds, params,
                  "COALESCE(t.title, t.relpath) COLLATE NOCASE, t.artist COLLATE NOCASE, t.id",  # par titre, puis par artiste
                  user["id"], offset, limit, _track)
