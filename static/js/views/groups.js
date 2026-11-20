@@ -27,13 +27,13 @@ function detail(container, kind, params) {
   const tabBtn = (label, on, hash) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(on),
     onclick: () => { location.hash = hash; } }, label);
   // administrateur : rattacher cet artiste à un autre (règle gardée après les scans)
-  const attach = kind === 'artists' && session.user?.role === 'admin' && el('button', { type: 'button', onclick: async () => {
-    const target = (prompt(tr('Rattacher « {0} » à quel artiste ?', name)) || '').trim();
+  const attach = ['artists', 'labels'].includes(kind) && session.user?.role === 'admin' && el('button', { type: 'button', onclick: async () => {
+    const target = (prompt(kind === 'labels' ? tr('Rattacher « {0} » à quel label ?', name) : tr('Rattacher « {0} » à quel artiste ?', name)) || '').trim();
     if (!target) return;
     attach.disabled = true;
     try {
-      await api('/admin/artists/aliases', { method: 'PUT', body: { alias: name, target } });
-      location.hash = `#/artists/${encodeURIComponent(target)}`;
+      await api(`/admin/${kind}/aliases`, { method: 'PUT', body: { alias: name, target } });
+      location.hash = `#/${kind}/${encodeURIComponent(target)}`;
     } catch (err) { alert(err.message); attach.disabled = false; }
   } }, tr('Rattacher à…'));
   container.replaceChildren(

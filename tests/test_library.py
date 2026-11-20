@@ -547,13 +547,26 @@ def test_keep_version_separate_artist_label_smart_playlist(admin_client, user_cl
         == ["Defected", "Deep State", "PIAS", "Warner", "Protocol Recordings", "!K7", "", "", ""]
     assert cl("((JOLLY ROGER) SOUND OF PIRATES))") == "JOLLY ROGER SOUND OF PIRATES"
     assert len({nfo.label_key(cl(x)) for x in ("Spinnin Records", "Spinnin' Records", "SpinninRecords", "spinnin", "..... Spinnin`Records")}) == 1
-    assert nfo.label_key("Records") == "records" and nfo.label_key("Armada") != nfo.label_key("Armada Music")
+    assert nfo.label_key("Records") == "records" and nfo.label_key("Armada") == nfo.label_key("Armada Music")
     c.execute("UPDATE releases SET label='..... ninja-tune records' WHERE id=?", (a,))
     c.execute("UPDATE releases SET label='?' WHERE name LIKE 'VA-%'"); c.commit()
     db.merge_labels(c); c.commit()
     assert [r[0] for r in c.execute("SELECT DISTINCT label FROM releases WHERE label!='' ORDER BY 1")] in (["Ninja Tune"], ["ninja-tune records"])
     assert c.execute("SELECT label FROM releases WHERE name LIKE 'VA-%'").fetchone()[0] == ""
     c.execute("UPDATE releases SET label='' WHERE id=?", (a,)); c.commit()
+    # numéro de catalogue pris pour un label, parenthèse redondante, « Music » final, puis rattachement manuel
+    assert {nfo.label_key(cl(x)) for x in ("ZYX", "ZYX (ZYX-9168-8)", "ZYX 55786-2", "ZYX82273-2", "ZYX Music", "Zyx Music (ZYX)",
+                                           "ZYX Music / Noise Traxx", "ZYX Music \u00fb ZYX 20590-2")} == {"zyx"}
+    assert cl("Studio 2000") == "Studio 2000" and cl("Area 51") == "Area 51" and cl("Kontor Records (Edel)") == "Kontor Records (Edel)"
+    c.execute("UPDATE releases SET label='ZYX Germany' WHERE id=?", (a,)); c.commit()
+    lab = lambda m, **kw: getattr(admin_client, m)("/api/admin/labels/aliases", **kw).status_code
+    assert lab("put", json={"alias": "ZYX Germany", "target": "Ninja Tune"}) == 204
+    assert lab("put", json={"alias": "Ninja Tune", "target": "ninja-tune"}) == 400 and user_client.get("/api/admin/labels/aliases").status_code == 403
+    assert admin_client.get(f"/api/releases/{a}").json()["label"] == "Ninja Tune"
+    assert admin_client.get("/api/admin/labels/aliases").json() == [{"alias": "ZYX Germany", "target": "Ninja Tune"}]
+    assert lab("delete", params={"alias": "zyx germany"}) == 204 and lab("delete", params={"alias": "zyx germany"}) == 404
+    scan_structure(c, settings.music_root, now=3500.0); scan_tags(c, settings.music_root); c.commit()   # relus dans les NFO
+    assert admin_client.get(f"/api/releases/{a}").json()["label"] is None and admin_client.get(f"/api/releases/{b}").json()["label"] == "Ninja Tune"
     # playlist intelligente : les pistes des releases qui passent les filtres, sans modification manuelle
     mk = lambda body: user_client.post("/api/playlists", json=body)
     assert mk({"name": "Vide", "rules": {}}).status_code == 400

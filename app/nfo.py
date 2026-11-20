@@ -87,13 +87,20 @@ def clean_label(v: str) -> str:
     for _ in range(depth):
         i = v.rindex("(")
         v = v[:i] + v[i + 1:]
+    # « ZYX Music û ZYX 20590-2 », « ZYX Music / Noise Traxx » : le premier label nommé (û : tiret mal décodé)
+    v = re.split(r"\s+[/|û\u2013\u2014]\s+", v)[0]
+    # numéro de catalogue pris pour le label ou collé à lui : « ZYX (ZYX-9168-8) », « ZYX 55786-2 », « ZYX82273-2 »
+    v = re.sub(r"\s*\([^()]*\d{3}[^()]*\)", "", v)
+    v = re.sub(r"(?<=[^\W\d_]{2})[\s-]*(?:\d{5,}|\d{3,}[\s-]\d+)(?:[\s-]\d+)*$", "", v)
+    # « Zyx Music (ZYX) » : la parenthèse répète le début du nom
+    if (m := re.fullmatch(r"(.+?)\s*\(([^()]+)\)", v)) and m[1].casefold().startswith(m[2].casefold()):
+        v = m[1]
     v = " ".join(re.sub(r"[^\w)\]!?.'\"]+$", "", v).split())
     return v if sum(c.isalnum() for c in v) >= 2 else ""  # une lettre seule n'est pas un label
 
 
 def label_key(v: str) -> str:
-    """Clé de rapprochement des labels : sans casse, accents, espaces ni ponctuation, et sans « Records » final
-    (« Defected », « DEFECTED », « Defected Records », « De-fected » ne font qu'un)."""
-    # ponytail: « X Music » et « X » restent distincts (trop de labels s'appellent « … Music ») ; table d'alias si besoin
+    """Clé de rapprochement des labels : sans casse, accents, espaces ni ponctuation, et sans « Records » ni « Music »
+    final (« Defected », « DEFECTED », « Defected Records », « De-fected », « ZYX », « ZYX Music » ne font qu'un)."""
     k = "".join(c for c in unicodedata.normalize("NFKD", v).casefold() if c.isalnum())
-    return re.sub(r"(?<=.)(?:records?|recordings?|recs?)$", "", k) or k
+    return re.sub(r"(?<=..)(?:records?|recordings?|recs?|music)$", "", k) or k

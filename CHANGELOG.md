@@ -4,6 +4,19 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.37.4](https://github.com/djkix/mp3-scene/compare/v1.37.3...v1.37.4) (2026-11-20)
+
+### Résumé
+
+**Labels : numéros de catalogue écartés, « Music » ignoré, rattachement manuel.**
+
+- Un numéro de catalogue pris pour le label ou collé à lui est retiré (« ZYX 55786-2 », « ZYX82273-2 »,
+  « BMG (74321-72236-2) ») ; une parenthèse qui répète le nom aussi (« Zyx Music (ZYX) »).
+- « Music » final est ignoré au rapprochement, comme « Records » : « ZYX Music » rejoint « ZYX ».
+- Quand la ligne du NFO nomme plusieurs labels (« EMI / Virgin »), seul le premier est gardé.
+- Page d'un label (administrateur) : **Rattacher à…** réunit ce label à un autre ; Administration › Règles liste les
+  labels rattachés. Détacher rend le label d'origine au scan suivant.
+
 ## [1.37.3](https://github.com/djkix/mp3-scene/compare/v1.37.2...v1.37.3) (2026-11-20)
 
 ### Résumé

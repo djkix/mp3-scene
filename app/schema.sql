@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS releases(
   hidden INTEGER NOT NULL DEFAULT 0);  -- doublon masqué des listes (une autre version est gardée)
 -- corrections manuelles d'un administrateur, par chemin de release : elles survivent aux scans (NULL : valeur automatique)
 CREATE TABLE IF NOT EXISTS overrides(path TEXT PRIMARY KEY, artist TEXT, category TEXT, genre TEXT, year INTEGER, hidden INTEGER);
+-- labels rattachés à la main : `key` est la clé de rapprochement (nfo.label_key) du label rattaché
+CREATE TABLE IF NOT EXISTS label_aliases(key TEXT PRIMARY KEY, alias TEXT NOT NULL, target TEXT NOT NULL);
 -- graphies d'artistes à ne jamais fusionner avec une autre (« Florida » n'est pas « Flo Rida »)
 CREATE TABLE IF NOT EXISTS artist_separate(name TEXT PRIMARY KEY COLLATE NOCASE);
 -- artistes rattachés à la main : `key` est la clé de rapprochement (artists.fold) de l'artiste rattaché

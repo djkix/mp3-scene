@@ -74,16 +74,20 @@ def merge_labels(conn) -> None:
     """Nettoie les labels (restes de mise en forme du NFO) et réunit ceux qui ne diffèrent que par la casse, les
     espaces, la ponctuation ou un « Records » final, sous la graphie la plus répandue. Sans effet au second passage."""
     rows = conn.execute("SELECT label, COUNT(*) FROM releases WHERE label IS NOT NULL AND label!='' GROUP BY label").fetchall()
+    aliases = dict(conn.execute("SELECT key, target FROM label_aliases").fetchall())  # rattachements manuels
+
+    def clean(label):
+        c = nfo.clean_label(label)
+        return aliases.get(nfo.label_key(c), c) if c else ""
+
     groups = {}  # clé -> {graphie nettoyée: nombre de releases}
     for label, n in rows:
-        clean = nfo.clean_label(label)
-        if clean:
-            spellings = groups.setdefault(nfo.label_key(clean), {})
-            spellings[clean] = spellings.get(clean, 0) + n
+        if c := clean(label):
+            spellings = groups.setdefault(nfo.label_key(c), {})
+            spellings[c] = spellings.get(c, 0) + n
     best = {k: min(s, key=lambda x: (-s[x], x)) for k, s in groups.items()}
     conn.executemany("UPDATE releases SET label=? WHERE label=?", [
-        (new, label) for label, _ in rows
-        if (new := best[nfo.label_key(c)] if (c := nfo.clean_label(label)) else "") != label])
+        (new, label) for label, _ in rows if (new := best[nfo.label_key(c)] if (c := clean(label)) else "") != label])
 
 
 _KIND_FOLDER = {"live": r"live|radio", "comp": r"compil", "single": r"single"}

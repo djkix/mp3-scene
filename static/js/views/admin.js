@@ -206,17 +206,23 @@ export function render(container, params = {}) {
   } else if (section === 'rules') {
     const counts = Object.fromEntries(RULES.map(([, key]) => [key, el('span', { class: 'chip' }, '…')]));
     // artistes rattachés à la main depuis leur page (« Rattacher à… »)
-    const aliases = el('tbody'), aliasMsg = el('p', { class: 'status', role: 'status' });
-    const loadAliases = () => api('/admin/artists/aliases').then((list) => {
-      if (dead) return;
-      aliasMsg.textContent = list.length ? '' : t('Aucun artiste rattaché à la main.');
-      aliases.replaceChildren(...list.map((a) => el('tr', {}, el('th', { scope: 'row' }, a.alias), el('td', {}, a.target),
-        el('td', {}, el('button', { type: 'button', onclick: async (e) => {
-          e.target.disabled = true;
-          try { await api('/admin/artists/aliases?alias=' + encodeURIComponent(a.alias), { method: 'DELETE' }); } catch (err) { aliasMsg.textContent = err.message; }
-          loadAliases();
-        } }, t('Détacher'))))));
-    }).catch((err) => { if (!dead) aliasMsg.textContent = err.message; });
+    // rattachements manuels (artistes ou labels) : un tableau avec « Détacher »
+    const aliasTable = (path, first, empty) => {
+      const rows = el('tbody'), msg = el('p', { class: 'status', role: 'status' });
+      const load = () => api(path).then((list) => {
+        if (dead) return;
+        msg.textContent = list.length ? '' : empty;
+        rows.replaceChildren(...list.map((a) => el('tr', {}, el('th', { scope: 'row' }, a.alias), el('td', {}, a.target),
+          el('td', {}, el('button', { type: 'button', onclick: async (e) => {
+            e.target.disabled = true;
+            try { await api(path + '?alias=' + encodeURIComponent(a.alias), { method: 'DELETE' }); } catch (err) { msg.textContent = err.message; }
+            load();
+          } }, t('Détacher'))))));
+      }).catch((err) => { if (!dead) msg.textContent = err.message; });
+      load();
+      return [el('div', { class: 'table-wrap' }, el('table', { class: 'users' },
+        el('thead', {}, el('tr', {}, th(first), th(t('Rattaché à')), th(t('Actions')))), rows)), msg];
+    };
     // graphies à ne jamais fusionner (« Florida » n'est pas « Flo Rida »)
     const seps = el('tbody'), sepMsg = el('p', { class: 'status', role: 'status' });
     const sepName = el('input', { required: true, maxLength: 200, placeholder: t('Graphie exacte, par exemple Florida'), 'aria-label': t('Artiste à garder à part') });
@@ -239,14 +245,15 @@ export function render(container, params = {}) {
       ...RULES.map(([title, key, text]) => el('section', { class: 'ad-card' }, el('h3', {}, t(title), counts[key]), el('p', {}, t(text)))),
       classBtn, classMsg,
       el('h2', {}, t('Artistes rattachés')),
-      el('div', { class: 'table-wrap' }, el('table', { class: 'users' },
-        el('thead', {}, el('tr', {}, th(t('Artiste')), th(t('Rattaché à')), th(t('Actions')))), aliases)), aliasMsg,
+      ...aliasTable('/admin/artists/aliases', t('Artiste'), t('Aucun artiste rattaché à la main.')),
+      el('h2', {}, t('Labels rattachés')),
+      el('p', { class: 'hint' }, t('Depuis la page d’un label, bouton Rattacher à… Détacher rend son label d’origine à chaque release au prochain scan.')),
+      ...aliasTable('/admin/labels/aliases', t('Label'), t('Aucun label rattaché à la main.')),
       el('h2', {}, t('Artistes à ne jamais fusionner')),
       el('p', { class: 'hint' }, t('Une graphie listée ici garde ses releases au lieu de rejoindre un artiste au nom proche, à ce scan et aux suivants.')),
       sepForm,
       el('div', { class: 'table-wrap' }, el('table', { class: 'users' },
         el('thead', {}, el('tr', {}, th(t('Artiste')), th(t('Actions')))), seps)), sepMsg);
-    loadAliases();
     loadSeps();
     api('/admin/overview').then((o) => { if (alive()) RULES.forEach(([, key]) => { counts[key].textContent = o[key]; }); }).catch(() => {});
   } else if (section === 'corrections') {

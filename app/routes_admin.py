@@ -6,7 +6,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from . import artists, db, genres, scanner, security
+from . import artists, db, genres, nfo, scanner, security
 from .deps import MAX_INT, Id, get_conn, require_admin
 from .naming import parse_release_name
 from .routes_library import RELEASE_COLS, RELEASE_FROM, Dir, Sort, _order, _page, _release
@@ -289,6 +289,35 @@ def detach_artist(alias: str = Query(max_length=200), conn=Depends(get_conn)):
         artists.reset(conn, shown[0])
     artists.apply(conn)
     db.categorize(conn)
+    conn.commit()
+
+
+@router.get("/labels/aliases")
+def label_aliases(conn=Depends(get_conn)):
+    """Labels rattachés à la main."""
+    return [dict(r) for r in conn.execute("SELECT alias, target FROM label_aliases ORDER BY alias COLLATE NOCASE")]
+
+
+@router.put("/labels/aliases", status_code=204)
+def attach_label(body: Alias, conn=Depends(get_conn)):
+    """Rattache un label à un autre (« ZYX Germany » à « ZYX ») ; la règle est gardée et réappliquée à chaque scan."""
+    alias, target = body.alias.strip(), body.target.strip()
+    if not target or nfo.label_key(alias) == nfo.label_key(target):
+        raise HTTPException(400, "Ces deux noms sont déjà réunis.")
+    conn.execute("INSERT OR REPLACE INTO label_aliases(key, alias, target) VALUES (?,?,?)", (nfo.label_key(alias), alias, target))
+    db.merge_labels(conn)
+    conn.commit()
+
+
+@router.delete("/labels/aliases", status_code=204)
+def detach_label(alias: str = Query(max_length=200), conn=Depends(get_conn)):
+    """Retire un rattachement. Le label d'origine n'est plus en base : les releases du label cible sont marquées à
+    relire, et retrouvent le leur au prochain scan."""
+    row = conn.execute("SELECT target FROM label_aliases WHERE key=?", (nfo.label_key(alias),)).fetchone()
+    if row is None:
+        raise HTTPException(404, "Rattachement introuvable.")
+    conn.execute("DELETE FROM label_aliases WHERE key=?", (nfo.label_key(alias),))
+    conn.execute("UPDATE releases SET label=NULL WHERE has_nfo=1 AND label=? COLLATE NOCASE", (row["target"],))
     conn.commit()
 
 
