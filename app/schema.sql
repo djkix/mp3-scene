@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS releases(
   has_cover INTEGER,  -- NULL : pas encore vérifié par le scan
   released_at REAL,  -- date de sortie lue dans le NFO ; NULL : pas encore lu, 0 : aucune
   label TEXT, catalog TEXT,  -- label et numéro de catalogue lus dans le NFO ; label NULL : pas encore lu, '' : aucun
-  hidden INTEGER NOT NULL DEFAULT 0);  -- doublon masqué des listes (une autre version est gardée)
+  hidden INTEGER NOT NULL DEFAULT 0,  -- doublon masqué des listes (une autre version est gardée)
+  cue_done INTEGER);  -- NULL : fichiers .cue pas encore lus par le scan
 -- corrections manuelles d'un administrateur, par chemin de release : elles survivent aux scans (NULL : valeur automatique)
 CREATE TABLE IF NOT EXISTS overrides(path TEXT PRIMARY KEY, artist TEXT, category TEXT, genre TEXT, year INTEGER, hidden INTEGER,
   cover INTEGER);  -- 1 : pochette déposée à la main (data/covers)
@@ -24,6 +25,14 @@ CREATE TABLE IF NOT EXISTS label_aliases(key TEXT PRIMARY KEY, alias TEXT NOT NU
 CREATE TABLE IF NOT EXISTS backup_runs(
   started_at REAL NOT NULL, finished_at REAL NOT NULL, ok INTEGER NOT NULL, message TEXT NOT NULL DEFAULT '',
   size INTEGER NOT NULL DEFAULT 0);
+-- chapitres des longs mixes, lus dans les fichiers .cue pendant le scan (recherche, lecteur)
+CREATE TABLE IF NOT EXISTS chapters(
+  track_id INTEGER NOT NULL REFERENCES tracks ON DELETE CASCADE, pos INTEGER NOT NULL, start REAL NOT NULL,
+  artist TEXT NOT NULL DEFAULT '', title TEXT NOT NULL DEFAULT '', PRIMARY KEY(track_id, pos));
+-- position d'écoute gardée dans une longue piste, par utilisateur : « reprendre à 43:12 »
+CREATE TABLE IF NOT EXISTS positions(
+  user_id INTEGER NOT NULL REFERENCES users ON DELETE CASCADE, track_id INTEGER NOT NULL REFERENCES tracks ON DELETE CASCADE,
+  pos REAL NOT NULL, updated_at REAL NOT NULL, PRIMARY KEY(user_id, track_id));
 -- journal d'activité de l'administration : connexions, actions des administrateurs, sauvegardes
 CREATE TABLE IF NOT EXISTS activity(at REAL NOT NULL, user TEXT NOT NULL, action TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '');
 CREATE INDEX IF NOT EXISTS idx_activity_at ON activity(at DESC);

@@ -4,6 +4,21 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.47.0](https://github.com/djkix/mp3-scene/compare/v1.46.0...v1.47.0) (2026-11-20)
+
+### Résumé
+
+**Chapitre en cours dans le lecteur, recherche dans les chapitres, reprise des longs mixes.**
+
+- Lecteur : le morceau en cours d'un long mix s'affiche à droite de la barre (au-dessus des outils en plein écran),
+  avec « chapitre précédent » et « chapitre suivant ».
+- Recherche, onglet Pistes : un morceau joué dans un mix est trouvé par son chapitre ; un clic lance le mix à cet
+  endroit. Les fichiers `.cue` sont lus pendant le scan et gardés en base : un scan est nécessaire après la mise à jour.
+- Longs mixes (plus de vingt minutes) : la position d'écoute est gardée par compte ; au lancement suivant, un bouton
+  propose de reprendre là où l'écoute s'était arrêtée.
+- Favoris › Statistiques : chiffres clés, courbe des écoutes par jour et anneau des genres.
+- Fiche : pastilles toutes de la même couleur ; cœur de la barre d'actions identique à celui des pistes.
+
 ## [1.46.0](https://github.com/djkix/mp3-scene/compare/v1.45.0...v1.46.0) (2026-11-20)
 
 ### Résumé

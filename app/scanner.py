@@ -13,7 +13,7 @@ from typing import Callable
 import mutagen
 from mutagen.id3 import ID3
 
-from app import artists, backup, db, genres, nfo
+from app import artists, backup, cue, db, genres, nfo
 from app.naming import parse_release_name
 
 DISC_RE = re.compile(r"^(cd|disc|disk)[ _-]?(\d+)$", re.IGNORECASE)
@@ -150,7 +150,7 @@ def _scan_structure(conn, root, now):
         if rel in known:
             rid = known[rel][0]
             seen.add(rel)
-            conn.execute("UPDATE releases SET mtime=?, size=?, track_count=?, has_nfo=?, tags_done=0, has_cover=NULL, released_at=NULL WHERE id=?",
+            conn.execute("UPDATE releases SET mtime=?, size=?, track_count=?, has_nfo=?, tags_done=0, has_cover=NULL, released_at=NULL, cue_done=NULL WHERE id=?",
                          (mtime, size, len(tracks), nfo, rid))
             old = {(r["relpath"], r["size"]): r["id"]
                    for r in conn.execute("SELECT id, relpath, size FROM tracks WHERE release_id=?", (rid,))}
@@ -401,6 +401,7 @@ def _scan_tags(conn, root, should_stop):
     conn.commit()
     _scan_covers(conn, root, should_stop)
     _scan_dates(conn, root, should_stop)
+    _scan_cues(conn, root, should_stop)
     return read
 
 
@@ -437,6 +438,31 @@ def _scan_dates(conn, root, should_stop):
         conn.executemany("UPDATE releases SET released_at=?, label=?, catalog=? WHERE id=?", done)
         db.year_from_nfo(conn)
         db.merge_labels(conn)
+        conn.commit()
+
+
+def _scan_cues(conn, root, should_stop):
+    """Met en base les chapitres des releases dont les .cue n'ont jamais été lus (nouvelles, modifiées, ou antérieures
+    à la colonne) : la recherche et le lecteur les trouvent sans relire le NAS."""
+    last = 0
+    while not should_stop():
+        rows = conn.execute("SELECT id, path FROM releases WHERE cue_done IS NULL AND id>? ORDER BY id LIMIT ?",
+                            (last, TAG_BATCH)).fetchall()
+        if not rows:
+            break
+        last = rows[-1]["id"]
+        for r in rows:
+            tracks = [(t["id"], t["relpath"]) for t in conn.execute("SELECT id, relpath FROM tracks WHERE release_id=?", (r["id"],))]
+            try:
+                found = cue.for_tracks(Path(root, r["path"]), tracks)
+            except OSError as e:
+                log.warning("fichiers .cue non lus, à refaire au prochain scan : %s (%s)", r["path"], e)
+                continue
+            conn.execute("DELETE FROM chapters WHERE track_id IN (SELECT id FROM tracks WHERE release_id=?)", (r["id"],))
+            conn.executemany("INSERT INTO chapters(track_id, pos, start, artist, title) VALUES (?,?,?,?,?)",
+                             [(tid, i, c["start"], c["artist"][:200], c["title"][:300]) for tid, parts in found.items()
+                              for i, c in enumerate(parts)])
+            conn.execute("UPDATE releases SET cue_done=1 WHERE id=?", (r["id"],))
         conn.commit()
 
 

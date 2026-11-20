@@ -169,6 +169,29 @@ def remove_track(pid: Id, track_id: Id, user=Depends(current_user), conn=Depends
     conn.commit()
 
 
+class Position(BaseModel):
+    pos: float = Field(ge=0, le=1e7)
+
+
+@router.get("/api/positions/{track_id}")
+def get_position(track_id: Id, user=Depends(current_user), conn=Depends(get_conn)):
+    """Position gardée dans cette piste par l'utilisateur (secondes), 0 s'il n'y en a pas."""
+    row = conn.execute("SELECT pos FROM positions WHERE user_id=? AND track_id=?", (user["id"], track_id)).fetchone()
+    return {"pos": row["pos"] if row else 0}
+
+
+@router.put("/api/positions/{track_id}", status_code=204)
+def put_position(track_id: Id, body: Position, user=Depends(current_user), conn=Depends(get_conn)):
+    """Garde la position d'écoute d'une longue piste ; 0 l'oublie (piste finie ou reprise du début)."""
+    if body.pos <= 0:
+        conn.execute("DELETE FROM positions WHERE user_id=? AND track_id=?", (user["id"], track_id))
+    else:
+        conn.execute("INSERT INTO positions(user_id, track_id, pos, updated_at) SELECT ?, id, ?, ? FROM tracks WHERE id=?"
+                     " ON CONFLICT(user_id, track_id) DO UPDATE SET pos=excluded.pos, updated_at=excluded.updated_at",
+                     (user["id"], body.pos, time.time(), track_id))
+    conn.commit()
+
+
 STATE_MAX = 512 * 1024
 
 

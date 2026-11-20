@@ -32,7 +32,8 @@ def init(data_dir: Path) -> None:
         # colonnes ajoutées en 1.36.0 (année corrigée) et en 1.37.0
         for table, col, kind in (("overrides", "year", "INTEGER"), ("overrides", "hidden", "INTEGER"), ("overrides", "cover", "INTEGER"),
                                  ("releases", "label", "TEXT"), ("releases", "catalog", "TEXT"),
-                                 ("releases", "hidden", "INTEGER NOT NULL DEFAULT 0"), ("playlists", "rules", "TEXT")):
+                                 ("releases", "hidden", "INTEGER NOT NULL DEFAULT 0"), ("playlists", "rules", "TEXT"),
+                                 ("releases", "cue_done", "INTEGER")):  # NULL : fichiers .cue pas encore lus
             if col not in {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {kind}")
         classify(conn)  # données rangées par une version antérieure : mêmes règles que le scanner d'aujourd'hui

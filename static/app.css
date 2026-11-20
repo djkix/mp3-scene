@@ -192,6 +192,15 @@ a.icon:hover { background: var(--hover); }
 .pl-msg { position: absolute; bottom: 100%; left: 12px; margin: 0 0 8px; padding: 4px 8px; border-radius: 4px;
   background: var(--fg); color: var(--bg); font: 12px var(--mono); z-index: 2; }
 .pl-msg:empty { display: none; }
+.pl-msg button { min-height: 0; padding: 4px 10px; }
+/* chapitre en cours d'un long mix, à droite du lecteur : précédent, artiste - titre, suivant */
+/* sur sa propre ligne, au-dessus des outils : toute la largeur de la colonne de droite pour le titre */
+.pl-tools { flex-wrap: wrap; row-gap: 2px; }
+.pl-chap { display: flex; align-items: center; justify-content: flex-end; gap: 2px; min-width: 0; flex-basis: 100%; }
+.pl-chap[hidden] { display: none; }
+.pl-chap-text { flex: 0 1 auto; min-width: 0; color: var(--muted); font: 11px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#player .pl-tools .pl-chap .icon { min-width: 26px; height: 26px; border: 0; }
+#player .pl-chap .icon[data-ico]::before { width: 14px; height: 14px; }
 #cast-slot:empty { display: none; }
 #cast-slot { display: inline-flex; }
 google-cast-launcher { display: inline-block; width: 32px; height: 32px; padding: 5px; cursor: pointer; border-radius: 3px;
@@ -325,7 +334,11 @@ google-cast-launcher:hover { background: var(--hover); }
   #player:not(.expanded) .pl-artist { display: block; max-width: 100%; color: var(--muted); font: 11px var(--mono); white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis; }
   #player:not(.expanded) .pl-artist:empty { display: none; }
-  .pl-rel, .pl-seek, .pl-qbtn, .pl-fx, .pl-volwrap, .pl-controls :is(.pl-shuffle, .pl-prev, .pl-repeat) { display: none; }
+  .pl-rel, .pl-seek, .pl-qbtn, .pl-fx, .pl-volwrap, .pl-chap, .pl-controls :is(.pl-shuffle, .pl-prev, .pl-repeat) { display: none; }
+  /* plein écran : le chapitre en cours sur sa propre ligne, au-dessus des outils */
+  #player.expanded .pl-tools { flex-wrap: wrap; }
+  #player.expanded .pl-chap:not([hidden]) { display: flex; flex-basis: 100%; order: -1; justify-content: center; max-width: none; margin: 0 0 4px; }
+  #player.expanded .pl-chap-text { max-width: none; flex: 0 1 auto; font-size: 13px; color: var(--fg); }
   #player .icon { min-width: 44px; height: 44px; font-size: 16px; }
 
   /* Lecteur plein écran : titre entier en haut, commandes larges en bas */
@@ -411,13 +424,10 @@ google-cast-launcher:hover { background: var(--hover); }
 .detail-info dd { margin: 0; font: 13px var(--mono); overflow-wrap: anywhere; text-align: right; }
 .detail-info dd:nth-of-type(odd) { padding-right: 24px; }
 .detail-info { align-items: center; }
-/* pastilles colorées par type : provenance en vert, classement en bleu, édition en violet, mesures en gris */
 .pill { display: inline-block; max-width: 100%; padding: 2px 10px; border-radius: 999px; font: 500 12px var(--mono);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
-.pill-src { background: var(--tint); color: var(--accent-text); }
-.pill-cls { background: var(--info-tint); color: var(--info); }
-.pill-ed { background: var(--ed-tint); color: var(--ed); }
-.pill-num { background: var(--hover); color: var(--muted); }
+/* toutes de la même couleur, celle du groupe (vert) */
+.pill-src, .pill-cls, .pill-ed, .pill-num { background: var(--tint); color: var(--accent-text); }
 a.pill:hover { filter: brightness(1.12); }
 /* chapitres d'un long mix (fichier .cue) : heure de début, puis artiste et titre */
 .chapters { list-style: none; margin: 0; padding: 0; columns: 2 320px; column-gap: 24px; }
@@ -432,7 +442,8 @@ a.pill:hover { filter: brightness(1.12); }
 .detail-admin { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 0; }
 .detail-admin button { min-height: 0; padding: 4px 10px; font-size: 12px; }
 .detail-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; margin: 12px 0; }
-.detail-actions .fav { font-size: 16px; line-height: 1; letter-spacing: 0; }
+/* même cœur que sur une ligne de piste : police et taille du texte courant, pas celles des libellés de la barre */
+.detail-actions .fav { font: 400 16px/1 var(--sans); letter-spacing: 0; text-transform: none; }
 .detail-actions :is(button, .btn):not(.icon) { padding: 8px 14px; }
 .btn { display: inline-block; padding: 5px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); }
 .btn:hover { background: var(--hover); }
@@ -585,6 +596,7 @@ tr.disc th { background: var(--hover); color: var(--fg); padding-block: 8px; }
 /* liste de pistes, comme les releases : vignette | artiste - titre | genre | durée ou date | débit | release | actions */
 /* bureau seulement : sur téléphone, la ligne garde la disposition en carte des releases */
 @media (min-width: 700px) { .trk { grid-template-columns: 40px minmax(0, 3fr) 7rem var(--when, 5rem) 5.25rem minmax(0, 2fr) var(--acts, 72px); } }
+.trk-chapter { display: block; margin-top: 2px; color: var(--info); font-weight: 400; font-size: 12px; }
 .trk-rel { color: var(--muted); font: 12px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .trk-rel:hover { color: var(--fg); text-decoration: underline; }
 .stack { display: flex; flex-direction: column; gap: 10px; max-width: 320px; }

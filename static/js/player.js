@@ -432,6 +432,7 @@ function playTracks(tracks, startIndex = 0, pos = null) {
   failures = 0;
   player.queue.replace(tracks, startIndex);
   load(true, pos);
+  if (pos == null) offerResume(player.queue.current());
   save();
 }
 
@@ -663,8 +664,64 @@ function duration() {
   return Number.isFinite(d) && d > 0 ? d : player.queue.current()?.duration || 0;
 }
 
+// --- Longs mixes : chapitre en cours (fichier .cue) et reprise là où l'écoute s'est arrêtée ---
+const LONG = 1200; // secondes : au-delà, la position est gardée d'une écoute à l'autre
+let chapters = [], chaptersFor = null, shownChapter = -2, savedAt = 0;
+const chapterAt = (pos) => { let i = -1; while (i + 1 < chapters.length && chapters[i + 1].start <= pos + 0.5) i++; return i; };
+
+function loadChapters(t) {
+  if ((t?.id ?? null) === chaptersFor) return;
+  chaptersFor = t?.id ?? null;
+  chapters = [];
+  shownChapter = -2;
+  paintChapter();
+  if (!t || (t.duration || 0) < 600) return; // une piste courte n'a pas de chapitres : pas de requête
+  api(`/tracks/${t.id}/chapters`).then((list) => { if (chaptersFor === t.id) { chapters = list; shownChapter = -2; paintChapter(); } }).catch(() => {});
+}
+
+function paintChapter() {
+  if (!ui) return;
+  ui.chap.hidden = !chapters.length;
+  const i = chapters.length ? chapterAt(position()) : -1;
+  if (i === shownChapter) return;
+  shownChapter = i;
+  const c = chapters[i];
+  ui.chapText.textContent = c ? (c.artist && c.title ? `${c.artist} - ${c.title}` : c.title || c.artist) : '';
+  ui.chapText.title = ui.chapText.textContent;
+}
+
+// Chapitre précédent (ou début du chapitre en cours après trois secondes) et suivant.
+function skipChapter(dir) {
+  const i = chapterAt(position());
+  const to = dir < 0 ? (position() - (chapters[i]?.start ?? 0) > 3 ? i : i - 1) : i + 1;
+  if (chapters[to]) seek(chapters[to].start);
+}
+
+// Garde la position d'une longue piste toutes les quinze secondes ; l'oublie dans la dernière minute.
+function savePosition() {
+  const t = player.queue.current(), d = duration(), pos = position();
+  if (!t || backend || d < LONG || !playing() || Math.abs(Date.now() - savedAt) < 15000) return;
+  savedAt = Date.now();
+  api(`/positions/${t.id}`, { method: 'PUT', body: { pos: d - pos < 60 ? 0 : Math.floor(pos) } }).catch(() => {});
+}
+
+// Au lancement d'une longue piste depuis le début : propose de reprendre là où l'écoute s'était arrêtée.
+function offerResume(t) {
+  if (!t || (t.duration || 0) < LONG) return;
+  api(`/positions/${t.id}`).then(({ pos }) => {
+    if (!ui || player.queue.current()?.id !== t.id || pos < 60 || position() > 30) return;
+    ui.msg.replaceChildren(el('button', { type: 'button', class: 'primary', onclick: () => { seek(pos); flash(''); } },
+      tr('Reprendre à {0}', fmtDuration(pos))));
+    ui.footer.classList.add('has-msg');
+    clearTimeout(msgTimer);
+    msgTimer = setTimeout(() => { ui.msg.textContent = ''; ui.footer.classList.remove('has-msg'); }, 12000);
+  }).catch(() => {});
+}
+
 function tick() {
   if (!ui) return;
+  paintChapter();
+  savePosition();
   const d = duration();
   ui.seek.max = d || 0;
   ui.total.textContent = fmtDuration(d);
@@ -717,6 +774,7 @@ function loadWave(t) {
 
 function update() {
   const q = player.queue, t = q.current(), on = playing();
+  loadChapters(t);
   if (t && on && t.id !== logged) { // une fois par piste lancée, en local comme en cast ; un échec est sans conséquence
     logged = t.id;
     api(`/history/${t.id}`, { method: 'POST' }).catch(() => {});
@@ -869,6 +927,11 @@ export function initPlayer(footer) {
   ui.fx = iconBtn('pl-fx', '≋', tr('Réglages audio'), openAudioPrefs);
   ui.qbtn.setAttribute('aria-expanded', 'false');
   ui.msg = el('p', { class: 'pl-msg', role: 'status' });
+  // chapitre en cours d'un long mix, encadré par « précédent » et « suivant » ; masqué sans chapitres
+  ui.chapText = el('span', { class: 'pl-chap-text' });
+  ui.chap = el('div', { class: 'pl-chap', hidden: true },
+    iconBtn('pl-chprev', '', tr('Chapitre précédent'), () => skipChapter(-1), 'prev'), ui.chapText,
+    iconBtn('pl-chnext', '', tr('Chapitre suivant'), () => skipChapter(1), 'next'));
 
   ui.count = el('span', { class: 'pl-count' });
   ui.sleep = el('select', { class: 'pl-sleep', 'aria-label': tr('Minuterie de sommeil'), title: tr('Minuterie de sommeil'),
@@ -897,7 +960,7 @@ export function initPlayer(footer) {
         iconBtn('pl-next', '', tr('Suivant'), () => player.next(), 'next'),
         ui.repeat),
       el('div', { class: 'pl-seek' }, ui.elapsed, ui.wave, ui.total),
-      el('div', { class: 'pl-tools' }, ui.rate, volwrap, ui.fx, ui.fav, ui.qbtn,
+      el('div', { class: 'pl-tools' }, ui.chap, ui.rate, volwrap, ui.fx, ui.fav, ui.qbtn,
         el('span', { id: 'cast-slot' })), // emplacement du bouton cast (cast.js)
       el('p', { class: 'pl-hint' }, tr('Balayez pour changer de piste'))));
 

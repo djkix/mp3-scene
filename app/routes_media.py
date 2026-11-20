@@ -236,35 +236,37 @@ WAVE_POINTS = 800   # largeur de la forme d'onde, en barres
 WAVE_RATE = 8000    # décodage en mono 8 kHz : largement assez pour une enveloppe
 WAVE_WINDOW = 800   # échantillons par crête intermédiaire (0,1 s)
 WAVE_TIMEOUT = 600
-@router.get("/api/releases/{rid}/chapters")
-def chapters(rid: Id, request: Request, conn=Depends(get_conn)):
-    """Chapitres des pistes de la release, lus dans ses fichiers .cue : {identifiant de piste: [{title, artist, start}]}.
-    Seules les pistes découpées en au moins deux chapitres y figurent."""
-    row = conn.execute("SELECT path FROM releases WHERE id=?", (rid,)).fetchone()
+def _chapters(request: Request, conn, rid: int) -> dict[int, list[dict]]:
+    """Chapitres des pistes d'une release : ceux que le scan a mis en base, sinon lus dans ses .cue à la volée."""
+    row = conn.execute("SELECT path, cue_done FROM releases WHERE id=?", (rid,)).fetchone()
     if row is None:
         raise HTTPException(404, "Release introuvable.")
-    tracks = conn.execute("SELECT id, relpath FROM tracks WHERE release_id=? ORDER BY disc, relpath", (rid,)).fetchall()
-    found = {}
+    if row["cue_done"]:
+        out = {}
+        for c in conn.execute("SELECT c.track_id, c.start, c.artist, c.title FROM chapters c JOIN tracks t ON t.id=c.track_id"
+                              " WHERE t.release_id=? ORDER BY c.track_id, c.pos", (rid,)):
+            out.setdefault(c["track_id"], []).append({"title": c["title"], "artist": c["artist"], "start": c["start"]})
+        return out
+    tracks = [(t["id"], t["relpath"]) for t in conn.execute("SELECT id, relpath FROM tracks WHERE release_id=? ORDER BY disc, relpath", (rid,))]
     try:
-        folder = safe_path(request.app.state.settings.music_root, row["path"])
-        # ponytail: fichiers .cue du dossier de la release et de ses sous-dossiers de disque, lus à chaque ouverture de fiche
-        cues = sorted(p for p in folder.rglob("*") if p.suffix.lower() == ".cue" and p.is_file() and p.stat().st_size < 512 * 1024)[:20]
-        for path in cues:
-            with open(path, "rb") as fh:  # lecture seule
-                for name, parts in cue.parse(fh.read().decode("cp437")).items():
-                    found.setdefault(name, parts)
+        return cue.for_tracks(safe_path(request.app.state.settings.music_root, row["path"]), tracks)
     except (OSError, HTTPException):
         return {}
-    out = {}
-    for t in tracks:
-        name = t["relpath"].rsplit("/", 1)[-1].lower()
-        # le .cue nomme parfois un .wav d'origine : rapprochement sur le nom sans extension, puis piste unique
-        parts = found.get(name) or next((v for k, v in found.items() if k.rsplit(".", 1)[0] == name.rsplit(".", 1)[0]), None)
-        if parts is None and len(tracks) == 1 and len(found) == 1:
-            parts = next(iter(found.values()))
-        if parts and len(parts) > 1:
-            out[t["id"]] = parts
-    return out
+
+
+@router.get("/api/releases/{rid}/chapters")
+def chapters(rid: Id, request: Request, conn=Depends(get_conn)):
+    """{identifiant de piste: [{title, artist, start}]} pour les pistes découpées en chapitres (fichier .cue)."""
+    return _chapters(request, conn, rid)
+
+
+@router.get("/api/tracks/{track_id}/chapters")
+def track_chapters(track_id: Id, request: Request, conn=Depends(get_conn)):
+    """Chapitres d'une piste, pour le lecteur ; liste vide s'il n'y en a pas."""
+    row = conn.execute("SELECT release_id FROM tracks WHERE id=?", (track_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "Piste introuvable.")
+    return _chapters(request, conn, row["release_id"]).get(track_id, [])
 
 
 _MODES = {0: "Stéréo", 1: "Stéréo jointe", 2: "Deux canaux", 3: "Mono"}

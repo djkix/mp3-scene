@@ -224,11 +224,22 @@ def search_tracks(q: str = Query("", max_length=200), category: Many = None, gen
     conds = " AND ".join("(t.title LIKE ? OR t.artist LIKE ? OR ((length(t.title)=30 OR length(t.artist)=30)"
                          " AND t.relpath LIKE ?))" for _ in words)
     params = [f"%{w}%" for w in words for _ in range(3)]  # mots sans % ni _ : _WORDS les a retirés
+    # ou un chapitre d'un long mix (fichier .cue) dont l'artiste et le titre contiennent tous les mots
+    in_chapter = " AND ".join("(c.title LIKE ? OR c.artist LIKE ?)" for _ in words)
+    conds = f"(({conds}) OR t.id IN (SELECT c.track_id FROM chapters c WHERE {in_chapter}))"
+    likes = [f"%{w}%" for w in words for _ in range(2)]
+    params += likes
     more, extra = _release_conds(category, genre, year, source=source, decade=decade)
     conds, params = " AND ".join([conds, *more]), params + extra
-    return _page(conn, TRACK_COLS, TRACK_FROM, "WHERE " + conds, params,
+    page = _page(conn, TRACK_COLS, TRACK_FROM, "WHERE " + conds, params,
                  "COALESCE(t.title, t.relpath) COLLATE NOCASE, t.artist COLLATE NOCASE, t.id",  # par titre, puis par artiste
                  user["id"], offset, limit, _track)
+    for item in page["items"]:  # le chapitre trouvé, pour l'afficher et lancer la piste à cet endroit
+        c = conn.execute(f"SELECT c.start, c.artist, c.title FROM chapters c WHERE c.track_id=? AND {in_chapter} ORDER BY c.pos LIMIT 1",
+                         (item["id"], *likes)).fetchone()
+        if c:
+            item["chapter"] = dict(c)
+    return page
 
 
 @router.get("/api/folders")
@@ -377,7 +388,10 @@ def stats(days: int = Query(0, ge=0, le=36500), user=Depends(current_user), conn
         f"SELECT {TRACK_COLS}, n.plays FROM (SELECT track_id, COUNT(*) AS plays FROM plays p {where} GROUP BY track_id"
         f" ORDER BY plays DESC, track_id LIMIT 10) n JOIN {TRACK_FROM} WHERE t.id=n.track_id"
         " ORDER BY n.plays DESC, t.id", (uid, since, uid))]
-    return {"plays": total["plays"], "duration": total["duration"], "tracks": tracks,
+    days = [dict(r) for r in conn.execute(
+        f"SELECT strftime('%Y-%m-%d', p.played_at, 'unixepoch', 'localtime') AS name, COUNT(*) AS n, COALESCE(SUM(t.duration), 0) AS duration"
+        f" FROM {src} {where} GROUP BY 1 ORDER BY 1 DESC LIMIT 31", (uid, since))]
+    return {"plays": total["plays"], "duration": total["duration"], "tracks": tracks, "days": days,
             "artists": top("COALESCE(t.artist, r.tag_artist, r.artist)"), "genres": top("COALESCE(t.genre, r.genre)"),
             "groups": top("r.grp")}
 

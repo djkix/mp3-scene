@@ -758,6 +758,28 @@ def test_chapters_tech_artist_years_and_activity(admin_client, user_client, libr
     rel = user_client.get("/api/release-by-name", params={"name": A}).json()
     assert user_client.get(f"/api/releases/{rel['id']}/chapters").json() == {}          # pas de .cue : rien
     (settings.music_root / rel["path"] / "mix.cue").write_text(text)
+    from app import db
+    from app.scanner import _scan_cues
+    c = db.connect(settings.data_dir)
+    c.execute("UPDATE releases SET cue_done=NULL WHERE id=?", (rel["id"],)); c.commit()   # comme après un changement du dossier
+    ch = user_client.get(f"/api/releases/{rel['id']}/chapters").json()                    # pas encore en base : lu dans le fichier
+    assert [x["title"] for x in ch[str(rel["tracks"][0]["id"])]] == ["Intro", "Mediate"]
+    _scan_cues(c, settings.music_root, lambda: False)                                     # le scan les met en base
+    assert c.execute("SELECT COUNT(*) FROM chapters").fetchone()[0] == 2 and c.execute("SELECT cue_done FROM releases WHERE id=?", (rel["id"],)).fetchone()[0] == 1
+    c.close()
+    tid = rel["tracks"][0]["id"]
+    assert [x["title"] for x in user_client.get(f"/api/tracks/{tid}/chapters").json()] == ["Intro", "Mediate"]
+    assert user_client.get(f"/api/tracks/{rel['tracks'][1]['id']}/chapters").json() == []
+    # recherche : un morceau joué dans un mix est trouvé par son chapitre, avec l'endroit où il commence
+    hit = user_client.get("/api/tracks?q=inxs mediate").json()["items"]
+    assert [x["id"] for x in hit] == [tid] and round(hit[0]["chapter"]["start"]) == 115 and hit[0]["chapter"]["artist"] == "INXS"
+    assert "chapter" not in user_client.get("/api/tracks?q=ibanez").json()["items"][0]
+    # position gardée dans une longue piste, par utilisateur
+    assert user_client.get(f"/api/positions/{tid}").json() == {"pos": 0}
+    assert user_client.put(f"/api/positions/{tid}", json={"pos": 2592.5}).status_code == 204
+    assert user_client.get(f"/api/positions/{tid}").json() == {"pos": 2592.5} and admin_client.get(f"/api/positions/{tid}").json() == {"pos": 0}
+    assert user_client.put(f"/api/positions/{tid}", json={"pos": 0}).status_code == 204 and user_client.get(f"/api/positions/{tid}").json() == {"pos": 0}
+    assert user_client.put("/api/positions/99999", json={"pos": 5}).status_code == 204 and user_client.get("/api/positions/99999").json() == {"pos": 0}
     ch = user_client.get(f"/api/releases/{rel['id']}/chapters").json()
     assert list(ch) == [str(rel["tracks"][0]["id"])] and [c["title"] for c in ch[str(rel["tracks"][0]["id"])]] == ["Intro", "Mediate"]
     assert user_client.get("/api/releases/99999/chapters").status_code == 404

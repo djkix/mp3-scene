@@ -40,7 +40,8 @@ export function trackList(container, { path, empty, history = false, remove = nu
   const observer = new IntersectionObserver((e) => { if (e.some((x) => x.isIntersecting)) load(); }, { rootMargin: '400px' });
 
   function row(t) {
-    const play = () => player.playTracks(tracks.slice(), tracks.indexOf(t));
+    // résultat trouvé par un chapitre d'un long mix : la lecture démarre à ce morceau
+    const play = () => player.playTracks(tracks.slice(), tracks.indexOf(t), t.chapter?.start ?? null);
     const del = remove && el('button', { type: 'button', class: 'icon fav', title: remove.label, 'aria-label': remove.label,
       onclick: async () => {
         del.disabled = true;
@@ -73,7 +74,8 @@ export function trackList(container, { path, empty, history = false, remove = nu
       onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) play(); } },
     el('img', { class: 'rel-thumb', src: `/api/releases/${t.release_id}/thumb`, alt: '', loading: 'lazy', width: 40, height: 40,
       onerror: (e) => { e.target.style.visibility = 'hidden'; } }),
-    el('span', { class: 'rel-name' }, t.title ? (t.artist ? `${t.artist} - ${t.title}` : t.title) : t.filename),
+    el('span', { class: 'rel-name' }, t.title ? (t.artist ? `${t.artist} - ${t.title}` : t.title) : t.filename,
+      t.chapter ? el('small', { class: 'trk-chapter' }, `↳ ${fmtDuration(t.chapter.start)} · ${[t.chapter.artist, t.chapter.title].filter(Boolean).join(' - ')}`) : null),
     el('span', { class: 'rel-info' },
       el('span', { class: 'mid' }, t.genre ? el('span', { class: 'chip' }, t.genre) : ''),
       el('span', { class: 'mid' }, history
