@@ -21,8 +21,21 @@ export function render(container, params) {
   const byName = () => api(/^\d+$/.test(id) ? `/releases/${id}` : `/release-by-name?name=${encodeURIComponent(id)}`);
   (/^\d+$/.test(params.id || '') ? api(`/releases/${params.id}`).catch((err) => { if (err.status === 404) return byName(); throw err; }) : byName()).then((rel) => {
     if (dead) return;
-    const nfo = el('div'), sim = el('div'), vers = el('div');
-    container.replaceChildren(el('div', { class: 'detail' }, header(rel), trackTable(rel), vers, nfo, sim));
+    const nfo = el('div'), sim = el('div'), vers = el('div'), chap = el('div');
+    container.replaceChildren(el('div', { class: 'detail' }, header(rel), trackTable(rel), chap, vers, nfo, sim));
+    // chapitres d'un long mix, lus dans le fichier .cue de la release : un clic lance la piste à cet endroit
+    api(`/releases/${rel.id}/chapters`).then((byTrack) => {
+      if (dead) return;
+      chap.replaceChildren(...rel.tracks.flatMap((tk, i) => {
+        const parts = byTrack[tk.id];
+        if (!parts) return [];
+        return [el('h2', { class: 'nfo-h' }, rel.tracks.length > 1 ? `${t('Chapitres')} · ${tk.title || tk.filename}` : t('Chapitres')),
+          el('ol', { class: 'chapters' }, parts.map((c) => el('li', {}, el('button', { type: 'button',
+            onclick: () => player.playTracks(rel.tracks, i, c.start) },
+          el('span', { class: 'ch-time' }, fmtDuration(c.start)),
+          el('span', {}, c.artist && c.title ? `${c.artist} - ${c.title}` : c.title || c.artist || '—')))))];
+      }));
+    }).catch(() => {}); // facultatif
     // même artiste et même titre, sortis par un autre groupe ou d'une autre source : débit et pistes pour comparer
     api(`/releases/${rel.id}/versions`).then((list) => {
       if (dead || !list.length) return;

@@ -745,3 +745,34 @@ def test_truncated_artist_search_original_stream_and_custom_cover(admin_client, 
         raw = user_client.get(f"/api/tracks/{tid}/stream?original=1", headers={"Range": "bytes=0-3"})
         assert raw.status_code == 206 and raw.content == b"fLaC" and raw.headers["content-type"] == "audio/flac"
         assert user_client.get(f"/api/tracks/{tid}/stream").headers["content-type"] == "audio/mpeg"
+
+
+def test_chapters_tech_artist_years_and_activity(admin_client, user_client, library, settings):
+    from app import cue
+    text = 'PERFORMER "2ManyDJs"\nTITLE "Mix"\nFILE "01-a-trak--ibanez.mp3" MP3\n  TRACK 01 AUDIO\n    TITLE "Intro"\n    PERFORMER "2ManyDJs"\n' \
+           '    INDEX 01 00:00:00\n  TRACK 02 AUDIO\n    TITLE "Mediate"\n    PERFORMER "INXS"\n    INDEX 00 01:50:00\n    INDEX 01 01:55:05\n' \
+           '  TRACK 03 AUDIO\n    TITLE "Sans index"\n'
+    parts = cue.parse(text)["01-a-trak--ibanez.mp3"]
+    assert [(p["artist"], p["title"], round(p["start"], 2)) for p in parts] == [("2ManyDJs", "Intro", 0.0), ("INXS", "Mediate", 115.07)]
+    assert cue.parse("n'importe quoi\n") == {}
+    rel = user_client.get("/api/release-by-name", params={"name": A}).json()
+    assert user_client.get(f"/api/releases/{rel['id']}/chapters").json() == {}          # pas de .cue : rien
+    (settings.music_root / rel["path"] / "mix.cue").write_text(text)
+    ch = user_client.get(f"/api/releases/{rel['id']}/chapters").json()
+    assert list(ch) == [str(rel["tracks"][0]["id"])] and [c["title"] for c in ch[str(rel["tracks"][0]["id"])]] == ["Intro", "Mediate"]
+    assert user_client.get("/api/releases/99999/chapters").status_code == 404
+    # détails techniques lus dans le fichier
+    tech = user_client.get(f"/api/tracks/{rel['tracks'][0]['id']}/tech").json()
+    assert tech["format"] == "MP3" and tech["sample_rate"] == 44100 and tech["bitrate"] == 128000 and tech["size"] > 0
+    assert user_client.get("/api/tracks/99999/tech").status_code == 404
+    # chronologie d'un artiste : ses releases par année
+    assert user_client.get("/api/groups?by=year&artist=A-Trak").json() == [{"name": 2015, "releases": 1, "size": rel["size"]}]
+    # journal : connexion, action d'administration réussie (pas l'échec), écoutes à la demande
+    assert user_client.get("/api/admin/activity").status_code == 403
+    assert admin_client.patch(f"/api/admin/releases/{rel['id']}", json={"genre": "Techno"}).status_code == 204
+    assert admin_client.patch("/api/admin/releases/99999", json={"genre": "x"}).status_code == 404
+    assert user_client.post(f"/api/history/{rel['tracks'][0]['id']}").status_code == 204
+    log = admin_client.get("/api/admin/activity").json()["items"]
+    assert [(x["user"], x["action"]) for x in log[:2]] == [("user", "Écoute"), ("admin", "Correction")] and log[1]["detail"] == A
+    assert {x["action"] for x in log} >= {"Connexion", "Correction", "Écoute"} and [x["action"] for x in log].count("Correction") == 1
+    assert "Écoute" not in {x["action"] for x in admin_client.get("/api/admin/activity?plays=0").json()["items"]}

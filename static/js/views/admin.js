@@ -18,7 +18,7 @@ const NAV = [['', [['#/admin', 'Vue d’ensemble', 'overview']]],
   ['Bibliothèque', [['#/admin/scan', 'Scan', 'scan'], ['#/library?tab=quality', 'Contrôle qualité', 'check'],
     ['#/admin/corrections', 'Corrections', 'edit'], ['#/library', 'Statistiques', 'stats']]],
   ['Classement', [['#/admin/rules', 'Règles', 'rules']]],
-  ['Accès', [['#/admin/users', 'Utilisateurs', 'users'], ['#/admin/shares', 'Partages', 'share']]],
+  ['Accès', [['#/admin/users', 'Utilisateurs', 'users'], ['#/admin/shares', 'Partages', 'share'], ['#/admin/activity', 'Journal', 'check']]],
   ['Mon compte', [['#/admin/account', 'Mot de passe et préférences', 'lock']]]];
 const QUALITY = [['dupes', 'Doublons possibles'], ['no_nfo', 'Sans NFO'], ['no_year', 'Sans année'], ['no_artist', 'Sans artiste']];
 const RULES = [['Catégories', 'categories', 'Les tags du nom décident (SAT, DVBS, date complète : Live & Radio ; VA : Compilations ; CDM, CDS : Singles), sinon le dossier. Dans Singles, dix pistes sans tag de single font un album.'],
@@ -40,7 +40,7 @@ export function render(container, params = {}) {
     return;
   }
   let dead = false, pollTimer = null;
-  const section = ['scan', 'corrections', 'rules', 'users', 'shares', 'account'].includes(params.rest) ? params.rest : '';
+  const section = ['scan', 'corrections', 'rules', 'users', 'shares', 'account', 'activity'].includes(params.rest) ? params.rest : '';
   let disposeSub = null; // nettoyage de la section Partages ou Mon compte, rendues par leur propre module
   const alive = () => !dead;
 
@@ -287,6 +287,25 @@ export function render(container, params = {}) {
       el('p', { class: 'hint' }, t('Faites depuis la fiche d’une release, bouton Corriger. Elles sont gardées après les scans.')),
       el('div', { class: 'table-wrap' }, el('table', { class: 'users' },
         el('thead', {}, el('tr', {}, th(t('Release')), th(t('Artiste')), th(t('Catégorie')), th(t('Genre')), th(t('Année')), th(t('Masquée')), th(t('Actions')))), rows)), msg);
+    load();
+  } else if (section === 'activity') {
+    // Journal : connexions, actions d'administration, sauvegardes et écoutes, le plus récent d'abord
+    const rows = el('tbody'), msg = el('p', { class: 'status', role: 'status' });
+    const more = el('button', { type: 'button', hidden: true, onclick: () => load() }, t('Afficher la suite'));
+    const plays = el('input', { type: 'checkbox', class: 'switch', role: 'switch', checked: true, onchange: () => { offset = 0; rows.replaceChildren(); load(); } });
+    let offset = 0;
+    const load = () => api(`/admin/activity?plays=${plays.checked ? 1 : 0}&offset=${offset}`).then((page) => {
+      if (dead) return;
+      rows.append(...page.items.map((a) => el('tr', {}, el('td', { class: 'num' }, fmtTime(a.at)), el('td', {}, a.user),
+        el('td', {}, t(a.action)), el('td', {}, a.detail))));
+      offset += page.items.length;
+      more.hidden = !page.has_more;
+      msg.textContent = offset ? '' : t('Rien au journal pour l’instant.');
+    }).catch((err) => { if (!dead) msg.textContent = err.message; });
+    body.replaceChildren(el('h1', {}, t('Journal d’activité')),
+      el('label', { class: 'fx-line' }, t('Afficher les écoutes'), plays),
+      el('div', { class: 'table-wrap' }, el('table', { class: 'users' },
+        el('thead', {}, el('tr', {}, th(t('Date')), th(t('Compte')), th(t('Action')), th(t('Détail')))), rows)), msg, more);
     load();
   } else if (section === 'shares') {
     const box = el('div');

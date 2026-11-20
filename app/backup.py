@@ -73,6 +73,7 @@ def run(settings, now: float | None = None) -> dict:
         try:
             conn.execute("INSERT INTO backup_runs(started_at, finished_at, ok, message, size) VALUES (?,?,?,?,?)",
                          (now, time.time(), int(ok), message, size))
+            db.log(conn, "système", "Sauvegarde" if ok else "Sauvegarde en échec", message)
             conn.commit()
         finally:
             conn.close()

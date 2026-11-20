@@ -24,6 +24,9 @@ CREATE TABLE IF NOT EXISTS label_aliases(key TEXT PRIMARY KEY, alias TEXT NOT NU
 CREATE TABLE IF NOT EXISTS backup_runs(
   started_at REAL NOT NULL, finished_at REAL NOT NULL, ok INTEGER NOT NULL, message TEXT NOT NULL DEFAULT '',
   size INTEGER NOT NULL DEFAULT 0);
+-- journal d'activité de l'administration : connexions, actions des administrateurs, sauvegardes
+CREATE TABLE IF NOT EXISTS activity(at REAL NOT NULL, user TEXT NOT NULL, action TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '');
+CREATE INDEX IF NOT EXISTS idx_activity_at ON activity(at DESC);
 -- graphies d'artistes à ne jamais fusionner avec une autre (« Florida » n'est pas « Flo Rida »)
 CREATE TABLE IF NOT EXISTS artist_separate(name TEXT PRIMARY KEY COLLATE NOCASE);
 -- artistes rattachés à la main : `key` est la clé de rapprochement (artists.fold) de l'artiste rattaché

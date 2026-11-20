@@ -25,6 +25,7 @@ function detail(container, kind, params) {
   const name = params.rest, base = `#/${kind}/${encodeURIComponent(name)}`;
   const total = el('span', { class: 'muted' });
   const list = el('div');
+  const years = el('div', { class: 'letters years' });
   // artiste : ses releases, celles dont le nom l'associe à un autre (feat, vs, &), ou celles des autres
   // (compilations) où il signe une piste
   const other = kind === 'artists' && { with: 'collab', appears: 'appears' }[params.in];
@@ -36,7 +37,16 @@ function detail(container, kind, params) {
     ...(kind === 'artists' ? [el('div', { class: 'tabs', role: 'tablist', 'aria-label': name },
       tabBtn(tr('Releases'), !other, base), tabBtn(tr('Avec'), other === 'collab', base + '?in=with'),
       tabBtn(tr('Apparitions'), other === 'appears', base + '?in=appears'))] : []),
-    list);
+    ...(kind === 'artists' && !other ? [years] : []), list);
+  // chronologie : une pastille par année avec son nombre de releases ; un clic filtre la liste sur cette année
+  if (kind === 'artists' && !other) api('/groups?' + new URLSearchParams({ by: 'year', artist: name })).then((rows) => {
+    if (rows.length < 2) return;
+    const picked = (params.year || '').split('|');
+    years.replaceChildren(...rows.sort((a, b) => a.name - b.name).map((y) => el('button', { type: 'button', 'aria-pressed': String(picked.includes(String(y.name))),
+      title: tr('{0} : {1} releases', y.name, y.releases),
+      onclick: () => { location.hash = base + qs({ genre: params.genre, year: picked.includes(String(y.name)) ? '' : y.name }); } },
+    `${y.name} `, el('small', {}, String(y.releases)))));
+  }).catch(() => {});
   const one = releases.multiQuery({ genre: params.genre, year: params.year });
   one.set('by', by);
   one.set('name', name);

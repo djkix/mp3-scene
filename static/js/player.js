@@ -426,11 +426,12 @@ async function refill() {
   } catch { /* réseau : nouvel essai au prochain passage */ } finally { refilling = false; }
 }
 
-function playTracks(tracks, startIndex = 0) {
+// `pos` : position de départ en secondes (chapitre d'un long mix).
+function playTracks(tracks, startIndex = 0, pos = null) {
   radioId = null;
   failures = 0;
   player.queue.replace(tracks, startIndex);
-  load(true);
+  load(true, pos);
   save();
 }
 

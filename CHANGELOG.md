@@ -4,6 +4,20 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.46.0](https://github.com/djkix/mp3-scene/compare/v1.45.0...v1.46.0) (2026-11-20)
+
+### Résumé
+
+**Chapitres des longs mixes, détails techniques, chronologie d'un artiste, journal d'activité.**
+
+- Fiche : section **Chapitres** pour les pistes accompagnées d'un fichier `.cue` (heure, artiste, titre) ; un clic
+  lance la piste à cet endroit.
+- Menu « … » d'une piste : **Détails techniques** lus dans le fichier (format, débit et son mode, fréquence, canaux,
+  encodeur, tags, BPM et tonalité quand ils existent).
+- Page d'un artiste : une pastille par année avec le nombre de releases ; un clic filtre la liste.
+- Administration › **Journal** : connexions, actions d'administration, sauvegardes et écoutes de tous les comptes,
+  le plus récent d'abord ; 20 000 lignes gardées.
+
 ## [1.45.0](https://github.com/djkix/mp3-scene/compare/v1.44.0...v1.45.0) (2026-11-20)
 
 ### Résumé

@@ -12,7 +12,38 @@ from .naming import parse_release_name
 from .routes_media import COVER_MAX, save_cover
 from .routes_library import RELEASE_COLS, RELEASE_FROM, Dir, Sort, _order, _page, _release
 
-router = APIRouter(prefix="/api/admin", dependencies=[Depends(require_admin)])
+# libellé au journal d'activité de chaque action d'administration : (méthode, route) -> libellé
+_ACTIONS = {
+    ("POST", "/users"): "Compte créé", ("PATCH", "/users/{user_id}"): "Compte modifié", ("DELETE", "/users/{user_id}"): "Compte supprimé",
+    ("POST", "/scan"): "Scan lancé", ("PUT", "/scan/schedule"): "Scan quotidien réglé", ("POST", "/classify"): "Reclassement",
+    ("PATCH", "/releases/{rid}"): "Correction", ("PATCH", "/releases"): "Correction en lot",
+    ("PUT", "/releases/{rid}/cover"): "Pochette ajoutée", ("DELETE", "/releases/{rid}/cover"): "Pochette retirée",
+    ("PUT", "/releases/{rid}/keep"): "Version gardée", ("DELETE", "/releases/{rid}/keep"): "Versions réaffichées",
+    ("PUT", "/artists/aliases"): "Artiste rattaché", ("DELETE", "/artists/aliases"): "Artiste détaché",
+    ("PUT", "/labels/aliases"): "Label rattaché", ("DELETE", "/labels/aliases"): "Label détaché",
+    ("PUT", "/artists/separate"): "Artiste gardé à part", ("DELETE", "/artists/separate"): "Artiste fusionné à nouveau",
+}
+
+
+def audit(request: Request, user=Depends(require_admin)):
+    """Inscrit au journal chaque action d'administration qui a réussi (une erreur interrompt avant l'inscription)."""
+    yield
+    route = getattr(request.scope.get("route"), "path", "")[len("/api/admin"):]
+    action = _ACTIONS.get((request.method, route))
+    if action is None:
+        return
+    conn = db.connect(request.app.state.settings.data_dir)
+    try:
+        rid = request.path_params.get("rid")
+        name = rid and conn.execute("SELECT name FROM releases WHERE id=?", (rid,)).fetchone()
+        detail = name[0] if name else request.query_params.get("alias") or request.query_params.get("name") or ""
+        db.log(conn, user["username"], action, detail)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+router = APIRouter(prefix="/api/admin", dependencies=[Depends(audit)])
 
 Role = Literal["admin", "user"]
 # condition SQL : l'utilisateur ciblé n'est pas le dernier admin (évaluée dans la même requête que l'écriture)
@@ -143,6 +174,19 @@ def usage(days: int = Query(30, ge=0, le=36500), conn=Depends(get_conn)):
             "artists": top("COALESCE(t.artist, r.tag_artist, r.artist)"), "releases": top("r.name"),
             "tracks": top("COALESCE(t.artist || ' - ', '') || COALESCE(t.title, t.relpath)"),
             "genres": top("COALESCE(t.genre, r.genre)")}
+
+
+@router.get("/activity")
+def activity(plays: int = Query(1, ge=0, le=1), offset: int = Query(0, ge=0, le=MAX_INT), limit: int = Query(100, ge=1, le=500),
+             conn=Depends(get_conn)):
+    """Journal d'activité, le plus récent d'abord : connexions, actions d'administration, sauvegardes et, avec
+    `plays`, les écoutes de tous les comptes."""
+    sql = "SELECT at, user, action, detail FROM activity"
+    if plays:
+        sql += (" UNION ALL SELECT p.played_at, u.username, 'Écoute', COALESCE(t.artist || ' - ', '') || COALESCE(t.title, t.relpath)"
+                " FROM plays p JOIN users u ON u.id=p.user_id JOIN tracks t ON t.id=p.track_id")
+    rows = conn.execute(sql + " ORDER BY 1 DESC LIMIT ? OFFSET ?", (limit + 1, offset)).fetchall()
+    return {"items": [dict(zip(("at", "user", "action", "detail"), r)) for r in rows[:limit]], "has_more": len(rows) > limit}
 
 
 @router.get("/backup")

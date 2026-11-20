@@ -179,18 +179,21 @@ def filters(conn=Depends(get_conn)):
 
 
 # regroupements de la page Explorer : colonnes autorisées (jamais de texte du client dans le SQL)
-GROUP_BY = {"grp": "grp", "artist": "COALESCE(tag_artist, artist)", "genre": "genre", "label": "NULLIF(label, '')", "category": "category"}
+GROUP_BY = {"grp": "grp", "artist": "COALESCE(tag_artist, artist)", "genre": "genre", "label": "NULLIF(label, '')", "category": "category", "year": "year"}
 
 
 @router.get("/api/groups")
-def groups(by: Literal["grp", "artist", "genre", "label", "category"] = "grp", name: str | None = None, genre: Many = None,
-           year: Years = None, decade: Years = None, conn=Depends(get_conn)):
+def groups(by: Literal["grp", "artist", "genre", "label", "category", "year"] = "grp", name: str | None = None, genre: Many = None,
+           year: Years = None, decade: Years = None, artist: str | None = Query(None, max_length=200), conn=Depends(get_conn)):
     """Releases regroupées par groupe, artiste, genre ou label : nombre et poids total, restreints au genre / à l'année."""
     col = GROUP_BY[by]
     conds, params = [f"{col} IS NOT NULL", "hidden=0"], []
     if name is not None:
         conds.append(f"{col}=?")
         params.append(name)
+    if artist is not None:  # chronologie d'un artiste : ses releases par année (by=year)
+        conds.append("COALESCE(tag_artist, artist)=?")
+        params.append(artist)
     if genre:  # plusieurs genres, années ou décennies : l'un ou l'autre, comme dans les listes
         conds.append(f"genre IN ({','.join('?' * len(genre))})")
         params += genre

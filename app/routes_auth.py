@@ -3,7 +3,7 @@ import time
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
-from . import security
+from . import db, security
 from .deps import current_user, get_conn
 
 router = APIRouter(prefix="/api")
@@ -39,6 +39,8 @@ def login(body: Login, request: Request, response: Response, conn=Depends(get_co
     row = conn.execute("SELECT id, username, role, password_hash FROM users WHERE username = ?", (username,)).fetchone()
     ok = security.verify_password(row["password_hash"] if row else security.DUMMY_HASH, body.password)
     if row is None or not ok:
+        db.log(conn, username[:60] or "—", "Connexion refusée", client_ip(request))
+        conn.commit()
         raise HTTPException(401, "Identifiant ou mot de passe incorrect.")
     limiter.reset(keys[0])
     # IP : on retire seulement l'essai de cette requête ; ses échecs passés comptent toujours
@@ -47,6 +49,8 @@ def login(body: Login, request: Request, response: Response, conn=Depends(get_co
     if old:
         security.drop_session(conn, old)
     security.set_session_cookie(response, security.create_session(conn, row["id"], now))
+    db.log(conn, row["username"], "Connexion", client_ip(request))
+    conn.commit()
     return {"username": row["username"], "role": row["role"]}
 
 

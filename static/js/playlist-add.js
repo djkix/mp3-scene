@@ -6,6 +6,22 @@ import { player } from './player.js';
 
 let dlg = null;
 
+// Détails techniques d'une piste, lus dans le fichier à la demande.
+async function techDialog(track) {
+  dlg ??= document.body.appendChild(el('dialog', { class: 'pl-add' }));
+  const d = await api(`/tracks/${track.id}/tech`);
+  const kb = (n) => `${Math.round(n / 1000)} kbit/s`;
+  const rows = [[tr('Format'), d.format], [tr('Débit'), d.bitrate && kb(d.bitrate) + (d.bitrate_mode ? ` · ${d.bitrate_mode}` : '')],
+    [tr('Fréquence'), d.sample_rate && `${(d.sample_rate / 1000).toLocaleString()} kHz`], [tr('Résolution'), d.bits && `${d.bits} bits`],
+    [tr('Canaux'), d.mode || d.channels], [tr('Encodeur'), d.encoder], [tr('Tags'), d.tags], [tr('BPM'), d.bpm], [tr('Tonalité'), d.key],
+    [tr('Taille'), d.size && `${(d.size / 1048576).toLocaleString(undefined, { maximumFractionDigits: 1 })} Mo`], [tr('Fichier'), track.filename]]
+    .filter(([, v]) => v);
+  dlg.replaceChildren(el('h2', {}, tr('Détails techniques')),
+    el('dl', { class: 'tech' }, rows.flatMap(([k, v]) => [el('dt', {}, k), el('dd', {}, String(v))])),
+    el('div', { class: 'fx-foot' }, el('span'), el('button', { type: 'button', class: 'primary', onclick: () => dlg.close() }, tr('Fermer'))));
+  dlg.showModal();
+}
+
 // `payload` : corps de POST /playlists/<id>/tracks ({track_ids: […]} ou {release_id}). Sans `text` : bouton icône.
 // `tracks` (pistes complètes) : la boîte propose aussi « Lire ensuite » et « Ajouter à la file ».
 export function addButton(payload, text, tracks = null) {
@@ -33,6 +49,7 @@ export async function openMenu(btn, payload, tracks = null) {
       item('queue', tr('Ajouter à la file'), () => player.enqueue(tracks, false)),
       tracks.length === 1 && tracks[0].release_id != null ? item('radio', tr('Radio'), () => player.radio(tracks[0].release_id, tracks),
         tr('Lire cette piste, puis sans fin des pistes proches')) : null,
+      tracks.length === 1 ? item('info', tr('Détails techniques'), () => techDialog(tracks[0])) : null,
       el('hr')] : []),
     el('p', { class: 'menu-cap' }, tr('Ajouter à une playlist')), lists);
   box.owner = btn;

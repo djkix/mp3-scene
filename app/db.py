@@ -70,6 +70,14 @@ def merge_case(conn, col: str) -> None:
         conn.execute(f"UPDATE releases SET {col}=? WHERE lower({col})=? AND {col}!=?", (best, k, best))
 
 
+def log(conn, user: str, action: str, detail: str = "") -> None:
+    """Inscrit une ligne au journal d'activité (sans valider la transaction : l'appelant le fait)."""
+    import time
+    conn.execute("INSERT INTO activity(at, user, action, detail) VALUES (?,?,?,?)", (time.time(), user, action, detail[:300]))
+    # ponytail: on garde les 20 000 dernières lignes ; archiver ailleurs si un historique plus long est voulu
+    conn.execute("DELETE FROM activity WHERE rowid <= (SELECT MAX(rowid) FROM activity) - 20000")
+
+
 def merge_labels(conn) -> None:
     """Nettoie les labels (restes de mise en forme du NFO) et réunit ceux qui ne diffèrent que par la casse, les
     espaces, la ponctuation ou un « Records » final, sous la graphie la plus répandue. Sans effet au second passage."""

@@ -13,13 +13,14 @@ from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote
 
+import mutagen
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import FileResponse, StreamingResponse
 from mutagen.id3 import ID3
 from PIL import Image
 from pydantic import BaseModel, Field
 
-from . import db
+from . import cue, db
 from .deps import MAX_INT, Id, current_user, get_conn
 from .security import CAST_TTL, check_track_sig, safe_path, sign_track
 
@@ -235,6 +236,71 @@ WAVE_POINTS = 800   # largeur de la forme d'onde, en barres
 WAVE_RATE = 8000    # décodage en mono 8 kHz : largement assez pour une enveloppe
 WAVE_WINDOW = 800   # échantillons par crête intermédiaire (0,1 s)
 WAVE_TIMEOUT = 600
+@router.get("/api/releases/{rid}/chapters")
+def chapters(rid: Id, request: Request, conn=Depends(get_conn)):
+    """Chapitres des pistes de la release, lus dans ses fichiers .cue : {identifiant de piste: [{title, artist, start}]}.
+    Seules les pistes découpées en au moins deux chapitres y figurent."""
+    row = conn.execute("SELECT path FROM releases WHERE id=?", (rid,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "Release introuvable.")
+    tracks = conn.execute("SELECT id, relpath FROM tracks WHERE release_id=? ORDER BY disc, relpath", (rid,)).fetchall()
+    found = {}
+    try:
+        folder = safe_path(request.app.state.settings.music_root, row["path"])
+        # ponytail: fichiers .cue du dossier de la release et de ses sous-dossiers de disque, lus à chaque ouverture de fiche
+        cues = sorted(p for p in folder.rglob("*") if p.suffix.lower() == ".cue" and p.is_file() and p.stat().st_size < 512 * 1024)[:20]
+        for path in cues:
+            with open(path, "rb") as fh:  # lecture seule
+                for name, parts in cue.parse(fh.read().decode("cp437")).items():
+                    found.setdefault(name, parts)
+    except (OSError, HTTPException):
+        return {}
+    out = {}
+    for t in tracks:
+        name = t["relpath"].rsplit("/", 1)[-1].lower()
+        # le .cue nomme parfois un .wav d'origine : rapprochement sur le nom sans extension, puis piste unique
+        parts = found.get(name) or next((v for k, v in found.items() if k.rsplit(".", 1)[0] == name.rsplit(".", 1)[0]), None)
+        if parts is None and len(tracks) == 1 and len(found) == 1:
+            parts = next(iter(found.values()))
+        if parts and len(parts) > 1:
+            out[t["id"]] = parts
+    return out
+
+
+_MODES = {0: "Stéréo", 1: "Stéréo jointe", 2: "Deux canaux", 3: "Mono"}
+
+
+@router.get("/api/tracks/{track_id}/tech")
+def tech(track_id: Id, request: Request, conn=Depends(get_conn)):
+    """Détails techniques lus dans le fichier : format, débit et son mode, fréquence, canaux, encodeur, BPM, tonalité."""
+    row = conn.execute("SELECT r.path, t.relpath, t.size FROM tracks t JOIN releases r ON r.id=t.release_id WHERE t.id=?",
+                       (track_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "Piste introuvable.")
+    path = safe_path(request.app.state.settings.music_root, row["path"], row["relpath"])
+    try:
+        with open(path, "rb") as fh:  # lecture seule
+            m = mutagen.File(fh)
+    except OSError:
+        raise HTTPException(404, "Fichier introuvable.") from None
+    except Exception:
+        m = None
+    info, tags = getattr(m, "info", None), getattr(m, "tags", None)
+    tag = lambda key: str(tags[key].text[0]).strip() if tags is not None and hasattr(tags, "getall") and key in tags and tags[key].text else None
+    mode = getattr(info, "bitrate_mode", None)
+    d = {"format": row["relpath"].rsplit(".", 1)[-1].upper(), "size": row["size"],
+         "bitrate": getattr(info, "bitrate", None), "bitrate_mode": getattr(mode, "name", None) if mode is not None else None,
+         "sample_rate": getattr(info, "sample_rate", None), "channels": getattr(info, "channels", None),
+         "mode": _MODES.get(getattr(info, "mode", None)), "bits": getattr(info, "bits_per_sample", None),
+         "encoder": (getattr(info, "encoder_info", "") or "").strip() or tag("TSSE"),
+         "duration": getattr(info, "length", None),
+         "tags": ".".join(map(str, tags.version)) and "ID3v" + ".".join(map(str, tags.version[:2])) if hasattr(tags, "version") else None,
+         "bpm": tag("TBPM"), "key": tag("TKEY")}
+    if d["bitrate_mode"] == "UNKNOWN":
+        d["bitrate_mode"] = None
+    return {k: v for k, v in d.items() if v not in (None, "", "0")}
+
+
 # ponytail: un seul calcul à la fois pour tout le serveur (un mix de 2 h occupe un cœur 20 à 60 s) ;
 # passer à un verrou par piste si l'attente devient gênante à plusieurs utilisateurs.
 _wave_lock = threading.Lock()
