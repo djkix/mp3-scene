@@ -159,10 +159,19 @@ def list_releases(q: str = "", category: Many = None, genre: Many = None, grp: s
                  user["id"], offset, limit, _release)
 
 
+# ordre d'affichage des catégories, partout : singles, albums, compilations, live et radio, puis les autres dossiers
+_CATEGORY_ORDER = (r"single", r"album", r"compil", r"live|radio")
+
+
+def _category_rank(name: str):
+    return next((i for i, pat in enumerate(_CATEGORY_ORDER) if re.search(pat, name, re.I)), len(_CATEGORY_ORDER)), name.lower()
+
+
 @router.get("/api/filters")
 def filters(conn=Depends(get_conn)):
     col = lambda sql: [r[0] for r in conn.execute(sql)]
-    return {"categories": col("SELECT DISTINCT category FROM releases WHERE category IS NOT NULL ORDER BY category"),
+    return {"categories": sorted(col("SELECT DISTINCT category FROM releases WHERE category IS NOT NULL ORDER BY category"),
+                                 key=_category_rank),
             "genres": col("SELECT DISTINCT genre FROM releases WHERE genre IS NOT NULL ORDER BY genre"),
             "sources": col("SELECT DISTINCT source FROM releases WHERE source IS NOT NULL ORDER BY source"),
             "years": col("SELECT DISTINCT year FROM releases WHERE year IS NOT NULL ORDER BY year DESC")}

@@ -24,7 +24,7 @@ def test_bad_paging_is_422(user_client, library, qs):
 
 def test_filters(user_client, library):
     f = user_client.get("/api/filters").json()
-    assert f["categories"] == ["Albums", "Singles"] and "House" in f["genres"] and f["years"] == [2017, 2015, 2003]
+    assert f["categories"] == ["Singles", "Albums"] and "House" in f["genres"] and f["years"] == [2017, 2015, 2003]
     assert [x["name"] for x in user_client.get("/api/releases?genre=House&year=2015").json()["items"]] == [A]
     assert [x["name"] for x in user_client.get("/api/releases?category=Albums").json()["items"]] == ["VA-Big_Mix-2CD-2003-GRP"]
 
@@ -642,3 +642,43 @@ def test_track_search_filters_and_title_order(user_client, library):
     assert titles("q=e") == ["Glue", "Ibanez", "Ibanez Dub", "One"]                       # par titre
     assert titles("q=e&genre=House") == ["Ibanez", "Ibanez Dub"] and titles("q=e&year=2017&year=2003") == ["Glue", "One"]
     assert titles("q=e&category=Albums&genre=House") == [] and titles("q=e&decade=2010") == ["Glue", "Ibanez", "Ibanez Dub"]
+
+
+def test_backup_daily_copy_rotation_and_admin(admin_client, user_client, library, settings, tmp_path):
+    import sqlite3, time
+    from app import backup, db
+    assert admin_client.get("/api/admin/backup").json() == {"configured": False, "hour": 3, "last": None, "last_ok_at": None, "late": False}
+    assert admin_client.post("/api/admin/backup").status_code == 400 and user_client.get("/api/admin/backup").status_code == 403
+    settings.backup_dir, settings.stack_dir = tmp_path / "nas", tmp_path / "pile"
+    settings.backup_dir.mkdir(); settings.stack_dir.mkdir()
+    (settings.stack_dir / "compose.yaml").write_text("services: {}"); (settings.stack_dir / ".env").write_text("X=1")
+    at = lambda day, hour: time.mktime((2026, 11, day, hour, 30, 0, 0, 0, -1))
+    c = db.connect(settings.data_dir)
+    assert not backup.due(c, settings, at(10, 2)) and backup.due(c, settings, at(10, 3))      # à partir de 3 h
+    for day in range(1, 10):                                                                    # neuf jours : sept gardés
+        assert backup.run(settings, at(day, 3))["ok"]
+    days = sorted(p.name for p in settings.backup_dir.iterdir())
+    assert days == [f"2026-11-0{d}" for d in range(3, 10)]
+    last = settings.backup_dir / "2026-11-09"
+    copy = sqlite3.connect(last / "mp3scene.db")
+    assert copy.execute("SELECT COUNT(*) FROM releases").fetchone()[0] == 3 and sorted(p.name for p in (last / "config").iterdir()) == [".env", "compose.yaml"]
+    copy.close()
+    assert not backup.due(c, settings, at(9, 5)) and backup.due(c, settings, at(10, 9))        # faite ; puis nuit manquée rattrapée
+    # un dossier illisible : l'échec est inscrit, rien n'est supprimé, pas de nouvelle tentative avant une heure
+    good, settings.backup_dir = settings.backup_dir, tmp_path / "absent" / "x"
+    (tmp_path / "absent").write_text("fichier, pas dossier")
+    bad = backup.run(settings, at(10, 9))
+    assert not bad["ok"] and bad["message"] and len(list(good.iterdir())) == 7
+    assert not backup.due(c, settings, at(10, 9) + 600) and backup.due(c, settings, at(10, 11))
+    st = backup.status(c, settings, at(12, 9))
+    assert st["late"] and st["last"]["ok"] is False and st["last_ok_at"] == at(9, 3)
+    c.close()
+    settings.backup_dir = good
+    r = admin_client.post("/api/admin/backup")
+    assert r.status_code == 200 and r.json()["size"] > 0 and admin_client.get("/api/admin/backup").json()["last"]["ok"] is True
+
+
+def test_categories_keep_a_fixed_order():
+    from app.routes_library import _category_rank
+    names = ["Albums", "03.Live & Radio", "02.Various Artists - Compilations", "Zzz", "01.Singles", "Autres"]
+    assert sorted(names, key=_category_rank) == ["01.Singles", "Albums", "02.Various Artists - Compilations", "03.Live & Radio", "Autres", "Zzz"]

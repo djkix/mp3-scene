@@ -19,6 +19,10 @@ CREATE TABLE IF NOT EXISTS releases(
 CREATE TABLE IF NOT EXISTS overrides(path TEXT PRIMARY KEY, artist TEXT, category TEXT, genre TEXT, year INTEGER, hidden INTEGER);
 -- labels rattachés à la main : `key` est la clé de rapprochement (nfo.label_key) du label rattaché
 CREATE TABLE IF NOT EXISTS label_aliases(key TEXT PRIMARY KEY, alias TEXT NOT NULL, target TEXT NOT NULL);
+-- tentatives de sauvegarde (app/backup.py), lues par l'administration
+CREATE TABLE IF NOT EXISTS backup_runs(
+  started_at REAL NOT NULL, finished_at REAL NOT NULL, ok INTEGER NOT NULL, message TEXT NOT NULL DEFAULT '',
+  size INTEGER NOT NULL DEFAULT 0);
 -- graphies d'artistes à ne jamais fusionner avec une autre (« Florida » n'est pas « Flo Rida »)
 CREATE TABLE IF NOT EXISTS artist_separate(name TEXT PRIMARY KEY COLLATE NOCASE);
 -- artistes rattachés à la main : `key` est la clé de rapprochement (artists.fold) de l'artiste rattaché

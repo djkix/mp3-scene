@@ -6,7 +6,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from . import artists, db, genres, nfo, scanner, security
+from . import artists, backup, db, genres, nfo, scanner, security
 from .deps import MAX_INT, Id, get_conn, require_admin
 from .naming import parse_release_name
 from .routes_library import RELEASE_COLS, RELEASE_FROM, Dir, Sort, _order, _page, _release
@@ -116,6 +116,23 @@ def classify(conn=Depends(get_conn)):
     """Réapplique les règles de classement (genres, groupes, artistes, catégories) à toute la bibliothèque."""
     db.classify(conn)
     conn.commit()
+
+
+@router.get("/backup")
+def backup_status(request: Request, conn=Depends(get_conn)):
+    """État de la sauvegarde : configurée ou non, dernière tentative, retard."""
+    return backup.status(conn, request.app.state.settings)
+
+
+@router.post("/backup")
+def backup_now(request: Request):
+    """Lance une sauvegarde tout de suite et attend sa fin (quelques secondes pour une centaine de Mo)."""
+    if request.app.state.settings.backup_dir is None:
+        raise HTTPException(400, "Sauvegarde non configurée : renseignez BACKUP_DIR et montez le dossier.")
+    result = backup.run(request.app.state.settings)
+    if not result["ok"]:
+        raise HTTPException(409 if "en cours" in result["message"] else 500, result["message"])
+    return result
 
 
 @router.get("/overrides")

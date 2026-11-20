@@ -309,7 +309,7 @@ export function render(container, params = {}) {
     const v = (key, f) => (d[key] ? f(d[key]) : '…');
     function paint() {
       if (dead) return;
-      const { s, o, ver } = d;
+      const { s, o, ver, b } = d;
       totals.replaceChildren(...[[t('Releases'), v('l', (l) => n(l.releases))], [t('Pistes'), v('l', (l) => n(l.tracks))],
         [t('Stocké'), v('l', (l) => fmtSize(l.size))], [t('Artistes'), v('o', (x) => n(x.artists))]]
         .map(([k, val]) => el('div', { class: 'ad-metric' }, el('span', {}, k), el('b', {}, val))));
@@ -331,11 +331,24 @@ export function render(container, params = {}) {
       sys.replaceChildren(card(t('Version'), ver && (ver.update ? t('Mise à jour disponible') : ver.latest ? t('À jour') : null),
         [[t('Version installée'), ver ? ver.version : '…'], [t('Base de données'), v('o', (x) => fmtSize(x.db_size))],
           [t('Vignettes'), v('o', (x) => fmtSize(x.thumbs_size))]],
-        link('#/library', t('Statistiques')), ver?.update && el('a', { class: 'btn', href: ver.url, target: '_blank', rel: 'noopener' }, t('Voir les nouveautés'))));
+        link('#/library', t('Statistiques')), ver?.update && el('a', { class: 'btn', href: ver.url, target: '_blank', rel: 'noopener' }, t('Voir les nouveautés'))),
+      // sauvegarde de la base vers le NAS : dernière tentative, retard éventuel, lancement à la main
+      card(t('Sauvegarde'), b && (!b.configured ? t('Non configurée') : b.late ? t('En retard') : b.last?.ok ? t('À jour') : null),
+        [[t('Dernière réussie'), v('b', (x) => fmtTime(x.last_ok_at))],
+          [t('Dernière tentative'), v('b', (x) => (x.last ? (x.last.ok ? fmtSize(x.last.size) : x.last.message) : '—'))],
+          [t('Chaque jour à'), v('b', (x) => (x.configured ? `${String(x.hour).padStart(2, '0')}:00` : '—'))]],
+        b?.configured ? backupBtn : null));
     }
+    const backupBtn = el('button', { type: 'button', onclick: async () => {
+      backupBtn.disabled = true;
+      status.textContent = t('Sauvegarde en cours…');
+      try { await api('/admin/backup', { method: 'POST' }); status.textContent = t('Sauvegarde terminée.'); } catch (err) { status.textContent = err.message; }
+      backupBtn.disabled = false;
+      api('/admin/backup').then((x) => { d.b = x; paint(); }).catch(() => {});
+    } }, t('Sauvegarder maintenant'));
     paint();
     for (const [key, call] of [['s', () => api('/admin/scan')], ['o', () => api('/admin/overview')], ['l', () => api('/admin/library')],
-      ['q', () => api('/admin/quality')], ['ver', versionInfo]]) {
+      ['q', () => api('/admin/quality')], ['b', () => api('/admin/backup')], ['ver', versionInfo]]) {
       call().then((x) => { d[key] = x; paint(); }).catch((err) => { if (!dead && key !== 'ver') status.textContent = err.message; });
     }
   }

@@ -4,6 +4,19 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.42.0](https://github.com/djkix/mp3-scene/compare/v1.41.1...v1.42.0) (2026-11-20)
+
+### Résumé
+
+**Sauvegarde quotidienne de la base, ordre fixe des catégories.**
+
+- Sauvegarde intégrée (facultative, `BACKUP_DIR`) : chaque jour à partir de `BACKUP_HOUR` (3 h par défaut), la base
+  est copiée à chaud et vérifiée dans un dossier daté ; sept jours gardés, nuit manquée rattrapée, nouvelle tentative
+  une heure après un échec. Le fichier compose et le `.env` sont copiés si le dossier de la pile est monté sur `/stack`.
+- Administration › Vue d'ensemble : carte **Sauvegarde** (dernière réussite, dernière tentative, heure), alerte après
+  36 heures sans réussite, bouton **Sauvegarder maintenant**.
+- Catégories toujours dans l'ordre Singles, Albums, Compilations, Live & Radio.
+
 ## [1.41.1](https://github.com/djkix/mp3-scene/compare/v1.41.0...v1.41.1) (2026-11-20)
 
 ### Résumé

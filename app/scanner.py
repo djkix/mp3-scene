@@ -13,7 +13,7 @@ from typing import Callable
 import mutagen
 from mutagen.id3 import ID3
 
-from app import artists, db, genres, nfo
+from app import artists, backup, db, genres, nfo
 from app.naming import parse_release_name
 
 DISC_RE = re.compile(r"^(cd|disc|disk)[ _-]?(\d+)$", re.IGNORECASE)
@@ -523,8 +523,11 @@ class Runner:
                 try:
                     if self.due(conn, time.time()):
                         self.start()
+                    backup_due = backup.due(conn, self.settings, time.time())
                 finally:
                     conn.close()
+                if backup_due:  # hors de la connexion : la sauvegarde ouvre les siennes
+                    backup.run(self.settings)
             except Exception:
                 log.exception("veille du scan quotidien")
 

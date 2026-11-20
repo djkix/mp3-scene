@@ -14,6 +14,9 @@ class Settings:
     public_url: str = ""
     admin_user: str | None = None
     admin_password: str | None = None
+    backup_dir: Path | None = None   # dossier des sauvegardes (NAS monté) ; None : sauvegarde désactivée
+    backup_hour: int = 3             # heure du serveur à partir de laquelle la sauvegarde du jour est faite
+    stack_dir: Path = Path("/stack")  # dossier de la pile (compose, .env), monté en lecture seule s'il est à copier
 
 
 def load() -> Settings:
@@ -30,4 +33,7 @@ def load() -> Settings:
         public_url=os.environ.get("PUBLIC_URL", "").rstrip("/"),
         admin_user=os.environ.get("ADMIN_USER") or None,
         admin_password=os.environ.get("ADMIN_PASSWORD") or None,
+        backup_dir=Path(os.environ["BACKUP_DIR"]) if os.environ.get("BACKUP_DIR") else None,
+        backup_hour=min(23, max(0, int(os.environ.get("BACKUP_HOUR") or 3))),
+        stack_dir=Path(os.environ.get("STACK_DIR", "/stack")),
     )

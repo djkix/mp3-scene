@@ -8,7 +8,10 @@ services:
       ADMIN_USER: ${ADMIN_USER:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}   # inutile une fois le compte créé
       PUBLIC_URL: https://mp3.exemple.fr   # adresse publique HTTPS, sans slash final (URL envoyées au Chromecast)
-      TZ: Europe/Paris                     # n'affecte que les journaux du serveur
+      TZ: Europe/Paris                     # heure des journaux, du scan quotidien et de la sauvegarde
+      # Sauvegarde nocturne de la base (facultative) : décommentez avec les deux volumes plus bas.
+      # BACKUP_DIR: /backup                # dossier des sauvegardes dans le conteneur
+      # BACKUP_HOUR: "3"                   # heure à partir de laquelle la sauvegarde du jour est faite
     ports:
       # Le port ne doit être joignable QUE par le reverse proxy : l'appli fait confiance à son X-Forwarded-For.
       # Proxy sur la même machine : laisser 127.0.0.1. Proxy sur une autre machine : remplacer par l'adresse LAN
@@ -18,6 +21,8 @@ services:
     volumes:
       - music:/music:ro        # lecture seule côté conteneur
       - ./data:/data           # base SQLite : à sauvegarder
+      # - /chemin/vers/nas/mp3-scene:/backup   # un dossier daté par jour, sept gardés ; inscriptible par l'UID 1000
+      # - .:/stack:ro                          # pour que la sauvegarde copie aussi ce fichier compose et le .env
 
 volumes:
   music:

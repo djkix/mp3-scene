@@ -4,7 +4,7 @@
 
 **Collection de releases MP3 « scene » — bibliothèque · lecteur web · Chromecast · PWA**
 
-[![Version](https://img.shields.io/badge/version-1.41.1-purple?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.42.0-purple?style=for-the-badge)](CHANGELOG.md)
 [![Stack](https://img.shields.io/badge/stack-FastAPI_·_SQLite_·_JavaScript_pur-blue?style=for-the-badge)](#stack-technique)
 [![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
 
@@ -318,6 +318,8 @@ La coquille de l'interface est mise en cache pour démarrer vite ; la musique et
 
 Sauvegardez uniquement `./data` (base SQLite : comptes, favoris, index ; les sous-dossiers `thumbs/` des vignettes et `transcode/` des pistes converties peuvent être exclus, ils se reconstruisent). Sans elle, il faut refaire un scan complet et les comptes et favoris sont perdus ; la musique n'est pas touchée. Pour une copie cohérente : `docker compose stop mp3-scene`, copier `data/`, `docker compose start mp3-scene`.
 
+**Sauvegarde intégrée (facultative).** Avec `BACKUP_DIR` et un dossier du NAS monté sur ce chemin, l'application copie chaque jour, à partir de l'heure `BACKUP_HOUR` (3 h par défaut), la base dans un dossier daté (`2026-11-20/mp3scene.db`), copie à chaud et vérifiée. Sept jours sont gardés ; une nuit manquée est rattrapée au redémarrage. Si le dossier de la pile est monté sur `/stack` en lecture seule, son fichier compose et son `.env` sont copiés aussi (en clair : le `.env` contient la clé secrète). Ni la musique, ni les vignettes, ni les pistes converties ne sont copiées. Administration › Vue d'ensemble affiche la dernière sauvegarde, alerte après 36 heures sans réussite et permet d'en lancer une. Pour restaurer : arrêter le conteneur, remplacer `data/mp3scene.db` par la copie voulue, supprimer `data/mp3scene.db-wal` et `data/mp3scene.db-shm` s'ils existent, redémarrer.
+
 Vider réellement l'index (le scan refuse de retirer toutes les releases d'un coup) : `docker compose stop mp3-scene`, supprimer `data/mp3scene.db*`, `docker compose start mp3-scene`, puis relancer un scan. **Tout** est perdu : index, comptes (l'administrateur est recréé depuis `ADMIN_USER` / `ADMIN_PASSWORD`, à remettre dans `.env`) et favoris de tous les utilisateurs.
 
 Une base créée par une version plus récente de l'appli est refusée au démarrage (message dans les journaux) : revenir à cette version, ou restaurer une sauvegarde de `data/`.
@@ -383,6 +385,10 @@ git tag v1.2.0 && git push origin v1.2.0
 ## Historique des versions
 
 Le détail est dans le [journal des modifications](CHANGELOG.md).
+
+### 1.42.0 — 20 novembre 2026
+
+**Sauvegarde quotidienne de la base** vers un dossier daté, avec carte dans l'administration ; ordre fixe des catégories.
 
 ### 1.41.0 — 20 novembre 2026
 
