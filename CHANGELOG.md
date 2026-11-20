@@ -4,6 +4,16 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.47.1](https://github.com/djkix/mp3-scene/compare/v1.47.0...v1.47.1) (2026-11-20)
+
+### Résumé
+
+**Releases proposées sous une compilation.**
+
+- Une compilation (artiste « VA ») n'avait souvent aucune release similaire. Elle propose maintenant celles de la même
+  série, reconnue au début du titre avant son numéro (« Global Underground 47… »), puis celles du même label, avant le
+  même genre la même année.
+
 ## [1.47.0](https://github.com/djkix/mp3-scene/compare/v1.46.0...v1.47.0) (2026-11-20)
 
 ### Résumé

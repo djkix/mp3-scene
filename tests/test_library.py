@@ -798,3 +798,21 @@ def test_chapters_tech_artist_years_and_activity(admin_client, user_client, libr
     assert [(x["user"], x["action"]) for x in log[:2]] == [("user", "Écoute"), ("admin", "Correction")] and log[1]["detail"] == A
     assert {x["action"] for x in log} >= {"Connexion", "Correction", "Écoute"} and [x["action"] for x in log].count("Correction") == 1
     assert "Écoute" not in {x["action"] for x in admin_client.get("/api/admin/activity?plays=0").json()["items"]}
+
+
+def test_similar_follows_series_and_label_for_compilations(user_client, library, settings):
+    from app import db
+    from app.routes_library import _series
+    assert _series("Global Underground 47 Joseph Capriati Montreal") == "Global Underground"
+    assert _series("Ibanez") is None and _series("Big Mix") is None and _series("Hed Kandi 2005") == "Hed Kandi" and _series(None) is None
+    names = lambda rid: [x["name"] for x in user_client.get(f"/api/releases/{rid}/similar").json()]
+    rel = {x["name"]: x for x in user_client.get("/api/releases").json()["items"]}
+    va, b = rel["VA-Big_Mix-2CD-2003-GRP"]["id"], rel["Bicep-Glue-(NT123)-WEB-2017-PWT"]["id"]
+    assert names(va) == []                                              # compilation sans série, label ni genre commun
+    c = db.connect(settings.data_dir)
+    c.execute("UPDATE releases SET title='Global Underground 47 Montreal' WHERE id=?", (va,))
+    c.execute("UPDATE releases SET title='Global Underground 12 Ibiza' WHERE id=?", (b,)); c.commit()
+    assert names(va) == ["Bicep-Glue-(NT123)-WEB-2017-PWT"]              # même série
+    c.execute("UPDATE releases SET title='Glue', label='Ninja Tune' WHERE id=?", (b,))
+    c.execute("UPDATE releases SET label='Ninja Tune' WHERE id=?", (va,)); c.commit(); c.close()
+    assert names(va) == ["Bicep-Glue-(NT123)-WEB-2017-PWT"]              # même label

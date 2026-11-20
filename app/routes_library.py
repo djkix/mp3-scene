@@ -304,16 +304,35 @@ def radio(rid: Id, limit: int = Query(50, ge=1, le=MAX_LIMIT), user=Depends(curr
     return {"items": [_track(x) for x in rows]}
 
 
+def _series(title: str | None) -> str | None:
+    """Début du titre commun à une série : « Global Underground 47 Joseph Capriati » -> « Global Underground ».
+    Les mots avant le premier qui contient un chiffre ; None s'il y en a moins de deux ou moins de huit caractères."""
+    words = []
+    for w in (title or "").split():
+        if any(c.isdigit() for c in w):
+            break
+        words.append(w)
+    prefix = " ".join(words)
+    return prefix if len(words) >= 2 and len(prefix) >= 8 and len(words) < len((title or "").split()) else None
+
+
 @router.get("/api/releases/{rid}/similar")
 def similar(rid: Id, user=Depends(current_user), conn=Depends(get_conn)):
-    """Jusqu'à 12 releases proches : même artiste d'abord, puis même genre la même année (même groupe en tête)."""
+    """Jusqu'à 12 releases proches : même artiste d'abord, puis même série (début du titre avant son numéro), même
+    label, enfin même genre la même année (même groupe en tête). Une compilation n'a pas d'artiste à suivre : la série
+    et le label lui en tiennent lieu."""
     r = _release_row(conn, user["id"], rid)
     artist, art = _seed_artist(r), "COALESCE(r.tag_artist, r.artist)"
+    series = _series(r["title"])
+    like = series and re.sub(r"([!%_])", r"!\1", series) + " %"
+    label = r["label"] or None
     # identifiants d'abord : le débit moyen (sous-requête) n'est calculé que pour les lignes retenues
     ids = [x[0] for x in conn.execute(
-        f"SELECT r.id FROM releases r WHERE r.id!=? AND ({art}=? OR (r.genre=? AND r.year=?))"
-        f" ORDER BY COALESCE({art}=?, 0) DESC, COALESCE(r.grp=?, 0) DESC, r.added_at DESC, r.id DESC LIMIT 12",
-        (rid, artist, r["genre"], r["year"], artist, r["grp"]))]
+        f"SELECT r.id FROM releases r WHERE r.id!=? AND r.hidden=0 AND ({art}=? OR r.title LIKE ? ESCAPE '!' OR r.label=?"
+        f" OR (r.genre=? AND r.year=?))"
+        f" ORDER BY COALESCE({art}=?, 0) DESC, COALESCE(r.title LIKE ? ESCAPE '!', 0) DESC, COALESCE(r.label=?, 0) DESC,"
+        f" COALESCE(r.grp=?, 0) DESC, r.added_at DESC, r.id DESC LIMIT 12",
+        (rid, artist, like, label, r["genre"], r["year"], artist, like, label, r["grp"]))]
     rows = {x["id"]: _release(x) for x in conn.execute(
         f"SELECT {RELEASE_COLS} FROM {RELEASE_FROM} WHERE r.id IN ({','.join('?' * len(ids))})", (user["id"], *ids))}
     return [rows[i] for i in ids]
