@@ -6,6 +6,7 @@ import { player } from '../player.js';
 import { picker } from './release.js'; // import croisé : picker n'est appelé qu'au rendu
 
 const PAGE = 50;
+const RULE_KEYS = ['category', 'genre', 'year', 'decade', 'source', 'grp', 'artist', 'label']; // filtres qu'une playlist intelligente retient
 const emit = (name, detail) => document.dispatchEvent(new CustomEvent(name, { detail }));
 const HEART = ['♡︎', '♥︎'];
 
@@ -67,7 +68,8 @@ export function row(rel, pick = null, onPick = () => {}) {
   el('span', { class: 'rel-name' },
     pick && el('input', { type: 'checkbox', class: 'rel-pick', value: rel.id, checked: pick.has(rel.id), 'aria-label': tr('Sélectionner {0}', rel.name),
       onchange: (e) => { if (e.target.checked) pick.add(rel.id); else pick.delete(rel.id); onPick(); } }),
-    since() && rel.added_at > since() ? el('span', { class: 'new' }, tr('nouveau')) : null, relName(rel.name)),
+    since() && rel.added_at > since() ? el('span', { class: 'new' }, tr('nouveau')) : null,
+    rel.hidden ? el('span', { class: 'new' }, tr('masquée')) : null, relName(rel.name)),
   // même ordre que HEAD ; sur mobile, .rel-info devient une ligne de détails sous le nom
   el('span', { class: 'rel-info' },
     el('span', { class: 'mid' }, rel.genre ? el('span', { class: 'chip' }, rel.genre) : ''),
@@ -187,7 +189,7 @@ export function render(container, params) {
     bar.replaceChildren(select(tr('Catégorie'), tr('Catégories'), 'category', f.categories, category, setFilter, catLabel),
       select(tr('Genre'), tr('Genres'), 'genre', f.genres, genre, setFilter), yearSelect(f, year, setFilter),
       select(tr('Source'), tr('Sources'), 'source', f.sources, source, setFilter),
-      ...(q ? [] : [mix]), ...(sel ? [sel.button] : []));
+      ...(q ? [] : [mix]), ...(q || !Object.values(filters).some(Boolean) ? [] : [smart]), ...(sel ? [sel.button] : []));
   }).catch(() => {});
   // Mix : 50 pistes au hasard parmi les releases qui passent les filtres affichés.
   const filters = { category, genre, ...yearQuery(year), source, ...(pin && { [pin.key]: pin.value }) };
@@ -199,6 +201,17 @@ export function render(container, params) {
     } catch (err) { player.flash(err.message); }
     mix.disabled = false;
   } }, tr('Mix'));
+  // Playlist intelligente : les filtres affichés deviennent sa règle ; ses pistes suivent la bibliothèque.
+  const smart = el('button', { type: 'button', title: tr('Enregistrer ces filtres comme une playlist qui se met à jour seule'), onclick: async () => {
+    const name = (prompt(tr('Nom de la playlist intelligente')) || '').trim();
+    if (!name) return;
+    const rules = Object.fromEntries(Object.entries(filters).filter(([k, v]) => v && RULE_KEYS.includes(k))
+      .map(([k, v]) => [k, ['year', 'decade'].includes(k) ? Number(v) : v]));
+    try {
+      await api('/playlists', { method: 'POST', body: { name, rules } });
+      player.flash(tr('Playlist « {0} » créée : Favoris › Playlists.', name));
+    } catch (err) { player.flash(err.message); }
+  } }, tr('Playlist auto'));
   const fresh = el('p', { class: 'status', role: 'status', hidden: true });
   if (!q && !pin && !category && !genre && !year && !source && since()) {
     container.insertBefore(fresh, list);

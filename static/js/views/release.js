@@ -23,7 +23,20 @@ export function render(container, params) {
     container.replaceChildren(el('div', { class: 'detail' }, header(rel), trackTable(rel), vers, nfo, sim));
     // même artiste et même titre, sortis par un autre groupe ou d'une autre source : débit et pistes pour comparer
     api(`/releases/${rel.id}/versions`).then((list) => {
-      if (!dead && list.length) vers.replaceChildren(el('h2', { class: 'nfo-h' }, t('Autres versions')), el('ul', { class: 'rel-list' }, list.map(row)));
+      if (dead || !list.length) return;
+      // administrateur : garder cette version masque les autres des listes (rien n'est supprimé du disque)
+      const keep = (method) => async (e) => {
+        e.target.disabled = true;
+        try { await api(`/admin/releases/${rel.id}/keep`, { method }); } catch (err) { player.flash(err.message); }
+        dispatchEvent(new HashChangeEvent('hashchange')); // recharge la fiche
+      };
+      const masked = rel.hidden || list.some((x) => x.hidden);
+      vers.replaceChildren(el('h2', { class: 'nfo-h' }, t('Autres versions')),
+        rel.hidden ? el('p', { class: 'status' }, t('Cette version est masquée des listes : une autre est gardée.')) : null,
+        session.user?.role !== 'admin' ? null : el('p', { class: 'filters' },
+          el('button', { type: 'button', onclick: keep('PUT') }, t('Garder cette version, masquer les autres')),
+          masked ? el('button', { type: 'button', onclick: keep('DELETE') }, t('Tout réafficher')) : null),
+        el('ul', { class: 'rel-list' }, list.map((x) => row(x))));
     }).catch(() => {}); // facultatif
     watch.mark();
     api(`/releases/${rel.id}/similar`).then((list) => {

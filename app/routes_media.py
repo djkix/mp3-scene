@@ -8,6 +8,7 @@ import threading
 import time
 import zipfile
 from array import array
+from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote
 
@@ -35,6 +36,46 @@ def _disposition(name: str) -> str:
     return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{quote(name, safe='')}"
 
 
+TRANSCODE_MAX = 5 * 1024 ** 3  # taille du cache des pistes converties (data/transcode)
+_transcode_lock = threading.Lock()
+
+
+def transcoded(src, cache: Path, track_id: int, mtime: float):
+    """Chemin de la piste convertie en MP3 320 kbit/s, gardée dans `cache` ; None sans ffmpeg ou si la conversion échoue.
+
+    Fichier entier, pour que le navigateur puisse s'y déplacer (requêtes Range), l'écouter hors ligne ou le diffuser."""
+    out = cache / f"{track_id}-{int(mtime)}.mp3"
+    if out.is_file():
+        os.utime(out)  # dernière écoute : la purge retire les plus anciennes
+        return out
+    exe = shutil.which("ffmpeg")
+    if exe is None:
+        return None
+    # ponytail: une conversion à la fois pour tout le serveur, et la première écoute attend sa fin (quelques secondes
+    # par piste) ; convertir à l'avance la piste suivante de la file si l'attente gêne
+    with _transcode_lock:
+        if out.is_file():
+            return out
+        cache.mkdir(parents=True, exist_ok=True)
+        tmp = out.with_suffix(".part")
+        try:
+            subprocess.run([exe, "-v", "error", "-nostdin", "-y", "-i", str(src), "-vn", "-map_metadata", "0",
+                            "-codec:a", "libmp3lame", "-b:a", "320k", "-f", "mp3", str(tmp)],
+                           stdin=subprocess.DEVNULL, capture_output=True, timeout=600, check=True)
+            os.replace(tmp, out)
+        except (subprocess.SubprocessError, OSError):
+            tmp.unlink(missing_ok=True)
+            return None
+        files = sorted(cache.glob("*.mp3"), key=lambda p: p.stat().st_mtime)
+        total = sum(p.stat().st_size for p in files)
+        for old in files[:-1]:  # jamais celle qui vient d'être convertie
+            if total <= TRANSCODE_MAX:
+                break
+            total -= old.stat().st_size
+            old.unlink(missing_ok=True)
+    return out
+
+
 def _track_file(request: Request, conn, track_id: int, download: bool = False, headers: dict | None = None):
     row = conn.execute("SELECT r.path, t.relpath FROM tracks t JOIN releases r ON r.id=t.release_id WHERE t.id=?",
                        (track_id,)).fetchone()
@@ -50,8 +91,15 @@ def _track_file(request: Request, conn, track_id: int, download: bool = False, h
     except OSError:
         raise HTTPException(404, "Fichier introuvable.") from None
     headers = dict(headers or {})
-    if download:
+    mp3 = row["relpath"].lower().endswith(".mp3")
+    if download:  # toujours le fichier d'origine
         headers["Content-Disposition"] = _disposition(row["relpath"].rsplit("/", 1)[-1])
+        return FileResponse(path, media_type="audio/mpeg" if mp3 else "application/octet-stream", stat_result=st, headers=headers)
+    if not mp3:  # FLAC, WAV, WMA, M4A… : écoutés en MP3 320 kbit/s, que tout navigateur et tout Chromecast lit
+        path = transcoded(path, request.app.state.settings.data_dir / "transcode", track_id, st.st_mtime)
+        if path is None:
+            raise HTTPException(503, "Conversion impossible : ffmpeg est absent ou le fichier est illisible.")
+        st = os.stat(path)
     return FileResponse(path, media_type="audio/mpeg", stat_result=st, headers=headers)
 
 
@@ -159,7 +207,7 @@ _wave_lock = threading.Lock()
 
 def _decode_cmd(path) -> list[str] | None:
     """Commande qui écrit la piste en PCM 16 bits mono sur sa sortie ; None si aucun décodeur n'est installé."""
-    if exe := shutil.which("mpg123"):  # celui de l'image Docker : petit, MP3 seulement
+    if str(path).lower().endswith(".mp3") and (exe := shutil.which("mpg123")):  # petit et rapide, MP3 seulement
         return [exe, "-q", "-s", "-m", "-r", str(WAVE_RATE), "-e", "s16", str(path)]
     if exe := shutil.which("ffmpeg"):
         return [exe, "-v", "error", "-nostdin", "-i", str(path), "-vn", "-ac", "1", "-ar", str(WAVE_RATE),

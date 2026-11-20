@@ -4,6 +4,25 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.37.0](https://github.com/djkix/mp3-scene/compare/v1.36.0...v1.37.0) (2026-11-20)
+
+### Résumé
+
+**FLAC et autres formats convertis à l'écoute, labels, playlists intelligentes, version gardée d'un doublon,
+artistes à ne jamais fusionner.**
+
+- Formats : les pistes FLAC, WAV, M4A, WMA, OGG, Opus, AIFF, APE et WavPack sont indexées et converties en MP3
+  320 kbit/s à l'écoute (`ffmpeg`, ajouté à l'image). La piste convertie est gardée dans `data/transcode` (5 Go au
+  plus) ; le téléchargement donne le fichier d'origine. La première écoute attend la fin de la conversion.
+- Labels : label et numéro de catalogue lus dans le NFO (à défaut, le numéro entre parenthèses du nom), affichés sur
+  la fiche ; onglet **Labels** dans Explorer. Les NFO sont relus au prochain scan.
+- Playlists intelligentes : sur une liste filtrée, **Playlist auto** enregistre les filtres ; la playlist suit la
+  bibliothèque. Ni ordre manuel, ni retrait de piste, ni partage.
+- Doublons : sur une fiche, **Garder cette version, masquer les autres** retire les autres versions des listes, de la
+  recherche, d'Explorer et du Mix, sans rien supprimer du disque ; **Tout réafficher** annule.
+- Artistes : Administration › Règles liste les graphies **à ne jamais fusionner** (« Florida » n'est pas
+  « Flo Rida »).
+
 ## [1.36.0](https://github.com/djkix/mp3-scene/compare/v1.35.0...v1.36.0) (2026-11-20)
 
 ### Résumé

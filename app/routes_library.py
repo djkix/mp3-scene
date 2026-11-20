@@ -21,6 +21,7 @@ DATE = "COALESCE(NULLIF(r.released_at, 0), r.added_at)"
 # artiste : tag commun s'il existe, sinon celui extrait du nom
 RELEASE_COLS = """r.id, r.name, r.path, r.category, r.added_at, """ + DATE + """ AS date, r.size, r.track_count, r.has_nfo,
   COALESCE(r.tag_artist, r.artist) AS artist, r.title, r.source, r.year, r.grp, r.genre, r.duration,
+  NULLIF(r.label, '') AS label, r.catalog, r.hidden,
   """ + BITRATE + """ AS bitrate, (f.item_id IS NOT NULL) AS favorite"""
 RELEASE_FROM = "releases r LEFT JOIN favorites f ON f.user_id=? AND f.kind='release' AND f.item_id=r.id"
 TRACK_COLS = """t.id, t.release_id, r.name AS release_name, r.source, r.grp, t.relpath, t.disc, t.size, t.title, t.artist,
@@ -54,6 +55,7 @@ def _fts_query(q: str) -> str:
 def _release(row) -> dict:
     d = dict(row)
     d["has_nfo"] = bool(d["has_nfo"])
+    d["hidden"] = bool(d["hidden"])
     d["favorite"] = bool(d["favorite"])
     return d
 
@@ -73,10 +75,12 @@ def _page(conn, cols, source, where, params, order, uid, offset, limit, build):
 
 
 def _release_conds(category=None, genre=None, year=None, grp=None, artist=None, source=None, decade=None, appears=None,
-                   collab=None):
-    """Conditions SQL (et leurs paramètres) des filtres de release communs aux listes et au mix."""
-    conds, params = [], []
-    for col, val in (("category", category), ("genre", genre), ("year", year), ("grp", grp), ("source", source)):
+                   collab=None, label=None):
+    """Conditions SQL (et leurs paramètres) des filtres de release communs aux listes, au mix et aux playlists
+    intelligentes. Les doublons masqués par un administrateur n'en font jamais partie."""
+    conds, params = ["r.hidden=0"], []
+    for col, val in (("category", category), ("genre", genre), ("year", year), ("grp", grp), ("source", source),
+                     ("label", label)):
         if val is not None:
             conds.append(f"r.{col}=?")
             params.append(val)
@@ -101,9 +105,10 @@ def _release_conds(category=None, genre=None, year=None, grp=None, artist=None, 
 def mix(category: str | None = None, genre: str | None = None, year: int | None = Query(None, ge=0, le=MAX_INT),
         grp: str | None = None, artist: str | None = None, source: str | None = None,
         decade: int | None = Query(None, ge=0, le=MAX_INT), appears: str | None = None,
-        collab: str | None = Query(None, max_length=200), limit: int = Query(50, ge=1, le=MAX_LIMIT), user=Depends(current_user), conn=Depends(get_conn)):
+        collab: str | None = Query(None, max_length=200), label: str | None = Query(None, max_length=200),
+        limit: int = Query(50, ge=1, le=MAX_LIMIT), user=Depends(current_user), conn=Depends(get_conn)):
     """Pistes tirées au hasard parmi les releases qui passent les filtres."""
-    conds, params = _release_conds(category, genre, year, grp, artist, source, decade, appears, collab)
+    conds, params = _release_conds(category, genre, year, grp, artist, source, decade, appears, collab, label)
     where = "WHERE " + " AND ".join(conds) if conds else ""
     # ponytail: ORDER BY RANDOM() trie tous les identifiants candidats (rapide jusqu'au million de pistes)
     rows = conn.execute(
@@ -123,10 +128,12 @@ def list_releases(q: str = "", category: str | None = None, genre: str | None = 
                   artist: str | None = None, source: str | None = None, appears: str | None = None,
                   decade: int | None = Query(None, ge=0, le=MAX_INT), collab: str | None = Query(None, max_length=200),
                   year: int | None = Query(None, ge=0, le=MAX_INT), favorites: int = Query(0, ge=0, le=1),
-                  sort: Sort | None = None, dir: Dir = "asc",
+                  label: str | None = Query(None, max_length=200), sort: Sort | None = None, dir: Dir = "asc",
                   offset: int = Query(0, ge=0, le=MAX_INT), limit: int = Query(50, ge=1, le=MAX_INT),
                   user=Depends(current_user), conn=Depends(get_conn)):
-    conds, params = _release_conds(category, genre, year, grp, artist, source, decade, appears, collab)
+    conds, params = _release_conds(category, genre, year, grp, artist, source, decade, appears, collab, label)
+    if favorites:  # un favori reste visible même masqué
+        conds.remove("r.hidden=0")
     if match := _fts_query(q):
         conds.append("r.id IN (SELECT rowid FROM releases_fts WHERE releases_fts MATCH ?)")
         params.append(match)
@@ -147,16 +154,16 @@ def filters(conn=Depends(get_conn)):
 
 
 # regroupements de la page Explorer : colonnes autorisées (jamais de texte du client dans le SQL)
-GROUP_BY = {"grp": "grp", "artist": "COALESCE(tag_artist, artist)", "genre": "genre"}
+GROUP_BY = {"grp": "grp", "artist": "COALESCE(tag_artist, artist)", "genre": "genre", "label": "NULLIF(label, '')"}
 
 
 @router.get("/api/groups")
-def groups(by: Literal["grp", "artist", "genre"] = "grp", name: str | None = None, genre: str | None = None,
+def groups(by: Literal["grp", "artist", "genre", "label"] = "grp", name: str | None = None, genre: str | None = None,
            year: int | None = Query(None, ge=0, le=MAX_INT), decade: int | None = Query(None, ge=0, le=MAX_INT),
            conn=Depends(get_conn)):
-    """Releases regroupées par groupe, artiste ou genre : nombre et poids total, restreints au genre / à l'année."""
+    """Releases regroupées par groupe, artiste, genre ou label : nombre et poids total, restreints au genre / à l'année."""
     col = GROUP_BY[by]
-    conds, params = [f"{col} IS NOT NULL"], []
+    conds, params = [f"{col} IS NOT NULL", "hidden=0"], []
     for c, val in ((col, name), ("genre", genre), ("year", year)):
         if val is not None:
             conds.append(f"{c}=?")

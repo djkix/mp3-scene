@@ -9,7 +9,7 @@ import * as releases from './releases.js';
 const MAX_ROWS = 1000; // au-delà, on demande d'affiner (des dizaines de milliers d'artistes figeraient la page)
 // route -> [onglet, en-tête de colonne, valeur de `by` côté serveur, paramètre de /releases qui épingle la liste]
 const KINDS = { groups: ['Groupes', 'Groupe', 'grp', 'grp'], artists: ['Artistes', 'Artiste', 'artist', 'artist'],
-  genres: ['Genres', 'Genre', 'genre', null] };
+  labels: ['Labels', 'Label', 'label', 'label'], genres: ['Genres', 'Genre', 'genre', null] };
 
 const qs = (o) => { const s = String(new URLSearchParams(Object.entries(o).filter(([, v]) => v))); return s ? '?' + s : ''; };
 const count = (n) => `${n} ${n > 1 ? tr('releases') : tr('release')}`;

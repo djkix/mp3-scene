@@ -12,9 +12,13 @@ CREATE TABLE IF NOT EXISTS releases(
   artist TEXT, title TEXT, source TEXT, year INTEGER, grp TEXT,
   tag_artist TEXT, genre TEXT, duration REAL, tags_done INTEGER NOT NULL DEFAULT 0,
   has_cover INTEGER,  -- NULL : pas encore vérifié par le scan
-  released_at REAL);  -- date de sortie lue dans le NFO ; NULL : pas encore lu, 0 : aucune
+  released_at REAL,  -- date de sortie lue dans le NFO ; NULL : pas encore lu, 0 : aucune
+  label TEXT, catalog TEXT,  -- label et numéro de catalogue lus dans le NFO ; label NULL : pas encore lu, '' : aucun
+  hidden INTEGER NOT NULL DEFAULT 0);  -- doublon masqué des listes (une autre version est gardée)
 -- corrections manuelles d'un administrateur, par chemin de release : elles survivent aux scans (NULL : valeur automatique)
-CREATE TABLE IF NOT EXISTS overrides(path TEXT PRIMARY KEY, artist TEXT, category TEXT, genre TEXT, year INTEGER);
+CREATE TABLE IF NOT EXISTS overrides(path TEXT PRIMARY KEY, artist TEXT, category TEXT, genre TEXT, year INTEGER, hidden INTEGER);
+-- graphies d'artistes à ne jamais fusionner avec une autre (« Florida » n'est pas « Flo Rida »)
+CREATE TABLE IF NOT EXISTS artist_separate(name TEXT PRIMARY KEY COLLATE NOCASE);
 -- artistes rattachés à la main : `key` est la clé de rapprochement (artists.fold) de l'artiste rattaché
 CREATE TABLE IF NOT EXISTS artist_aliases(key TEXT PRIMARY KEY, alias TEXT NOT NULL, target TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS tracks(
@@ -34,7 +38,8 @@ CREATE INDEX IF NOT EXISTS idx_plays_user ON plays(user_id, played_at DESC);
 -- playlists : une piste au plus une fois par playlist, dans l'ordre d'ajout
 CREATE TABLE IF NOT EXISTS playlists(
   id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users ON DELETE CASCADE,
-  name TEXT NOT NULL, created_at REAL NOT NULL);
+  name TEXT NOT NULL, created_at REAL NOT NULL,
+  rules TEXT);  -- playlist intelligente : filtres de releases en JSON, pistes calculées à la lecture
 CREATE TABLE IF NOT EXISTS playlist_tracks(
   playlist_id INTEGER NOT NULL REFERENCES playlists ON DELETE CASCADE,
   track_id INTEGER NOT NULL REFERENCES tracks ON DELETE CASCADE,

@@ -35,9 +35,15 @@ def _clean(artist):
     return main(artist)
 
 
-def _step(pairs: dict, aliases: dict) -> dict:
+def norm(artist: str) -> str:
+    """Graphie comparée à celles à ne jamais fusionner : sans casse, soulignés ni espaces en double."""
+    return " ".join(artist.replace("_", " ").casefold().split())
+
+
+def _step(pairs: dict, aliases: dict, keep=frozenset()) -> dict:
     """Un passage du regroupement sur {id: (artiste du nom, artiste des tags)} ; `aliases` : rattachements manuels
-    {clé de l'artiste rattaché: artiste cible}."""
+    {clé de l'artiste rattaché: artiste cible} ; `keep` : graphies (norm) qui ne rejoignent aucune autre."""
+    key = lambda a: "\0" + norm(a) if norm(a) in keep else fold(a)  # « Florida » gardé à part de « Flo Rida »
     out = {}
     for i, (name, tag) in pairs.items():
         name, tag = _clean(name), _clean(tag)
@@ -46,23 +52,23 @@ def _step(pairs: dict, aliases: dict) -> dict:
                 and name.lower().startswith(tag.lower()) and not name[len(tag)].isalnum():
             tag = None
         out[i] = name, tag
-    count = Counter(fold(a) for n, t in out.values() if (a := t or n))  # releases par artiste affiché
+    count = Counter(key(a) for n, t in out.values() if (a := t or n))  # releases par artiste affiché
 
     def lead(a):
         """« Chocolate Puma & Firebeatz » -> Chocolate Puma, qui a plus de releases seul ; « Block & Crown », « Dimitri
         Vegas & Like Mike » restent des duos."""
         # ponytail: un duo moins fourni que son premier membre seul (« Axwell & Ingrosso ») rejoint ce membre ;
         # liste d'exceptions si cela gêne
-        return a and next((a[:m.start()] for m in _AMP.finditer(a) if count[fold(a[:m.start()])] > count[fold(a)]), a)
+        return a and next((a[:m.start()] for m in _AMP.finditer(a) if count[key(a[:m.start()])] > count[key(a)]), a)
 
-    manual = lambda a: a and aliases.get(fold(a), a)
+    manual = lambda a: a and aliases.get(key(a), a)
     out = {i: (manual(lead(n)), manual(lead(t))) for i, (n, t) in out.items()}
     spellings = defaultdict(Counter)
     for pair in out.values():
         for a in {*pair} - {None}:
-            spellings[fold(a)][a.title() if a.islower() else a] += 1
+            spellings[key(a)][a.title() if a.islower() else a] += 1
     best = {k: min(c, key=lambda s: (-c[s], s)) for k, c in spellings.items()}
-    return {i: (n and best[fold(n)], t and best[fold(t)]) for i, (n, t) in out.items()}
+    return {i: (n and best[key(n)], t and best[key(t)]) for i, (n, t) in out.items()}
 
 
 def apply(conn) -> int:
@@ -74,9 +80,10 @@ def apply(conn) -> int:
     start = {r["id"]: (r["artist"], r["tag_artist"]) for r in conn.execute(
         "SELECT id, artist, tag_artist FROM releases WHERE artist IS NOT NULL OR tag_artist IS NOT NULL")}
     aliases = dict(conn.execute("SELECT key, target FROM artist_aliases").fetchall())
+    keep = frozenset(norm(n) for (n,) in conn.execute("SELECT name FROM artist_separate"))
     pairs = start
     for _ in range(8):  # un regroupement peut en permettre un autre : jusqu'à stabilité
-        pairs, before = _step(pairs, aliases), pairs
+        pairs, before = _step(pairs, aliases, keep), pairs
         if pairs == before:
             break
     changed = [(*pair, i) for i, pair in pairs.items() if pair != start[i]]

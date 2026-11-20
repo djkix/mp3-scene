@@ -64,7 +64,7 @@ def test_group_case_merged_to_most_common(tmp_path):
     for i, g in enumerate(("dh", "dh", "DH", "WiTF", "Solo", None)):
         conn.execute("INSERT INTO releases(path,name,parent,category,mtime,added_at,size,track_count,has_nfo,grp)"
                      " VALUES (?,?,'p','c',0,0,0,0,0,?)", (f"p{i}", f"n{i}", g))
-    db.merge_group_case(conn)
+    db.merge_case(conn, "grp")
     assert [r[0] for r in conn.execute("SELECT grp FROM releases ORDER BY id")] == ["dh", "dh", "dh", "WiTF", "Solo", None]
 
 

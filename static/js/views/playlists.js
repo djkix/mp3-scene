@@ -29,7 +29,7 @@ async function play(id, status) {
 }
 
 export function render(container, params) {
-  return /^\d+$/.test(params.id || '') ? detail(container, params.id) : list(container);
+  return /^\d+$/.test(params.id || '') ? detail(container, params.id, params.smart === '1') : list(container);
 }
 
 function list(container) {
@@ -50,7 +50,8 @@ function list(container) {
     const all = await api('/playlists');
     if (dead) return;
     body.replaceChildren(...all.map((p) => el('tr', {},
-      el('td', {}, el('a', { href: `${HOME}&id=${p.id}` }, p.name)),
+      el('td', {}, el('a', { href: `${HOME}&id=${p.id}${p.smart ? '&smart=1' : ''}` }, p.name), p.smart ? ' ' : null,
+        p.smart ? el('span', { class: 'chip', title: tr('Ses pistes viennent de ses filtres et suivent la bibliothèque') }, tr('auto')) : null),
       el('td', { class: 'num' }, String(p.tracks)), el('td', { class: 'num' }, fmtDuration(p.duration)),
       el('td', {}, el('div', { class: 'actions' },
         el('button', { type: 'button', class: 'icon', 'data-ico': 'play', title: tr('Lire'), 'aria-label': tr('Lire'), onclick: () => play(p.id, status) }),
@@ -67,7 +68,8 @@ function list(container) {
   return () => { dead = true; };
 }
 
-function detail(container, id) {
+// `smart` : playlist intelligente, dont les pistes viennent de filtres ; ni ordre ni retrait à la main, ni partage.
+function detail(container, id, smart) {
   const title = el('span');
   const status = el('span', { class: 'muted', role: 'status' });
   const body = el('div');
@@ -75,10 +77,10 @@ function detail(container, id) {
     el('h1', { class: 'grp-title' }, el('a', { href: HOME }, tr('Playlists')), ' › ', title, ' ', status),
     el('p', { class: 'tabs' }, el('button', { type: 'button', class: 'primary', onclick: () => play(id, status) }, tr('Lire')),
       offlineButton({ id: `pl:${id}`, get name() { return title.textContent; } }, () => allTracks(id)),
-      shareButton('playlist', +id)),
+      smart ? null : shareButton('playlist', +id)),
     body);
   return trackList(body, { path: `/playlists/${id}`, empty: tr('Playlist vide'),
     onPage: (page) => { title.textContent = page.name; },
-    move: (t, dir) => `/playlists/${id}/tracks/${t.id}/move?dir=${dir}`,
-    remove: { url: (t) => `/playlists/${id}/tracks/${t.id}`, icon: '✕', label: tr('Retirer de la playlist') } });
+    move: smart ? null : (t, dir) => `/playlists/${id}/tracks/${t.id}/move?dir=${dir}`,
+    remove: smart ? null : { url: (t) => `/playlists/${id}/tracks/${t.id}`, icon: '✕', label: tr('Retirer de la playlist') } });
 }

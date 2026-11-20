@@ -134,6 +134,7 @@ def parse_release_name(name: str) -> dict:
             skip.add(i)
             break
 
+    skip |= {i for i, s in enumerate(segs) if i and s.upper() in ("FLAC", "LOSSLESS")}  # format, pas un bout de titre
     source, si = _source(segs, skip)
     if si is not None:
         skip.add(si)

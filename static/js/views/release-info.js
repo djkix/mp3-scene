@@ -8,6 +8,7 @@ const enc = encodeURIComponent;
 export function infoRows(rel, el) {
   return [[t('Artiste'), rel.artist, (v) => `#/artists/${enc(v)}`], [t('Titre'), rel.title], [t('Source'), rel.source, (v) => `#/?source=${enc(v)}`],
     [t('Année'), rel.year, (v) => `#/?year=${enc(v)}`], [t('Date'), rel.date == null ? null : fmtDate(rel.date)], [t('Groupe'), rel.grp, (v) => `#/groups/${enc(v)}`],
+    [t('Label'), rel.label, (v) => `#/labels/${enc(v)}`], [t('Catalogue'), rel.catalog],
     [t('Catégorie'), rel.category && catLabel(rel.category)], [t('Genre'), rel.genre, (v) => `#/?genre=${enc(v)}`],
     [t('Taille'), rel.size == null ? null : fmtSize(rel.size)],
     [t('Durée'), rel.duration == null ? null : fmtDuration(rel.duration)]]

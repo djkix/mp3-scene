@@ -122,7 +122,7 @@ def classify(conn=Depends(get_conn)):
 def overrides(conn=Depends(get_conn)):
     """Corrections manuelles en vigueur, avec la release concernée."""
     return [dict(r) for r in conn.execute(
-        "SELECT r.id, r.name, o.artist, o.category, o.genre, o.year FROM overrides o JOIN releases r ON r.path=o.path"
+        "SELECT r.id, r.name, o.artist, o.category, o.genre, o.year, o.hidden FROM overrides o JOIN releases r ON r.path=o.path"
         " ORDER BY r.name COLLATE NOCASE")]
 
 
@@ -137,7 +137,7 @@ def overview(request: Request, conn=Depends(get_conn)):
             "groups": one("SELECT COUNT(DISTINCT grp) FROM releases"), "genres": one("SELECT COUNT(DISTINCT genre) FROM releases"),
             "categories": one("SELECT COUNT(DISTINCT category) FROM releases"),
             "overrides": dict(conn.execute("SELECT COUNT(*) AS total, COUNT(artist) AS artist, COUNT(category) AS category,"
-                                           " COUNT(genre) AS genre, COUNT(year) AS year FROM overrides").fetchone()),
+                                           " COUNT(genre) AS genre, COUNT(year) AS year, COUNT(hidden) AS hidden FROM overrides").fetchone()),
             "shares": one("SELECT COUNT(*) FROM shares WHERE expires_at>?", now),
             "share_opens": one("SELECT COALESCE(SUM(opens), 0) FROM shares WHERE expires_at>?", now),
             "users": one("SELECT COUNT(*) FROM users"),
@@ -177,6 +177,7 @@ class Correction(BaseModel):
     category: str | None = Field(default=None, max_length=200)
     genre: str | None = Field(default=None, max_length=200)
     year: int | None = Field(default=None, ge=1900, le=2100)
+    hidden: bool | None = None  # doublon masqué des listes
 
 
 def _correct(conn, rids, fields):
@@ -188,13 +189,16 @@ def _correct(conn, rids, fields):
     if fields.get("category") and conn.execute("SELECT 1 FROM releases WHERE category=? LIMIT 1",
                                                (fields["category"],)).fetchone() is None:
         raise HTTPException(400, "Catégorie inconnue.")
+    if "hidden" in fields:
+        fields["hidden"] = 1 if fields["hidden"] else None
     if fields.get("genre"):
         fields["genre"] = genres.normalize(fields["genre"]) or fields["genre"]
     for path in paths:
         conn.execute("INSERT OR IGNORE INTO overrides(path) VALUES (?)", (path,))
         for col, val in fields.items():  # noms de colonnes issus du modèle, jamais du client
             conn.execute(f"UPDATE overrides SET {col}=? WHERE path=?", (val, path))
-    conn.execute("DELETE FROM overrides WHERE artist IS NULL AND category IS NULL AND genre IS NULL AND year IS NULL")
+    conn.execute("DELETE FROM overrides WHERE artist IS NULL AND category IS NULL AND genre IS NULL AND year IS NULL"
+                 " AND hidden IS NULL")
     if "year" in fields and fields["year"] is None:  # retour à l'automatique : année du nom, sinon celle du NFO
         conn.executemany("UPDATE releases SET year=? WHERE id=?",
                          [(parse_release_name(r["name"])["year"], rid) for r, rid in zip(found, rids)])
@@ -226,6 +230,26 @@ def correct_releases(body: BulkCorrection, conn=Depends(get_conn)):
     if not fields:
         raise HTTPException(400, "Aucun champ à corriger.")
     _correct(conn, list(dict.fromkeys(body.ids)), fields)
+
+
+def _versions(conn, rid):
+    """Identifiants des autres versions de la release : même artiste et même titre dans le nom."""
+    return [r[0] for r in conn.execute(
+        "SELECT r.id FROM releases r JOIN releases o ON o.id=? AND r.id!=o.id AND lower(r.artist)=lower(o.artist)"
+        " AND lower(r.title)=lower(o.title)", (rid,))]
+
+
+@router.put("/releases/{rid}/keep", status_code=204)
+def keep_version(rid: Id, conn=Depends(get_conn)):
+    """Garde cette version d'un doublon : les autres sont masquées des listes (rien n'est supprimé du disque)."""
+    _correct(conn, [rid], {"hidden": None})
+    _correct(conn, _versions(conn, rid), {"hidden": True})
+
+
+@router.delete("/releases/{rid}/keep", status_code=204)
+def show_versions(rid: Id, conn=Depends(get_conn)):
+    """Réaffiche toutes les versions de cette release."""
+    _correct(conn, [rid, *_versions(conn, rid)], {"hidden": None})
 
 
 class Alias(BaseModel):
@@ -268,6 +292,45 @@ def detach_artist(alias: str = Query(max_length=200), conn=Depends(get_conn)):
     conn.commit()
 
 
+def _regroup(conn, name):
+    """Défait puis refait le regroupement des artistes de même clé que `name` (règle de séparation ajoutée ou retirée)."""
+    k = artists.fold(name)
+    for (shown,) in conn.execute("SELECT DISTINCT COALESCE(tag_artist, artist) FROM releases"
+                                 " WHERE COALESCE(tag_artist, artist) IS NOT NULL").fetchall():
+        if artists.fold(shown) == k:
+            artists.reset(conn, shown)
+    artists.apply(conn)
+    db.categorize(conn)
+    conn.commit()
+
+
+class Separate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+
+
+@router.get("/artists/separate")
+def separate_list(conn=Depends(get_conn)):
+    """Graphies d'artistes à ne jamais fusionner avec une autre."""
+    return [r[0] for r in conn.execute("SELECT name FROM artist_separate ORDER BY name COLLATE NOCASE")]
+
+
+@router.put("/artists/separate", status_code=204)
+def separate_artist(body: Separate, conn=Depends(get_conn)):
+    """« Florida » n'est pas « Flo Rida » : cette graphie garde ses releases, à ce scan et aux suivants."""
+    name = " ".join(body.name.replace("_", " ").split())
+    if not name:
+        raise HTTPException(400, "Nom vide.")
+    conn.execute("INSERT OR IGNORE INTO artist_separate(name) VALUES (?)", (name,))
+    _regroup(conn, name)
+
+
+@router.delete("/artists/separate", status_code=204)
+def merge_artist(name: str = Query(max_length=200), conn=Depends(get_conn)):
+    if conn.execute("DELETE FROM artist_separate WHERE name=?", (name,)).rowcount == 0:
+        raise HTTPException(404, "Règle introuvable.")
+    _regroup(conn, name)
+
+
 # contrôles qualité : condition SQL sur la release r (jamais de texte du client dans le SQL)
 QUALITY = {
     "no_nfo": "r.has_nfo=0",
@@ -279,7 +342,9 @@ QUALITY = {
     "no_cover": "r.has_cover=0",  # NULL : pas encore vérifié par le scan
     "no_artist": "COALESCE(r.tag_artist, r.artist) IS NULL",
     # même artiste et même titre dans le nom qu'une autre release (index idx_releases_dupe)
-    "dupes": "EXISTS (SELECT 1 FROM releases d WHERE lower(d.artist)=lower(r.artist) AND lower(d.title)=lower(r.title) AND d.id!=r.id)",
+    # ; un doublon est réglé dès qu'une version est gardée et les autres masquées
+    "dupes": "r.hidden=0 AND EXISTS (SELECT 1 FROM releases d WHERE lower(d.artist)=lower(r.artist) AND lower(d.title)=lower(r.title)"
+             " AND d.id!=r.id AND d.hidden=0)",
 }
 
 

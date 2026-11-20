@@ -7,13 +7,36 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from .deps import MAX_INT, Id, current_user, get_conn
-from .routes_library import TRACK_COLS, TRACK_FROM, _page, _track
+from .routes_library import TRACK_COLS, TRACK_FROM, _page, _release_conds, _track
 
 router = APIRouter(dependencies=[Depends(current_user)])
 
 
 class Name(BaseModel):
     name: str = Field(min_length=1, max_length=100)
+
+
+class Rules(BaseModel):
+    """Filtres d'une playlist intelligente : les mêmes que ceux des listes de releases."""
+    category: str | None = Field(default=None, max_length=200)
+    genre: str | None = Field(default=None, max_length=200)
+    year: int | None = Field(default=None, ge=0, le=MAX_INT)
+    decade: int | None = Field(default=None, ge=0, le=MAX_INT)
+    source: str | None = Field(default=None, max_length=200)
+    grp: str | None = Field(default=None, max_length=200)
+    artist: str | None = Field(default=None, max_length=200)
+    label: str | None = Field(default=None, max_length=200)
+
+
+class NewPlaylist(Name):
+    rules: Rules | None = None
+
+
+def _smart(rules: str):
+    """(source SQL, condition, paramètres) des pistes d'une playlist intelligente : celles des releases qui passent
+    ses filtres aujourd'hui, donc à jour après chaque scan sans rien recalculer."""
+    conds, params = _release_conds(**json.loads(rules))
+    return "WHERE " + " AND ".join(conds), params
 
 
 class Add(BaseModel):
@@ -30,25 +53,44 @@ def _name(body: Name) -> str:
 
 def _own(conn, uid, pid):
     """La playlist `pid` si elle appartient à l'utilisateur ; 404 sinon (on ne révèle pas celles des autres)."""
-    row = conn.execute("SELECT id, name FROM playlists WHERE id=? AND user_id=?", (pid, uid)).fetchone()
+    row = conn.execute("SELECT id, name, rules FROM playlists WHERE id=? AND user_id=?", (pid, uid)).fetchone()
     if row is None:
         raise HTTPException(404, "Playlist introuvable.")
     return row
 
 
+def _manual(conn, uid, pid):
+    """Comme _own, pour une modification des pistes : refusée sur une playlist intelligente."""
+    if _own(conn, uid, pid)["rules"] is not None:
+        raise HTTPException(400, "Les pistes d'une playlist intelligente viennent de ses filtres.")
+
+
 @router.get("/api/playlists")
 def list_playlists(user=Depends(current_user), conn=Depends(get_conn)):
-    return [dict(r) for r in conn.execute(
-        "SELECT p.id, p.name, COUNT(t.id) AS tracks, COALESCE(SUM(t.duration), 0) AS duration FROM playlists p"
-        " LEFT JOIN playlist_tracks pt ON pt.playlist_id=p.id LEFT JOIN tracks t ON t.id=pt.track_id"
-        " WHERE p.user_id=? GROUP BY p.id ORDER BY p.name COLLATE NOCASE, p.id", (user["id"],))]
+    out = []
+    for r in conn.execute(
+            "SELECT p.id, p.name, p.rules, COUNT(t.id) AS tracks, COALESCE(SUM(t.duration), 0) AS duration FROM playlists p"
+            " LEFT JOIN playlist_tracks pt ON pt.playlist_id=p.id LEFT JOIN tracks t ON t.id=pt.track_id"
+            " WHERE p.user_id=? GROUP BY p.id ORDER BY p.name COLLATE NOCASE, p.id", (user["id"],)).fetchall():
+        d = {"id": r["id"], "name": r["name"], "tracks": r["tracks"], "duration": r["duration"], "smart": r["rules"] is not None}
+        if d["smart"]:  # ponytail: un comptage par playlist intelligente à chaque affichage de la liste
+            where, params = _smart(r["rules"])
+            d["tracks"], d["duration"] = conn.execute(
+                "SELECT COUNT(*), COALESCE(SUM(t.duration), 0) FROM tracks t JOIN releases r ON r.id=t.release_id " + where,
+                params).fetchone()
+        out.append(d)
+    return out
 
 
 @router.post("/api/playlists", status_code=201)
-def create_playlist(body: Name, user=Depends(current_user), conn=Depends(get_conn)):
+def create_playlist(body: NewPlaylist, user=Depends(current_user), conn=Depends(get_conn)):
+    """Avec `rules`, une playlist intelligente : ses pistes sont celles des releases qui passent ces filtres."""
     name = _name(body)
-    pid = conn.execute("INSERT INTO playlists(user_id, name, created_at) VALUES (?,?,?)",
-                       (user["id"], name, time.time())).lastrowid
+    rules = body.rules and body.rules.model_dump(exclude_none=True)
+    if body.rules and not rules:
+        raise HTTPException(400, "Choisissez au moins un filtre.")
+    pid = conn.execute("INSERT INTO playlists(user_id, name, created_at, rules) VALUES (?,?,?,?)",
+                       (user["id"], name, time.time(), json.dumps(rules) if rules else None)).lastrowid
     conn.commit()
     return {"id": pid, "name": name}
 
@@ -70,6 +112,11 @@ def delete_playlist(pid: Id, user=Depends(current_user), conn=Depends(get_conn))
 def playlist(pid: Id, offset: int = Query(0, ge=0, le=MAX_INT), limit: int = Query(50, ge=1, le=MAX_INT),
              user=Depends(current_user), conn=Depends(get_conn)):
     row = _own(conn, user["id"], pid)
+    if row["rules"] is not None:
+        where, params = _smart(row["rules"])
+        page = _page(conn, TRACK_COLS, TRACK_FROM, where, params, "r.name COLLATE NOCASE, r.id, t.disc, t.relpath",
+                     user["id"], offset, limit, _track)
+        return {"id": row["id"], "name": row["name"], "smart": True, "rules": json.loads(row["rules"]), **page}
     page = _page(conn, TRACK_COLS, "playlist_tracks pt JOIN " + TRACK_FROM, "WHERE pt.track_id=t.id AND pt.playlist_id=?",
                  [pid], "pt.position, t.id", user["id"], offset, limit, _track)
     return {"id": row["id"], "name": row["name"], **page}
@@ -78,7 +125,7 @@ def playlist(pid: Id, offset: int = Query(0, ge=0, le=MAX_INT), limit: int = Que
 @router.post("/api/playlists/{pid}/tracks", status_code=204)
 def add_tracks(pid: Id, body: Add, user=Depends(current_user), conn=Depends(get_conn)):
     """Ajoute des pistes (ou toutes celles d'une release) à la fin ; celles déjà présentes sont ignorées."""
-    _own(conn, user["id"], pid)
+    _manual(conn, user["id"], pid)
     ids = list(body.track_ids)
     if body.release_id is not None:
         ids += [r[0] for r in conn.execute("SELECT id FROM tracks WHERE release_id=? ORDER BY disc, relpath",
@@ -94,7 +141,7 @@ def add_tracks(pid: Id, body: Add, user=Depends(current_user), conn=Depends(get_
 @router.post("/api/playlists/{pid}/tracks/{track_id}/move", status_code=204)
 def move_track(pid: Id, track_id: Id, dir: Literal["up", "down"], user=Depends(current_user), conn=Depends(get_conn)):
     """Échange la piste avec sa voisine du dessus ou du dessous ; sans effet en bout de liste."""
-    _own(conn, user["id"], pid)
+    _manual(conn, user["id"], pid)
     me = conn.execute("SELECT position FROM playlist_tracks WHERE playlist_id=? AND track_id=?", (pid, track_id)).fetchone()
     if me is None:
         raise HTTPException(404, "Piste introuvable.")
@@ -110,7 +157,7 @@ def move_track(pid: Id, track_id: Id, dir: Literal["up", "down"], user=Depends(c
 
 @router.delete("/api/playlists/{pid}/tracks/{track_id}", status_code=204)
 def remove_track(pid: Id, track_id: Id, user=Depends(current_user), conn=Depends(get_conn)):
-    _own(conn, user["id"], pid)
+    _manual(conn, user["id"], pid)
     conn.execute("DELETE FROM playlist_tracks WHERE playlist_id=? AND track_id=?", (pid, track_id))
     conn.commit()
 

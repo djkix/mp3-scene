@@ -4,7 +4,7 @@
 
 **Collection de releases MP3 « scene » — bibliothèque · lecteur web · Chromecast · PWA**
 
-[![Version](https://img.shields.io/badge/version-1.36.0-purple?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.37.0-purple?style=for-the-badge)](CHANGELOG.md)
 [![Stack](https://img.shields.io/badge/stack-FastAPI_·_SQLite_·_JavaScript_pur-blue?style=for-the-badge)](#stack-technique)
 [![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
 
@@ -130,7 +130,7 @@ Chromecast ──HTTPS /cast/ (URL signées)──▶            │            
 |--------|--------------|
 | Backend | Python 3.12, FastAPI, Starlette, Uvicorn |
 | Base de données | SQLite (WAL, FTS5) |
-| Audio et images | mutagen (tags ID3), flux HTTP avec `Range`, mpg123 (formes d'onde), Pillow (vignettes) |
+| Audio et images | mutagen (tags ID3), flux HTTP avec `Range`, mpg123 (formes d'onde), ffmpeg (FLAC, WAV, WMA, M4A convertis en MP3 à l'écoute), Pillow (vignettes) |
 | Sécurité | argon2-cffi, cookie de session, URL de cast signées |
 | Frontend | JavaScript pur (modules ES), CSS, service worker, Google Cast SDK |
 | Tests | pytest (serveur), `node --test` (interface) |
@@ -316,7 +316,7 @@ La coquille de l'interface est mise en cache pour démarrer vite ; la musique et
 
 ## Sauvegarde
 
-Sauvegardez uniquement `./data` (base SQLite : comptes, favoris, index ; le sous-dossier `thumbs/` des vignettes peut être exclu, il se reconstruit). Sans elle, il faut refaire un scan complet et les comptes et favoris sont perdus ; la musique n'est pas touchée. Pour une copie cohérente : `docker compose stop mp3-scene`, copier `data/`, `docker compose start mp3-scene`.
+Sauvegardez uniquement `./data` (base SQLite : comptes, favoris, index ; les sous-dossiers `thumbs/` des vignettes et `transcode/` des pistes converties peuvent être exclus, ils se reconstruisent). Sans elle, il faut refaire un scan complet et les comptes et favoris sont perdus ; la musique n'est pas touchée. Pour une copie cohérente : `docker compose stop mp3-scene`, copier `data/`, `docker compose start mp3-scene`.
 
 Vider réellement l'index (le scan refuse de retirer toutes les releases d'un coup) : `docker compose stop mp3-scene`, supprimer `data/mp3scene.db*`, `docker compose start mp3-scene`, puis relancer un scan. **Tout** est perdu : index, comptes (l'administrateur est recréé depuis `ADMIN_USER` / `ADMIN_PASSWORD`, à remettre dans `.env`) et favoris de tous les utilisateurs.
 
@@ -383,6 +383,11 @@ git tag v1.2.0 && git push origin v1.2.0
 ## Historique des versions
 
 Le détail est dans le [journal des modifications](CHANGELOG.md).
+
+### 1.37.0 — 20 novembre 2026
+
+**FLAC, WAV, WMA, M4A** convertis à l'écoute, **labels**, **playlists intelligentes**, version gardée d'un doublon,
+artistes à ne jamais fusionner.
 
 ### 1.36.0 — 20 novembre 2026
 

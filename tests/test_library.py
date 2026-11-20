@@ -421,10 +421,10 @@ def test_admin_overview_classify_schedule(admin_client, user_client, library, ap
     assert user_client.get("/api/admin/overview").status_code == 403
     o = admin_client.get("/api/admin/overview").json()
     assert o["artists"] >= 2 and o["groups"] == 3 and o["users"] == 2 and o["db_size"] > 0 and o["thumbs_size"] == 0
-    assert o["overrides"] == {"total": 0, "artist": 0, "category": 0, "genre": 0, "year": 0} and o["shares"] == 0
+    assert o["overrides"] == {"total": 0, "artist": 0, "category": 0, "genre": 0, "year": 0, "hidden": 0} and o["shares"] == 0
     rid = admin_client.get("/api/releases?grp=WUS").json()["items"][0]["id"]
     admin_client.patch(f"/api/admin/releases/{rid}", json={"genre": "Techno"})
-    assert admin_client.get("/api/admin/overrides").json() == [{"id": rid, "name": A, "artist": None, "category": None, "genre": "Techno", "year": None}]
+    assert admin_client.get("/api/admin/overrides").json() == [{"id": rid, "name": A, "artist": None, "category": None, "genre": "Techno", "year": None, "hidden": None}]
     assert admin_client.get("/api/admin/overview").json()["overrides"]["genre"] == 1
     # reclassement à la demande : une graphie isolée rejoint la majorité, la correction manuelle tient
     c = db.connect(settings.data_dir)
@@ -498,3 +498,88 @@ def test_year_correction_select_all_and_played_releases(admin_client, user_clien
     assert [x["id"] for x in user_client.get("/api/history/releases").json()["items"]] == [a, b]
     assert [x["name"] for x in user_client.get("/api/history/releases?sort=name&dir=desc").json()["items"]] == [B, A]
     assert admin_client.get("/api/history/releases").json()["items"] == []
+
+
+def test_keep_version_separate_artist_label_smart_playlist(admin_client, user_client, library, settings):
+    import sqlite3
+    from app import artists, db, nfo
+    from app.scanner import scan_structure, scan_tags
+    rel = lambda c=admin_client, qs="": {x["name"]: x for x in c.get("/api/releases" + qs).json()["items"]}
+    B = "Bicep-Glue-(NT123)-WEB-2017-PWT"
+    a, b = rel()[A]["id"], rel()[B]["id"]
+    # doublons : même artiste et même titre dans le nom ; garder une version masque l'autre des listes
+    c = db.connect(settings.data_dir)
+    c.execute("UPDATE releases SET artist='A-Trak', title='Ibanez' WHERE id=?", (b,)); c.commit()
+    assert admin_client.get("/api/admin/quality").json()["dupes"] == 2
+    assert user_client.put(f"/api/admin/releases/{a}/keep").status_code == 403
+    assert admin_client.put(f"/api/admin/releases/{a}/keep").status_code == 204
+    assert B not in rel() and A in rel() and admin_client.get("/api/admin/quality").json()["dupes"] == 0
+    assert [(v["name"], v["hidden"]) for v in admin_client.get(f"/api/releases/{a}/versions").json()] == [(B, True)]
+    db.init(settings.data_dir)                                              # masquée après un redémarrage aussi
+    assert B not in rel() and admin_client.get(f"/api/releases/{b}").json()["hidden"] is True
+    assert admin_client.put(f"/api/admin/releases/{b}/keep").status_code == 204 and A not in rel() and B in rel()
+    assert admin_client.delete(f"/api/admin/releases/{b}/keep").status_code == 204 and {A, B} <= set(rel())
+    assert admin_client.get("/api/admin/overrides").json() == []
+    c.execute("UPDATE releases SET artist='Bicep', title='Glue' WHERE id=?", (b,)); c.commit()
+    # artistes à ne jamais fusionner : « Florida » ne rejoint plus « Flo Rida »
+    pairs = {1: ("Flo Rida", None), 2: ("Flo_Rida", None), 3: ("Florida", None)}
+    assert {v[0] for v in artists._step(pairs, {}).values()} == {"Flo Rida"}
+    assert [v[0] for v in artists._step(pairs, {}, frozenset({"florida"})).values()] == ["Flo Rida", "Flo Rida", "Florida"]
+    c.execute("UPDATE releases SET name='A_Trak-Ibanez-WEB-2009-WUS' WHERE id=?", (a,)); c.commit()
+    sep = lambda m, **kw: getattr(admin_client, m)("/api/admin/artists/separate", **kw).status_code
+    assert sep("put", json={"name": "A_Trak"}) == 204 and admin_client.get("/api/admin/artists/separate").json() == ["A Trak"]
+    assert user_client.get("/api/admin/artists/separate").status_code == 403
+    assert sep("delete", params={"name": "a trak"}) == 204 and sep("delete", params={"name": "a trak"}) == 404
+    c.execute("UPDATE releases SET name=? WHERE id=?", (A, a)); c.commit()
+    # label et catalogue : lus dans le NFO, sinon le numéro entre parenthèses du nom
+    assert nfo.label("\u2551 Label.....: Ministry of Sound      \u2551\n\u2551 Cat.Nr....: MOS123CD \u2551\n Category: x\n") == ("Ministry of Sound", "MOS123CD")
+    assert nfo.label("LABEL: n/a\nCatalogue: -\n") == (None, None) and nfo.label("Label : http://x.com") == (None, None)
+    folder = settings.music_root / c.execute("SELECT path FROM releases WHERE id=?", (b,)).fetchone()[0]
+    (folder / "00-bicep.nfo").write_bytes(b"Label....: Ninja Tune\nR.Date...: 2017-09-01\n")
+    scan_structure(c, settings.music_root, now=3000.0); scan_tags(c, settings.music_root); c.commit()
+    r = admin_client.get(f"/api/releases/{b}").json()
+    assert (r["label"], r["catalog"]) == ("Ninja Tune", "NT123")
+    assert admin_client.get("/api/groups?by=label").json()[0]["name"] == "Ninja Tune"
+    assert list(rel(qs="?label=Ninja%20Tune")) == [B]
+    # playlist intelligente : les pistes des releases qui passent les filtres, sans modification manuelle
+    mk = lambda body: user_client.post("/api/playlists", json=body)
+    assert mk({"name": "Vide", "rules": {}}).status_code == 400
+    pid = mk({"name": "Ninja", "rules": {"label": "Ninja Tune"}}).json()["id"]
+    p = user_client.get(f"/api/playlists/{pid}").json()
+    assert p["smart"] and p["rules"] == {"label": "Ninja Tune"} and {t["release_id"] for t in p["items"]} == {b}
+    row = next(x for x in user_client.get("/api/playlists").json() if x["id"] == pid)
+    assert row["smart"] and row["tracks"] == len(p["items"]) > 0
+    assert user_client.post(f"/api/playlists/{pid}/tracks", json={"release_id": a}).status_code == 400
+    assert admin_client.get(f"/api/playlists/{pid}").status_code == 404
+    c.close()
+
+
+def test_other_formats_are_indexed_and_transcoded(admin_client, library, settings, monkeypatch):
+    import shutil, subprocess
+    from app import db, routes_media
+    from app.scanner import scan_structure, scan_tags
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("ffmpeg absent")
+    folder = settings.music_root / "Singles" / "Tone-Sine-WEB-FLAC-2020-GRP"
+    folder.mkdir(parents=True)
+    subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=1", "-metadata", "title=Sine",
+                    str(folder / "01-tone-sine.flac")], check=True)
+    c = db.connect(settings.data_dir)
+    scan_structure(c, settings.music_root, now=4000.0); scan_tags(c, settings.music_root); c.commit(); c.close()
+    rel = admin_client.get("/api/release-by-name", params={"name": folder.name}).json()
+    t = rel["tracks"][0]
+    assert t["title"] == "Sine" and t["filename"].endswith(".flac") and 0.9 < t["duration"] < 1.1
+    assert (rel["artist"], rel["title"], rel["source"], rel["year"]) == ("Tone", "Sine", "WEB", 2020)   # « FLAC » hors du titre
+    r = admin_client.get(f"/api/tracks/{t['id']}/stream")
+    assert r.status_code == 200 and r.headers["content-type"] == "audio/mpeg" and r.content[:3] in (b"ID3", b"\xff\xfb\xe0"[:3])
+    assert len(list((settings.data_dir / "transcode").glob("*.mp3"))) == 1
+    part = admin_client.get(f"/api/tracks/{t['id']}/stream", headers={"Range": "bytes=0-9"})
+    assert part.status_code == 206 and len(part.content) == 10                      # déplacement dans la piste
+    assert admin_client.get(f"/api/tracks/{t['id']}/stream?download=1").content[:4] == b"fLaC"   # l'original
+    assert admin_client.get(f"/api/tracks/{t['id']}/waveform").status_code == 200
+    # sans ffmpeg : erreur claire, pas de fichier servi à moitié
+    for f in (settings.data_dir / "transcode").glob("*"):
+        f.unlink()
+    monkeypatch.setattr(routes_media.shutil, "which", lambda name: None)
+    assert admin_client.get(f"/api/tracks/{t['id']}/stream").status_code == 503
+    assert not list(settings.music_root.rglob("*.mp3.part")) and not list(settings.music_root.rglob("*.part"))

@@ -29,8 +29,12 @@ def init(data_dir: Path) -> None:
             conn.execute("ALTER TABLE releases ADD COLUMN released_at REAL")
         if "daily_at" not in {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}:  # ajoutée en 1.34.0
             conn.execute("ALTER TABLE scan_state ADD COLUMN daily_at INTEGER")
-        if "year" not in {r[1] for r in conn.execute("PRAGMA table_info(overrides)")}:  # ajoutée en 1.36.0
-            conn.execute("ALTER TABLE overrides ADD COLUMN year INTEGER")
+        # colonnes ajoutées en 1.36.0 (année corrigée) et en 1.37.0
+        for table, col, kind in (("overrides", "year", "INTEGER"), ("overrides", "hidden", "INTEGER"),
+                                 ("releases", "label", "TEXT"), ("releases", "catalog", "TEXT"),
+                                 ("releases", "hidden", "INTEGER NOT NULL DEFAULT 0"), ("playlists", "rules", "TEXT")):
+            if col not in {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {kind}")
         classify(conn)  # données rangées par une version antérieure : mêmes règles que le scanner d'aujourd'hui
         conn.execute("INSERT OR IGNORE INTO scan_state(id) VALUES (1)")
         conn.execute(f"PRAGMA user_version = {VERSION}")
@@ -48,20 +52,22 @@ def classify(conn) -> None:
         new, year = group(g)
         if new != g:
             conn.execute("UPDATE releases SET grp=?, year=COALESCE(year, ?) WHERE grp=?", (new, year, g))
-    merge_group_case(conn)
+    merge_case(conn, "grp")
+    merge_case(conn, "label")
     year_from_nfo(conn)
     artists.apply(conn)
     categorize(conn)
 
 
-def merge_group_case(conn) -> None:
-    """Réunit les groupes qui ne diffèrent que par la casse (« dh » / « DH ») sous la graphie la plus répandue."""
+def merge_case(conn, col: str) -> None:
+    """Réunit les groupes (ou les labels) qui ne diffèrent que par la casse (« dh » / « DH ») sous la graphie la
+    plus répandue. `col` : grp ou label, jamais un texte du client."""
     # ponytail: lower() de SQLite, donc ASCII seulement ; suffisant pour des noms de groupes de la scène
-    for (k,) in conn.execute("SELECT lower(grp) FROM releases WHERE grp IS NOT NULL GROUP BY 1"
-                             " HAVING COUNT(DISTINCT grp)>1").fetchall():
-        best = conn.execute("SELECT grp FROM releases WHERE lower(grp)=? GROUP BY grp ORDER BY COUNT(*) DESC, grp"
+    for (k,) in conn.execute(f"SELECT lower({col}) FROM releases WHERE {col} IS NOT NULL GROUP BY 1"
+                             f" HAVING COUNT(DISTINCT {col})>1").fetchall():
+        best = conn.execute(f"SELECT {col} FROM releases WHERE lower({col})=? GROUP BY {col} ORDER BY COUNT(*) DESC, {col}"
                             " LIMIT 1", (k,)).fetchone()[0]
-        conn.execute("UPDATE releases SET grp=? WHERE lower(grp)=? AND grp!=?", (best, k, best))
+        conn.execute(f"UPDATE releases SET {col}=? WHERE lower({col})=? AND {col}!=?", (best, k, best))
 
 
 _KIND_FOLDER = {"live": r"live|radio", "comp": r"compil", "single": r"single"}
@@ -107,8 +113,10 @@ def apply_overrides(conn) -> None:
         "UPDATE releases SET tag_artist=COALESCE((SELECT artist FROM overrides WHERE path=releases.path), tag_artist),"
         " category=COALESCE((SELECT category FROM overrides WHERE path=releases.path), category),"
         " genre=COALESCE((SELECT genre FROM overrides WHERE path=releases.path), genre),"
-        " year=COALESCE((SELECT year FROM overrides WHERE path=releases.path), year)"
+        " year=COALESCE((SELECT year FROM overrides WHERE path=releases.path), year),"
+        " hidden=COALESCE((SELECT hidden FROM overrides WHERE path=releases.path), 0)"
         " WHERE path IN (SELECT path FROM overrides)")
+    conn.execute("UPDATE releases SET hidden=0 WHERE hidden=1 AND path NOT IN (SELECT path FROM overrides WHERE hidden=1)")
 
 
 def year_from_nfo(conn) -> None:

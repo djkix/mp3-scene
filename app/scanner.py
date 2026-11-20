@@ -19,6 +19,8 @@ from app.naming import parse_release_name
 DISC_RE = re.compile(r"^(cd|disc|disk)[ _-]?(\d+)$", re.IGNORECASE)
 BATCH = 500
 TAG_BATCH = 200
+# pistes indexées ; tout ce qui n'est pas du MP3 est converti à l'écoute (routes_media)
+AUDIO = {".mp3", ".flac", ".wav", ".m4a", ".wma", ".ogg", ".opus", ".aiff", ".aif", ".ape", ".wv"}
 IMAGES = (".jpg", ".jpeg", ".png")  # mêmes types que routes_media.IMAGE_TYPES
 log = logging.getLogger(__name__)
 
@@ -56,7 +58,7 @@ def _decode(e):
 
 
 def _files(entries, prefix="", disc=1):
-    """Fichiers directs : ([(relpath, disc, taille)] des .mp3, taille totale, présence d'un .nfo, ignorés)."""
+    """Fichiers directs : ([(relpath, disc, taille)] des pistes audio, taille totale, présence d'un .nfo, ignorés)."""
     tracks, size, nfo, skipped = [], 0, False, 0
     for e in entries:
         if not e.is_file(follow_symlinks=False):
@@ -68,7 +70,7 @@ def _files(entries, prefix="", disc=1):
         st = e.stat(follow_symlinks=False).st_size  # OSError : la release entière est ignorée par l'appelant
         size += st
         ext = os.path.splitext(name)[1].lower()
-        if ext == ".mp3":
+        if ext in AUDIO:
             tracks.append((prefix + name, disc, st))
         elif ext == ".nfo":
             nfo = True
@@ -277,7 +279,7 @@ def _scan_structure(conn, root, now):
     conn.execute("DELETE FROM folders")
     conn.executemany("INSERT INTO folders(path, parent) VALUES (?,?)",
                      [(f, f.rpartition("/")[0]) for f in folders])
-    db.merge_group_case(conn)  # une release ajoutée rejoint la graphie majoritaire de son groupe
+    db.merge_case(conn, "grp")  # une release ajoutée rejoint la graphie majoritaire de son groupe
     artists.apply(conn)
     db.categorize(conn)
     conn.execute("UPDATE scan_state SET first_scan_done=1 WHERE id=1")
@@ -330,7 +332,7 @@ class _Watched:
 
 
 def _read_tags(path):
-    """(titre, artiste, genre, durée, débit) du fichier, champs None s'il n'est pas lisible comme MP3.
+    """(titre, artiste, genre, durée, débit) du fichier, champs None s'il n'est pas lisible.
 
     Lève OSError si le fichier ne peut pas être lu (absent, NFS indisponible) : la piste reste à lire."""
     with open(path, "rb") as raw:  # lecture seule : mutagen ne reçoit qu'un fichier ouvert en 'rb'
@@ -402,20 +404,26 @@ def _scan_tags(conn, root, should_stop):
     return read
 
 
-def _nfo_date(root, path):
-    """Date de sortie du premier NFO du dossier (le même que celui de la fiche) ; 0 s'il n'en donne pas."""
+def _nfo_info(root, path):
+    """(date de sortie, label, catalogue) du premier NFO du dossier (le même que celui de la fiche) ; 0 et '' pour
+    une date ou un label absents. Sans numéro dans le NFO, celui du nom : « Artist-Title-(CAT001)-WEB-2019-GRP »."""
     names = sorted(n for n in os.listdir(Path(root, path)) if n.lower().endswith(".nfo"))
+    in_name = re.search(r"-\(([^()]{2,30})\)-", _name(path))
+    cat = in_name and in_name.group(1).replace("_", " ")
     if not names:
-        return 0
+        return 0, "", cat
     with open(Path(root, path, names[0]), "rb") as fh:  # lecture seule
-        return nfo.release_date(fh.read(1024 * 1024).decode("cp437")) or 0
+        text = fh.read(1024 * 1024).decode("cp437")
+    label, nfo_cat = nfo.label(text)
+    return nfo.release_date(text) or 0, label or "", nfo_cat or cat
 
 
 def _scan_dates(conn, root, should_stop):
-    """Renseigne released_at des releases à NFO jamais lu (nouvelles, modifiées, ou antérieures à la colonne)."""
+    """Renseigne date de sortie, label et catalogue des releases à NFO jamais lu (nouvelles, modifiées, ou
+    antérieures à l'une de ces colonnes)."""
     last = 0
     while not should_stop():
-        rows = conn.execute("SELECT id, path FROM releases WHERE has_nfo=1 AND released_at IS NULL AND id>?"
+        rows = conn.execute("SELECT id, path FROM releases WHERE has_nfo=1 AND (released_at IS NULL OR label IS NULL) AND id>?"
                             " ORDER BY id LIMIT ?", (last, TAG_BATCH)).fetchall()
         if not rows:
             break
@@ -423,11 +431,12 @@ def _scan_dates(conn, root, should_stop):
         done = []  # lot lu avant d'écrire, comme pour les tags
         for r in rows:
             try:
-                done.append((_nfo_date(root, r["path"]), r["id"]))
+                done.append((*_nfo_info(root, r["path"]), r["id"]))
             except OSError as e:
                 log.warning("NFO illisible, relu au prochain scan : %s (%s)", r["path"], e)
-        conn.executemany("UPDATE releases SET released_at=? WHERE id=?", done)
+        conn.executemany("UPDATE releases SET released_at=?, label=?, catalog=? WHERE id=?", done)
         db.year_from_nfo(conn)
+        db.merge_case(conn, "label")
         conn.commit()
 
 
@@ -493,7 +502,7 @@ class Runner:
             conn.commit()
             pending = (conn.execute("SELECT 1 FROM tracks WHERE tags_read=0 LIMIT 1").fetchone()
                        or conn.execute("SELECT 1 FROM releases WHERE has_cover IS NULL LIMIT 1").fetchone()
-                       or conn.execute("SELECT 1 FROM releases WHERE has_nfo=1 AND released_at IS NULL LIMIT 1").fetchone())
+                       or conn.execute("SELECT 1 FROM releases WHERE has_nfo=1 AND (released_at IS NULL OR label IS NULL) LIMIT 1").fetchone())
         finally:
             conn.close()
         if pending:

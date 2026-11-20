@@ -211,14 +211,37 @@ export function render(container, params = {}) {
           loadAliases();
         } }, t('Détacher'))))));
     }).catch((err) => { if (!dead) aliasMsg.textContent = err.message; });
+    // graphies à ne jamais fusionner (« Florida » n'est pas « Flo Rida »)
+    const seps = el('tbody'), sepMsg = el('p', { class: 'status', role: 'status' });
+    const sepName = el('input', { required: true, maxLength: 200, placeholder: t('Graphie exacte, par exemple Florida'), 'aria-label': t('Artiste à garder à part') });
+    const sepCall = async (method, name) => {
+      try {
+        await api('/admin/artists/separate' + (method === 'DELETE' ? '?name=' + encodeURIComponent(name) : ''), { method, ...(method === 'PUT' && { body: { name } }) });
+      } catch (err) { sepMsg.textContent = err.message; return; }
+      loadSeps();
+    };
+    const loadSeps = () => api('/admin/artists/separate').then((list) => {
+      if (dead) return;
+      sepMsg.textContent = list.length ? '' : t('Aucun artiste gardé à part.');
+      seps.replaceChildren(...list.map((n) => el('tr', {}, el('th', { scope: 'row' }, n),
+        el('td', {}, el('button', { type: 'button', onclick: (e) => { e.target.disabled = true; sepCall('DELETE', n); } }, t('Fusionner à nouveau'))))));
+    }).catch((err) => { if (!dead) sepMsg.textContent = err.message; });
+    const sepForm = el('form', { class: 'inline-form', onsubmit: (e) => { e.preventDefault(); sepCall('PUT', sepName.value).then(() => { sepName.value = ''; }); } },
+      sepName, el('button', { type: 'submit' }, t('Garder à part')));
     body.replaceChildren(el('h1', {}, t('Règles de classement')),
       el('p', { class: 'hint' }, t('Appliquées à chaque scan et à chaque démarrage. Les corrections manuelles l’emportent toujours.')),
       ...RULES.map(([title, key, text]) => el('section', { class: 'ad-card' }, el('h3', {}, t(title), counts[key]), el('p', {}, t(text)))),
       classBtn, classMsg,
       el('h2', {}, t('Artistes rattachés')),
       el('div', { class: 'table-wrap' }, el('table', { class: 'users' },
-        el('thead', {}, el('tr', {}, th(t('Artiste')), th(t('Rattaché à')), th(t('Actions')))), aliases)), aliasMsg);
+        el('thead', {}, el('tr', {}, th(t('Artiste')), th(t('Rattaché à')), th(t('Actions')))), aliases)), aliasMsg,
+      el('h2', {}, t('Artistes à ne jamais fusionner')),
+      el('p', { class: 'hint' }, t('Une graphie listée ici garde ses releases au lieu de rejoindre un artiste au nom proche, à ce scan et aux suivants.')),
+      sepForm,
+      el('div', { class: 'table-wrap' }, el('table', { class: 'users' },
+        el('thead', {}, el('tr', {}, th(t('Artiste')), th(t('Actions')))), seps)), sepMsg);
     loadAliases();
+    loadSeps();
     api('/admin/overview').then((o) => { if (alive()) RULES.forEach(([, key]) => { counts[key].textContent = o[key]; }); }).catch(() => {});
   } else if (section === 'corrections') {
     const rows = el('tbody');
@@ -229,17 +252,17 @@ export function render(container, params = {}) {
       rows.replaceChildren(...list.map((o) => el('tr', {},
         el('th', { scope: 'row' }, el('a', { href: `#/release/${encodeURIComponent(o.name)}` }, relName(o.name))),
         el('td', {}, o.artist || '—'), el('td', {}, o.category ? catLabel(o.category) : '—'), el('td', {}, o.genre || '—'),
-        el('td', {}, o.year ? String(o.year) : '—'),
+        el('td', {}, o.year ? String(o.year) : '—'), el('td', {}, o.hidden ? t('oui') : '—'),
         el('td', {}, el('button', { type: 'button', onclick: async (e) => {
           e.target.disabled = true;
-          try { await api(`/admin/releases/${o.id}`, { method: 'PATCH', body: { artist: '', category: '', genre: '', year: null } }); } catch (err) { msg.textContent = err.message; }
+          try { await api(`/admin/releases/${o.id}`, { method: 'PATCH', body: { artist: '', category: '', genre: '', year: null, hidden: false } }); } catch (err) { msg.textContent = err.message; }
           load();
         } }, t('Retour à l’automatique'))))));
     }).catch((err) => { if (!dead) msg.textContent = err.message; });
     body.replaceChildren(el('h1', {}, t('Corrections manuelles')),
       el('p', { class: 'hint' }, t('Faites depuis la fiche d’une release, bouton Corriger. Elles sont gardées après les scans.')),
       el('div', { class: 'table-wrap' }, el('table', { class: 'users' },
-        el('thead', {}, el('tr', {}, th(t('Release')), th(t('Artiste')), th(t('Catégorie')), th(t('Genre')), th(t('Année')), th(t('Actions')))), rows)), msg);
+        el('thead', {}, el('tr', {}, th(t('Release')), th(t('Artiste')), th(t('Catégorie')), th(t('Genre')), th(t('Année')), th(t('Masquée')), th(t('Actions')))), rows)), msg);
     load();
   } else {
     // Vue d'ensemble : les totaux, puis un bloc par type d'action
@@ -264,7 +287,7 @@ export function render(container, params = {}) {
           link('#/admin/scan', t('Gérer le scan'))),
           card(t('Contrôle qualité'), null, QUALITY.map(([k, label]) => [t(label), n(q[k])]), link('#/library?tab=quality', t('Tout voir'))),
           card(t('Corrections'), o.overrides.total ? String(o.overrides.total) : null, [[t('Artiste'), o.overrides.artist],
-            [t('Catégorie'), o.overrides.category], [t('Genre'), o.overrides.genre], [t('Année'), o.overrides.year]], link('#/admin/corrections', t('Gérer'))));
+            [t('Catégorie'), o.overrides.category], [t('Genre'), o.overrides.genre], [t('Année'), o.overrides.year], [t('Masquées'), o.overrides.hidden]], link('#/admin/corrections', t('Gérer'))));
         cls.replaceChildren(card(t('Règles'), null, [[t('Catégories'), n(o.categories)], [t('Artistes'), n(o.artists)],
           [t('Groupes'), n(o.groups)], [t('Genres'), n(o.genres)]], classBtn, link('#/admin/rules', t('Voir les règles'))));
         acc.replaceChildren(

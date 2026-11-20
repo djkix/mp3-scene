@@ -1,4 +1,4 @@
-"""Date de sortie lue dans le NFO d'une release."""
+"""Date de sortie, label et numéro de catalogue lus dans le NFO d'une release."""
 import datetime
 import re
 
@@ -38,3 +38,28 @@ def release_date(text: str) -> float | None:
         if 1980 <= day.year and day <= datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=366):
             return day.timestamp()
     return None
+
+
+_FIELD = r"[^A-Za-z0-9\n]*[:=][ \t]*(\S[^\n]*)"
+_LABEL = re.compile(r"^[^A-Za-z0-9\n]*(?:record[ ._]*)?label\b" + _FIELD, re.I | re.M)
+_CAT = re.compile(r"\bcat(?:alog(?:ue)?)?(?:[ ._-]*(?:nr|no|num(?:ber)?|#|id))?(?![A-Za-z])" + _FIELD, re.I)
+_NONE = {"na", "none", "unknown", "various", "va", "nolabel", "notonlabel", "selfreleased", "tba", "whitelabel"}
+
+
+def _value(m, size):
+    """Valeur d'un champ, sans le cadre du NFO à droite ; None si vide, trop longue, une adresse ou « n/a »."""
+    if m is None:
+        return None
+    # « Foo Records      ║ », « Foo  Releasedate: … », « Foo / Cat.Nr: X » : la valeur s'arrête au cadre ou au champ suivant
+    v = re.split(r"\s{2,}|\s+[/|]\s+(?=[^/|]*:)", m.group(1).strip())[0]
+    v = re.sub(r"[^\w)\]!?.'\"]+$", "", v).strip()
+    if not v or len(v) > size or "://" in v or "www." in v.lower() or re.sub(r"[\W_]", "", v).lower() in _NONE:
+        return None
+    return v
+
+
+def label(text: str) -> tuple[str | None, str | None]:
+    """(label, numéro de catalogue) annoncés par le NFO : « Label....: Ministry of Sound », « Cat.Nr: MOS123 »."""
+    # ponytail: lignes « libellé : valeur » seulement ; les NFO en prose ou en tableau ne sont pas lus
+    cat = _value(_CAT.search(text), 30)
+    return _value(_LABEL.search(text), 60), cat if cat and any(c.isdigit() for c in cat) else None
