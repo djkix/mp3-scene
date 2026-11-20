@@ -179,7 +179,14 @@ function stopAudio() {
 const AHEAD = 600;
 const blobs = new Map();  // id de piste -> URL d'objet de la piste téléchargée
 let fetching = false, fetchRetry = 0;
-const streamUrl = (id) => `/api/tracks/${encodeURIComponent(id)}/stream`;
+// Flux d'une piste. Avec le réglage « qualité d'origine », un FLAC, WAV, M4A, OGG ou Opus que ce navigateur sait lire
+// est demandé tel quel ; sinon le serveur l'envoie converti en MP3.
+const NATIVE = { flac: 'audio/flac', wav: 'audio/wav', m4a: 'audio/mp4', ogg: 'audio/ogg', opus: 'audio/ogg; codecs=opus' };
+const probe = typeof Audio === 'function' ? new Audio() : null;
+function streamUrl(t) {
+  const type = prefs.original && NATIVE[String(t.filename || '').split('.').pop().toLowerCase()];
+  return `/api/tracks/${encodeURIComponent(t.id)}/stream${type && probe?.canPlayType(type) ? '?original=1' : ''}`;
+}
 
 function dropBlobs(keep = new Set()) {
   for (const [id, url] of blobs) if (!keep.has(id)) { URL.revokeObjectURL(url); blobs.delete(id); }
@@ -203,7 +210,7 @@ async function buffer() {
   try {
     let blob = offline.has(todo.id) ? await offline.blob(todo.id) : null; // déjà sur l'appareil : pas de réseau
     if (!blob) {
-      const res = await fetch(streamUrl(todo.id));
+      const res = await fetch(streamUrl(todo));
       if (!res.ok) throw new Error(res.status);
       blob = await res.blob();
     }
@@ -296,7 +303,7 @@ function swap(x) {
 // jusqu'au rechargement de la page.
 // ponytail: nivellement = compresseur (réduit les écarts de volume), pas une analyse ReplayGain piste par piste.
 const PREFS = KEY + '.audio';
-const prefs = { eq: [0, 0, 0], level: false, fade: 0 };
+const prefs = { eq: [0, 0, 0], level: false, fade: 0, original: false };
 try { Object.assign(prefs, JSON.parse(localStorage.getItem(PREFS))); } catch { /* absent ou corrompu */ }
 if (!Array.isArray(prefs.eq) || prefs.eq.length !== 3) prefs.eq = [0, 0, 0];
 let ctx = null, fx = null;
@@ -348,11 +355,15 @@ function openAudioPrefs() {
       el('label', { class: 'fx-line' }, tr('Niveler le volume entre les pistes'), el('input', { type: 'checkbox', class: 'switch', role: 'switch',
         checked: prefs.level, onchange: (e) => { prefs.level = e.target.checked; applyPrefs(); } })),
       el('div', { class: 'fx-line' }, tr('Fondu enchaîné'), fades),
+      el('h3', {}, tr('Qualité')),
+      el('label', { class: 'fx-line' }, tr('Qualité d’origine pour les FLAC, WAV et M4A'), el('input', { type: 'checkbox', class: 'switch', role: 'switch',
+        checked: prefs.original, onchange: (e) => { prefs.original = e.target.checked; applyPrefs(); } })),
+      el('p', { class: 'hint' }, tr('Sans ce réglage, ces fichiers sont écoutés convertis en MP3 320 kbit/s, plus légers. Il s’applique à partir de la piste suivante.')),
       el('p', { class: 'hint' }, canFade ? tr("Les pistes s'enchaînent sans blanc ; le fondu les fait se chevaucher.")
         : tr("Les pistes s'enchaînent sans blanc. Le fondu n'est pas possible sur cet appareil.")),
       el('p', { class: 'hint' }, tr("Sur iPhone, l'égaliseur et le nivellement peuvent couper le son écran verrouillé : remettez-les à zéro puis rechargez la page."))),
     el('div', { class: 'fx-foot' },
-      el('button', { type: 'button', onclick: () => { prefs.eq = [0, 0, 0]; prefs.level = false; prefs.fade = 0; applyPrefs(); openAudioPrefs(); } }, tr('Réinitialiser')),
+      el('button', { type: 'button', onclick: () => { prefs.eq = [0, 0, 0]; prefs.level = false; prefs.fade = 0; prefs.original = false; applyPrefs(); openAudioPrefs(); } }, tr('Réinitialiser')),
       el('button', { type: 'button', class: 'primary', onclick: () => fxDlg.close() }, tr('Fermer'))));
   if (!fxDlg.open) fxDlg.showModal();
 }
@@ -374,13 +385,13 @@ function load(play, pos = null) {
     offline.blob(t.id).then((b) => {
       if (loadedId !== t.id) return; // une autre piste a été chargée entre-temps
       if (b && !blobs.has(t.id)) blobs.set(t.id, URL.createObjectURL(b));
-      audio.src = blobs.get(t.id) || streamUrl(t.id);
+      audio.src = blobs.get(t.id) || streamUrl(t);
       if (wantPlay) start();
     });
     update();
     return tick();
   }
-  audio.src = blobs.get(t.id) || streamUrl(t.id);
+  audio.src = blobs.get(t.id) || streamUrl(t);
   if (play) start();
   update();
   tick();

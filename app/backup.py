@@ -35,6 +35,9 @@ def _copy(settings, tmp: Path) -> int:
             dst.close()
     finally:
         src.close()
+    covers = settings.data_dir / "covers"  # pochettes déposées à la main : elles n'existent nulle part ailleurs
+    if covers.is_dir():
+        shutil.copytree(covers, tmp / "covers")
     for name in _CONFIG:  # configuration de la pile, si son dossier est monté
         if (settings.stack_dir / name).is_file():
             (tmp / "config").mkdir(exist_ok=True)

@@ -30,7 +30,7 @@ def init(data_dir: Path) -> None:
         if "daily_at" not in {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}:  # ajoutée en 1.34.0
             conn.execute("ALTER TABLE scan_state ADD COLUMN daily_at INTEGER")
         # colonnes ajoutées en 1.36.0 (année corrigée) et en 1.37.0
-        for table, col, kind in (("overrides", "year", "INTEGER"), ("overrides", "hidden", "INTEGER"),
+        for table, col, kind in (("overrides", "year", "INTEGER"), ("overrides", "hidden", "INTEGER"), ("overrides", "cover", "INTEGER"),
                                  ("releases", "label", "TEXT"), ("releases", "catalog", "TEXT"),
                                  ("releases", "hidden", "INTEGER NOT NULL DEFAULT 0"), ("playlists", "rules", "TEXT")):
             if col not in {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}:

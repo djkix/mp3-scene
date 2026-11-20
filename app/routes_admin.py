@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from . import artists, backup, db, genres, nfo, scanner, security
 from .deps import MAX_INT, Id, get_conn, require_admin
 from .naming import parse_release_name
+from .routes_media import COVER_MAX, save_cover
 from .routes_library import RELEASE_COLS, RELEASE_FROM, Dir, Sort, _order, _page, _release
 
 router = APIRouter(prefix="/api/admin", dependencies=[Depends(require_admin)])
@@ -241,7 +242,7 @@ def _correct(conn, rids, fields):
         for col, val in fields.items():  # noms de colonnes issus du modèle, jamais du client
             conn.execute(f"UPDATE overrides SET {col}=? WHERE path=?", (val, path))
     conn.execute("DELETE FROM overrides WHERE artist IS NULL AND category IS NULL AND genre IS NULL AND year IS NULL"
-                 " AND hidden IS NULL")
+                 " AND hidden IS NULL AND cover IS NULL")
     if "year" in fields and fields["year"] is None:  # retour à l'automatique : année du nom, sinon celle du NFO
         conn.executemany("UPDATE releases SET year=? WHERE id=?",
                          [(parse_release_name(r["name"])["year"], rid) for r, rid in zip(found, rids)])
@@ -273,6 +274,50 @@ def correct_releases(body: BulkCorrection, conn=Depends(get_conn)):
     if not fields:
         raise HTTPException(400, "Aucun champ à corriger.")
     _correct(conn, list(dict.fromkeys(body.ids)), fields)
+
+
+def _release_path(conn, rid):
+    row = conn.execute("SELECT path FROM releases WHERE id=?", (rid,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "Release introuvable.")
+    return row["path"]
+
+
+@router.put("/releases/{rid}/cover", status_code=204)
+async def upload_cover(rid: Id, request: Request):
+    """Dépose une pochette pour cette release (corps de la requête : l'image, JPEG ou PNG). Elle est gardée dans les
+    données de l'application, jamais dans le dossier de musique, et passe avant celle du dossier."""
+    if int(request.headers.get("content-length") or 0) > COVER_MAX:
+        raise HTTPException(413, "Image trop lourde (8 Mo au plus).")
+    data = await request.body()
+    if not data or len(data) > COVER_MAX:
+        raise HTTPException(413 if data else 400, "Image trop lourde (8 Mo au plus)." if data else "Image manquante.")
+    settings = request.app.state.settings
+    conn = db.connect(settings.data_dir)
+    try:
+        path = _release_path(conn, rid)
+        try:
+            save_cover(settings.data_dir, path, rid, data)
+        except HTTPException:
+            raise
+        except Exception:
+            raise HTTPException(400, "Ce fichier n'est pas une image lisible (JPEG ou PNG).") from None
+        conn.execute("INSERT OR IGNORE INTO overrides(path) VALUES (?)", (path,))
+        conn.execute("UPDATE overrides SET cover=1 WHERE path=?", (path,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+@router.delete("/releases/{rid}/cover", status_code=204)
+def remove_cover(rid: Id, request: Request, conn=Depends(get_conn)):
+    """Retire la pochette déposée à la main ; celle du dossier ou des tags, s'il y en a une, revient."""
+    path = _release_path(conn, rid)
+    save_cover(request.app.state.settings.data_dir, path, rid, None)
+    conn.execute("UPDATE overrides SET cover=NULL WHERE path=?", (path,))
+    conn.execute("DELETE FROM overrides WHERE artist IS NULL AND category IS NULL AND genre IS NULL AND year IS NULL"
+                 " AND hidden IS NULL AND cover IS NULL")
+    conn.commit()
 
 
 def _versions(conn, rid):
@@ -413,7 +458,8 @@ QUALITY = {
     "unreadable": "r.id IN (SELECT release_id FROM tracks WHERE tags_read=1 AND duration IS NULL)",
     "low_bitrate": "(SELECT AVG(bitrate) FROM tracks WHERE release_id=r.id)<192000",
     "no_year": "r.year IS NULL",
-    "no_cover": "r.has_cover=0",  # NULL : pas encore vérifié par le scan
+    # NULL : pas encore vérifié par le scan ; une pochette déposée à la main compte
+    "no_cover": "r.has_cover=0 AND r.path NOT IN (SELECT path FROM overrides WHERE cover=1)",
     "no_artist": "COALESCE(r.tag_artist, r.artist) IS NULL",
     # même artiste et même titre dans le nom qu'une autre release (index idx_releases_dupe)
     # ; un doublon est réglé dès qu'une version est gardée et les autres masquées

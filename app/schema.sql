@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS releases(
   label TEXT, catalog TEXT,  -- label et numéro de catalogue lus dans le NFO ; label NULL : pas encore lu, '' : aucun
   hidden INTEGER NOT NULL DEFAULT 0);  -- doublon masqué des listes (une autre version est gardée)
 -- corrections manuelles d'un administrateur, par chemin de release : elles survivent aux scans (NULL : valeur automatique)
-CREATE TABLE IF NOT EXISTS overrides(path TEXT PRIMARY KEY, artist TEXT, category TEXT, genre TEXT, year INTEGER, hidden INTEGER);
+CREATE TABLE IF NOT EXISTS overrides(path TEXT PRIMARY KEY, artist TEXT, category TEXT, genre TEXT, year INTEGER, hidden INTEGER,
+  cover INTEGER);  -- 1 : pochette déposée à la main (data/covers)
 -- labels rattachés à la main : `key` est la clé de rapprochement (nfo.label_key) du label rattaché
 CREATE TABLE IF NOT EXISTS label_aliases(key TEXT PRIMARY KEY, alias TEXT NOT NULL, target TEXT NOT NULL);
 -- tentatives de sauvegarde (app/backup.py), lues par l'administration

@@ -419,6 +419,8 @@ google-cast-launcher:hover { background: var(--hover); }
 .pill-ed { background: var(--ed-tint); color: var(--ed); }
 .pill-num { background: var(--hover); color: var(--muted); }
 a.pill:hover { filter: brightness(1.12); }
+.detail-admin { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 0; }
+.detail-admin button { min-height: 0; padding: 4px 10px; font-size: 12px; }
 .detail-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; margin: 12px 0; }
 .detail-actions .fav { font-size: 16px; line-height: 1; letter-spacing: 0; }
 .detail-actions :is(button, .btn):not(.icon) { padding: 8px 14px; }
@@ -446,10 +448,15 @@ thead th { color: var(--muted); background: var(--panel); padding-block: 8px; wh
 .chart.donut { flex: none; width: 96px; }
 .chart.donut svg { height: 96px; }
 .legend { flex: 1; min-width: 0; margin: 0; padding: 0; list-style: none; font: 12px var(--mono); }
-.legend li { display: flex; align-items: center; gap: 7px; padding: 2px 0; }
+/* nom sur une ligne, chiffres dessous : le nom n'est pas coupé dans un panneau étroit */
+.legend li { display: grid; grid-template-columns: 9px minmax(0, 1fr); align-items: center; column-gap: 7px; padding: 3px 0; }
+.legend b { grid-column: 2; font-size: 11px; }
 .legend i { flex: none; width: 9px; height: 9px; border-radius: 2px; }
 .legend span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .legend b { color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
+.chart { touch-action: pan-y; }
+.chart-val { margin: 6px 0 0; color: var(--fg); font: 12px var(--mono); font-variant-numeric: tabular-nums; text-align: center; }
+.legend b { white-space: nowrap; }
 .axis { display: flex; justify-content: space-between; margin: 4px 0 0; color: var(--muted); font: 11px var(--mono); }
 @media (max-width: 699px) { .st-wide { grid-template-columns: minmax(0, 1fr); } .ad-metrics.st-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .stats td:first-child { overflow-wrap: anywhere; }

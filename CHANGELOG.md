@@ -4,6 +4,21 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.45.0](https://github.com/djkix/mp3-scene/compare/v1.44.0...v1.45.0) (2026-11-20)
+
+### Résumé
+
+**Qualité d'origine, pochette ajoutée à la main, chiffres exacts sur les graphiques.**
+
+- Lecteur : réglage **Qualité d'origine** (par appareil) ; les FLAC, WAV, M4A, OGG et Opus que le navigateur sait lire
+  sont envoyés tels quels au lieu d'être convertis en MP3. WMA, APE et WavPack restent convertis.
+- Fiche (administrateur) : **Ajouter une pochette**, gardée dans `data/covers`, jamais dans le dossier de musique ;
+  elle passe avant celle du dossier et est copiée par la sauvegarde.
+- Statistiques : nombre exact, poids et pourcentage dans la légende des anneaux ; valeur du point survolé ou touché
+  sous la courbe et les colonnes.
+- Pistes : un artiste coupé à 30 caractères est complété par le nom du fichier, comme les titres ; la recherche trouve
+  un mot de la partie complétée.
+
 ## [1.44.0](https://github.com/djkix/mp3-scene/compare/v1.43.0...v1.44.0) (2026-11-20)
 
 ### Résumé

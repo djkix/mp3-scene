@@ -66,6 +66,7 @@ def _track(row) -> dict:
     d = dict(row)
     d["filename"] = d.pop("relpath").rsplit("/", 1)[-1]
     d["title"] = complete_title(d.get("title"), d["filename"])  # tag ID3v1 coupé à 30 caractères
+    d["artist"] = complete_title(d.get("artist"), d["filename"], artist=True)
     d["favorite"] = bool(d["favorite"])
     return d
 
@@ -216,8 +217,10 @@ def search_tracks(q: str = Query("", max_length=200), category: Many = None, gen
     if not words:
         return {"items": [], "has_more": False}
     # ponytail: LIKE parcourt toutes les pistes (~0,1 s pour 500 000) ; index FTS sur les pistes si trop lent
-    conds = " AND ".join("(t.title LIKE ? OR t.artist LIKE ?)" for _ in words)
-    params = [f"%{w}%" for w in words for _ in range(2)]  # mots sans % ni _ : _WORDS les a retirés
+    # un titre ou un artiste de 30 caractères est peut-être coupé (ID3v1) : sa suite est dans le nom du fichier
+    conds = " AND ".join("(t.title LIKE ? OR t.artist LIKE ? OR ((length(t.title)=30 OR length(t.artist)=30)"
+                         " AND t.relpath LIKE ?))" for _ in words)
+    params = [f"%{w}%" for w in words for _ in range(3)]  # mots sans % ni _ : _WORDS les a retirés
     more, extra = _release_conds(category, genre, year, source=source, decade=decade)
     conds, params = " AND ".join([conds, *more]), params + extra
     return _page(conn, TRACK_COLS, TRACK_FROM, "WHERE " + conds, params,
@@ -261,6 +264,7 @@ def release_by_name(name: str = Query(max_length=1024), user=Depends(current_use
 @router.get("/api/releases/{rid}")
 def release_detail(rid: Id, user=Depends(current_user), conn=Depends(get_conn)):
     d = _release(_release_row(conn, user["id"], rid))
+    d["custom_cover"] = conn.execute("SELECT 1 FROM overrides WHERE path=? AND cover=1", (d["path"],)).fetchone() is not None
     d["tracks"] = [_track(r) for r in conn.execute(
         f"SELECT {TRACK_COLS} FROM {TRACK_FROM} WHERE t.release_id=? ORDER BY t.disc, t.relpath",
         (user["id"], rid))]

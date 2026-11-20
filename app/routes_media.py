@@ -1,3 +1,4 @@
+import hashlib
 import io
 import os
 import re
@@ -76,7 +77,12 @@ def transcoded(src, cache: Path, track_id: int, mtime: float):
     return out
 
 
-def _track_file(request: Request, conn, track_id: int, download: bool = False, headers: dict | None = None):
+# formats servis tels quels à la demande (réglage « qualité d'origine » du lecteur) ; WMA, APE, WavPack restent convertis
+ORIGINAL_TYPES = {".flac": "audio/flac", ".wav": "audio/wav", ".m4a": "audio/mp4", ".ogg": "audio/ogg", ".opus": "audio/ogg"}
+
+
+def _track_file(request: Request, conn, track_id: int, download: bool = False, headers: dict | None = None,
+                original: bool = False):
     row = conn.execute("SELECT r.path, t.relpath FROM tracks t JOIN releases r ON r.id=t.release_id WHERE t.id=?",
                        (track_id,)).fetchone()
     if row is None:
@@ -95,6 +101,9 @@ def _track_file(request: Request, conn, track_id: int, download: bool = False, h
     if download:  # toujours le fichier d'origine
         headers["Content-Disposition"] = _disposition(row["relpath"].rsplit("/", 1)[-1])
         return FileResponse(path, media_type="audio/mpeg" if mp3 else "application/octet-stream", stat_result=st, headers=headers)
+    native = ORIGINAL_TYPES.get(os.path.splitext(row["relpath"])[1].lower())
+    if original and native:
+        return FileResponse(path, media_type=native, stat_result=st, headers=headers)
     if not mp3:  # FLAC, WAV, WMA, M4A… : écoutés en MP3 320 kbit/s, que tout navigateur et tout Chromecast lit
         path = transcoded(path, request.app.state.settings.data_dir / "transcode", track_id, st.st_mtime)
         if path is None:
@@ -104,8 +113,10 @@ def _track_file(request: Request, conn, track_id: int, download: bool = False, h
 
 
 @router.get("/api/tracks/{track_id}/stream")
-def stream(track_id: Id, request: Request, download: bool = False, conn=Depends(get_conn)):
-    return _track_file(request, conn, track_id, download)
+def stream(track_id: Id, request: Request, download: bool = False, original: bool = False, conn=Depends(get_conn)):
+    """`original` : le fichier tel quel pour un format que les navigateurs savent lire (FLAC, WAV, M4A, OGG, Opus),
+    au lieu de sa conversion en MP3 ; ignoré pour les autres formats."""
+    return _track_file(request, conn, track_id, download, original=original)
 
 
 IMAGE_TYPES = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
@@ -113,6 +124,27 @@ COVER_MAX = 8 * 1024 * 1024
 COVER_CACHE = {"Cache-Control": "private, max-age=86400"}
 _FRONT = ("front", "cover", "folder")
 _NOT_FRONT = ("back", "inlay", "inside", "cd", "cd1", "cd2", "disc", "booklet", "proof")
+
+
+def custom_cover(data_dir: Path, release_path: str) -> Path:
+    """Fichier de la pochette déposée à la main pour cette release : nommé d'après son chemin, il survit aux scans."""
+    return data_dir / "covers" / (hashlib.sha1(release_path.encode("utf-8")).hexdigest() + ".jpg")
+
+
+def save_cover(data_dir: Path, release_path: str, rid: int, data: bytes | None) -> None:
+    """Enregistre (ou retire, `data` None) la pochette déposée à la main et oublie la vignette déjà calculée."""
+    target = custom_cover(data_dir, release_path)
+    if data is None:
+        target.unlink(missing_ok=True)
+    else:
+        with Image.open(io.BytesIO(data)) as img:  # lève une erreur si ce n'est pas une image
+            img = img.convert("RGB")
+            img.thumbnail((1600, 1600))
+            target.parent.mkdir(exist_ok=True)
+            tmp = target.with_suffix(".tmp")
+            img.save(tmp, "JPEG", quality=88)
+        os.replace(tmp, target)
+    (data_dir / "thumbs" / f"{rid}.jpg").unlink(missing_ok=True)
 
 
 def pick_cover(names: list[str]) -> str | None:
@@ -131,6 +163,9 @@ def _find_cover(request: Request, conn, rid: int):
     row = conn.execute("SELECT path FROM releases WHERE id=?", (rid,)).fetchone()
     if row is None:
         raise HTTPException(404, "Release introuvable.")
+    custom = custom_cover(request.app.state.settings.data_dir, row["path"])
+    if custom.is_file():  # pochette déposée par un administrateur : elle passe avant celle du dossier
+        return custom, None, "image/jpeg"
     try:
         name = pick_cover([p.name for p in safe_path(root, row["path"]).iterdir()])
         if name:

@@ -696,3 +696,52 @@ def test_admin_usage_counts_all_accounts(admin_client, user_client, library):
     assert [(x["name"], x["n"]) for x in u["users"]] == [("user", 2), ("admin", 1)] and len(u["tracks"]) == 2
     assert [(x["name"], x["n"]) for x in u["artists"]] == [("A-Trak", 2), ("Bicep", 1)] and u["releases"][0] == {"name": A, "n": 2, "duration": u["releases"][0]["duration"]}
     assert [x["name"] for x in u["genres"]] == ["House", "Techno"]
+
+
+def test_truncated_artist_search_original_stream_and_custom_cover(admin_client, user_client, library, settings, make_mp3):
+    import io, shutil, subprocess
+    from PIL import Image
+    from app import db
+    from app.naming import complete_title as ct
+    from app.scanner import scan_structure, scan_tags
+    # artiste coupé à 30 caractères : complété jusqu'au tiret qui le sépare du titre
+    cut = "Bob Sinclar Feat Gary Nesta Pi"
+    assert len(cut) == 30 and ct(cut, "01-bob_sinclar_feat_gary_nesta_pine-love_generation-grp.mp3", artist=True) == cut + "ne"
+    assert ct("Short", "01-short_name-title.mp3", artist=True) == "Short"
+    # recherche : un mot de la partie coupée d'un titre de 30 caractères est trouvé par le nom du fichier
+    folder = settings.music_root / "Singles" / "Dajae-Everyday_My_Life-WEB-2001-GRP"
+    folder.mkdir(parents=True)
+    make_mp3(folder / "01-dajae-everyday_my_life_(cevin_fisher_mix).mp3", title="Dajae - Everyday My Life (Cevi", artist="Dajae")
+    c = db.connect(settings.data_dir)
+    scan_structure(c, settings.music_root, now=5000.0); scan_tags(c, settings.music_root); c.commit()
+    hit = user_client.get("/api/tracks?q=fisher").json()["items"]
+    assert [x["title"] for x in hit] == ["Dajae - Everyday My Life (Cevin fisher mix)"] and len("Dajae - Everyday My Life (Cevi") == 30 and user_client.get("/api/tracks?q=zzz").json()["items"] == []
+    # pochette déposée à la main : réservée à l'administrateur, validée, servie avant celle du dossier, retirable
+    rid = hit[0]["release_id"]
+    png = io.BytesIO(); Image.new("RGB", (2400, 1200), (200, 30, 30)).save(png, "PNG")
+    put = lambda cl, data: cl.put(f"/api/admin/releases/{rid}/cover", content=data, headers={"Content-Type": "image/png"}).status_code
+    assert put(user_client, png.getvalue()) == 403 and put(admin_client, b"pas une image") == 400 and put(admin_client, b"") == 400
+    assert user_client.get(f"/api/releases/{rid}/cover").status_code == 404
+    assert put(admin_client, png.getvalue()) == 204
+    got = user_client.get(f"/api/releases/{rid}/cover")
+    assert got.status_code == 200 and got.headers["content-type"] == "image/jpeg" and Image.open(io.BytesIO(got.content)).size == (1600, 800)
+    assert user_client.get(f"/api/releases/{rid}/thumb").status_code == 200 and user_client.get(f"/api/releases/{rid}").json()["custom_cover"] is True
+    c.execute("UPDATE releases SET has_cover=0 WHERE id=?", (rid,)); c.commit()
+    assert rid not in admin_client.get("/api/admin/quality?kind=no_cover&ids=1").json()["ids"]
+    assert not list(settings.music_root.rglob("*.jpg"))                       # rien n'est écrit dans la musique
+    assert admin_client.delete(f"/api/admin/releases/{rid}/cover").status_code == 204
+    assert user_client.get(f"/api/releases/{rid}/cover").status_code == 404 and admin_client.get("/api/admin/overrides").json() == []
+    c.close()
+    # qualité d'origine : un FLAC est servi tel quel sur demande, un MP3 ne change pas
+    mp3 = user_client.get(f"/api/tracks/{hit[0]['id']}/stream?original=1")
+    assert mp3.status_code == 200 and mp3.headers["content-type"] == "audio/mpeg"
+    if shutil.which("ffmpeg"):
+        f = settings.music_root / "Singles" / "Tone-Sine-WEB-FLAC-2020-GRP"
+        f.mkdir()
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=1", str(f / "01-tone-sine.flac")], check=True)
+        c = db.connect(settings.data_dir)
+        scan_structure(c, settings.music_root, now=6000.0); scan_tags(c, settings.music_root); c.commit(); c.close()
+        tid = user_client.get("/api/release-by-name", params={"name": f.name}).json()["tracks"][0]["id"]
+        raw = user_client.get(f"/api/tracks/{tid}/stream?original=1", headers={"Range": "bytes=0-3"})
+        assert raw.status_code == 206 and raw.content == b"fLaC" and raw.headers["content-type"] == "audio/flac"
+        assert user_client.get(f"/api/tracks/{tid}/stream").headers["content-type"] == "audio/mpeg"

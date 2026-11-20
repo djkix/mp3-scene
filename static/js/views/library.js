@@ -50,16 +50,16 @@ function stats(box, isDead) {
       tile(tr('Écoutes'), u ? n(u.plays) : wait), tile(tr('Temps écouté'), u ? hours(u.duration) : wait),
       tile(tr('Comptes actifs'), u ? `${u.active} / ${u.accounts}` : wait), tile(tr('Pistes différentes'), u ? n(u.distinct_tracks) : wait));
     const days = u ? [...u.days].reverse() : []; // du plus ancien au plus récent
-    top.replaceChildren(panel(tr('Écoutes par jour'), days.length ? area(tr('Écoutes par jour'), days.map((r) => r.n)) : el('p', {}, u ? tr('Aucune écoute') : wait),
+    top.replaceChildren(panel(tr('Écoutes par jour'), days.length ? area(tr('Écoutes par jour'), days.map((r) => r.n), days.map((r) => `${r.name} : ${n(r.n)} · ${hours(r.duration)}`)) : el('p', {}, u ? tr('Aucune écoute') : wait),
       days.length ? el('p', { class: 'axis' }, el('span', {}, days[0].name), el('span', {}, days.at(-1).name)) : null),
-    panel(tr('Par catégorie'), s ? donut(tr('Par catégorie'), shares(s.categories.map((r) => ({ name: catLabel(r.name), n: r.n })), 5, tr('Autres'))) : el('p', {}, wait)));
+    panel(tr('Par catégorie'), s ? donut(tr('Par catégorie'), shares(s.categories.map((r) => ({ name: catLabel(r.name), n: r.n, detail: fmtSize(r.size) })), 5, tr('Autres'))) : el('p', {}, wait)));
     parts.replaceChildren(
-      panel(tr('Par source'), s ? donut(tr('Par source'), shares(s.sources, 5, tr('Autres'))) : el('p', {}, wait)),
+      panel(tr('Par source'), s ? donut(tr('Par source'), shares(s.sources.map((r) => ({ ...r, detail: fmtSize(r.size) })), 5, tr('Autres'))) : el('p', {}, wait)),
       panel(tr('Pistes par débit'), s ? donut(tr('Pistes par débit'), rateClasses(s.bitrates).filter((r) => r.n)) : el('p', {}, wait)),
       panel(tr('Genres les plus écoutés'), u ? (u.genres.length ? donut(tr('Genres les plus écoutés'), shares(u.genres, 5, tr('Autres'))) : el('p', {}, tr('Aucune écoute'))) : el('p', {}, wait)));
     const byTime = (title, rows, color) => { // colonnes dans l'ordre du temps, bornes dessous
       const r = [...rows].sort((x, y) => String(x.name).localeCompare(String(y.name)));
-      return panel(title, r.length ? columns(title, r.map((x) => x.n), color) : el('p', {}, wait),
+      return panel(title, r.length ? columns(title, r.map((x) => x.n), color, r.map((x) => `${x.name} : ${n(x.n)} · ${fmtSize(x.size)}`)) : el('p', {}, wait),
         r.length ? el('p', { class: 'axis' }, el('span', {}, String(r[0].name)), el('span', {}, String(r.at(-1).name))) : null);
     };
     time.replaceChildren(byTime(tr('Par année'), s ? s.years : [], 1), byTime(tr('Ajouts par mois'), s ? s.months : [], 2));

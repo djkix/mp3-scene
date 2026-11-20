@@ -149,11 +149,13 @@ def parse_release_name(name: str) -> dict:
     return dict(artist=_clean(artist), title=_clean(title), source=source, year=year, grp=grp)
 
 
-def complete_title(title: str | None, filename: str) -> str | None:
+def complete_title(title: str | None, filename: str, artist: bool = False) -> str | None:
     """Titre coupé à 30 caractères par un tag ID3v1, complété par la suite lue dans le nom du fichier :
     « Everyday My Life (Cevi » + « 01-dajae-everyday_my_life_(cevin_fisher_mix).mp3 » -> « Everyday My Life (Cevin fisher mix) ».
 
-    Inchangé si le titre ne fait pas exactement 30 caractères ou si le nom du fichier ne le contient pas."""
+    Inchangé si le titre ne fait pas exactement 30 caractères ou si le nom du fichier ne le contient pas.
+    `artist` : la valeur est un artiste, dont la suite s'arrête au tiret qui le sépare du titre dans le nom du fichier
+    (« Bob Sinclar Feat Gary Nesta Pi » + « 01-bob_sinclar_feat_gary_nesta_pine-love_generation.mp3 »)."""
     if not title or len(title) != 30:
         return title
     if title.endswith(")") and title.count("(") == title.count(")"):  # parenthèses refermées : titre entier
@@ -164,7 +166,8 @@ def complete_title(title: str | None, filename: str) -> str | None:
     at = "".join(c for _, c in letters).rfind(key) if key else -1
     if at < 0:
         return title
-    tail = re.sub(r"-[^-\s()\[\]]+$", "", stem[letters[at + len(key) - 1][0] + 1:])  # sans le groupe final (« -etlmp3 »)
+    tail = stem[letters[at + len(key) - 1][0] + 1:]
+    tail = tail.split("-", 1)[0] if artist else re.sub(r"-[^-\s()\[\]]+$", "", tail)  # sans le groupe final (« -etlmp3 »)
     tail = " ".join(tail.replace("_", " ").split(" ")) if tail else ""
     # ponytail: la suite garde la casse du nom du fichier (souvent en minuscules) ; relire un tag ID3v2 si elle existe
     # sans lettre dans la suite, le titre faisait 30 caractères sans être coupé

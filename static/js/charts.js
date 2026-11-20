@@ -28,25 +28,42 @@ export function donut(label, rows) {
   }).join('');
   const ring = svg(label, `<g transform="rotate(-90 40 40)">${arcs}</g>`, '0 0 80 80');
   ring.classList.add('donut');
+  // la légende porte le chiffre exact et le pourcentage ; `detail` (poids…) s'ajoute si la ligne en a un
   return el('div', { class: 'donut-box' }, ring, el('ul', { class: 'legend' }, rows.map((r, i) => el('li', {},
-    el('i', { style: `background:${COLORS[i % 6]}` }), el('span', {}, r.name), el('b', {}, `${Math.round(100 * r.n / total)} %`)))));
+    el('i', { style: `background:${COLORS[i % 6]}` }), el('span', {}, r.name),
+    el('b', {}, `${Number(r.n).toLocaleString()}${r.detail ? ` · ${r.detail}` : ''} · ${Math.round(100 * r.n / total)} %`)))));
 }
 
-// Courbe avec son aire : `values` dans l'ordre du temps.
-export function area(label, values) {
+// Sous une courbe ou des colonnes : la valeur du point survolé ou touché (`texts[i]`), la dernière au repos.
+function readout(box, texts) {
+  if (!texts?.length) return box;
+  const out = el('p', { class: 'chart-val' }, texts.at(-1));
+  const pick = (e) => {
+    const r = box.getBoundingClientRect();
+    out.textContent = texts[Math.min(texts.length - 1, Math.max(0, Math.floor((e.clientX - r.left) / r.width * texts.length)))];
+  };
+  box.addEventListener('pointermove', pick);
+  box.addEventListener('pointerdown', pick);
+  box.addEventListener('pointerleave', () => { out.textContent = texts.at(-1); });
+  return el('div', {}, box, out);
+}
+
+// Courbe avec son aire : `values` dans l'ordre du temps ; `texts` : libellé exact de chaque point.
+export function area(label, values, texts = null) {
+  texts = texts && values.length >= 2 ? texts : null;
   if (values.length < 2) values = [0, ...values, 0].slice(0, Math.max(2, values.length + 1));
   const max = Math.max(1, ...values), w = 300, h = 80;
   const pts = values.map((v, i) => `${(i * w / (values.length - 1)).toFixed(1)},${(h - 4 - (v / max) * (h - 10)).toFixed(1)}`);
-  return svg(label, `<polygon points="0,${h} ${pts.join(' ')} ${w},${h}" style="fill:var(--tint)"/>`
-    + `<polyline points="${pts.join(' ')}" fill="none" stroke-width="2" vector-effect="non-scaling-stroke" style="stroke:var(--c1)"/>`, `0 0 ${w} ${h}`);
+  return readout(svg(label, `<polygon points="0,${h} ${pts.join(' ')} ${w},${h}" style="fill:var(--tint)"/>`
+    + `<polyline points="${pts.join(' ')}" fill="none" stroke-width="2" vector-effect="non-scaling-stroke" style="stroke:var(--c1)"/>`, `0 0 ${w} ${h}`), texts);
 }
 
-// Colonnes : une par période, dans l'ordre donné.
-export function columns(label, values, color = 0) {
+// Colonnes : une par période, dans l'ordre donné ; `texts` : libellé exact de chaque colonne.
+export function columns(label, values, color = 0, texts = null) {
   const max = Math.max(1, ...values), w = 300, h = 60, step = w / Math.max(1, values.length);
-  return svg(label, values.map((v, i) => {
+  return readout(svg(label, values.map((v, i) => {
     const bh = Math.max(v ? 1 : 0, (v / max) * (h - 2));
     const bw = Math.min(step * 0.76, 22); // peu de périodes : des colonnes, pas des pavés
     return `<rect x="${(i * step + (step - bw) / 2).toFixed(1)}" y="${(h - bh).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" style="fill:${COLORS[color]}"/>`;
-  }).join(''), `0 0 ${w} ${h}`);
+  }).join(''), `0 0 ${w} ${h}`), texts);
 }

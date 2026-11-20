@@ -66,6 +66,7 @@ function header(rel) {
       el('a', { class: 'cover', href: `/api/releases/${rel.id}/cover`, target: '_blank', rel: 'noopener' },
         el('img', { src: `/api/releases/${rel.id}/cover`, alt: t('Pochette'), onerror: (e) => e.target.parentNode.remove() })),
       el('dl', { class: 'detail-info' }, infoRows(rel, el))),
+    session.user?.role === 'admin' ? coverTools(rel) : null,
     el('div', { class: 'detail-actions' },
       el('button', { type: 'button', class: 'primary', 'data-ico': 'play', disabled: !rel.tracks.length, onclick: play }, t('Lire')),
       el('button', { type: 'button', 'data-ico': 'queue', onclick: () => emit('queue-release', { releaseId: rel.id }) }, t('Ajouter à la file')),
@@ -76,6 +77,26 @@ function header(rel) {
       fav,
       el('a', { class: 'btn', 'data-ico': 'download', href: `/api/releases/${rel.id}/zip`, download: '' }, t('Télécharger (zip)')),
       shareButton('release', rel.id)));
+}
+
+// Administrateur : déposer une pochette pour cette release (gardée dans les données de l'application, jamais dans le
+// dossier de musique), ou retirer celle qui a été déposée.
+function coverTools(rel) {
+  const msg = el('span', { class: 'muted', role: 'status' });
+  const send = async (method, body) => {
+    msg.textContent = t('Chargement…');
+    try {
+      const res = await fetch(`/api/admin/releases/${rel.id}/cover`, { method, body, credentials: 'same-origin',
+        headers: { 'X-CSRF': '1', ...(body && { 'Content-Type': body.type || 'application/octet-stream' }) } });
+      if (!res.ok) throw new Error(t((await res.json().catch(() => ({}))).detail || t('Erreur {0}', res.status)));
+      // la pochette et sa vignette sont en cache dans le navigateur : rechargement complet de la page
+      location.reload();
+    } catch (err) { msg.textContent = err.message; }
+  };
+  const file = el('input', { type: 'file', accept: 'image/jpeg,image/png', hidden: true, onchange: () => { if (file.files[0]) send('PUT', file.files[0]); } });
+  return el('p', { class: 'detail-admin' }, file,
+    el('button', { type: 'button', onclick: () => file.click() }, rel.custom_cover ? t('Remplacer la pochette') : t('Ajouter une pochette')),
+    rel.custom_cover ? el('button', { type: 'button', onclick: () => send('DELETE') }, t('Retirer la pochette ajoutée')) : null, msg);
 }
 
 // Correction manuelle (administrateur) : artiste, catégorie, genre, année. Un champ vidé revient à la valeur automatique.
