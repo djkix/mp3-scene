@@ -421,10 +421,10 @@ def test_admin_overview_classify_schedule(admin_client, user_client, library, ap
     assert user_client.get("/api/admin/overview").status_code == 403
     o = admin_client.get("/api/admin/overview").json()
     assert o["artists"] >= 2 and o["groups"] == 3 and o["users"] == 2 and o["db_size"] > 0 and o["thumbs_size"] == 0
-    assert o["overrides"] == {"total": 0, "artist": 0, "category": 0, "genre": 0} and o["shares"] == 0
+    assert o["overrides"] == {"total": 0, "artist": 0, "category": 0, "genre": 0, "year": 0} and o["shares"] == 0
     rid = admin_client.get("/api/releases?grp=WUS").json()["items"][0]["id"]
     admin_client.patch(f"/api/admin/releases/{rid}", json={"genre": "Techno"})
-    assert admin_client.get("/api/admin/overrides").json() == [{"id": rid, "name": A, "artist": None, "category": None, "genre": "Techno"}]
+    assert admin_client.get("/api/admin/overrides").json() == [{"id": rid, "name": A, "artist": None, "category": None, "genre": "Techno", "year": None}]
     assert admin_client.get("/api/admin/overview").json()["overrides"]["genre"] == 1
     # reclassement à la demande : une graphie isolée rejoint la majorité, la correction manuelle tient
     c = db.connect(settings.data_dir)
@@ -469,3 +469,32 @@ def test_bulk_correction_and_artist_alias(admin_client, user_client, library):
     assert admin_client.delete("/api/admin/artists/aliases", params={"alias": "Bicep"}).status_code == 204
     assert rel()[B]["artist"] == "Bicep" and rel()[A]["artist"] == "A-Trak"
     assert admin_client.delete("/api/admin/artists/aliases", params={"alias": "Bicep"}).status_code == 404
+
+
+def test_year_correction_select_all_and_played_releases(admin_client, user_client, library, settings):
+    from app import db
+    rel = lambda: {x["name"]: x for x in admin_client.get("/api/releases").json()["items"]}
+    B = "Bicep-Glue-(NT123)-WEB-2017-PWT"
+    rid, auto = rel()[B]["id"], rel()[B]["year"]
+    fix = lambda body: admin_client.patch(f"/api/admin/releases/{rid}", json=body).status_code
+    assert fix({"year": 1999}) == 204 and fix({"year": 12}) == 422 and rel()[B]["year"] == 1999
+    db.init(settings.data_dir)                                             # la correction survit au redémarrage
+    assert rel()[B]["year"] == 1999 and admin_client.get("/api/admin/overview").json()["overrides"]["year"] == 1
+    assert fix({"year": None}) == 204 and rel()[B]["year"] == auto == 2017  # retour à l'année du nom
+    assert admin_client.get("/api/admin/overrides").json() == []
+    ids = [x["id"] for x in rel().values()]
+    assert admin_client.patch("/api/admin/releases", json={"ids": ids, "year": 2001}).status_code == 204
+    assert {x["year"] for x in rel().values()} == {2001}
+    # tout cocher : tous les identifiants d'un contrôle, réservés à l'administrateur
+    c = db.connect(settings.data_dir)
+    c.execute("UPDATE releases SET has_cover=0"); c.commit(); c.close()
+    assert sorted(admin_client.get("/api/admin/quality?kind=no_cover&ids=1").json()["ids"]) == sorted(ids)
+    assert user_client.get("/api/admin/quality?kind=no_cover&ids=1").status_code == 403
+    # releases écoutées : la dernière écoutée d'abord, une fois chacune, par utilisateur
+    track = lambda r: user_client.get(f"/api/releases/{r}").json()["tracks"][0]["id"]
+    a, b = rel()[A]["id"], rid
+    for r in (a, b, a):
+        assert user_client.post(f"/api/history/{track(r)}").status_code == 204
+    assert [x["id"] for x in user_client.get("/api/history/releases").json()["items"]] == [a, b]
+    assert [x["name"] for x in user_client.get("/api/history/releases?sort=name&dir=desc").json()["items"]] == [B, A]
+    assert admin_client.get("/api/history/releases").json()["items"] == []

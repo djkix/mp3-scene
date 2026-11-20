@@ -29,6 +29,8 @@ def init(data_dir: Path) -> None:
             conn.execute("ALTER TABLE releases ADD COLUMN released_at REAL")
         if "daily_at" not in {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}:  # ajoutée en 1.34.0
             conn.execute("ALTER TABLE scan_state ADD COLUMN daily_at INTEGER")
+        if "year" not in {r[1] for r in conn.execute("PRAGMA table_info(overrides)")}:  # ajoutée en 1.36.0
+            conn.execute("ALTER TABLE overrides ADD COLUMN year INTEGER")
         classify(conn)  # données rangées par une version antérieure : mêmes règles que le scanner d'aujourd'hui
         conn.execute("INSERT OR IGNORE INTO scan_state(id) VALUES (1)")
         conn.execute(f"PRAGMA user_version = {VERSION}")
@@ -98,13 +100,14 @@ def categorize(conn) -> None:
 
 
 def apply_overrides(conn) -> None:
-    """Corrections manuelles : elles l'emportent sur l'artiste, la catégorie et le genre calculés.
+    """Corrections manuelles : elles l'emportent sur l'artiste, la catégorie, le genre et l'année calculés.
 
     Appelée en fin de categorize(), donc après chaque regroupement d'artistes et chaque lecture de tags."""
     conn.execute(
         "UPDATE releases SET tag_artist=COALESCE((SELECT artist FROM overrides WHERE path=releases.path), tag_artist),"
         " category=COALESCE((SELECT category FROM overrides WHERE path=releases.path), category),"
-        " genre=COALESCE((SELECT genre FROM overrides WHERE path=releases.path), genre)"
+        " genre=COALESCE((SELECT genre FROM overrides WHERE path=releases.path), genre),"
+        " year=COALESCE((SELECT year FROM overrides WHERE path=releases.path), year)"
         " WHERE path IN (SELECT path FROM overrides)")
 
 

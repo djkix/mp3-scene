@@ -302,6 +302,15 @@ def history(offset: int = Query(0, ge=0, le=MAX_INT), limit: int = Query(50, ge=
                  user["id"], offset, limit, _track)
 
 
+@router.get("/api/history/releases")
+def history_releases(sort: Sort | None = None, dir: Dir = "asc", offset: int = Query(0, ge=0, le=MAX_INT),
+                     limit: int = Query(50, ge=1, le=MAX_INT), user=Depends(current_user), conn=Depends(get_conn)):
+    """Releases écoutées par l'utilisateur, la plus récemment écoutée d'abord."""
+    return _page(conn, RELEASE_COLS, RELEASE_FROM + " JOIN (SELECT t.release_id, MAX(p.played_at) AS last FROM plays p"
+                 " JOIN tracks t ON t.id=p.track_id WHERE p.user_id=? GROUP BY 1) h ON h.release_id=r.id",
+                 "", [user["id"]], _order(sort, dir, "h.last DESC, r.id DESC"), user["id"], offset, limit, _release)
+
+
 @router.get("/api/stats")
 def stats(days: int = Query(0, ge=0, le=36500), user=Depends(current_user), conn=Depends(get_conn)):
     """Statistiques d'écoute de l'utilisateur sur les `days` derniers jours (0 : tout l'historique)."""

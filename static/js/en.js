@@ -180,6 +180,8 @@ export const EN = {
   'Artiste': 'Artist',
   'Source': 'Source',
   'Année': 'Year',
+  'Tout cocher': 'Select all',
+  'Tout décocher': 'Clear selection',
   'Années {0}': '{0}s',
   'Sources': 'Sources',
   'Apparitions': 'Appearances',

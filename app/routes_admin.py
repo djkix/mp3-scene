@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from . import artists, db, genres, scanner, security
 from .deps import MAX_INT, Id, get_conn, require_admin
+from .naming import parse_release_name
 from .routes_library import RELEASE_COLS, RELEASE_FROM, Dir, Sort, _order, _page, _release
 
 router = APIRouter(prefix="/api/admin", dependencies=[Depends(require_admin)])
@@ -121,7 +122,7 @@ def classify(conn=Depends(get_conn)):
 def overrides(conn=Depends(get_conn)):
     """Corrections manuelles en vigueur, avec la release concernée."""
     return [dict(r) for r in conn.execute(
-        "SELECT r.id, r.name, o.artist, o.category, o.genre FROM overrides o JOIN releases r ON r.path=o.path"
+        "SELECT r.id, r.name, o.artist, o.category, o.genre, o.year FROM overrides o JOIN releases r ON r.path=o.path"
         " ORDER BY r.name COLLATE NOCASE")]
 
 
@@ -136,7 +137,7 @@ def overview(request: Request, conn=Depends(get_conn)):
             "groups": one("SELECT COUNT(DISTINCT grp) FROM releases"), "genres": one("SELECT COUNT(DISTINCT genre) FROM releases"),
             "categories": one("SELECT COUNT(DISTINCT category) FROM releases"),
             "overrides": dict(conn.execute("SELECT COUNT(*) AS total, COUNT(artist) AS artist, COUNT(category) AS category,"
-                                           " COUNT(genre) AS genre FROM overrides").fetchone()),
+                                           " COUNT(genre) AS genre, COUNT(year) AS year FROM overrides").fetchone()),
             "shares": one("SELECT COUNT(*) FROM shares WHERE expires_at>?", now),
             "share_opens": one("SELECT COALESCE(SUM(opens), 0) FROM shares WHERE expires_at>?", now),
             "users": one("SELECT COUNT(*) FROM users"),
@@ -175,11 +176,13 @@ class Correction(BaseModel):
     artist: str | None = Field(default=None, max_length=200)
     category: str | None = Field(default=None, max_length=200)
     genre: str | None = Field(default=None, max_length=200)
+    year: int | None = Field(default=None, ge=1900, le=2100)
 
 
 def _correct(conn, rids, fields):
     """Enregistre la correction `fields` (colonne -> valeur, None : retour à l'automatique) pour les releases `rids`."""
-    paths = [r["path"] for rid in rids for r in conn.execute("SELECT path FROM releases WHERE id=?", (rid,))]
+    found = [r for rid in rids for r in conn.execute("SELECT path, name FROM releases WHERE id=?", (rid,))]
+    paths = [r["path"] for r in found]
     if len(paths) != len(rids):
         raise HTTPException(404, "Release introuvable.")
     if fields.get("category") and conn.execute("SELECT 1 FROM releases WHERE category=? LIMIT 1",
@@ -191,7 +194,11 @@ def _correct(conn, rids, fields):
         conn.execute("INSERT OR IGNORE INTO overrides(path) VALUES (?)", (path,))
         for col, val in fields.items():  # noms de colonnes issus du modèle, jamais du client
             conn.execute(f"UPDATE overrides SET {col}=? WHERE path=?", (val, path))
-    conn.execute("DELETE FROM overrides WHERE artist IS NULL AND category IS NULL AND genre IS NULL")
+    conn.execute("DELETE FROM overrides WHERE artist IS NULL AND category IS NULL AND genre IS NULL AND year IS NULL")
+    if "year" in fields and fields["year"] is None:  # retour à l'automatique : année du nom, sinon celle du NFO
+        conn.executemany("UPDATE releases SET year=? WHERE id=?",
+                         [(parse_release_name(r["name"])["year"], rid) for r, rid in zip(found, rids)])
+        db.year_from_nfo(conn)
     # valeurs automatiques recalculées, puis corrections réappliquées (un artiste rendu à l'automatique n'est regroupé
     # avec les autres graphies qu'au prochain scan ou démarrage)
     scanner._aggregate(conn, rids)
@@ -201,19 +208,21 @@ def _correct(conn, rids, fields):
 
 @router.patch("/releases/{rid}", status_code=204)
 def correct_release(rid: Id, body: Correction, conn=Depends(get_conn)):
-    """Corrige l'artiste, la catégorie ou le genre d'une release. Champ absent : inchangé ; vide : retour à la valeur
+    """Corrige l'artiste, la catégorie, le genre ou l'année d'une release. Champ absent : inchangé ; vide : retour à la valeur
     automatique. La correction est gardée par chemin et réappliquée après chaque scan."""
-    _correct(conn, [rid], {k: (v or "").strip() or None for k, v in body.model_dump(exclude_unset=True).items()})
+    _correct(conn, [rid], {k: (v.strip() or None) if isinstance(v, str) else v
+                           for k, v in body.model_dump(exclude_unset=True).items()})
 
 
 class BulkCorrection(Correction):
-    ids: list[Id] = Field(min_length=1, max_length=500)
+    ids: list[Id] = Field(min_length=1, max_length=100_000)
 
 
 @router.patch("/releases", status_code=204)
 def correct_releases(body: BulkCorrection, conn=Depends(get_conn)):
     """Même correction pour plusieurs releases ; seuls les champs remplis sont modifiés."""
-    fields = {k: v.strip() for k, v in body.model_dump(exclude={"ids"}).items() if v and v.strip()}
+    fields = {k: v for k, raw in body.model_dump(exclude={"ids"}).items()
+              if (v := raw.strip() if isinstance(raw, str) else raw)}
     if not fields:
         raise HTTPException(400, "Aucun champ à corriger.")
     _correct(conn, list(dict.fromkeys(body.ids)), fields)
@@ -277,9 +286,13 @@ QUALITY = {
 @router.get("/quality")
 def quality(kind: Literal["no_nfo", "no_tracks", "no_tags", "unreadable", "low_bitrate", "no_year", "no_cover", "no_artist", "dupes"] | None = None,
             sort: Sort | None = None, dir: Dir = "asc", offset: int = Query(0, ge=0, le=MAX_INT),
-            limit: int = Query(50, ge=1, le=MAX_INT), user=Depends(require_admin), conn=Depends(get_conn)):
-    """Sans `kind` : nombre de releases par contrôle. Avec : la page de releases concernées."""
+            limit: int = Query(50, ge=1, le=MAX_INT), ids: int = Query(0, ge=0, le=1),
+            user=Depends(require_admin), conn=Depends(get_conn)):
+    """Sans `kind` : nombre de releases par contrôle. Avec : la page de releases concernées, ou tous leurs
+    identifiants (`ids=1`, pour « Tout cocher »)."""
     if kind is None:
         return {k: conn.execute(f"SELECT COUNT(*) FROM releases r WHERE {cond}").fetchone()[0] for k, cond in QUALITY.items()}
+    if ids:
+        return {"ids": [r[0] for r in conn.execute(f"SELECT r.id FROM releases r WHERE {QUALITY[kind]}")]}
     return _page(conn, RELEASE_COLS, RELEASE_FROM, "WHERE " + QUALITY[kind], [],
                  _order(sort, dir, "r.name COLLATE NOCASE, r.id"), user["id"], offset, limit, _release)

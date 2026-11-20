@@ -229,16 +229,17 @@ export function render(container, params = {}) {
       rows.replaceChildren(...list.map((o) => el('tr', {},
         el('th', { scope: 'row' }, el('a', { href: `#/release/${encodeURIComponent(o.name)}` }, relName(o.name))),
         el('td', {}, o.artist || '—'), el('td', {}, o.category ? catLabel(o.category) : '—'), el('td', {}, o.genre || '—'),
+        el('td', {}, o.year ? String(o.year) : '—'),
         el('td', {}, el('button', { type: 'button', onclick: async (e) => {
           e.target.disabled = true;
-          try { await api(`/admin/releases/${o.id}`, { method: 'PATCH', body: { artist: '', category: '', genre: '' } }); } catch (err) { msg.textContent = err.message; }
+          try { await api(`/admin/releases/${o.id}`, { method: 'PATCH', body: { artist: '', category: '', genre: '', year: null } }); } catch (err) { msg.textContent = err.message; }
           load();
         } }, t('Retour à l’automatique'))))));
     }).catch((err) => { if (!dead) msg.textContent = err.message; });
     body.replaceChildren(el('h1', {}, t('Corrections manuelles')),
       el('p', { class: 'hint' }, t('Faites depuis la fiche d’une release, bouton Corriger. Elles sont gardées après les scans.')),
       el('div', { class: 'table-wrap' }, el('table', { class: 'users' },
-        el('thead', {}, el('tr', {}, th(t('Release')), th(t('Artiste')), th(t('Catégorie')), th(t('Genre')), th(t('Actions')))), rows)), msg);
+        el('thead', {}, el('tr', {}, th(t('Release')), th(t('Artiste')), th(t('Catégorie')), th(t('Genre')), th(t('Année')), th(t('Actions')))), rows)), msg);
     load();
   } else {
     // Vue d'ensemble : les totaux, puis un bloc par type d'action
@@ -263,7 +264,7 @@ export function render(container, params = {}) {
           link('#/admin/scan', t('Gérer le scan'))),
           card(t('Contrôle qualité'), null, QUALITY.map(([k, label]) => [t(label), n(q[k])]), link('#/library?tab=quality', t('Tout voir'))),
           card(t('Corrections'), o.overrides.total ? String(o.overrides.total) : null, [[t('Artiste'), o.overrides.artist],
-            [t('Catégorie'), o.overrides.category], [t('Genre'), o.overrides.genre]], link('#/admin/corrections', t('Gérer'))));
+            [t('Catégorie'), o.overrides.category], [t('Genre'), o.overrides.genre], [t('Année'), o.overrides.year]], link('#/admin/corrections', t('Gérer'))));
         cls.replaceChildren(card(t('Règles'), null, [[t('Catégories'), n(o.categories)], [t('Artistes'), n(o.artists)],
           [t('Groupes'), n(o.groups)], [t('Genres'), n(o.genres)]], classBtn, link('#/admin/rules', t('Voir les règles'))));
         acc.replaceChildren(

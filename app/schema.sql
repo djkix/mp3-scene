@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS releases(
   has_cover INTEGER,  -- NULL : pas encore vérifié par le scan
   released_at REAL);  -- date de sortie lue dans le NFO ; NULL : pas encore lu, 0 : aucune
 -- corrections manuelles d'un administrateur, par chemin de release : elles survivent aux scans (NULL : valeur automatique)
-CREATE TABLE IF NOT EXISTS overrides(path TEXT PRIMARY KEY, artist TEXT, category TEXT, genre TEXT);
+CREATE TABLE IF NOT EXISTS overrides(path TEXT PRIMARY KEY, artist TEXT, category TEXT, genre TEXT, year INTEGER);
 -- artistes rattachés à la main : `key` est la clé de rapprochement (artists.fold) de l'artiste rattaché
 CREATE TABLE IF NOT EXISTS artist_aliases(key TEXT PRIMARY KEY, alias TEXT NOT NULL, target TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS tracks(

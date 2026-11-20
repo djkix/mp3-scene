@@ -4,6 +4,20 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.36.0](https://github.com/djkix/mp3-scene/compare/v1.35.0...v1.36.0) (2026-11-20)
+
+### Résumé
+
+**Année dans les corrections, tout cocher, sélection sur la page d'un artiste, releases écoutées.**
+
+- Corrections : la boîte **Corriger** a un champ Année, pour une release ou en lot ; un champ vidé revient à l'année
+  du nom, sinon à celle du NFO.
+- Contrôle qualité : **Tout cocher** sélectionne toutes les releases de l'onglet, même celles que le défilement n'a
+  pas encore chargées (100 000 au plus par correction, contre 500).
+- Page d'un artiste ou d'un groupe et recherche (administrateur) : cases à cocher et **Corriger la sélection**, pour
+  sortir d'un artiste les releases qui y ont été rangées à tort.
+- Favoris › Historique : choix **Pistes** / **Releases** ; les releases écoutées, la plus récente d'abord.
+
 ## [1.35.0](https://github.com/djkix/mp3-scene/compare/v1.34.0...v1.35.0) (2026-11-19)
 
 ### Résumé

@@ -61,7 +61,7 @@ function header(rel) {
       el('a', { class: 'btn', 'data-ico': 'download', href: `/api/releases/${rel.id}/zip`, download: '' }, t('Télécharger (zip)'))));
 }
 
-// Correction manuelle (administrateur) : artiste, catégorie, genre. Un champ vidé revient à la valeur automatique.
+// Correction manuelle (administrateur) : artiste, catégorie, genre, année. Un champ vidé revient à la valeur automatique.
 // Avec `ids` (contrôle qualité), la même correction pour plusieurs releases : seuls les champs remplis comptent.
 let dlg = null;
 export async function correct(rel, ids = null) {
@@ -72,13 +72,15 @@ export async function correct(rel, ids = null) {
   const genre = el('input', { value: rel?.genre || '', maxLength: 200, list: 'fix-genres' });
   const category = el('select', {}, ids && el('option', { value: '' }, '—'), f.categories.map((c) => el('option', { value: c }, catLabel(c))));
   category.value = rel?.category || '';
-  const was = { artist: artist.value, category: category.value, genre: genre.value };
+  const year = el('input', { type: 'number', min: 1900, max: 2100, value: rel?.year || '' });
+  const was = { artist: artist.value, category: category.value, genre: genre.value, year: year.value };
   const field = (label, input) => el('label', {}, label, input);
   dlg.replaceChildren(el('h2', {}, ids ? t('Corriger {0} releases', ids.length) : t('Corriger la release')),
     el('form', { class: 'stack', onsubmit: async (e) => {
       e.preventDefault();
-      const now = { artist: artist.value.trim(), category: category.value, genre: genre.value.trim() };
+      const now = { artist: artist.value.trim(), category: category.value, genre: genre.value.trim(), year: year.value };
       const body = Object.fromEntries(Object.entries(now).filter(([k, v]) => v !== was[k])); // seuls les champs modifiés
+      if ('year' in body) body.year = body.year ? Number(body.year) : null;
       try {
         if (ids && Object.keys(body).length) await api('/admin/releases', { method: 'PATCH', body: { ...body, ids } });
         else if (Object.keys(body).length) await api(`/admin/releases/${rel.id}`, { method: 'PATCH', body });
@@ -86,7 +88,7 @@ export async function correct(rel, ids = null) {
         dispatchEvent(new HashChangeEvent('hashchange')); // recharge la fiche
       } catch (err) { msg.textContent = err.message; }
     } },
-    field(t('Artiste'), artist), field(t('Catégorie'), category), field(t('Genre'), genre),
+    field(t('Artiste'), artist), field(t('Catégorie'), category), field(t('Genre'), genre), field(t('Année'), year),
     el('datalist', { id: 'fix-genres' }, f.genres.map((g) => el('option', { value: g }))),
     el('p', { class: 'status' }, ids ? t('Seuls les champs remplis sont modifiés. La correction est gardée après les scans.')
       : t('Un champ vidé revient à la valeur automatique. La correction est gardée après les scans.')),
@@ -94,6 +96,16 @@ export async function correct(rel, ids = null) {
     el('div', { class: 'inline-form' }, el('button', { type: 'submit', class: 'primary' }, t('Enregistrer')),
       el('button', { type: 'button', onclick: () => dlg.close() }, t('Annuler')))));
   dlg.showModal();
+}
+
+// Sélection de releases à corriger ensemble : `pick` et `onPick` vont à releaseList, `button` ouvre la correction.
+// `also(pick)` est appelé à chaque changement de la sélection, et une première fois tout de suite.
+export function picker(also = () => {}) {
+  const pick = new Set();
+  const button = el('button', { type: 'button', class: 'primary', onclick: () => correct(null, [...pick]) });
+  const onPick = () => { button.disabled = !pick.size; button.textContent = t('Corriger la sélection ({0})', pick.size); also(pick); };
+  onPick();
+  return { pick, onPick, button };
 }
 
 function trackTable(rel) {

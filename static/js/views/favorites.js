@@ -23,7 +23,17 @@ export function render(container, params) {
   if (tab === 'playlists') return playlists.render(body, params);
   if (tab === 'stats') return stats.render(body, params);
   if (tab === 'offline') return offlineView.render(body);
-  if (tab === 'history') return trackList(body, { path: '/history', history: true, empty: tr('Aucune écoute') });
+  if (tab === 'history') {
+    // par piste (chaque écoute, avec son heure) ou par release (la plus récemment écoutée d'abord)
+    const byRel = params.by === 'releases', list = el('div');
+    const sub = (label, on, hash) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(on), onclick: () => { location.hash = hash; } }, label);
+    body.replaceChildren(el('div', { class: 'tabs', role: 'tablist', 'aria-label': tr('Historique') }, sub(tr('Pistes'), !byRel, '#/favorites?tab=history'),
+      sub(tr('Releases'), byRel, '#/favorites?tab=history&by=releases')), list);
+    if (!byRel) return trackList(list, { path: '/history', history: true, empty: tr('Aucune écoute') });
+    // tri « played » : l'ordre du serveur, tant qu'aucune colonne n'est choisie
+    return releaseList(list, (offset, tri) => api(`/history/releases?offset=${offset}&limit=${PAGE}${tri.includes('played') ? '' : tri}`),
+      { empty: tr('Aucune écoute'), sort: ['played', 'desc'] });
+  }
   if (tab === 'tracks') {
     const list = el('div');
     const keep = offlineView.offlineButton({ id: 'fav', name: tr('Pistes favorites') }, () => allPages('/favorites/tracks'));

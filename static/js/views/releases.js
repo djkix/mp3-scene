@@ -1,8 +1,9 @@
-import { api, fmtDate, fmtSize } from '../api.js';
+import { api, fmtDate, fmtSize, session } from '../api.js';
 import { el, relName } from '../dom.js';
 import { t as tr, catLabel } from '../i18n.js';
 import { trackList } from './tracklist.js';
 import { player } from '../player.js';
+import { picker } from './release.js'; // import croisé : picker n'est appelé qu'au rendu
 
 const PAGE = 50;
 const emit = (name, detail) => document.dispatchEvent(new CustomEvent(name, { detail }));
@@ -64,7 +65,7 @@ export function row(rel, pick = null, onPick = () => {}) {
   el('img', { class: 'rel-thumb', src: `/api/releases/${rel.id}/thumb`, alt: '', loading: 'lazy', width: 40, height: 40,
     onerror: (e) => { e.target.style.visibility = 'hidden'; } }),
   el('span', { class: 'rel-name' },
-    pick && el('input', { type: 'checkbox', class: 'rel-pick', checked: pick.has(rel.id), 'aria-label': tr('Sélectionner {0}', rel.name),
+    pick && el('input', { type: 'checkbox', class: 'rel-pick', value: rel.id, checked: pick.has(rel.id), 'aria-label': tr('Sélectionner {0}', rel.name),
       onchange: (e) => { if (e.target.checked) pick.add(rel.id); else pick.delete(rel.id); onPick(); } }),
     since() && rel.added_at > since() ? el('span', { class: 'new' }, tr('nouveau')) : null, relName(rel.name)),
   // même ordre que HEAD ; sur mobile, .rel-info devient une ligne de détails sous le nom
@@ -177,13 +178,16 @@ export function render(container, params) {
     location.hash = (pin ? pin.base : q ? '#/search' : '#/') + (qs ? '?' + qs : ''); // nouvelle entrée d'historique, pagination remise à zéro
   }
 
+  // administrateur, sur une recherche ou la page d'un artiste ou d'un groupe : cocher des releases pour les corriger
+  // ensemble (des releases rangées à tort sous cet artiste, par exemple)
+  const sel = session.user?.role === 'admin' && (q || pin) ? picker() : null;
   let dead = false;
   loadFilters().then((f) => {
     if (dead) return;
     bar.replaceChildren(select(tr('Catégorie'), tr('Catégories'), 'category', f.categories, category, setFilter, catLabel),
       select(tr('Genre'), tr('Genres'), 'genre', f.genres, genre, setFilter), yearSelect(f, year, setFilter),
       select(tr('Source'), tr('Sources'), 'source', f.sources, source, setFilter),
-      ...(q ? [] : [mix]));
+      ...(q ? [] : [mix]), ...(sel ? [sel.button] : []));
   }).catch(() => {});
   // Mix : 50 pistes au hasard parmi les releases qui passent les filtres affichés.
   const filters = { category, genre, ...yearQuery(year), source, ...(pin && { [pin.key]: pin.value }) };
@@ -211,6 +215,7 @@ export function render(container, params) {
     query.set('limit', PAGE);
     return api('/releases?' + query + tri);
   // derniers ajouts (accueil sans filtre) par date d'ajout, même si la colonne Date montre celle du NFO ; recherche, filtre, groupe ou artiste par ordre alphabétique
-  }, { empty: tr('Aucun résultat'), sort: q || pin || category || genre || year || source ? ['name', 'asc'] : ['added', 'desc'] });
+  }, { empty: tr('Aucun résultat'), sort: q || pin || category || genre || year || source ? ['name', 'asc'] : ['added', 'desc'],
+    pick: sel?.pick, onPick: sel?.onPick });
   return () => { dead = true; dispose(); };
 }

@@ -4,7 +4,8 @@ import { el } from '../dom.js';
 import { t as tr, catLabel } from '../i18n.js';
 import { releaseList } from './releases.js';
 import { navBar } from './admin.js';
-import { correct } from './release.js';
+import { picker } from './release.js';
+import { player } from '../player.js';
 
 const KINDS = [['no_nfo', 'Sans NFO'], ['no_tags', 'Sans tags'], ['unreadable', 'Pistes illisibles'], ['low_bitrate', 'Débit inférieur à 192 kbit/s'],
   ['no_year', 'Sans année'], ['no_cover', 'Sans pochette'], ['no_tracks', 'Sans piste'], ['no_artist', 'Sans artiste'],
@@ -49,11 +50,18 @@ export function render(container, params) {
     paint(null);
     api('/admin/quality').then((c) => { if (!dead) paint(c); }).catch(() => {});
     // correction en lot : cocher des releases, puis leur donner le même artiste, la même catégorie ou le même genre
-    const picked = new Set(), list = el('div');
-    const fix = el('button', { type: 'button', class: 'primary', disabled: true, onclick: () => correct(null, [...picked]) });
-    const onPick = () => { fix.disabled = !picked.size; fix.textContent = tr('Corriger la sélection ({0})', picked.size); };
-    onPick();
-    body.replaceChildren(el('p', { class: 'filters' }, fix), list);
+    const list = el('div');
+    // tout cocher : toutes les releases de l'onglet, même celles que le défilement n'a pas encore chargées
+    const all = el('button', { type: 'button', onclick: async () => {
+      try {
+        if (picked.size) picked.clear();
+        else (await api(`/admin/quality?kind=${kind}&ids=1`)).ids.forEach((i) => picked.add(i));
+      } catch (err) { player.flash(err.message); }
+      list.querySelectorAll('.rel-pick').forEach((b) => { b.checked = picked.has(Number(b.value)); });
+      onPick();
+    } });
+    const { pick: picked, onPick, button: fix } = picker((p) => { all.textContent = p.size ? tr('Tout décocher') : tr('Tout cocher'); });
+    body.replaceChildren(el('p', { class: 'filters' }, fix, all), list);
     dispose = releaseList(list, (offset, tri) => api(`/admin/quality?kind=${kind}&offset=${offset}&limit=50${tri}`),
       { empty: tr('Aucune release concernée.'), sort: ['name', 'asc'], pick: picked, onPick });
   }
