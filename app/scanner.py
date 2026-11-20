@@ -436,7 +436,7 @@ def _scan_dates(conn, root, should_stop):
                 log.warning("NFO illisible, relu au prochain scan : %s (%s)", r["path"], e)
         conn.executemany("UPDATE releases SET released_at=?, label=?, catalog=? WHERE id=?", done)
         db.year_from_nfo(conn)
-        db.merge_case(conn, "label")
+        db.merge_labels(conn)
         conn.commit()
 
 

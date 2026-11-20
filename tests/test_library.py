@@ -541,6 +541,19 @@ def test_keep_version_separate_artist_label_smart_playlist(admin_client, user_cl
     assert (r["label"], r["catalog"]) == ("Ninja Tune", "NT123")
     assert admin_client.get("/api/groups?by=label").json()[0]["name"] == "Ninja Tune"
     assert list(rel(qs="?label=Ninja%20Tune")) == [B]
+    # labels : restes de mise en forme retirés, graphies proches réunies sous la plus répandue
+    cl = nfo.clean_label
+    assert [cl(x) for x in ("..... Defected", "] Deep State", "\u2588 PIAS", "(Warner)", "(P) 2014 Protocol Recordings", "!K7", "?", ".....", "X")] \
+        == ["Defected", "Deep State", "PIAS", "Warner", "Protocol Recordings", "!K7", "", "", ""]
+    assert cl("((JOLLY ROGER) SOUND OF PIRATES))") == "JOLLY ROGER SOUND OF PIRATES"
+    assert len({nfo.label_key(cl(x)) for x in ("Spinnin Records", "Spinnin' Records", "SpinninRecords", "spinnin", "..... Spinnin`Records")}) == 1
+    assert nfo.label_key("Records") == "records" and nfo.label_key("Armada") != nfo.label_key("Armada Music")
+    c.execute("UPDATE releases SET label='..... ninja-tune records' WHERE id=?", (a,))
+    c.execute("UPDATE releases SET label='?' WHERE name LIKE 'VA-%'"); c.commit()
+    db.merge_labels(c); c.commit()
+    assert [r[0] for r in c.execute("SELECT DISTINCT label FROM releases WHERE label!='' ORDER BY 1")] in (["Ninja Tune"], ["ninja-tune records"])
+    assert c.execute("SELECT label FROM releases WHERE name LIKE 'VA-%'").fetchone()[0] == ""
+    c.execute("UPDATE releases SET label='' WHERE id=?", (a,)); c.commit()
     # playlist intelligente : les pistes des releases qui passent les filtres, sans modification manuelle
     mk = lambda body: user_client.post("/api/playlists", json=body)
     assert mk({"name": "Vide", "rules": {}}).status_code == 400

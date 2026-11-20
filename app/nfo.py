@@ -1,6 +1,7 @@
 """Date de sortie, label et numéro de catalogue lus dans le NFO d'une release."""
 import datetime
 import re
+import unicodedata
 
 # libellés par ordre de préférence : date de la release, du rip, de diffusion, puis de mise en vente
 _LABELS = (r"rel(?:ease|s)?[ ._]*date|rls[ ._]*date|\br[ ._]?date", r"rip[ ._]*date", r"air[ ._]*date",
@@ -52,7 +53,7 @@ def _value(m, size):
         return None
     # « Foo Records      ║ », « Foo  Releasedate: … », « Foo / Cat.Nr: X » : la valeur s'arrête au cadre ou au champ suivant
     v = re.split(r"\s{2,}|\s+[/|]\s+(?=[^/|]*:)", m.group(1).strip())[0]
-    v = re.sub(r"[^\w)\]!?.'\"]+$", "", v).strip()
+    v = clean_label(v)
     if not v or len(v) > size or "://" in v or "www." in v.lower() or re.sub(r"[\W_]", "", v).lower() in _NONE:
         return None
     return v
@@ -63,3 +64,36 @@ def label(text: str) -> tuple[str | None, str | None]:
     # ponytail: lignes « libellé : valeur » seulement ; les NFO en prose ou en tableau ne sont pas lus
     cat = _value(_CAT.search(text), 30)
     return _value(_LABEL.search(text), 60), cat if cat and any(c.isdigit() for c in cat) else None
+
+
+def clean_label(v: str) -> str:
+    """Label sans les restes de mise en forme du NFO : « ..... Defected », « ] Deep State », « █ PIAS », « (Warner) »,
+    « (P) 2014 Protocol Recordings », « ((JOLLY ROGER) SOUND OF PIRATES)) ». Vide s'il ne reste rien (« ? », « ..... »)."""
+    start = re.search(r"!?[^\W_]", v)  # premier caractère utile ; « !K7 » garde son point d'exclamation
+    if start is None:
+        return ""
+    v = v[start.start():].replace("_", " ")
+    v = re.sub(r"^[pc]\)\s*(?:(?:19|20)\d\d\s+)?", "", v, flags=re.I)              # « (P) 2014 … » : mention de copyright
+    out, depth = [], 0
+    for ch in v:  # parenthèses sans vis-à-vis retirées
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            if depth == 0:
+                continue
+            depth -= 1
+        out.append(ch)
+    v = "".join(out)
+    for _ in range(depth):
+        i = v.rindex("(")
+        v = v[:i] + v[i + 1:]
+    v = " ".join(re.sub(r"[^\w)\]!?.'\"]+$", "", v).split())
+    return v if sum(c.isalnum() for c in v) >= 2 else ""  # une lettre seule n'est pas un label
+
+
+def label_key(v: str) -> str:
+    """Clé de rapprochement des labels : sans casse, accents, espaces ni ponctuation, et sans « Records » final
+    (« Defected », « DEFECTED », « Defected Records », « De-fected » ne font qu'un)."""
+    # ponytail: « X Music » et « X » restent distincts (trop de labels s'appellent « … Music ») ; table d'alias si besoin
+    k = "".join(c for c in unicodedata.normalize("NFKD", v).casefold() if c.isalnum())
+    return re.sub(r"(?<=.)(?:records?|recordings?|recs?)$", "", k) or k

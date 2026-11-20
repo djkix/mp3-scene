@@ -2,7 +2,7 @@ import re
 import sqlite3
 from pathlib import Path
 
-from app import artists, genres
+from app import artists, genres, nfo
 from app.naming import album_like, group, kind, one_song
 
 SCHEMA = Path(__file__).with_name("schema.sql")
@@ -53,7 +53,7 @@ def classify(conn) -> None:
         if new != g:
             conn.execute("UPDATE releases SET grp=?, year=COALESCE(year, ?) WHERE grp=?", (new, year, g))
     merge_case(conn, "grp")
-    merge_case(conn, "label")
+    merge_labels(conn)
     year_from_nfo(conn)
     artists.apply(conn)
     categorize(conn)
@@ -68,6 +68,22 @@ def merge_case(conn, col: str) -> None:
         best = conn.execute(f"SELECT {col} FROM releases WHERE lower({col})=? GROUP BY {col} ORDER BY COUNT(*) DESC, {col}"
                             " LIMIT 1", (k,)).fetchone()[0]
         conn.execute(f"UPDATE releases SET {col}=? WHERE lower({col})=? AND {col}!=?", (best, k, best))
+
+
+def merge_labels(conn) -> None:
+    """Nettoie les labels (restes de mise en forme du NFO) et réunit ceux qui ne diffèrent que par la casse, les
+    espaces, la ponctuation ou un « Records » final, sous la graphie la plus répandue. Sans effet au second passage."""
+    rows = conn.execute("SELECT label, COUNT(*) FROM releases WHERE label IS NOT NULL AND label!='' GROUP BY label").fetchall()
+    groups = {}  # clé -> {graphie nettoyée: nombre de releases}
+    for label, n in rows:
+        clean = nfo.clean_label(label)
+        if clean:
+            spellings = groups.setdefault(nfo.label_key(clean), {})
+            spellings[clean] = spellings.get(clean, 0) + n
+    best = {k: min(s, key=lambda x: (-s[x], x)) for k, s in groups.items()}
+    conn.executemany("UPDATE releases SET label=? WHERE label=?", [
+        (new, label) for label, _ in rows
+        if (new := best[nfo.label_key(c)] if (c := nfo.clean_label(label)) else "") != label])
 
 
 _KIND_FOLDER = {"live": r"live|radio", "comp": r"compil", "single": r"single"}

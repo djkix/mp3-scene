@@ -4,6 +4,20 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.37.3](https://github.com/djkix/mp3-scene/compare/v1.37.2...v1.37.3) (2026-11-20)
+
+### Résumé
+
+**Labels nettoyés et réunis, navigation Admin en arborescence.**
+
+- Labels : les restes de mise en forme du NFO sont retirés (« ..... Defected », « ] Deep State », « (Warner) »,
+  « (P) 2014 Protocol Recordings ») ; « ? », « ..... » et une lettre seule ne sont plus des labels.
+- Labels : les graphies qui ne diffèrent que par la casse, les accents, les espaces, la ponctuation ou un « Records »
+  final sont réunies sous la plus répandue (« Spinnin », « Spinnin' Records », « SpinninRecords »). Appliqué à toute
+  la base au démarrage.
+- Administration : la colonne de navigation est une arborescence, rubriques en clair et liens en retrait avec un
+  pictogramme chacun.
+
 ## [1.37.2](https://github.com/djkix/mp3-scene/compare/v1.37.1...v1.37.2) (2026-11-20)
 
 ### Résumé

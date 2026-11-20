@@ -13,13 +13,13 @@ const fmtTime = (ts) => (ts ? new Date(ts * 1000).toLocaleString(locale) : '—'
 const roleSelect = (value, props = {}) => el('select', props,
   ROLES.map(([v, l]) => el('option', { value: v, selected: v === value }, l)));
 
-// Sections de la page, regroupées par type d'action : [titre du groupe, [[adresse, libellé], …]]
-const NAV = [['', [['#/admin', 'Vue d’ensemble']]],
-  ['Bibliothèque', [['#/admin/scan', 'Scan'], ['#/library?tab=quality', 'Contrôle qualité'], ['#/admin/corrections', 'Corrections'],
-    ['#/library', 'Statistiques']]],
-  ['Classement', [['#/admin/rules', 'Règles']]],
-  ['Accès', [['#/admin/users', 'Utilisateurs'], ['#/admin/shares', 'Partages']]],
-  ['Mon compte', [['#/admin/account', 'Mot de passe et préférences']]]];
+// Sections de la page, regroupées par type d'action : [titre du groupe, [[adresse, libellé, pictogramme], …]]
+const NAV = [['', [['#/admin', 'Vue d’ensemble', 'overview']]],
+  ['Bibliothèque', [['#/admin/scan', 'Scan', 'scan'], ['#/library?tab=quality', 'Contrôle qualité', 'check'],
+    ['#/admin/corrections', 'Corrections', 'edit'], ['#/library', 'Statistiques', 'stats']]],
+  ['Classement', [['#/admin/rules', 'Règles', 'rules']]],
+  ['Accès', [['#/admin/users', 'Utilisateurs', 'users'], ['#/admin/shares', 'Partages', 'share']]],
+  ['Mon compte', [['#/admin/account', 'Mot de passe et préférences', 'lock']]]];
 const QUALITY = [['dupes', 'Doublons possibles'], ['no_nfo', 'Sans NFO'], ['no_year', 'Sans année'], ['no_artist', 'Sans artiste']];
 const RULES = [['Catégories', 'categories', 'Les tags du nom décident (SAT, DVBS, date complète : Live & Radio ; VA : Compilations ; CDM, CDS : Singles), sinon le dossier. Dans Singles, dix pistes sans tag de single font un album.'],
   ['Artistes', 'artists', 'Casse, accents, espaces et ponctuation sont ignorés. Un featuring ou un « vs » rejoint l’artiste principal ; un « & » aussi, sauf si le duo a au moins autant de releases que son premier membre.'],
@@ -27,9 +27,11 @@ const RULES = [['Catégories', 'categories', 'Les tags du nom décident (SAT, DV
   ['Genres', 'genres', 'Les genres qui ne diffèrent que par l’orthographe, la casse ou la mise en forme sont réunis ; une liste de genres est réduite au premier.']];
 
 export function navBar(current) {
+  // arborescence : le nom de la rubrique, puis ses liens (avec pictogramme) en retrait le long d'un trait
   return el('nav', { class: 'ad-nav', 'aria-label': t('Administration') }, NAV.map(([group, links]) => [
-    group && el('p', {}, t(group)),
-    ...links.map(([href, label]) => el('a', { href, 'aria-current': href === current ? 'page' : null }, t(label)))]).flat());
+    group ? el('p', {}, t(group)) : null,
+    el('div', { class: group ? 'ad-sub' : 'ad-top' }, links.map(([href, label, ico]) =>
+      el('a', { href, 'data-ico': ico, 'aria-current': href === current ? 'page' : null }, t(label))))]).flat());
 }
 
 export function render(container, params = {}) {
