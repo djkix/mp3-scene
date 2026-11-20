@@ -6,6 +6,7 @@ import { releaseList } from './releases.js';
 import { navBar } from './admin.js';
 import { picker } from './release.js';
 import { player } from '../player.js';
+import { area, columns, donut, shares } from '../charts.js';
 
 const KINDS = [['no_nfo', 'Sans NFO'], ['no_tags', 'Sans tags'], ['unreadable', 'Pistes illisibles'], ['low_bitrate', 'Débit inférieur à 192 kbit/s'],
   ['no_year', 'Sans année'], ['no_cover', 'Sans pochette'], ['no_tracks', 'Sans piste'], ['no_artist', 'Sans artiste'],
@@ -22,51 +23,69 @@ function block(title, rows, name = (r) => String(r.name), last = (r) => fmtSize(
     el('td', { class: 'num' }, String(r.n)), el('td', { class: 'num' }, last(r)))))) : el('p', { class: 'status' }, tr('Aucune écoute')));
 }
 
-// Usage par tous les comptes : écoutes par jour et par utilisateur, artistes, releases, pistes et genres les plus écoutés.
+// Tableau de bord : chiffres clés, courbe des écoutes, anneaux des répartitions, colonnes dans le temps, classements.
+// La période ne concerne que l'usage (écoutes) ; la bibliothèque est toujours montrée en entier.
 const PERIODS = [[7, '7 jours'], [30, '30 jours'], [365, '12 mois'], [0, 'Depuis le début']];
 const hours = (s) => (s >= 3600 ? `${Math.round(s / 360) / 10} h` : `${Math.round(s / 60)} min`);
-function usage(box, isDead) {
-  const sel = el('select', { 'aria-label': tr('Période'), onchange: () => load() }, PERIODS.map(([d, label]) => el('option', { value: d }, tr(label))));
-  sel.value = '30';
-  const status = el('p', { class: 'status', role: 'status' }, tr('Chargement…'));
-  const body = el('div', { class: 'stats' });
-  box.replaceChildren(el('h1', {}, tr('Usage')), el('div', { class: 'filters' }, sel), status, body);
-  const load = () => api(`/admin/usage?days=${sel.value}`).then((u) => {
-    if (isDead()) return;
-    status.textContent = tr('{0} écoutes · {1} · {2} pistes différentes · comptes actifs : {3} sur {4} · {5} playlists · {6} favoris',
-      u.plays, hours(u.duration), u.distinct_tracks, u.active, u.accounts, u.playlists, u.favorites);
-    const t = (r) => hours(r.duration);
-    body.replaceChildren(block(tr('Écoutes par jour'), u.days, undefined, t), block(tr('Par utilisateur'), u.users, undefined, t),
-      block(tr('Artistes les plus écoutés'), u.artists, undefined, t), block(tr('Releases les plus écoutées'), u.releases, undefined, t),
-      block(tr('Pistes les plus écoutées'), u.tracks, undefined, t), block(tr('Genres les plus écoutés'), u.genres, undefined, t));
-  }).catch((err) => { if (!isDead()) status.textContent = err.message; });
-  load();
-}
+const tile = (label, value) => el('div', { class: 'ad-metric' }, el('span', {}, label), el('b', {}, value));
+const panel = (title, ...content) => el('section', { class: 'ad-card' }, el('h3', {}, title), ...content);
+// classes de débit : parts d'un tout, de la meilleure à la plus faible
+const rateClasses = (rows) => [['320 kbit/s', (k) => k >= 320], ['256 à 319', (k) => k >= 256 && k < 320], ['192 à 255', (k) => k >= 192 && k < 256],
+  ['< 192', (k) => k < 192]].map(([name, test]) => ({ name, n: rows.filter((r) => test(Number(r.name))).reduce((n, r) => n + r.n, 0) }));
 
-function dashboard(body, status, isDead) {
-  api('/admin/library').then((s) => {
+function stats(box, isDead) {
+  const sel = el('select', { 'aria-label': tr('Période'), onchange: () => loadUsage() }, PERIODS.map(([d, label]) => el('option', { value: d }, tr(label))));
+  sel.value = '30';
+  const status = el('p', { class: 'status', role: 'status' });
+  const tiles = el('div', { class: 'ad-metrics st-tiles' }), top = el('div', { class: 'st-row st-wide' }), parts = el('div', { class: 'st-row' }),
+    time = el('div', { class: 'st-row' }), ranks = el('div', { class: 'stats' });
+  box.replaceChildren(el('div', { class: 'filters' }, sel), status, tiles, top, parts, time, ranks);
+  const d = {};
+  const n = (x) => Number(x).toLocaleString();
+  function paint() {
     if (isDead()) return;
-    status.textContent = tr('{0} releases · {1} pistes · {2} · {3} jours de musique', s.releases, s.tracks, fmtSize(s.size), Math.round(s.duration / 8640) / 10);
-    body.className = 'stats';
-    body.replaceChildren(block(tr('Ajouts par mois'), s.months), block(tr('Par année'), s.years), block(tr('Par genre'), s.genres),
-      block(tr('Par source'), s.sources), block(tr('Par catégorie'), s.categories, (r) => catLabel(r.name)),
-      block(tr('Pistes par débit'), s.bitrates, (r) => `${r.name} kbit/s`));
-  }).catch((err) => { if (!isDead()) status.textContent = err.message; });
+    const { s, u } = d, wait = '…';
+    tiles.replaceChildren(tile(tr('Releases'), s ? n(s.releases) : wait), tile(tr('Pistes'), s ? n(s.tracks) : wait),
+      tile(tr('Stocké'), s ? fmtSize(s.size) : wait), tile(tr('Jours de musique'), s ? n(Math.round(s.duration / 8640) / 10) : wait),
+      tile(tr('Écoutes'), u ? n(u.plays) : wait), tile(tr('Temps écouté'), u ? hours(u.duration) : wait),
+      tile(tr('Comptes actifs'), u ? `${u.active} / ${u.accounts}` : wait), tile(tr('Pistes différentes'), u ? n(u.distinct_tracks) : wait));
+    const days = u ? [...u.days].reverse() : []; // du plus ancien au plus récent
+    top.replaceChildren(panel(tr('Écoutes par jour'), days.length ? area(tr('Écoutes par jour'), days.map((r) => r.n)) : el('p', {}, u ? tr('Aucune écoute') : wait),
+      days.length ? el('p', { class: 'axis' }, el('span', {}, days[0].name), el('span', {}, days.at(-1).name)) : null),
+    panel(tr('Par catégorie'), s ? donut(tr('Par catégorie'), shares(s.categories.map((r) => ({ name: catLabel(r.name), n: r.n })), 5, tr('Autres'))) : el('p', {}, wait)));
+    parts.replaceChildren(
+      panel(tr('Par source'), s ? donut(tr('Par source'), shares(s.sources, 5, tr('Autres'))) : el('p', {}, wait)),
+      panel(tr('Pistes par débit'), s ? donut(tr('Pistes par débit'), rateClasses(s.bitrates).filter((r) => r.n)) : el('p', {}, wait)),
+      panel(tr('Genres les plus écoutés'), u ? (u.genres.length ? donut(tr('Genres les plus écoutés'), shares(u.genres, 5, tr('Autres'))) : el('p', {}, tr('Aucune écoute'))) : el('p', {}, wait)));
+    const byTime = (title, rows, color) => { // colonnes dans l'ordre du temps, bornes dessous
+      const r = [...rows].sort((x, y) => String(x.name).localeCompare(String(y.name)));
+      return panel(title, r.length ? columns(title, r.map((x) => x.n), color) : el('p', {}, wait),
+        r.length ? el('p', { class: 'axis' }, el('span', {}, String(r[0].name)), el('span', {}, String(r.at(-1).name))) : null);
+    };
+    time.replaceChildren(byTime(tr('Par année'), s ? s.years : [], 1), byTime(tr('Ajouts par mois'), s ? s.months : [], 2));
+    const t = (r) => hours(r.duration);
+    ranks.replaceChildren(...(u ? [block(tr('Artistes les plus écoutés'), u.artists, undefined, t), block(tr('Releases les plus écoutées'), u.releases, undefined, t),
+      block(tr('Pistes les plus écoutées'), u.tracks, undefined, t), block(tr('Par utilisateur'), u.users, undefined, t)] : []),
+    ...(s ? [block(tr('Par genre'), s.genres)] : []));
+  }
+  const fail = (err) => { if (!isDead()) status.textContent = err.message; };
+  const loadUsage = () => api(`/admin/usage?days=${sel.value}`).then((u) => { d.u = u; paint(); }).catch(fail);
+  paint();
+  api('/admin/library').then((s) => { d.s = s; paint(); }).catch(fail);
+  loadUsage();
 }
 
 export function render(container, params) {
   let dead = false, dispose = null;
   const quality = params.tab === 'quality';
   const kind = KINDS.some(([k]) => k === params.kind) ? params.kind : KINDS[0][0];
-  const status = el('p', { class: 'status', role: 'status' }, tr('Chargement…'));
   const body = el('div');
-  const use = el('div');
   const kinds = el('div', { class: 'tabs', role: 'tablist', 'aria-label': tr('Contrôle qualité') });
   // même navigation que la page Administration, dont ces deux écrans sont des sections
   container.replaceChildren(el('div', { class: 'page admin' }, navBar(quality ? '#/library?tab=quality' : '#/library'),
     el('div', { class: 'ad-main' }, el('h1', {}, quality ? tr('Contrôle qualité') : tr('Statistiques')),
-      ...(quality ? [kinds] : [status]), body, ...(quality ? [] : [use]))));
-  if (!quality) { dashboard(body, status, () => dead); usage(use, () => dead); }
+      ...(quality ? [kinds] : []), body)));
+  if (!quality) stats(body, () => dead);
   else {
     const paint = (counts) => kinds.replaceChildren(...KINDS.map(([k, label]) =>
       tabBtn(counts ? `${tr(label)} (${counts[k]})` : tr(label), k === kind, `#/library?tab=quality&kind=${k}`)));

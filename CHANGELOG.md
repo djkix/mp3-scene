@@ -4,6 +4,18 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.44.0](https://github.com/djkix/mp3-scene/compare/v1.43.0...v1.44.0) (2026-11-20)
+
+### Résumé
+
+**Statistiques de l'administration en tableau de bord, avec graphiques.**
+
+- Huit chiffres clés (bibliothèque, puis usage sur la période choisie), courbe des écoutes par jour, anneaux pour les
+  catégories, les sources, les classes de débit et les genres écoutés, colonnes pour les releases par année et les
+  ajouts par mois, classements en barres pour les artistes, releases, pistes et utilisateurs.
+- Les graphiques sont dessinés par l'application (SVG), sans bibliothèque externe ; couleurs adaptées aux thèmes
+  clair et sombre.
+
 ## [1.43.0](https://github.com/djkix/mp3-scene/compare/v1.42.0...v1.43.0) (2026-11-20)
 
 ### Résumé
