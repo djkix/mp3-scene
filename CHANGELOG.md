@@ -4,6 +4,16 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.39.1](https://github.com/djkix/mp3-scene/compare/v1.39.0...v1.39.1) (2026-11-20)
+
+### Résumé
+
+**Menu déroulant pour les actions d'une piste.**
+
+- Le bouton « … » d'une piste ouvre un menu sous le bouton (Lire ensuite, Ajouter à la file, Radio, playlists,
+  Nouvelle playlist…) au lieu d'une boîte qui assombrit la page ; « Ajouter à une playlist » de la fiche utilise le
+  même menu. Les playlists intelligentes n'y sont pas proposées.
+
 ## [1.39.0](https://github.com/djkix/mp3-scene/compare/v1.38.0...v1.39.0) (2026-11-20)
 
 ### Résumé

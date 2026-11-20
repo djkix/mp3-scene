@@ -184,6 +184,8 @@ export const EN = {
   'Source': 'Source',
   'Année': 'Year',
   'Tout cocher': 'Select all',
+  'Nouvelle playlist…': 'New playlist…',
+  'Nom de la nouvelle playlist': 'New playlist name',
   'Réinitialiser': 'Reset',
   'Label': 'Label',
   'Rattacher « {0} » à quel label ?': 'Attach “{0}” to which label?',
