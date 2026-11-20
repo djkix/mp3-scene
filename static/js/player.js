@@ -328,25 +328,32 @@ function applyPrefs() {
 let fxDlg = null;
 function openAudioPrefs() {
   fxDlg ??= document.body.appendChild(el('dialog', { class: 'pl-add' }));
+  // lignes alignées : nom, curseur, valeur ; un interrupteur pour le nivellement, des boutons pour le fondu
+  const db = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v)} dB`;
   const slider = (label, i) => {
-    const out = el('span', { class: 'pl-time' }, `${prefs.eq[i]} dB`);
-    return el('label', {}, label, el('input', { type: 'range', min: -12, max: 12, step: 1, value: prefs.eq[i],
-      oninput: (e) => { prefs.eq[i] = +e.target.value; out.textContent = `${prefs.eq[i]} dB`; applyPrefs(); } }), out);
+    const out = el('span', { class: 'fx-val' }, db(prefs.eq[i]));
+    return el('label', { class: 'fx-row' }, el('span', {}, label), el('input', { type: 'range', min: -12, max: 12, step: 1, value: prefs.eq[i],
+      oninput: (e) => { prefs.eq[i] = +e.target.value; out.textContent = db(prefs.eq[i]); applyPrefs(); } }), out);
   };
-  const fadeSel = el('select', { disabled: !canFade, onchange: () => { prefs.fade = +fadeSel.value; applyPrefs(); } },
-    [0, 2, 4, 6, 8, 12].map((s) => el('option', { value: s }, s ? tr('{0} s', s) : tr('Aucun'))));
-  fadeSel.value = prefs.fade;
+  const fades = el('div', { class: 'fx-seg', role: 'group', 'aria-label': tr('Fondu enchaîné') }, [0, 2, 4, 6, 8, 12].map((sec) =>
+    el('button', { type: 'button', disabled: !canFade, 'aria-pressed': String(prefs.fade === sec), onclick: () => {
+      prefs.fade = sec;
+      applyPrefs();
+      [...fades.children].forEach((x) => x.setAttribute('aria-pressed', String(x === fades.children[[0, 2, 4, 6, 8, 12].indexOf(sec)])));
+    } }, sec ? tr('{0} s', sec) : tr('Aucun'))));
   fxDlg.replaceChildren(el('h2', {}, tr('Réglages audio')),
-    el('div', { class: 'stack fx' }, slider(tr('Graves'), 0), slider(tr('Médiums'), 1), slider(tr('Aigus'), 2),
-      el('label', { class: 'check' }, el('input', { type: 'checkbox', checked: prefs.level,
-        onchange: (e) => { prefs.level = e.target.checked; applyPrefs(); } }), tr('Niveler le volume entre les pistes')),
-      el('label', {}, tr('Fondu enchaîné'), fadeSel),
+    el('div', { class: 'fx' },
+      el('h3', {}, tr('Égaliseur')), slider(tr('Graves'), 0), slider(tr('Médiums'), 1), slider(tr('Aigus'), 2),
+      el('h3', {}, tr('Enchaînement')),
+      el('label', { class: 'fx-line' }, tr('Niveler le volume entre les pistes'), el('input', { type: 'checkbox', class: 'switch', role: 'switch',
+        checked: prefs.level, onchange: (e) => { prefs.level = e.target.checked; applyPrefs(); } })),
+      el('div', { class: 'fx-line' }, tr('Fondu enchaîné'), fades),
       el('p', { class: 'hint' }, canFade ? tr("Les pistes s'enchaînent sans blanc ; le fondu les fait se chevaucher.")
         : tr("Les pistes s'enchaînent sans blanc. Le fondu n'est pas possible sur cet appareil.")),
       el('p', { class: 'hint' }, tr("Sur iPhone, l'égaliseur et le nivellement peuvent couper le son écran verrouillé : remettez-les à zéro puis rechargez la page."))),
-    el('div', { class: 'inline' },
+    el('div', { class: 'fx-foot' },
       el('button', { type: 'button', onclick: () => { prefs.eq = [0, 0, 0]; prefs.level = false; prefs.fade = 0; applyPrefs(); openAudioPrefs(); } }, tr('Réinitialiser')),
-      el('button', { type: 'button', onclick: () => fxDlg.close() }, tr('Fermer'))));
+      el('button', { type: 'button', class: 'primary', onclick: () => fxDlg.close() }, tr('Fermer'))));
   if (!fxDlg.open) fxDlg.showModal();
 }
 
@@ -499,12 +506,14 @@ function sleepDone() {
   flash(tr('Minuterie : lecture arrêtée.'));
 }
 
+// Vide la file sans couper la musique : la piste en cours reste, toutes les autres sont retirées.
 function clear() {
-  radioId = null;
-  player.queue.clear();
-  load(false);
+  radioId = null; // la radio ne rajoute plus de pistes
+  const q = player.queue;
+  for (let i = q.tracks.length - 1; i >= 0; i--) if (i !== q.index) q.remove(i);
+  backend?.sync();
+  update();
   save();
-  if (ui) { openPanel(false); ui.qbtn.focus(); }
 }
 
 // Déconnexion / vue de connexion : un autre utilisateur ne doit pas hériter de la file.
@@ -612,6 +621,16 @@ function iconBtn(cls, glyph, label, onclick, ico = null) {
   return el('button', { type: 'button', class: 'icon ' + cls, title: label, 'aria-label': label, 'data-ico': ico, onclick }, glyph);
 }
 
+// Titre trop long pour sa place : il défile d'un bout à l'autre (CSS) au lieu d'être coupé.
+function fitTitle() {
+  const span = ui?.title.firstElementChild;
+  if (!span) return;
+  const over = span.offsetWidth - ui.title.clientWidth;
+  ui.title.classList.toggle('long', over > 4);
+  ui.title.style.setProperty('--shift', `${-over}px`);
+  ui.title.style.setProperty('--dur', `${Math.max(6, Math.round(over / 20))}s`);
+}
+
 function label(btn, text) {
   btn.title = text;
   btn.setAttribute('aria-label', text);
@@ -695,8 +714,12 @@ function update() {
   positionState();
   if (ui) {
     ui.footer.classList.toggle('is-empty', !t);
-    ui.title.textContent = !t ? '' : t.title && t.artist ? `${t.artist} - ${t.title}` : title(t);
-    ui.title.title = ui.title.textContent;
+    const name = !t ? '' : t.title && t.artist ? `${t.artist} - ${t.title}` : title(t);
+    if (ui.title.title !== name) { // seulement quand la piste change : le défilement ne repart pas à chaque rafraîchissement
+      ui.title.replaceChildren(el('span', {}, name));
+      ui.title.title = name;
+      fitTitle();
+    }
     ui.rel.textContent = relName(t?.release_name);
     loadWave(t);
     const cover = t ? `/api/releases/${t.release_id}/cover` : '';
@@ -761,10 +784,12 @@ function expand(on) {
   ui.footer.classList.toggle('expanded', on);
   document.documentElement.classList.toggle('player-open', on); // fige le défilement de la page derrière
   ui.title.setAttribute('aria-expanded', on);
+  fitTitle(); // la place du titre change entre la barre et le plein écran
 }
 
 export function initPlayer(footer) {
   if (ui) return; // une seule initialisation : pas d'écouteurs en double
+  addEventListener('resize', fitTitle);
   const q = () => player.queue;
   ui = { footer };
   ui.title = el('button', { type: 'button', class: 'pl-title', 'aria-expanded': 'false',
@@ -774,7 +799,7 @@ export function initPlayer(footer) {
       expand(open);
       if (open) ui.collapse.focus();
     } });
-  ui.collapse = iconBtn('pl-collapse', '⌄', tr('Réduire le lecteur'), () => { expand(false); ui.title.focus(); });
+  ui.collapse = iconBtn('pl-collapse', '', tr('Réduire le lecteur'), () => { expand(false); ui.title.focus(); }, 'back');
   ui.rel = el('a', { class: 'pl-rel', href: '#/' });
   // plein écran : fiche de la release (NFO), source · débit · groupe, favori de la piste en cours
   ui.doc = el('a', { class: 'icon pl-doc', href: '#/', title: tr('Détail de la release'), 'aria-label': tr('Détail de la release') });

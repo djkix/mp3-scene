@@ -619,5 +619,7 @@ def test_filters_accept_several_values(user_client, library):
     assert names("genre=House&genre=Techno&year=2017") == [B] and names("decade=1980") == []
     assert user_client.get("/api/mix?genre=House&genre=Techno").status_code == 200
     assert [g["name"] for g in user_client.get("/api/groups?by=category").json()] == ["Singles", "Albums"]
+    grp = lambda qs: sorted(g["name"] for g in user_client.get("/api/groups?by=artist&" + qs).json())
+    assert grp("genre=House&genre=Techno") == ["A-Trak", "Bicep"] and grp("year=2015&decade=2000") == ["A-Trak", "VA"]
     pid = user_client.post("/api/playlists", json={"name": "Deux genres", "rules": {"genre": ["House", "Techno"], "year": [2015, 2017]}}).json()["id"]
     assert len(user_client.get(f"/api/playlists/{pid}").json()["items"]) == 3

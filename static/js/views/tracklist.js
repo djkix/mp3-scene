@@ -4,6 +4,7 @@ import { el, relName } from '../dom.js';
 import { player, watchPlaying } from '../player.js';
 import { t as tr, locale } from '../i18n.js';
 import { addButton } from '../playlist-add.js';
+import { favButton } from './releases.js'; // import croisé : appelé au rendu seulement
 
 const PAGE = 50;
 
@@ -27,9 +28,11 @@ export function trackList(container, { path, empty, history = false, remove = nu
     list.replaceChildren();
     status.textContent = empty;
   } }, tr("Effacer l'historique")));
-  const head = el('div', { class: 'rel-head trk-fav' },
-    [history ? tr('Date') : tr('Durée'), tr('Artiste'), tr('Titre'), tr('Release')].map((x) => el('span', {}, x)), el('span'));
+  // même présentation que les lignes de releases : vignette, nom, genre, durée (ou date d'écoute), débit, release, actions
+  const head = el('div', { class: 'rel-head trk' }, el('span'), el('span', { class: 'mid' }, tr('Artiste - Titre')),
+    [tr('Genre'), history ? tr('Date') : tr('Durée'), tr('Débit'), tr('Release')].map((x) => el('span', { class: 'mid' }, x)), el('span'));
   if (move) container.style.setProperty('--acts', '136px');
+  if (history) container.style.setProperty('--when', '9.5rem');
   container.replaceChildren(...(clear ? [clear] : []), head, list, status, sentinel);
   const watch = watchPlaying(list);
   const tracks = []; // pistes chargées, dans l'ordre : file de lecture au clic
@@ -65,16 +68,21 @@ export function trackList(container, { path, empty, history = false, remove = nu
           if (dir === 'up') li.previousSibling.before(li); else li.nextSibling.after(li);
         } catch (err) { if (!dead) status.textContent = err.message; }
       } }, dir === 'up' ? '▲' : '▼');
-    const li = el('li', { class: 'rel trk-fav', tabIndex: 0, 'data-track': t.id,
+    const li = el('li', { class: 'rel trk', tabIndex: 0, 'data-track': t.id,
       onclick: (e) => { if (!e.target.closest('button, a')) play(); },
       onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) play(); } },
-    el('span', { class: 'rel-date' }, history
-      ? `${fmtDate(t.played_at)} ${new Date(t.played_at * 1000).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}`
-      : (t.duration == null ? '—' : fmtDuration(t.duration))),
-    el('span', { class: 'rel-cat' }, t.artist || ''),
-    el('span', { class: 'rel-name' }, t.title || t.filename),
-    el('a', { class: 'rel-meta', href: `#/release/${encodeURIComponent(t.release_name)}` }, relName(t.release_name)),
-    el('span', { class: 'rel-actions' }, shift('up'), shift('down'), addButton({ track_ids: [t.id] }, null, [t]), del));
+    el('img', { class: 'rel-thumb', src: `/api/releases/${t.release_id}/thumb`, alt: '', loading: 'lazy', width: 40, height: 40,
+      onerror: (e) => { e.target.style.visibility = 'hidden'; } }),
+    el('span', { class: 'rel-name' }, t.title ? (t.artist ? `${t.artist} - ${t.title}` : t.title) : t.filename),
+    el('span', { class: 'rel-info' },
+      el('span', { class: 'mid' }, t.genre ? el('span', { class: 'chip' }, t.genre) : ''),
+      el('span', { class: 'mid' }, history
+        ? `${fmtDate(t.played_at)} ${new Date(t.played_at * 1000).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}`
+        : (t.duration == null ? '—' : fmtDuration(t.duration))),
+      el('span', { class: 'mid rate' }, t.bitrate ? `${Math.round(t.bitrate / 1000)} kbit/s` : ''),
+      el('a', { class: 'trk-rel', href: `#/release/${encodeURIComponent(t.release_name)}` }, relName(t.release_name))),
+    // le cœur des favoris, sauf dans une liste qui a déjà son bouton de retrait
+    el('span', { class: 'rel-actions' }, shift('up'), shift('down'), addButton({ track_ids: [t.id] }, null, [t]), del || favButton(t, 'track')));
     return li;
   }
 

@@ -4,6 +4,23 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.40.0](https://github.com/djkix/mp3-scene/compare/v1.39.1...v1.40.0) (2026-11-20)
+
+### Résumé
+
+**Listes de pistes au rendu des releases, filtres multiples dans Explorer, lecteur mobile et réglages audio retouchés.**
+
+- Listes de pistes (recherche, favoris, historique, playlists) : même présentation que les releases, avec vignette,
+  « Artiste - Titre », genre en pastille, durée, débit, release, menu « … » et cœur. La recherche de pistes est triée
+  par titre.
+- Explorer : filtres Genres et Années à choix multiples avec Réinitialiser ; Catégories a sa rangée de lettres.
+- Lecteur : un titre trop long défile au lieu d'être coupé ; sur téléphone, la pochette suit le bandeau, le bouton de
+  gauche est une flèche de retour et celui de droite un « i ».
+- File d'attente : **Vider la file** garde la piste en cours, qui continue, et retire les autres.
+- Réglages audio : une ligne par bande (nom, curseur, valeur), interrupteur pour le nivellement, boutons pour le fondu.
+- Favoris : cœur de la couleur du texte, plein quand l'élément est en favori.
+- Corrigé : « null » affiché sous « Autres versions » d'une fiche.
+
 ## [1.39.1](https://github.com/djkix/mp3-scene/compare/v1.39.0...v1.39.1) (2026-11-20)
 
 ### Résumé

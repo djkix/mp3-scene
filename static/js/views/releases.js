@@ -145,8 +145,16 @@ let filtersCache = null;
 export const invalidateFilters = () => { filtersCache = null; }; // après un scan : nouveaux genres/années/catégories
 export const loadFilters = () => (filtersCache ??= api('/filters').catch((e) => { filtersCache = null; throw e; }));
 
-// Filtre Année : les décennies (valeur « 1990s ») puis les années ; yearQuery() en fait le paramètre de l'API.
-export const yearQuery = (year) => (/s$/.test(year) ? { decade: parseInt(year, 10) } : { year });
+// Filtre Année : les décennies (valeur « 1990s ») puis les années.
+// Paramètres d'API de filtres à choix multiples ({genre: 'House|Techno', year: '2015|1990s'}) : une entrée par valeur,
+// les décennies sous `decade`.
+export function multiQuery(filters) {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(filters)) for (const x of (v ? String(v).split('|') : [])) {
+    if (k === 'year' && /s$/.test(x)) p.append('decade', parseInt(x, 10)); else p.append(k, x);
+  }
+  return p;
+}
 export const yearSelect = (f, year, onChange, kind = select) => kind(tr('Année'), tr('Années'), 'year',
   [...new Set(f.years.map((y) => `${Math.floor(y / 10) * 10}s`)), ...f.years], year, onChange,
   (v) => (/s$/.test(v) ? tr('Années {0}', v.slice(0, 4)) : String(v)));

@@ -49,7 +49,10 @@ function detail(container, kind, params) {
       tabBtn(tr('Releases'), !other, base), tabBtn(tr('Avec'), other === 'collab', base + '?in=with'),
       tabBtn(tr('Apparitions'), other === 'appears', base + '?in=appears'))] : []),
     list);
-  if (!appears) api('/groups' + qs({ by, name, genre: params.genre, ...releases.yearQuery(params.year || '') }))
+  const one = releases.multiQuery({ genre: params.genre, year: params.year });
+  one.set('by', by);
+  one.set('name', name);
+  if (!appears) api('/groups?' + one)
     .then(([g]) => { total.textContent = g ? `${count(g.releases)} · ${fmtSize(g.size)}` : ''; }).catch(() => {});
   return releases.render(list, { ...params, q: '', pin: appears ? { key: other, value: name, base, extra: { in: params.in } } : { key: pin, value: name, base } });
 }
@@ -82,7 +85,7 @@ export function render(container, params) {
     el('button', { type: 'button', onclick: () => { dir = key === k ? -dir : first; key = k; paint(); } }, text)));
   container.replaceChildren(
     tabs(kind, genre, year),
-    bar, ...(kind === 'categories' ? [] : [letters]), el('div', { class: 'table-wrap' }, el('table', { class: 'groups' }, el('thead', {}, el('tr', {}, heads)), body)), status);
+    bar, letters, el('div', { class: 'table-wrap' }, el('table', { class: 'groups' }, el('thead', {}, el('tr', {}, heads)), body)), status);
 
   // un genre ou une catégorie ouvre la liste « Derniers » filtrée
   const show = kind === 'categories' ? catLabel : String;
@@ -103,10 +106,14 @@ export function render(container, params) {
 
   releases.loadFilters().then((f) => {
     if (dead) return;
-    if (kind !== 'genres') bar.append(releases.select(tr('Genre'), tr('Genres'), 'genre', f.genres, genre, setFilter));
-    bar.append(releases.yearSelect(f, year, setFilter));
+    // mêmes filtres à choix multiples que dans les listes de releases
+    if (kind !== 'genres') bar.append(releases.multi(tr('Genre'), tr('Genres'), 'genre', f.genres, genre, setFilter));
+    bar.append(releases.yearSelect(f, year, setFilter, releases.multi));
+    if (genre || year) bar.append(el('button', { type: 'button', class: 'reset', onclick: () => { location.hash = `#/${kind}`; } }, tr('Réinitialiser')));
   }).catch(() => {});
-  api('/groups' + qs({ by, genre: kind === 'genres' ? '' : genre, ...releases.yearQuery(year) })).then((g) => { if (!dead) { rows = g; paint(); } })
+  const all = releases.multiQuery({ genre: kind === 'genres' ? '' : genre, year });
+  all.set('by', by);
+  api('/groups?' + all).then((g) => { if (!dead) { rows = g; paint(); } })
     .catch((err) => { if (!dead) status.textContent = err.message; });
   return () => { dead = true; };
 }

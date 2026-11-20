@@ -171,19 +171,24 @@ GROUP_BY = {"grp": "grp", "artist": "COALESCE(tag_artist, artist)", "genre": "ge
 
 
 @router.get("/api/groups")
-def groups(by: Literal["grp", "artist", "genre", "label", "category"] = "grp", name: str | None = None, genre: str | None = None,
-           year: int | None = Query(None, ge=0, le=MAX_INT), decade: int | None = Query(None, ge=0, le=MAX_INT),
-           conn=Depends(get_conn)):
+def groups(by: Literal["grp", "artist", "genre", "label", "category"] = "grp", name: str | None = None, genre: Many = None,
+           year: Years = None, decade: Years = None, conn=Depends(get_conn)):
     """Releases regroupées par groupe, artiste, genre ou label : nombre et poids total, restreints au genre / à l'année."""
     col = GROUP_BY[by]
     conds, params = [f"{col} IS NOT NULL", "hidden=0"], []
-    for c, val in ((col, name), ("genre", genre), ("year", year)):
-        if val is not None:
-            conds.append(f"{c}=?")
-            params.append(val)
-    if decade is not None:
-        conds.append("year BETWEEN ? AND ?")
-        params += [decade, decade + 9]
+    if name is not None:
+        conds.append(f"{col}=?")
+        params.append(name)
+    if genre:  # plusieurs genres, années ou décennies : l'un ou l'autre, comme dans les listes
+        conds.append(f"genre IN ({','.join('?' * len(genre))})")
+        params += genre
+    when = [f"year IN ({','.join('?' * len(year))})"] if year else []
+    params += year or []
+    for d in decade or []:
+        when.append("year BETWEEN ? AND ?")
+        params += [d, d + 9]
+    if when:
+        conds.append("(" + " OR ".join(when) + ")")
     # ponytail: liste entière sans pagination (l'interface n'affiche que les 1000 premières lignes) ; paginer si lourd
     return [dict(r) for r in conn.execute(
         f"SELECT {col} AS name, COUNT(*) AS releases, SUM(size) AS size FROM releases WHERE " + " AND ".join(conds)
@@ -201,7 +206,8 @@ def search_tracks(q: str = Query("", max_length=200), offset: int = Query(0, ge=
     conds = " AND ".join("(t.title LIKE ? OR t.artist LIKE ?)" for _ in words)
     params = [f"%{w}%" for w in words for _ in range(2)]  # mots sans % ni _ : _WORDS les a retirés
     return _page(conn, TRACK_COLS, TRACK_FROM, "WHERE " + conds, params,
-                 "t.artist COLLATE NOCASE, t.title COLLATE NOCASE, t.id", user["id"], offset, limit, _track)
+                 "COALESCE(t.title, t.relpath) COLLATE NOCASE, t.artist COLLATE NOCASE, t.id",  # par titre, puis par artiste
+                 user["id"], offset, limit, _track)
 
 
 @router.get("/api/folders")

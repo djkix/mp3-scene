@@ -184,6 +184,8 @@ export const EN = {
   'Source': 'Source',
   'Année': 'Year',
   'Tout cocher': 'Select all',
+  'Égaliseur': 'Equaliser',
+  'Enchaînement': 'Playback',
   'Nouvelle playlist…': 'New playlist…',
   'Nom de la nouvelle playlist': 'New playlist name',
   'Réinitialiser': 'Reset',

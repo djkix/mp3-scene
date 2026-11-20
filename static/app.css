@@ -114,7 +114,8 @@ button:disabled { opacity: .6; cursor: default; }
   border-color: transparent; background: transparent; border-radius: 4px; line-height: 1; color: var(--muted); }
 .icon:hover { color: var(--fg); }
 a.icon:hover { background: var(--hover); }
-.fav[aria-pressed="true"] { color: var(--accent-text); }
+/* favori : cœur plein de la couleur du texte (noir en clair, blanc en sombre) ; contour seul tant qu'il ne l'est pas */
+.fav, .fav[aria-pressed="true"] { color: var(--fg); }
 
 .crumbs { padding: 12px 12px 10px; color: var(--muted); }
 .crumbs a:hover { color: var(--fg); text-decoration: underline; }
@@ -319,20 +320,22 @@ google-cast-launcher:hover { background: var(--hover); }
   #player.expanded .pl-bar { position: relative; flex-direction: column; align-items: stretch; gap: 16px; min-height: 100%;
     padding: 8px 16px 20px; }
   /* bandeau : réduire, « En cours de lecture », cast (placé ici depuis les outils), fiche de la release */
-  #player.expanded .pl-top { display: flex; align-items: center; gap: 8px; margin-bottom: auto; }
+  #player.expanded .pl-top { display: flex; align-items: center; gap: 8px; }
+  /* la pochette suit le bandeau ; l'espace libre passe sous les informations, les commandes restent en bas sous le pouce */
+  #player.expanded .pl-info { margin-bottom: auto; }
   #player.expanded .pl-top .icon, #player.expanded #cast-slot > * { min-width: 40px; height: 40px; border-radius: 50%;
     background: var(--panel); border: 1px solid var(--line); }
-  #player.expanded .pl-collapse { font-size: 24px; }
+  #player.expanded .pl-collapse { font-size: 16px; }
   .pl-now { flex: 1; text-align: center; color: var(--muted); font: 11px var(--mono); letter-spacing: .08em;
     text-transform: uppercase; }
   .pl-doc::before { content: ""; width: 18px; height: 18px; background: currentColor;
     -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat;
-    --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linejoin='round' stroke-linecap='round'%3E%3Cpath d='M6 3h8l4 4v14H6zM14 3v4h4M9 12h6M9 16h6'/%3E%3C/svg%3E"); }
+    --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v6'/%3E%3Ccircle cx='12' cy='7.5' r='.6' fill='%23000'/%3E%3C/svg%3E"); } /* « i » : fiche de la release */
   #player.expanded #cast-slot { position: absolute; top: 8px; right: 64px; }
   #player.expanded #cast-slot:empty { display: none; }
   #player.expanded .pl-info { flex: none; grid-template-columns: minmax(0, 1fr); justify-items: center; row-gap: 8px; }
   #player.expanded .pl-info > * { grid-column: 1; }
-  #player.expanded .pl-cover { grid-row: auto; width: min(72vw, 280px); height: auto; aspect-ratio: 1; margin: 0 0 8px;
+  #player.expanded .pl-cover { grid-row: auto; width: min(80vw, 320px); height: auto; aspect-ratio: 1; margin: 0 0 8px;
     border-radius: 8px; box-shadow: 0 12px 32px rgb(0 0 0 / .45); }
   #player.expanded .pl-title { display: block; max-width: 100%; text-align: center; font: 600 22px/1.3 var(--sans);
     letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -431,6 +434,24 @@ dialog.pl-add { width: min(360px, calc(100vw - 24px)); padding: 16px; border: 1p
 .menu button:hover, .menu button:focus-visible { background: var(--hover); }
 .menu hr { width: 100%; margin: 5px 0; border: 0; border-top: 1px solid var(--line); }
 .menu-cap { margin: 0; padding: 5px 10px 3px; color: var(--muted); font: 11px var(--sans); }
+/* réglages audio : une ligne par réglage (nom, curseur, valeur), interrupteur et boutons de fondu */
+.fx h3 { margin: 14px 0 6px; color: var(--muted); font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.fx-row { display: grid; grid-template-columns: 5rem minmax(0, 1fr) 3.5rem; align-items: center; gap: 10px; min-height: 36px; }
+.fx-row input { width: 100%; padding: 0; border: 0; background: none; accent-color: var(--accent); }
+.fx-val { color: var(--muted); font: 12px var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+.fx-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; min-height: 40px; }
+.fx .hint { margin: 8px 0 0; font-size: 12px; }
+.fx-seg { display: flex; flex-wrap: wrap; gap: 4px; }
+.fx-seg button { min-height: 0; padding: 4px 9px; border-radius: 999px; font: 12px var(--sans); text-transform: none; letter-spacing: 0; }
+.fx-seg button[aria-pressed="true"] { background: var(--tint); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+.fx-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 14px; }
+.switch { appearance: none; -webkit-appearance: none; flex: none; width: 36px; height: 20px; min-height: 0; margin: 0; padding: 0; border: 0;
+  border-radius: 999px; background: var(--line); position: relative; cursor: pointer; transition: background .15s; }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--panel);
+  transition: transform .15s; }
+.switch:checked { background: var(--accent); }
+.switch:checked::after { transform: translateX(16px); }
+@media (prefers-reduced-motion: reduce) { .switch, .switch::after { transition: none; } }
 dialog.pl-add::backdrop { background: rgb(0 0 0 / .5); }
 dialog.pl-add h2 { margin: 0 0 10px; font-size: 15px; }
 .pl-add-list { display: flex; flex-direction: column; gap: 4px; max-height: 40vh; overflow-y: auto; margin-bottom: 10px; }
@@ -488,10 +509,6 @@ dialog.pl-add .status { padding: 8px 0; min-height: 1em; }
 .share-list button:hover { background: var(--hover); }
 .bars td.bar { width: 40%; padding-inline: 4px; }
 .bars td.bar span { display: block; height: 8px; min-width: 2px; border-radius: 1px; background: var(--accent); }
-.fx { max-width: none; margin-bottom: 12px; }
-.fx label { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr) 3.5rem; align-items: center; gap: 8px; }
-.fx label.check { display: flex; flex-direction: row; color: inherit; }
-.fx .hint { margin: 0; font-size: 12px; color: var(--muted); }
 .grp-title { margin: 0; padding: 14px 12px 0; font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
 .grp-title .muted { color: var(--muted); font-size: 12px; font-weight: 400; margin-left: 8px; white-space: nowrap; }
 td.num { text-align: right; white-space: nowrap; font: 12px var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); }
@@ -515,10 +532,11 @@ tr.disc th { background: var(--hover); color: var(--fg); padding-block: 8px; }
 .tabs button { flex: none; padding: 7px 12px; }
 /* :not(:disabled) : passe devant le fond de survol des boutons, sinon l'onglet actif survolé est illisible */
 .tabs button[aria-selected="true"]:not(:disabled) { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
-/* date | artiste | titre | release | action : artiste et release passent à la ligne plutôt que d'être coupés */
-.trk-fav { grid-template-columns: 8rem minmax(0, 2fr) minmax(0, 3fr) minmax(0, 4fr) var(--acts, 72px); gap: 0 16px; }
-.trk-fav .rel-cat, .trk-fav .rel-meta { white-space: normal; overflow-wrap: anywhere; }
-.trk-fav .rel-meta:hover { text-decoration: underline; }
+/* liste de pistes, comme les releases : vignette | artiste - titre | genre | durée ou date | débit | release | actions */
+/* bureau seulement : sur téléphone, la ligne garde la disposition en carte des releases */
+@media (min-width: 700px) { .trk { grid-template-columns: 40px minmax(0, 3fr) 7rem var(--when, 5rem) 5.25rem minmax(0, 2fr) var(--acts, 72px); } }
+.trk-rel { color: var(--muted); font: 12px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trk-rel:hover { color: var(--fg); text-decoration: underline; }
 .stack { display: flex; flex-direction: column; gap: 10px; max-width: 320px; }
 .stack label, .inline-form label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); }
 .inline-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
@@ -529,9 +547,7 @@ td .actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .hint { color: var(--muted); margin: 0 0 8px; }
 @media (max-width: 699px) {
   .col-bitrate { display: none; }
-  .trk-fav { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; grid-template-areas: "name act" "cat act" "meta act" "date act"; }
-  .trk-fav .rel-meta { grid-area: meta; }
-  .trk-fav .rel-cat { max-width: none; }
+  .trk-rel { flex-basis: 100%; white-space: normal; overflow-wrap: anywhere; } /* la release sur sa propre ligne */
 }
 
 /* Icônes : masque SVG teinté par la couleur du texte, devant le libellé (attribut data-ico, ou onglet de navigation) */
@@ -553,6 +569,14 @@ td .actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 [data-ico="users"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='8' r='3.5'/%3E%3Cpath d='M2.5 20a6.5 6.5 0 0 1 13 0M16 4.8a3.5 3.5 0 0 1 0 6.4M18 14.5a6.5 6.5 0 0 1 3.5 5.5'/%3E%3C/svg%3E"); }
 [data-ico="lock"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3'/%3E%3C/svg%3E"); }
 [data-ico="plus"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E"); }
+[data-ico="back"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 12H5M11 6l-6 6 6 6'/%3E%3C/svg%3E"); }
+/* titre du lecteur trop long : il défile d'un bout à l'autre, avec une pause à chaque extrémité */
+.pl-title > span { display: inline-block; white-space: nowrap; }
+@media (prefers-reduced-motion: no-preference) {
+  #player .pl-title.long { text-overflow: clip; }
+  .pl-title.long > span { animation: pl-marquee var(--dur, 8s) ease-in-out infinite alternate; }
+}
+@keyframes pl-marquee { 0%, 15% { transform: translateX(0); } 85%, 100% { transform: translateX(var(--shift, 0)); } }
 [data-ico="pause"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 5h4v14H7zM13 5h4v14h-4z'/%3E%3C/svg%3E"); }
 [data-ico="prev"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 5h2.5v14H6zM20 5v14l-10.5-7z'/%3E%3C/svg%3E"); }
 [data-ico="next"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M15.5 5H18v14h-2.5zM4 5v14l10.5-7z'/%3E%3C/svg%3E"); }
