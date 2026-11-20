@@ -18,3 +18,7 @@ export const encodePath = (p) => p.split('/').map(encodeURIComponent).join('/');
 // Nom de release tel qu'affiché : les espaces deviennent des « _ », comme dans les noms de la scène. L'adresse et la
 // recherche gardent le vrai nom.
 export const relName = (name) => String(name ?? '').replace(/ /g, '_');
+
+// Adresse de la fiche d'une release : son nom, lisible, et son identifiant, qui seul la désigne sans erreur
+// (deux releases peuvent porter le même nom, et un nom tout en chiffres serait pris pour un identifiant).
+export const relHref = (name, id) => `#/release/${encodeURIComponent(name)}${id ? `?id=${id}` : ''}`;

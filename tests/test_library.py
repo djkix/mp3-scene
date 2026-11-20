@@ -682,3 +682,17 @@ def test_categories_keep_a_fixed_order():
     from app.routes_library import _category_rank
     names = ["Albums", "03.Live & Radio", "02.Various Artists - Compilations", "Zzz", "01.Singles", "Autres"]
     assert sorted(names, key=_category_rank) == ["01.Singles", "Albums", "02.Various Artists - Compilations", "03.Live & Radio", "Autres", "Zzz"]
+
+
+def test_admin_usage_counts_all_accounts(admin_client, user_client, library):
+    assert user_client.get("/api/admin/usage").status_code == 403
+    empty = admin_client.get("/api/admin/usage").json()
+    assert empty["plays"] == 0 and empty["days"] == [] and empty["accounts"] == 2
+    tid = lambda c, name: c.get("/api/release-by-name", params={"name": name}).json()["tracks"][0]["id"]
+    for c, name in ((user_client, A), (user_client, A), (admin_client, "Bicep-Glue-(NT123)-WEB-2017-PWT")):
+        assert c.post(f"/api/history/{tid(c, name)}").status_code == 204
+    u = admin_client.get("/api/admin/usage?days=7").json()
+    assert (u["plays"], u["distinct_tracks"], u["active"]) == (3, 2, 2) and u["duration"] > 0 and len(u["days"]) == 1 and u["days"][0]["n"] == 3
+    assert [(x["name"], x["n"]) for x in u["users"]] == [("user", 2), ("admin", 1)] and len(u["tracks"]) == 2
+    assert [(x["name"], x["n"]) for x in u["artists"]] == [("A-Trak", 2), ("Bicep", 1)] and u["releases"][0] == {"name": A, "n": 2, "duration": u["releases"][0]["duration"]}
+    assert [x["name"] for x in u["genres"]] == ["House", "Techno"]

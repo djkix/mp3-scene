@@ -16,8 +16,10 @@ export function render(container, params) {
   const watch = watchPlaying(container);
   container.replaceChildren(el('p', { class: 'status', role: 'status' }, t('Chargement…')));
 
-  // adresse par nom ; un identifiant numérique (anciens liens, favoris du navigateur) reste accepté
-  api(/^\d+$/.test(id) ? `/releases/${id}` : `/release-by-name?name=${encodeURIComponent(id)}`).then((rel) => {
+  // l'identifiant (?id=) désigne la release sans erreur ; à défaut, le nom, ou un identifiant seul (anciens liens).
+  // Un identifiant qui n'existe plus (release rescannée ailleurs) retombe sur le nom.
+  const byName = () => api(/^\d+$/.test(id) ? `/releases/${id}` : `/release-by-name?name=${encodeURIComponent(id)}`);
+  (/^\d+$/.test(params.id || '') ? api(`/releases/${params.id}`).catch((err) => { if (err.status === 404) return byName(); throw err; }) : byName()).then((rel) => {
     if (dead) return;
     const nfo = el('div'), sim = el('div'), vers = el('div');
     container.replaceChildren(el('div', { class: 'detail' }, header(rel), trackTable(rel), vers, nfo, sim));

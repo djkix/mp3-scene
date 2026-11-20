@@ -4,6 +4,19 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.43.0](https://github.com/djkix/mp3-scene/compare/v1.42.0...v1.43.0) (2026-11-20)
+
+### Résumé
+
+**Statistiques d'usage dans l'administration, liens de fiche fiabilisés.**
+
+- Administration › Statistiques : section **Usage**, tous comptes confondus, sur 7 jours, 30 jours, 12 mois ou depuis
+  le début : écoutes par jour et par utilisateur, artistes, releases, pistes et genres les plus écoutés, avec le
+  nombre d'écoutes et la durée.
+- Corrigé : le lien vers la fiche d'une release dont le nom est tout en chiffres (« 1 ») ouvrait la release portant
+  ce numéro ; deux releases de même nom ouvraient toujours la même. Les liens portent désormais l'identifiant.
+- Favoris : cœur toujours plein, de la couleur du texte, vert quand l'élément est en favori.
+
 ## [1.42.0](https://github.com/djkix/mp3-scene/compare/v1.41.1...v1.42.0) (2026-11-20)
 
 ### Résumé

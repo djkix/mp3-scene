@@ -4,7 +4,7 @@
 // attach/detach) remplace l'<audio> local pour le transport et l'état lu (lecture, position, durée, volume).
 import { api, fmtDuration } from './api.js';
 import { t as tr } from './i18n.js';
-import { el, relName } from './dom.js';
+import { el, relName, relHref } from './dom.js';
 import { Queue } from './queue.js';
 import { offline } from './offline.js';
 
@@ -731,7 +731,7 @@ function update() {
       ui.cover.hidden = true;
       if (cover) ui.cover.src = cover; else ui.cover.removeAttribute('src');
     }
-    ui.rel.href = ui.doc.href = t ? `#/release/${encodeURIComponent(t.release_name)}` : '#/';
+    ui.rel.href = ui.doc.href = t ? relHref(t.release_name, t.release_id) : '#/';
     // plein écran : source, débit et groupe de la release (absents d'une file enregistrée avant la 1.33.0)
     // source, débit, groupe : seuls la source et le nom du groupe sont en pastille ; les points de séparation sont à part
     const meta = !t ? [] : [t.source && el('span', { class: 'chip src' }, t.source),

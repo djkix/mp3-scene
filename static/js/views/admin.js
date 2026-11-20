@@ -3,7 +3,7 @@ import { el } from '../dom.js';
 import { invalidateFilters } from './releases.js';
 import { versionInfo } from '../version.js';
 import { t, locale, catLabel } from '../i18n.js';
-import { relName } from '../dom.js';
+import { relName, relHref } from '../dom.js';
 import * as account from './account.js';
 import * as shares from './shares.js';
 
@@ -274,7 +274,7 @@ export function render(container, params = {}) {
       if (dead) return;
       msg.textContent = list.length ? '' : t('Aucune correction manuelle.');
       rows.replaceChildren(...list.map((o) => el('tr', {},
-        el('th', { scope: 'row' }, el('a', { href: `#/release/${encodeURIComponent(o.name)}` }, relName(o.name))),
+        el('th', { scope: 'row' }, el('a', { href: relHref(o.name, o.id) }, relName(o.name))),
         el('td', {}, o.artist || '—'), el('td', {}, o.category ? catLabel(o.category) : '—'), el('td', {}, o.genre || '—'),
         el('td', {}, o.year ? String(o.year) : '—'), el('td', {}, o.hidden ? t('oui') : '—'),
         el('td', {}, el('button', { type: 'button', onclick: async (e) => {

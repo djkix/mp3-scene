@@ -114,8 +114,9 @@ button:disabled { opacity: .6; cursor: default; }
   border-color: transparent; background: transparent; border-radius: 4px; line-height: 1; color: var(--muted); }
 .icon:hover { color: var(--fg); }
 a.icon:hover { background: var(--hover); }
-/* favori : cœur plein de la couleur du texte (noir en clair, blanc en sombre) ; contour seul tant qu'il ne l'est pas */
-.fav, .fav[aria-pressed="true"] { color: var(--fg); }
+/* favori : cœur toujours plein, de la couleur du texte (noir en clair, blanc en sombre) ; vert quand l'élément est en favori */
+.fav { color: var(--fg); }
+.fav[aria-pressed="true"] { color: var(--accent-text); }
 
 .crumbs { padding: 12px 12px 10px; color: var(--muted); }
 .crumbs a:hover { color: var(--fg); text-decoration: underline; }

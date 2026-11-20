@@ -118,6 +118,32 @@ def classify(conn=Depends(get_conn)):
     conn.commit()
 
 
+@router.get("/usage")
+def usage(days: int = Query(30, ge=0, le=36500), conn=Depends(get_conn)):
+    """Usage de l'application par tous les comptes sur les `days` derniers jours (0 : depuis le début) : écoutes par
+    jour et par utilisateur, artistes, releases, pistes et genres les plus écoutés."""
+    since = time.time() - days * 86400 if days else 0
+    src = "plays p JOIN tracks t ON t.id=p.track_id JOIN releases r ON r.id=t.release_id"
+    rows = lambda sql, *a: [dict(x) for x in conn.execute(sql, (since, *a))]
+    top = lambda col, limit=15: rows(
+        f"SELECT {col} AS name, COUNT(*) AS n, COALESCE(SUM(t.duration), 0) AS duration FROM {src} WHERE p.played_at>=?"
+        f" AND {col} IS NOT NULL GROUP BY 1 ORDER BY n DESC, 1 COLLATE NOCASE LIMIT {limit}")
+    total = conn.execute(f"SELECT COUNT(*) AS plays, COALESCE(SUM(t.duration), 0) AS duration, COUNT(DISTINCT p.user_id) AS active,"
+                         f" COUNT(DISTINCT p.track_id) AS distinct_tracks FROM {src} WHERE p.played_at>=?", (since,)).fetchone()
+    one = lambda sql: conn.execute(sql).fetchone()[0]
+    return {**dict(total),
+            "accounts": one("SELECT COUNT(*) FROM users"), "playlists": one("SELECT COUNT(*) FROM playlists"),
+            "favorites": one("SELECT COUNT(*) FROM favorites"),
+            "days": rows("SELECT strftime('%Y-%m-%d', p.played_at, 'unixepoch', 'localtime') AS name, COUNT(*) AS n,"
+                         f" COALESCE(SUM(t.duration), 0) AS duration FROM {src} WHERE p.played_at>=? GROUP BY 1 ORDER BY 1 DESC LIMIT 31"),
+            "users": rows("SELECT u.username AS name, COUNT(*) AS n, COALESCE(SUM(t.duration), 0) AS duration FROM plays p"
+                          " JOIN users u ON u.id=p.user_id JOIN tracks t ON t.id=p.track_id WHERE p.played_at>=?"
+                          " GROUP BY u.id ORDER BY n DESC, 1"),
+            "artists": top("COALESCE(t.artist, r.tag_artist, r.artist)"), "releases": top("r.name"),
+            "tracks": top("COALESCE(t.artist || ' - ', '') || COALESCE(t.title, t.relpath)"),
+            "genres": top("COALESCE(t.genre, r.genre)")}
+
+
 @router.get("/backup")
 def backup_status(request: Request, conn=Depends(get_conn)):
     """État de la sauvegarde : configurée ou non, dernière tentative, retard."""

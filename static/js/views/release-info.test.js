@@ -23,3 +23,10 @@ test('infoRows : paires dt/dd, champs null omis, aucun [object]', () => {
   assert.equal(dl.children.length, 16);
   assert.ok(!JSON.stringify(dl.children).includes('[object'));
 });
+
+test('relHref : le lien porte l’identifiant, un nom tout en chiffres ou en double ne mène pas ailleurs', async () => {
+  const { relHref } = await import('./../dom.js');
+  assert.equal(relHref('1', 4821), '#/release/1?id=4821');
+  assert.equal(relHref('A B/C?-2024', 7), '#/release/A%20B%2FC%3F-2024?id=7');
+  assert.equal(relHref('Nom'), '#/release/Nom');
+});

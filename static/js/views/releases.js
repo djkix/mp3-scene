@@ -1,5 +1,5 @@
 import { api, fmtDate, fmtSize, session } from '../api.js';
-import { el, relName } from '../dom.js';
+import { el, relName, relHref } from '../dom.js';
 import { t as tr, catLabel } from '../i18n.js';
 import { trackList } from './tracklist.js';
 import { player } from '../player.js';
@@ -8,7 +8,7 @@ import { picker } from './release.js'; // import croisé : picker n'est appelé 
 const PAGE = 50;
 const RULE_KEYS = ['category', 'genre', 'year', 'decade', 'source', 'grp', 'artist', 'label']; // filtres qu'une playlist intelligente retient
 const emit = (name, detail) => document.dispatchEvent(new CustomEvent(name, { detail }));
-const HEART = ['♡︎', '♥︎'];
+const HEART = ['♥︎', '♥︎']; // toujours plein : la couleur dit si l'élément est en favori
 
 // Visite précédente sur cet appareil (heure Unix, 0 si inconnue) : les releases ajoutées depuis sont marquées.
 // Une « visite » dure 6 h : recharger la page ne fait pas disparaître les nouveautés.
@@ -55,7 +55,7 @@ export function row(rel, pick = null, onPick = () => {}) {
   const play = () => emit('play-release', { releaseId: rel.id });
   const queue = el('button', { type: 'button', class: 'icon', title: tr('Ajouter à la file'), 'aria-label': tr('Ajouter à la file'),
     onclick: () => emit('queue-release', { releaseId: rel.id }) }, '+');
-  const detail = el('a', { class: 'icon', href: `#/release/${encodeURIComponent(rel.name)}`, title: tr('Détail de la release'),
+  const detail = el('a', { class: 'icon', href: relHref(rel.name, rel.id), title: tr('Détail de la release'),
     'aria-label': tr('Détail de la release') }, '›');
   return el('li', {
     class: 'rel', tabIndex: 0,
