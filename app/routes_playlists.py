@@ -2,7 +2,7 @@ import json
 import time
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
@@ -16,13 +16,20 @@ class Name(BaseModel):
     name: str = Field(min_length=1, max_length=100)
 
 
+Text = Annotated[str, Field(max_length=200)]
+Int = Annotated[int, Field(ge=0, le=MAX_INT)]
+Texts = Text | Annotated[list[Text], Field(min_length=1, max_length=100)]
+Ints = Int | Annotated[list[Int], Field(min_length=1, max_length=100)]
+
+
 class Rules(BaseModel):
     """Filtres d'une playlist intelligente : les mêmes que ceux des listes de releases."""
-    category: str | None = Field(default=None, max_length=200)
-    genre: str | None = Field(default=None, max_length=200)
-    year: int | None = Field(default=None, ge=0, le=MAX_INT)
-    decade: int | None = Field(default=None, ge=0, le=MAX_INT)
-    source: str | None = Field(default=None, max_length=200)
+    # catégorie, genre, année, décennie et source acceptent plusieurs valeurs, comme les filtres des listes
+    category: Texts | None = None
+    genre: Texts | None = None
+    year: Ints | None = None
+    decade: Ints | None = None
+    source: Texts | None = None
     grp: str | None = Field(default=None, max_length=200)
     artist: str | None = Field(default=None, max_length=200)
     label: str | None = Field(default=None, max_length=200)

@@ -3,18 +3,19 @@
 // liste « Derniers » filtrée. Les filtres Genre et Année sont dans l'adresse et suivent d'une page à l'autre.
 import { api, fmtSize, session } from '../api.js';
 import { el } from '../dom.js';
-import { t as tr } from '../i18n.js';
+import { t as tr, catLabel } from '../i18n.js';
 import * as releases from './releases.js';
 
 const MAX_ROWS = 1000; // au-delà, on demande d'affiner (des dizaines de milliers d'artistes figeraient la page)
 // route -> [onglet, en-tête de colonne, valeur de `by` côté serveur, paramètre de /releases qui épingle la liste]
 const KINDS = { groups: ['Groupes', 'Groupe', 'grp', 'grp'], artists: ['Artistes', 'Artiste', 'artist', 'artist'],
-  labels: ['Labels', 'Label', 'label', 'label'], genres: ['Genres', 'Genre', 'genre', null] };
-// Onglets d'Explorer, dans l'ordre affiché ; « Catégories » (dossiers de la bibliothèque) est rendu par folders.js.
-const TABS = [['artists', 'Artistes'], ['genres', 'Genres'], ['folders', 'Catégories'], ['labels', 'Labels'], ['groups', 'Groupes']];
+  labels: ['Labels', 'Label', 'label', 'label'], genres: ['Genres', 'Genre', 'genre', null],
+  categories: ['Catégories', 'Catégorie', 'category', null] };
+// Onglets d'Explorer, dans l'ordre affiché.
+const TABS = [['artists', 'Artistes'], ['genres', 'Genres'], ['categories', 'Catégories'], ['labels', 'Labels'], ['groups', 'Groupes']];
 export const tabs = (current, genre = '', year = '') => el('div', { class: 'tabs', role: 'tablist', 'aria-label': tr('Explorer') },
   TABS.map(([k, label]) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(k === current),
-    onclick: () => { location.hash = `#/${k}` + (k === 'folders' ? '' : qs({ genre: k === 'genres' ? '' : genre, year })); } }, tr(label))));
+    onclick: () => { location.hash = `#/${k}` + qs({ genre: k === 'genres' ? '' : genre, year }); } }, tr(label))));
 
 const qs = (o) => { const s = String(new URLSearchParams(Object.entries(o).filter(([, v]) => v))); return s ? '?' + s : ''; };
 const count = (n) => `${n} ${n > 1 ? tr('releases') : tr('release')}`;
@@ -81,16 +82,19 @@ export function render(container, params) {
     el('button', { type: 'button', onclick: () => { dir = key === k ? -dir : first; key = k; paint(); } }, text)));
   container.replaceChildren(
     tabs(kind, genre, year),
-    bar, letters, el('div', { class: 'table-wrap' }, el('table', { class: 'groups' }, el('thead', {}, el('tr', {}, heads)), body)), status);
+    bar, ...(kind === 'categories' ? [] : [letters]), el('div', { class: 'table-wrap' }, el('table', { class: 'groups' }, el('thead', {}, el('tr', {}, heads)), body)), status);
 
-  const href = (name) => (pin ? `#/${kind}/${encodeURIComponent(name)}` + qs({ genre, year }) : '#/' + qs({ genre: name, year }));
+  // un genre ou une catégorie ouvre la liste « Derniers » filtrée
+  const show = kind === 'categories' ? catLabel : String;
+  const href = (name) => (pin ? `#/${kind}/${encodeURIComponent(name)}` + qs({ genre, year })
+    : '#/' + qs(kind === 'categories' ? { category: name, genre, year } : { genre: name, year }));
   function paint() {
     HEAD.forEach(([text, k], i) => { heads[i].firstChild.textContent = k === key ? `${text} ${dir > 0 ? '▲' : '▼'}` : text; });
     const needle = find.value.trim().toLowerCase();
     const shown = rows.filter((g) => g.name.toLowerCase().includes(needle) && (!letter || initial(g.name) === letter))
       .sort((a, b) => dir * (key === 'name' ? a.name.localeCompare(b.name) : a[key] - b[key]) || a.name.localeCompare(b.name));
     body.replaceChildren(...shown.slice(0, MAX_ROWS).map((g) => el('tr', {},
-      el('td', {}, el('a', { href: href(g.name) }, g.name)),
+      el('td', {}, el('a', { href: href(g.name) }, show(g.name))),
       el('td', { class: 'num' }, String(g.releases)), el('td', { class: 'num' }, fmtSize(g.size)))));
     status.textContent = !shown.length ? tr('Aucun résultat')
       : tr('{0} lignes · {1} · {2}', shown.length, count(shown.reduce((n, g) => n + g.releases, 0)), fmtSize(shown.reduce((n, g) => n + g.size, 0)))

@@ -147,9 +147,30 @@ export const loadFilters = () => (filtersCache ??= api('/filters').catch((e) => 
 
 // Filtre Année : les décennies (valeur « 1990s ») puis les années ; yearQuery() en fait le paramètre de l'API.
 export const yearQuery = (year) => (/s$/.test(year) ? { decade: parseInt(year, 10) } : { year });
-export const yearSelect = (f, year, onChange) => select(tr('Année'), tr('Années'), 'year',
+export const yearSelect = (f, year, onChange, kind = select) => kind(tr('Année'), tr('Années'), 'year',
   [...new Set(f.years.map((y) => `${Math.floor(y / 10) * 10}s`)), ...f.years], year, onChange,
   (v) => (/s$/.test(v) ? tr('Années {0}', v.slice(0, 4)) : String(v)));
+
+// Filtre à choix multiples : des cases à cocher dans une liste déroulante. `current` : valeurs séparées par « | ».
+// Le choix est appliqué à la fermeture (clic ailleurs, Échap, nouveau clic sur le filtre), pas à chaque case.
+export function multi(label, all, name, values, current, onChange, text = String) {
+  const picked = new Set(current ? current.split('|') : []);
+  const title = () => (picked.size === 0 ? all : picked.size === 1 ? text([...picked][0]) : `${all} (${picked.size})`);
+  const sum = el('summary', {}, title());
+  const box = el('details', { class: 'multi', onkeydown: (e) => { if (e.key === 'Escape') box.open = false; } }, sum,
+    el('div', { class: 'multi-list' }, values.map((v) => el('label', {}, el('input', { type: 'checkbox', checked: picked.has(String(v)),
+      onchange: (e) => { if (e.target.checked) picked.add(String(v)); else picked.delete(String(v)); sum.textContent = title(); } }), text(v)))));
+  box.addEventListener('toggle', () => {
+    const next = [...picked].join('|');
+    if (!box.open && next !== (current || '')) onChange(name, next);
+  });
+  const outside = (e) => {
+    if (!box.isConnected) document.removeEventListener('click', outside);
+    else if (box.open && !box.contains(e.target)) box.open = false;
+  };
+  document.addEventListener('click', outside);
+  return box;
+}
 
 export function select(label, all, name, values, current, onChange, text = String) {
   const sel = el('select', { 'aria-label': label, onchange: () => onChange(name, sel.value) },
@@ -175,7 +196,7 @@ export function render(container, params) {
   if (inTracks) return trackList(list, { path: `/tracks?q=${encodeURIComponent(q)}`, empty: tr('Aucun résultat') });
 
   function setFilter(name, value) {
-    const next = { q, category, genre, year, source, ...pin?.extra, [name]: value };
+    const next = { q, category, genre, year, source, ...pin?.extra, ...(name ? { [name]: value } : { category: '', genre: '', year: '', source: '' }) };
     const qs = Object.entries(next).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
     location.hash = (pin ? pin.base : q ? '#/search' : '#/') + (qs ? '?' + qs : ''); // nouvelle entrée d'historique, pagination remise à zéro
   }
@@ -186,17 +207,27 @@ export function render(container, params) {
   let dead = false;
   loadFilters().then((f) => {
     if (dead) return;
-    bar.replaceChildren(select(tr('Catégorie'), tr('Catégories'), 'category', f.categories, category, setFilter, catLabel),
-      select(tr('Genre'), tr('Genres'), 'genre', f.genres, genre, setFilter), yearSelect(f, year, setFilter),
-      select(tr('Source'), tr('Sources'), 'source', f.sources, source, setFilter),
-      ...(q ? [] : [mix]), ...(q || !Object.values(filters).some(Boolean) ? [] : [smart]), ...(sel ? [sel.button] : []));
+    bar.replaceChildren(multi(tr('Catégorie'), tr('Catégories'), 'category', f.categories, category, setFilter, catLabel),
+      multi(tr('Genre'), tr('Genres'), 'genre', f.genres, genre, setFilter), yearSelect(f, year, setFilter, multi),
+      multi(tr('Source'), tr('Sources'), 'source', f.sources, source, setFilter),
+      ...(category || genre || year || source ? [el('button', { type: 'button', class: 'reset', onclick: () => setFilter() }, tr('Réinitialiser'))] : []),
+      ...(q ? [] : [mix]), ...(q || !Object.values(filters).some((v) => v.length) ? [] : [smart]), ...(sel ? [sel.button] : []));
   }).catch(() => {});
   // Mix : 50 pistes au hasard parmi les releases qui passent les filtres affichés.
-  const filters = { category, genre, ...yearQuery(year), source, ...(pin && { [pin.key]: pin.value }) };
+  // chaque filtre peut porter plusieurs valeurs : paramètre répété dans la requête (genre=House&genre=Techno)
+  const many = (v) => (v ? v.split('|') : []);
+  const years = many(year);
+  const filters = { category: many(category), genre: many(genre), year: years.filter((y) => !/s$/.test(y)),
+    decade: years.filter((y) => /s$/.test(y)).map((y) => parseInt(y, 10)), source: many(source), ...(pin && { [pin.key]: [pin.value] }) };
+  const toQuery = (extra = {}) => {
+    const p = new URLSearchParams();
+    for (const [k, vs] of Object.entries({ ...extra, ...filters })) for (const v of [].concat(vs)) if (v !== '') p.append(k, v);
+    return p;
+  };
   const mix = el('button', { type: 'button', title: tr('Lire 50 pistes au hasard parmi ces releases'), onclick: async () => {
     mix.disabled = true;
     try {
-      const { items } = await api('/mix?' + new URLSearchParams(Object.entries(filters).filter(([, v]) => v)));
+      const { items } = await api('/mix?' + toQuery());
       if (items.length) player.playTracks(items, 0); else player.flash(tr('Aucun résultat'));
     } catch (err) { player.flash(err.message); }
     mix.disabled = false;
@@ -205,8 +236,8 @@ export function render(container, params) {
   const smart = el('button', { type: 'button', title: tr('Enregistrer ces filtres comme une playlist qui se met à jour seule'), onclick: async () => {
     const name = (prompt(tr('Nom de la playlist intelligente')) || '').trim();
     if (!name) return;
-    const rules = Object.fromEntries(Object.entries(filters).filter(([k, v]) => v && RULE_KEYS.includes(k))
-      .map(([k, v]) => [k, ['year', 'decade'].includes(k) ? Number(v) : v]));
+    const rules = Object.fromEntries(Object.entries(filters).filter(([k, v]) => v.length && RULE_KEYS.includes(k))
+      .map(([k, v]) => [k, ['year', 'decade'].includes(k) ? v.map(Number) : v]).map(([k, v]) => [k, v.length === 1 ? v[0] : v]));
     try {
       await api('/playlists', { method: 'POST', body: { name, rules } });
       player.flash(tr('Playlist « {0} » créée : Favoris › Playlists.', name));
@@ -222,7 +253,7 @@ export function render(container, params) {
     }).catch(() => {});
   }
 
-  const query = new URLSearchParams(Object.entries({ q, ...filters }).filter(([, v]) => v));
+  const query = toQuery({ q });
   const dispose = releaseList(list, (offset, tri) => {
     query.set('offset', offset);
     query.set('limit', PAGE);

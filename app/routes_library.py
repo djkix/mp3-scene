@@ -1,7 +1,8 @@
 import re
 import time
-from typing import Literal
+from typing import Annotated, Literal
 
+from pydantic import Field
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from .deps import MAX_INT, Id, current_user, get_conn
@@ -74,19 +75,31 @@ def _page(conn, cols, source, where, params, order, uid, offset, limit, build):
     return {"items": [build(r) for r in rows[:limit]], "has_more": len(rows) > limit}
 
 
+# filtres à plusieurs valeurs : paramètre répété dans l'adresse (genre=House&genre=Techno)
+Many = Annotated[list[Annotated[str, Field(max_length=200)]] | None, Query(max_length=100)]
+Years = Annotated[list[Annotated[int, Field(ge=0, le=MAX_INT)]] | None, Query(max_length=100)]
+
+
 def _release_conds(category=None, genre=None, year=None, grp=None, artist=None, source=None, decade=None, appears=None,
                    collab=None, label=None):
     """Conditions SQL (et leurs paramètres) des filtres de release communs aux listes, au mix et aux playlists
     intelligentes. Les doublons masqués par un administrateur n'en font jamais partie."""
     conds, params = ["r.hidden=0"], []
-    for col, val in (("category", category), ("genre", genre), ("year", year), ("grp", grp), ("source", source),
-                     ("label", label)):
-        if val is not None:
-            conds.append(f"r.{col}=?")
-            params.append(val)
-    if decade is not None:
-        conds.append("r.year BETWEEN ? AND ?")
-        params += [decade, decade + 9]
+    several = lambda v: [] if v is None else v if isinstance(v, list) else [v]  # un filtre accepte plusieurs valeurs
+    for col, val in (("category", category), ("genre", genre), ("grp", grp), ("source", source), ("label", label)):
+        if vals := several(val):
+            conds.append(f"r.{col} IN ({','.join('?' * len(vals))})")
+            params += vals
+    # années et décennies cochées ensemble : l'une ou l'autre
+    years, when = several(year), []
+    if years:
+        when.append(f"r.year IN ({','.join('?' * len(years))})")
+        params += years
+    for d in several(decade):
+        when.append("r.year BETWEEN ? AND ?")
+        params += [d, d + 9]
+    if when:
+        conds.append("(" + " OR ".join(when) + ")")
     if appears is not None:  # releases d'un autre artiste (compilations surtout) où celui-ci signe une piste
         # ponytail: égalité stricte sur le tag de la piste ; « X feat. Y » n'est pas une apparition de X
         conds.append("COALESCE(r.tag_artist, r.artist, '')!=? AND r.id IN (SELECT release_id FROM tracks WHERE artist=?)")
@@ -102,9 +115,9 @@ def _release_conds(category=None, genre=None, year=None, grp=None, artist=None, 
 
 
 @router.get("/api/mix")
-def mix(category: str | None = None, genre: str | None = None, year: int | None = Query(None, ge=0, le=MAX_INT),
-        grp: str | None = None, artist: str | None = None, source: str | None = None,
-        decade: int | None = Query(None, ge=0, le=MAX_INT), appears: str | None = None,
+def mix(category: Many = None, genre: Many = None, year: Years = None,
+        grp: str | None = None, artist: str | None = None, source: Many = None,
+        decade: Years = None, appears: str | None = None,
         collab: str | None = Query(None, max_length=200), label: str | None = Query(None, max_length=200),
         limit: int = Query(50, ge=1, le=MAX_LIMIT), user=Depends(current_user), conn=Depends(get_conn)):
     """Pistes tirées au hasard parmi les releases qui passent les filtres."""
@@ -124,10 +137,10 @@ def new_count(since: float = Query(ge=0, le=1e12), conn=Depends(get_conn)):
 
 
 @router.get("/api/releases")
-def list_releases(q: str = "", category: str | None = None, genre: str | None = None, grp: str | None = None,
-                  artist: str | None = None, source: str | None = None, appears: str | None = None,
-                  decade: int | None = Query(None, ge=0, le=MAX_INT), collab: str | None = Query(None, max_length=200),
-                  year: int | None = Query(None, ge=0, le=MAX_INT), favorites: int = Query(0, ge=0, le=1),
+def list_releases(q: str = "", category: Many = None, genre: Many = None, grp: str | None = None,
+                  artist: str | None = None, source: Many = None, appears: str | None = None,
+                  decade: Years = None, collab: str | None = Query(None, max_length=200),
+                  year: Years = None, favorites: int = Query(0, ge=0, le=1),
                   label: str | None = Query(None, max_length=200), sort: Sort | None = None, dir: Dir = "asc",
                   offset: int = Query(0, ge=0, le=MAX_INT), limit: int = Query(50, ge=1, le=MAX_INT),
                   user=Depends(current_user), conn=Depends(get_conn)):
@@ -154,11 +167,11 @@ def filters(conn=Depends(get_conn)):
 
 
 # regroupements de la page Explorer : colonnes autorisées (jamais de texte du client dans le SQL)
-GROUP_BY = {"grp": "grp", "artist": "COALESCE(tag_artist, artist)", "genre": "genre", "label": "NULLIF(label, '')"}
+GROUP_BY = {"grp": "grp", "artist": "COALESCE(tag_artist, artist)", "genre": "genre", "label": "NULLIF(label, '')", "category": "category"}
 
 
 @router.get("/api/groups")
-def groups(by: Literal["grp", "artist", "genre", "label"] = "grp", name: str | None = None, genre: str | None = None,
+def groups(by: Literal["grp", "artist", "genre", "label", "category"] = "grp", name: str | None = None, genre: str | None = None,
            year: int | None = Query(None, ge=0, le=MAX_INT), decade: int | None = Query(None, ge=0, le=MAX_INT),
            conn=Depends(get_conn)):
     """Releases regroupées par groupe, artiste, genre ou label : nombre et poids total, restreints au genre / à l'année."""

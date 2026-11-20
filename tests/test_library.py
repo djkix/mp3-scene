@@ -609,3 +609,15 @@ def test_other_formats_are_indexed_and_transcoded(admin_client, library, setting
     monkeypatch.setattr(routes_media.shutil, "which", lambda name: None)
     assert admin_client.get(f"/api/tracks/{t['id']}/stream").status_code == 503
     assert not list(settings.music_root.rglob("*.mp3.part")) and not list(settings.music_root.rglob("*.part"))
+
+
+def test_filters_accept_several_values(user_client, library):
+    names = lambda qs: sorted(x["name"] for x in user_client.get("/api/releases?" + qs).json()["items"])
+    B = "Bicep-Glue-(NT123)-WEB-2017-PWT"
+    assert names("genre=House&genre=Techno") == [A, B] and names("genre=House") == [A]
+    assert names("year=2015&year=2017") == [A, B] and names("year=2015&decade=2000") == [A, "VA-Big_Mix-2CD-2003-GRP"]
+    assert names("genre=House&genre=Techno&year=2017") == [B] and names("decade=1980") == []
+    assert user_client.get("/api/mix?genre=House&genre=Techno").status_code == 200
+    assert [g["name"] for g in user_client.get("/api/groups?by=category").json()] == ["Singles", "Albums"]
+    pid = user_client.post("/api/playlists", json={"name": "Deux genres", "rules": {"genre": ["House", "Techno"], "year": [2015, 2017]}}).json()["id"]
+    assert len(user_client.get(f"/api/playlists/{pid}").json()["items"]) == 3

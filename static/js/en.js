@@ -184,6 +184,7 @@ export const EN = {
   'Source': 'Source',
   'Année': 'Year',
   'Tout cocher': 'Select all',
+  'Réinitialiser': 'Reset',
   'Label': 'Label',
   'Rattacher « {0} » à quel label ?': 'Attach “{0}” to which label?',
   'Labels rattachés': 'Attached labels',

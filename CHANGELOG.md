@@ -4,6 +4,22 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.39.0](https://github.com/djkix/mp3-scene/compare/v1.38.0...v1.39.0) (2026-11-20)
+
+### Résumé
+
+**Filtres à choix multiples, Catégories en tableau, fiche en pastilles.**
+
+- Filtres des listes : Catégories, Genres, Années et Sources acceptent plusieurs choix (cases à cocher, appliquées à
+  la fermeture de la liste) ; années et décennies s'additionnent. Bouton **Réinitialiser**. Mix et Playlist auto
+  suivent ces choix.
+- Explorer › Catégories : un tableau comme Artistes (catégorie, releases, poids) ; une catégorie ouvre la liste
+  filtrée. Le navigateur de dossiers reste à l'adresse `#/folders`.
+- Fiche : valeurs en pastilles colorées par type (provenance, classement, édition, mesures) ; la catégorie mène à sa
+  liste et le catalogue au label ; le genre des pistes est en pastille.
+- Fiche : actions centrées, dans l'ordre Lire, File, Playlist, Radio, Hors ligne, Favori, Télécharger, Partager ; le
+  favori est un bloc comme les autres. Le bouton Corriger en est retiré (la correction reste possible par sélection).
+
 ## [1.38.0](https://github.com/djkix/mp3-scene/compare/v1.37.4...v1.38.0) (2026-11-20)
 
 ### Résumé

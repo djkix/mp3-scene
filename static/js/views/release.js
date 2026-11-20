@@ -54,6 +54,8 @@ export function render(container, params) {
 
 function header(rel) {
   const play = () => player.playTracks(rel.tracks, 0);
+  const fav = favButton(rel);
+  fav.classList.remove('icon'); // dans la barre d'actions : un bloc comme les autres, même cœur que sur les pistes
   return el('header', { class: 'detail-head' },
     el('h1', { class: 'detail-name' }, relName(rel.name)),
     el('div', { class: 'detail-top' },
@@ -64,14 +66,13 @@ function header(rel) {
     el('div', { class: 'detail-actions' },
       el('button', { type: 'button', class: 'primary', 'data-ico': 'play', disabled: !rel.tracks.length, onclick: play }, t('Lire')),
       el('button', { type: 'button', 'data-ico': 'queue', onclick: () => emit('queue-release', { releaseId: rel.id }) }, t('Ajouter à la file')),
+      addButton({ release_id: rel.id }, t('Ajouter à une playlist')),
       el('button', { type: 'button', 'data-ico': 'radio', disabled: !rel.tracks.length, title: t('Lire cette release, puis sans fin des pistes proches'),
         onclick: () => player.radio(rel.id, rel.tracks) }, t('Radio')),
-      addButton({ release_id: rel.id }, t('Ajouter à une playlist')),
       offlineButton(rel),
-      shareButton('release', rel.id),
-      favButton(rel),
-      session.user?.role === 'admin' ? el('button', { type: 'button', onclick: () => correct(rel) }, t('Corriger')) : null,
-      el('a', { class: 'btn', 'data-ico': 'download', href: `/api/releases/${rel.id}/zip`, download: '' }, t('Télécharger (zip)'))));
+      fav,
+      el('a', { class: 'btn', 'data-ico': 'download', href: `/api/releases/${rel.id}/zip`, download: '' }, t('Télécharger (zip)')),
+      shareButton('release', rel.id)));
 }
 
 // Correction manuelle (administrateur) : artiste, catégorie, genre, année. Un champ vidé revient à la valeur automatique.
@@ -138,7 +139,7 @@ function trackTable(rel) {
     el('td', { class: 'trk-title' }, label),
     el('td', { class: 'num' }, tk.duration == null ? '—' : fmtDuration(tk.duration)),
     el('td', { class: 'num col-bitrate' }, tk.bitrate == null ? '—' : `${Math.round(tk.bitrate / 1000)} kbit/s`),
-    el('td', { class: 'num col-bitrate' }, tk.genre || '—'),
+    el('td', { class: 'num col-bitrate' }, tk.genre ? el('span', { class: 'chip' }, tk.genre) : '—'), // même pastille que dans les listes
     el('td', {}, addButton({ track_ids: [tk.id] }, null, [tk])),
     el('td', {}, favButton(tk, 'track')),
     el('td', { class: 'col-bitrate' }, el('a', { class: 'icon', href: `/api/tracks/${tk.id}/stream?download=1`, download: '',
