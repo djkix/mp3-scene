@@ -206,7 +206,7 @@ export function render(container, params) {
   function setFilter(name, value) {
     const next = { q, category, genre, year, source, ...pin?.extra, ...(name ? { [name]: value } : { category: '', genre: '', year: '', source: '' }) };
     const qs = Object.entries(next).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
-    location.hash = (pin ? pin.base : q ? '#/search' : '#/') + (qs ? '?' + qs : ''); // nouvelle entrée d'historique, pagination remise à zéro
+    location.hash = (pin ? pin.base : params.base || (q ? '#/search' : '#/')) + (qs ? '?' + qs : ''); // nouvelle entrée d'historique, pagination remise à zéro
   }
 
   // administrateur, sur une recherche ou la page d'un artiste ou d'un groupe : cocher des releases pour les corriger
@@ -215,13 +215,14 @@ export function render(container, params) {
   let dead = false;
   loadFilters().then((f) => {
     if (dead) return;
-    bar.replaceChildren(multi(tr('Catégorie'), tr('Catégories'), 'category', f.categories, category, setFilter, catLabel),
-      multi(tr('Genre'), tr('Genres'), 'genre', f.genres, genre, setFilter), yearSelect(f, year, setFilter, multi),
+    // `noCategory` : la page Catégories d'Explorer a déjà ses blocs au-dessus
+    bar.replaceChildren(...(params.noCategory ? [] : [multi(tr('Catégorie'), tr('Catégories'), 'category', f.categories, category, setFilter, catLabel)]),
+      // sur la page d'un genre d'Explorer, le filtre Genres n'a pas lieu d'être
+      ...(pin?.key === 'genre' ? [] : [multi(tr('Genre'), tr('Genres'), 'genre', f.genres, genre, setFilter)]), yearSelect(f, year, setFilter, multi),
       multi(tr('Source'), tr('Sources'), 'source', f.sources, source, setFilter),
       ...(category || genre || year || source ? [el('button', { type: 'button', class: 'reset', onclick: () => setFilter() }, tr('Réinitialiser'))] : []),
-      ...(q ? [] : [mix]), ...(q || !Object.values(filters).some((v) => v.length) ? [] : [smart]), ...(sel ? [sel.button] : []));
+      ...(q || !Object.values(filters).some((v) => v.length) ? [] : [smart]), ...(sel ? [sel.button] : []));
   }).catch(() => {});
-  // Mix : 50 pistes au hasard parmi les releases qui passent les filtres affichés.
   // chaque filtre peut porter plusieurs valeurs : paramètre répété dans la requête (genre=House&genre=Techno)
   const many = (v) => (v ? v.split('|') : []);
   const years = many(year);
@@ -232,14 +233,6 @@ export function render(container, params) {
     for (const [k, vs] of Object.entries({ ...extra, ...filters })) for (const v of [].concat(vs)) if (v !== '') p.append(k, v);
     return p;
   };
-  const mix = el('button', { type: 'button', title: tr('Lire 50 pistes au hasard parmi ces releases'), onclick: async () => {
-    mix.disabled = true;
-    try {
-      const { items } = await api('/mix?' + toQuery());
-      if (items.length) player.playTracks(items, 0); else player.flash(tr('Aucun résultat'));
-    } catch (err) { player.flash(err.message); }
-    mix.disabled = false;
-  } }, tr('Mix'));
   // Playlist intelligente : les filtres affichés deviennent sa règle ; ses pistes suivent la bibliothèque.
   const smart = el('button', { type: 'button', title: tr('Enregistrer ces filtres comme une playlist qui se met à jour seule'), onclick: async () => {
     const name = (prompt(tr('Nom de la playlist intelligente')) || '').trim();

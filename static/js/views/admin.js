@@ -205,7 +205,6 @@ export function render(container, params = {}) {
     refreshScan();
   } else if (section === 'rules') {
     const counts = Object.fromEntries(RULES.map(([, key]) => [key, el('span', { class: 'chip' }, '…')]));
-    // artistes rattachés à la main depuis leur page (« Rattacher à… »)
     // rattachements manuels (artistes ou labels) : un tableau avec « Détacher »
     const aliasTable = (path, first, empty) => {
       const rows = el('tbody'), msg = el('p', { class: 'status', role: 'status' });
@@ -220,7 +219,19 @@ export function render(container, params = {}) {
           } }, t('Détacher'))))));
       }).catch((err) => { if (!dead) msg.textContent = err.message; });
       load();
-      return [el('div', { class: 'table-wrap' }, el('table', { class: 'users' },
+      // rattacher : le nom à rattacher, puis celui qui le reçoit ; la règle est gardée après les scans
+      const from = el('input', { required: true, maxLength: 200, placeholder: first, 'aria-label': first });
+      const to = el('input', { required: true, maxLength: 200, placeholder: t('Rattaché à'), 'aria-label': t('Rattaché à') });
+      const form = el('form', { class: 'inline-form', onsubmit: async (e) => {
+        e.preventDefault();
+        try {
+          await api(path, { method: 'PUT', body: { alias: from.value, target: to.value } });
+          from.value = to.value = '';
+          msg.textContent = '';
+        } catch (err) { msg.textContent = err.message; }
+        load();
+      } }, from, to, el('button', { type: 'submit' }, t('Rattacher')));
+      return [form, el('div', { class: 'table-wrap' }, el('table', { class: 'users' },
         el('thead', {}, el('tr', {}, th(first), th(t('Rattaché à')), th(t('Actions')))), rows)), msg];
     };
     // graphies à ne jamais fusionner (« Florida » n'est pas « Flo Rida »)
@@ -247,7 +258,7 @@ export function render(container, params = {}) {
       el('h2', {}, t('Artistes rattachés')),
       ...aliasTable('/admin/artists/aliases', t('Artiste'), t('Aucun artiste rattaché à la main.')),
       el('h2', {}, t('Labels rattachés')),
-      el('p', { class: 'hint' }, t('Depuis la page d’un label, bouton Rattacher à… Détacher rend son label d’origine à chaque release au prochain scan.')),
+      el('p', { class: 'hint' }, t('Détacher rend son label d’origine à chaque release au prochain scan.')),
       ...aliasTable('/admin/labels/aliases', t('Label'), t('Aucun label rattaché à la main.')),
       el('h2', {}, t('Artistes à ne jamais fusionner')),
       el('p', { class: 'hint' }, t('Une graphie listée ici garde ses releases au lieu de rejoindre un artiste au nom proche, à ce scan et aux suivants.')),

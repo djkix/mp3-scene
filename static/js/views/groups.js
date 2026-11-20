@@ -1,7 +1,7 @@
 // Explorer : releases regroupées par groupe (#/groups), artiste (#/artists) ou genre (#/genres), avec le nombre de
-// releases et le poids. #/groups/<nom> et #/artists/<nom> ouvrent les releases correspondantes ; un genre ouvre la
-// liste « Derniers » filtrée. Les filtres Genre et Année sont dans l'adresse et suivent d'une page à l'autre.
-import { api, fmtSize, session } from '../api.js';
+// releases et le poids. #/groups/<nom>, #/artists/<nom>, #/labels/<nom> et #/genres/<nom> ouvrent les
+// releases correspondantes. Les filtres Genre et Année sont dans l'adresse et suivent d'une page à l'autre.
+import { api, fmtSize } from '../api.js';
 import { el } from '../dom.js';
 import { t as tr, catLabel } from '../i18n.js';
 import * as releases from './releases.js';
@@ -9,8 +9,7 @@ import * as releases from './releases.js';
 const MAX_ROWS = 1000; // au-delà, on demande d'affiner (des dizaines de milliers d'artistes figeraient la page)
 // route -> [onglet, en-tête de colonne, valeur de `by` côté serveur, paramètre de /releases qui épingle la liste]
 const KINDS = { groups: ['Groupes', 'Groupe', 'grp', 'grp'], artists: ['Artistes', 'Artiste', 'artist', 'artist'],
-  labels: ['Labels', 'Label', 'label', 'label'], genres: ['Genres', 'Genre', 'genre', null],
-  categories: ['Catégories', 'Catégorie', 'category', null] };
+  labels: ['Labels', 'Label', 'label', 'label'], genres: ['Genres', 'Genre', 'genre', 'genre'] };
 // Onglets d'Explorer, dans l'ordre affiché.
 const TABS = [['artists', 'Artistes'], ['genres', 'Genres'], ['categories', 'Catégories'], ['labels', 'Labels'], ['groups', 'Groupes']];
 export const tabs = (current, genre = '', year = '') => el('div', { class: 'tabs', role: 'tablist', 'aria-label': tr('Explorer') },
@@ -32,19 +31,8 @@ function detail(container, kind, params) {
   const appears = !!other;
   const tabBtn = (label, on, hash) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(on),
     onclick: () => { location.hash = hash; } }, label);
-  // administrateur : rattacher cet artiste à un autre (règle gardée après les scans)
-  const attach = ['artists', 'labels'].includes(kind) && session.user?.role === 'admin' && el('button', { type: 'button', onclick: async () => {
-    const target = (prompt(kind === 'labels' ? tr('Rattacher « {0} » à quel label ?', name) : tr('Rattacher « {0} » à quel artiste ?', name)) || '').trim();
-    if (!target) return;
-    attach.disabled = true;
-    try {
-      await api(`/admin/${kind}/aliases`, { method: 'PUT', body: { alias: name, target } });
-      location.hash = `#/${kind}/${encodeURIComponent(target)}`;
-    } catch (err) { alert(err.message); attach.disabled = false; }
-  } }, tr('Rattacher à…'));
   container.replaceChildren(
-    el('h1', { class: 'grp-title' }, el('a', { href: `#/${kind}` + qs({ genre: params.genre, year: params.year }) }, tr(tab)), ' › ', name, ' ', total,
-      ' ', attach),
+    el('h1', { class: 'grp-title' }, el('a', { href: `#/${kind}` + qs({ genre: params.genre, year: params.year }) }, tr(tab)), ' › ', name, ' ', total),
     ...(kind === 'artists' ? [el('div', { class: 'tabs', role: 'tablist', 'aria-label': name },
       tabBtn(tr('Releases'), !other, base), tabBtn(tr('Avec'), other === 'collab', base + '?in=with'),
       tabBtn(tr('Apparitions'), other === 'appears', base + '?in=appears'))] : []),
@@ -57,7 +45,25 @@ function detail(container, kind, params) {
   return releases.render(list, { ...params, q: '', pin: appears ? { key: other, value: name, base, extra: { in: params.in } } : { key: pin, value: name, base } });
 }
 
+// Catégories : un bloc par catégorie, centré sous les onglets et au-dessus des filtres ; les releases dessous.
+// Un clic choisit la catégorie, un second sur le même bloc revient à toutes les releases.
+function categories(container, params) {
+  const { category = '', genre = '', year = '', source = '' } = params;
+  const cats = el('div', { class: 'tabs cats', role: 'tablist', 'aria-label': tr('Catégories') });
+  const list = el('div');
+  container.replaceChildren(tabs('categories', genre, year), cats, list);
+  let dead = false;
+  releases.loadFilters().then((f) => {
+    if (dead) return;
+    cats.replaceChildren(...f.categories.map((c) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(c === category),
+      onclick: () => { location.hash = '#/categories' + qs({ category: c === category ? '' : c, genre, year, source }); } }, catLabel(c))));
+  }).catch(() => {});
+  const dispose = releases.render(list, { ...params, q: '', base: '#/categories', noCategory: true });
+  return () => { dead = true; dispose(); };
+}
+
 export function render(container, params) {
+  if (params.kind === 'categories') return categories(container, params);
   const kind = KINDS[params.kind] ? params.kind : 'groups';
   const [, label, by, pin] = KINDS[kind];
   if (params.rest && pin) return detail(container, kind, params);
@@ -87,17 +93,14 @@ export function render(container, params) {
     tabs(kind, genre, year),
     bar, letters, el('div', { class: 'table-wrap' }, el('table', { class: 'groups' }, el('thead', {}, el('tr', {}, heads)), body)), status);
 
-  // un genre ou une catégorie ouvre la liste « Derniers » filtrée
-  const show = kind === 'categories' ? catLabel : String;
-  const href = (name) => (pin ? `#/${kind}/${encodeURIComponent(name)}` + qs({ genre, year })
-    : '#/' + qs(kind === 'categories' ? { category: name, genre, year } : { genre: name, year }));
+  const href = (name) => `#/${kind}/${encodeURIComponent(name)}` + qs({ genre: kind === 'genres' ? '' : genre, year });
   function paint() {
     HEAD.forEach(([text, k], i) => { heads[i].firstChild.textContent = k === key ? `${text} ${dir > 0 ? '▲' : '▼'}` : text; });
     const needle = find.value.trim().toLowerCase();
     const shown = rows.filter((g) => g.name.toLowerCase().includes(needle) && (!letter || initial(g.name) === letter))
       .sort((a, b) => dir * (key === 'name' ? a.name.localeCompare(b.name) : a[key] - b[key]) || a.name.localeCompare(b.name));
     body.replaceChildren(...shown.slice(0, MAX_ROWS).map((g) => el('tr', {},
-      el('td', {}, el('a', { href: href(g.name) }, show(g.name))),
+      el('td', {}, el('a', { href: href(g.name) }, g.name)),
       el('td', { class: 'num' }, String(g.releases)), el('td', { class: 'num' }, fmtSize(g.size)))));
     status.textContent = !shown.length ? tr('Aucun résultat')
       : tr('{0} lignes · {1} · {2}', shown.length, count(shown.reduce((n, g) => n + g.releases, 0)), fmtSize(shown.reduce((n, g) => n + g.size, 0)))

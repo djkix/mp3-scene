@@ -142,7 +142,7 @@ a.icon:hover { background: var(--hover); }
 .pl-info > :not(.pl-cover) { grid-column: 2; }
 .pl-cover { grid-row: 1 / span 3; align-self: center; width: 48px; height: 48px; margin-right: 10px; object-fit: cover;
   border-radius: 3px; }
-.pl-rate { display: none; }
+.pl-rate, .pl-artist { display: none; }
 #player .pl-title { border: 0; padding: 0; min-height: 0; background: none; text-align: left; font: 600 13px/1.3 var(--mono);
   cursor: pointer; max-width: 100%; overflow: hidden; overflow-wrap: anywhere;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; } /* deux lignes avant de couper */
@@ -290,6 +290,12 @@ google-cast-launcher:hover { background: var(--hover); }
   .filters select { flex: 1 1 auto; padding-inline: 4px; font-family: var(--sans); letter-spacing: -.01em; } /* largeur selon le libellé : « Localisations » entier */
   .rel-name { grid-area: name; }
   .rel-actions { grid-area: act; }
+  /* pictos en colonne étroite : le nom gagne la largeur. Avec quatre boutons ou plus (playlist : monter, descendre…),
+     ils restent en ligne */
+  .rel-actions:not(:has(> :nth-child(4))) { flex-direction: column; gap: 0; align-self: center; }
+  .rel-actions:not(:has(> :nth-child(4))) .icon { min-width: 36px; height: 32px; min-height: 0; }
+  .rel { grid-template-rows: auto 1fr; } /* le nom garde sa hauteur, les informations suivent sans vide */
+  .rel-info { align-self: start; }
   .rel-date { grid-area: date; }
   .rel-cat { grid-area: cat; max-width: 7rem; }
   .rel-meta { grid-area: meta; white-space: normal; }
@@ -310,6 +316,11 @@ google-cast-launcher:hover { background: var(--hover); }
   .pl-bar { display: flex; gap: 2px; min-height: 60px; padding: 4px 4px 4px 12px; }
   .pl-info { flex: 1 1 0; }
   .pl-cover { width: 40px; height: 40px; }
+  /* barre réduite : le titre seul sur la première ligne, l'artiste dessous */
+  #player:not(.expanded) .pl-t-artist { display: none; }
+  #player:not(.expanded) .pl-artist { display: block; max-width: 100%; color: var(--muted); font: 11px var(--mono); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+  #player:not(.expanded) .pl-artist:empty { display: none; }
   .pl-rel, .pl-seek, .pl-qbtn, .pl-fx, .pl-volwrap, .pl-controls :is(.pl-shuffle, .pl-prev, .pl-repeat) { display: none; }
   #player .icon { min-width: 44px; height: 44px; font-size: 16px; }
 
@@ -335,7 +346,8 @@ google-cast-launcher:hover { background: var(--hover); }
   #player.expanded #cast-slot:empty { display: none; }
   #player.expanded .pl-info { flex: none; grid-template-columns: minmax(0, 1fr); justify-items: center; row-gap: 8px; }
   #player.expanded .pl-info > * { grid-column: 1; }
-  #player.expanded .pl-cover { grid-row: auto; width: min(80vw, 320px); height: auto; aspect-ratio: 1; margin: 0 0 8px;
+  /* la pochette et la forme d'onde prennent la place disponible */
+  #player.expanded .pl-cover { grid-row: auto; width: clamp(170px, calc(100dvh - 495px), min(100%, 420px)); /* tout tient sans défiler, même sur un petit écran */ height: auto; aspect-ratio: 1; margin: 0 0 8px;
     border-radius: 8px; box-shadow: 0 12px 32px rgb(0 0 0 / .45); }
   #player.expanded .pl-title { display: block; max-width: 100%; text-align: center; font: 600 22px/1.3 var(--sans);
     letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -344,7 +356,7 @@ google-cast-launcher:hover { background: var(--hover); }
     border-radius: 3px; }
   #player.expanded .pl-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 8px;
     color: var(--muted); font: 600 10px var(--mono); letter-spacing: .05em; }
-  .pl-meta > * + *::before { content: "·"; margin-right: 8px; color: var(--muted); font-weight: 400; }
+  .pl-meta .sep { color: var(--muted); font-weight: 400; }
   .pl-meta .chip { letter-spacing: .08em; }
   .pl-meta .chip.src { color: var(--accent-text); }
   #player.expanded { background: var(--bg); }
@@ -361,7 +373,7 @@ google-cast-launcher:hover { background: var(--hover); }
   #player.expanded .pl-hint { display: block; order: 4; margin: 0; text-align: center; color: var(--muted); font-size: 12px; opacity: .7; }
   #player.expanded .pl-seek { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
   #player.expanded .pl-wave { grid-column: 1 / -1; grid-row: 1; min-height: 44px; }
-  #player.expanded .pl-wave.has-wave { height: 48px; }
+  #player.expanded .pl-wave.has-wave { height: 72px; }
   #player.expanded .pl-seek .pl-time:last-child { justify-self: end; }
   #player.expanded .pl-seek { order: 1; }
   #player.expanded .pl-controls { order: 2; justify-content: space-between; }
@@ -530,6 +542,7 @@ tr.disc th { background: var(--hover); color: var(--fg); padding-block: 8px; }
   max-width: 100%; margin: 0 auto; padding: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); }
 .tabs { display: flex; gap: 4px; padding: 10px 12px; overflow-x: auto; }
 .tabs button { flex: none; padding: 7px 12px; }
+.cats { justify-content: center; padding-bottom: 0; } /* blocs des catégories, centrés au-dessus des filtres */
 /* :not(:disabled) : passe devant le fond de survol des boutons, sinon l'onglet actif survolé est illisible */
 .tabs button[aria-selected="true"]:not(:disabled) { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
 /* liste de pistes, comme les releases : vignette | artiste - titre | genre | durée ou date | débit | release | actions */

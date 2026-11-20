@@ -4,6 +4,22 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.41.0](https://github.com/djkix/mp3-scene/compare/v1.40.1...v1.41.0) (2026-11-20)
+
+### Résumé
+
+**Catégories en blocs, genres ouverts dans Explorer, lecteur et cartes du téléphone retouchés.**
+
+- Explorer › Catégories : un bloc par catégorie, centré au-dessus des filtres, et les releases dessous ; un second
+  clic sur le bloc choisi revient à toutes les releases.
+- Explorer › Genres : un genre ouvre ses releases dans Explorer (`#/genres/<nom>`) au lieu de la liste Derniers.
+- Rattacher un artiste ou un label se fait dans Administration › Règles (formulaire au-dessus de chaque liste) ; le
+  bouton a quitté les pages d'artiste et de label.
+- Téléphone, cartes : les pictos sont empilés dans une colonne étroite, le nom gagne la largeur.
+- Téléphone, lecteur : barre du bas avec le titre puis l'artiste ; en plein écran, pochette et forme d'onde agrandies
+  selon la hauteur de l'écran ; seul le nom du groupe est en pastille.
+- Le bouton Mix est retiré des listes.
+
 ## [1.40.1](https://github.com/djkix/mp3-scene/compare/v1.40.0...v1.40.1) (2026-11-20)
 
 ### Résumé

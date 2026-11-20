@@ -716,7 +716,10 @@ function update() {
     ui.footer.classList.toggle('is-empty', !t);
     const name = !t ? '' : t.title && t.artist ? `${t.artist} - ${t.title}` : title(t);
     if (ui.title.title !== name) { // seulement quand la piste change : le défilement ne repart pas à chaque rafraîchissement
-      ui.title.replaceChildren(el('span', {}, name));
+      // « Artiste - » dans son propre élément : la barre du téléphone le masque et montre l'artiste sur la ligne du dessous
+      const split = !!(t && t.title && t.artist);
+      ui.title.replaceChildren(el('span', {}, split ? el('span', { class: 'pl-t-artist' }, `${t.artist} - `) : null, split ? t.title : name));
+      ui.artist.textContent = split ? t.artist : '';
       ui.title.title = name;
       fitTitle();
     }
@@ -730,9 +733,11 @@ function update() {
     }
     ui.rel.href = ui.doc.href = t ? `#/release/${encodeURIComponent(t.release_name)}` : '#/';
     // plein écran : source, débit et groupe de la release (absents d'une file enregistrée avant la 1.33.0)
-    ui.meta.replaceChildren(...!t ? [] : [t.source && el('span', { class: 'chip src' }, t.source),
+    // source, débit, groupe : seuls la source et le nom du groupe sont en pastille ; les points de séparation sont à part
+    const meta = !t ? [] : [t.source && el('span', { class: 'chip src' }, t.source),
       t.bitrate && el('span', {}, `${Math.round(t.bitrate / 1000)} KBPS`),
-      t.grp && el('span', { class: 'chip' }, `GROUP: ${t.grp}`)].filter(Boolean));
+      t.grp && el('span', { class: 'chip' }, t.grp)].filter(Boolean);
+    ui.meta.replaceChildren(...meta.flatMap((x, i) => (i ? [el('span', { class: 'sep', 'aria-hidden': 'true' }, '·'), x] : [x])));
     ui.fav.textContent = t?.favorite ? '♥︎' : '♡︎';
     ui.fav.setAttribute('aria-pressed', !!t?.favorite);
     label(ui.fav, t?.favorite ? tr('Retirer des favoris') : tr('Ajouter aux favoris'));
@@ -801,6 +806,7 @@ export function initPlayer(footer) {
     } });
   ui.collapse = iconBtn('pl-collapse', '', tr('Réduire le lecteur'), () => { expand(false); ui.title.focus(); }, 'back');
   ui.rel = el('a', { class: 'pl-rel', href: '#/' });
+  ui.artist = el('span', { class: 'pl-artist' });
   // plein écran : fiche de la release (NFO), source · débit · groupe, favori de la piste en cours
   ui.doc = el('a', { class: 'icon pl-doc', href: '#/', title: tr('Détail de la release'), 'aria-label': tr('Détail de la release') });
   ui.meta = el('div', { class: 'pl-meta' });
@@ -871,7 +877,7 @@ export function initPlayer(footer) {
   footer.replaceChildren(ui.panel, ui.msg, el('div', { class: 'pl-progress', 'aria-hidden': 'true' }),
     el('div', { class: 'pl-bar' },
       el('div', { class: 'pl-top' }, ui.collapse, el('span', { class: 'pl-now' }, tr('En cours de lecture')), ui.doc),
-      el('div', { class: 'pl-info' }, ui.cover, ui.title, ui.rel, ui.meta, ui.cast),
+      el('div', { class: 'pl-info' }, ui.cover, ui.title, ui.artist, ui.rel, ui.meta, ui.cast),
       el('div', { class: 'pl-controls' },
         ui.shuffle,
         iconBtn('pl-prev', '', tr('Précédent'), () => player.prev(), 'prev'),
