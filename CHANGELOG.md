@@ -4,6 +4,17 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.50.0](https://github.com/djkix/mp3-scene/compare/v1.49.1...v1.50.0) (2026-11-21)
+
+### Résumé
+
+**Recherche de pochettes : Discogs à la place de Brave.**
+
+- La recherche d'images Brave (`BRAVE_API_KEY`), qui demandait une carte bancaire, est retirée.
+- Avec `DISCOGS_TOKEN` (jeton personnel d'un compte Discogs gratuit, Paramètres › Développeurs), les pochettes sont
+  cherchées aussi sur Discogs, en plus de Deezer et d'iTunes. Sans jeton, rien ne change.
+- Seuls l'artiste et le titre de la release sont envoyés à ces services.
+
 ## [1.49.1](https://github.com/djkix/mp3-scene/compare/v1.49.0...v1.49.1) (2026-11-21)
 
 ### Résumé

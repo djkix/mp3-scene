@@ -1,5 +1,5 @@
-"""Pochettes proposées pour une release sans image : catalogues Deezer et iTunes (sans clé), et recherche d'images
-Brave si une clé est fournie (BRAVE_API_KEY). Le serveur ne télécharge que les adresses qu'il a lui-même proposées."""
+"""Pochettes proposées pour une release sans image : catalogues Deezer et iTunes (sans clé), et Discogs
+si un jeton est fourni (DISCOGS_TOKEN). Le serveur ne télécharge que les adresses qu'il a lui-même proposées."""
 import hashlib
 import hmac
 import ipaddress
@@ -41,15 +41,16 @@ def _itunes(q: str) -> list[dict]:
             for a in data.get("results", []) if a.get("artworkUrl100")]
 
 
-def _brave(q: str, key: str) -> list[dict]:
-    data = _json("https://api.search.brave.com/res/v1/images/search?" + urllib.parse.urlencode({"q": q, "count": 8}),
-                 {"X-Subscription-Token": key, "Accept": "application/json"})
-    return [{"url": r["properties"]["url"], "thumb": r["thumbnail"]["src"], "source": r.get("source") or "Web",
-             "title": r.get("title") or ""}
-            for r in data.get("results", []) if (r.get("properties") or {}).get("url") and (r.get("thumbnail") or {}).get("src")]
+def _discogs(artist: str | None, title: str, token: str) -> list[dict]:
+    args = {"type": "release", "release_title": title, "per_page": 6, **({"artist": artist} if artist else {})}
+    data = _json("https://api.discogs.com/database/search?" + urllib.parse.urlencode(args),
+                 {"Authorization": f"Discogs token={token}"})
+    # sans image, Discogs renvoie un pixel « spacer.gif »
+    return [{"url": r["cover_image"], "thumb": r["thumb"], "source": "Discogs", "title": r.get("title") or ""}
+            for r in data.get("results", []) if r.get("thumb") and "spacer.gif" not in r.get("cover_image", "spacer.gif")]
 
 
-def candidates(artist: str | None, title: str | None, year: int | None, brave_key: str | None) -> list[dict]:
+def candidates(artist: str | None, title: str | None, discogs_token: str | None) -> list[dict]:
     """Images proposées, catalogues d'abord. Une source en panne ou muette est passée sans bruit."""
     va = (artist or "").lower() in ("", "va", "various", "various artists")
     q = " ".join(filter(None, [None if va else artist, title]))
@@ -58,7 +59,7 @@ def candidates(artist: str | None, title: str | None, year: int | None, brave_ke
     # ponytail: sources interrogées l'une après l'autre (une à deux secondes en tout) ; en parallèle si c'est trop long
     out = []
     for search in (lambda: _deezer(q), lambda: _itunes(q),
-                   lambda: _brave(f"{q} {year or ''} cover".replace("  ", " "), brave_key) if brave_key else []):
+                   lambda: _discogs(None if va else artist, title, discogs_token) if discogs_token and title else []):
         try:
             out += search()
         except (OSError, ValueError, KeyError, TypeError):  # réseau, JSON, réponse inattendue

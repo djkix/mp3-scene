@@ -57,7 +57,7 @@ export const EN = {
   'Passer': 'Skip',
   'Cliquez sur une image pour la valider.': 'Click an image to use it.',
   'Aucune pochette trouvée.': 'No cover found.',
-  'La recherche d’images sur le web n’est pas activée (BRAVE_API_KEY).': 'Web image search is not enabled (BRAVE_API_KEY).',
+  'La recherche sur Discogs n’est pas activée (DISCOGS_TOKEN).': 'Discogs search is not enabled (DISCOGS_TOKEN).',
   'Playlists': 'Playlists',
   'Playlist': 'Playlist',
   'Statistiques': 'Statistics',

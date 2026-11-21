@@ -16,7 +16,7 @@ class Settings:
     admin_password: str | None = None
     backup_dir: Path | None = None   # dossier des sauvegardes (NAS monté) ; None : sauvegarde désactivée
     backup_hour: int = 3             # heure du serveur à partir de laquelle la sauvegarde du jour est faite
-    brave_key: str | None = None     # clé de la recherche d'images Brave (pochettes des lives et radios) ; None : catalogues seuls
+    discogs_token: str | None = None  # jeton personnel Discogs (pochettes des singles et maxis) ; None : Deezer et iTunes seuls
     stack_dir: Path = Path("/stack")  # dossier de la pile (compose, .env), monté en lecture seule s'il est à copier
 
 
@@ -37,5 +37,5 @@ def load() -> Settings:
         backup_dir=Path(os.environ["BACKUP_DIR"]) if os.environ.get("BACKUP_DIR") else None,
         backup_hour=min(23, max(0, int(os.environ.get("BACKUP_HOUR") or 3))),
         stack_dir=Path(os.environ.get("STACK_DIR", "/stack")),
-        brave_key=os.environ.get("BRAVE_API_KEY") or None,
+        discogs_token=os.environ.get("DISCOGS_TOKEN") or None,
     )

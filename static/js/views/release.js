@@ -130,7 +130,7 @@ function coverTools(rel) {
     rel.custom_cover ? el('button', { type: 'button', onclick: () => send('DELETE') }, t('Retirer la pochette ajoutée')) : null, msg);
 }
 
-// Administrateur : pochettes proposées par la recherche du serveur (Deezer, iTunes, images du web avec une clé Brave).
+// Administrateur : pochettes proposées par la recherche du serveur (Deezer, iTunes, Discogs avec un jeton).
 // Un clic sur une image la valide : le serveur la télécharge et la garde comme une pochette déposée à la main.
 // `next(validée)` (contrôle qualité) : passe à la release suivante ; `stop` : appelé à la fermeture.
 export async function findCover(rel, next = null, stop = null) {
@@ -146,7 +146,7 @@ export async function findCover(rel, next = null, stop = null) {
   try {
     const r = await api(`/admin/releases/${rel.id}/cover/search`);
     msg.textContent = r.items.length ? t('Cliquez sur une image pour la valider.')
-      : t('Aucune pochette trouvée.') + (r.web ? '' : ' ' + t('La recherche d’images sur le web n’est pas activée (BRAVE_API_KEY).'));
+      : t('Aucune pochette trouvée.') + (r.web ? '' : ' ' + t('La recherche sur Discogs n’est pas activée (DISCOGS_TOKEN).'));
     grid.replaceChildren(...r.items.map((x) => el('button', { type: 'button', class: 'cover-pick', title: x.title, onclick: async () => {
       msg.textContent = t('Chargement…');
       try {

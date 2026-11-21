@@ -847,8 +847,13 @@ def test_cover_search_proposes_signed_images_and_saves_the_chosen_one(admin_clie
             return {"data": [{"cover_xl": "https://cdn.example/xl.jpg", "cover_medium": "https://cdn.example/m.jpg", "title": "Ibanez", "artist": {"name": "A-Trak"}}]}
         if "itunes" in url:
             raise OSError("panne")                                        # une source en panne ne bloque pas les autres
-        return {"results": [{"properties": {"url": "http://sans-https.example/a.jpg"}, "thumbnail": {"src": "https://t.example/a"}}]}
+        assert headers == {"Authorization": "Discogs token=jeton"} and "release_title=Ibanez" in url
+        return {"results": [{"cover_image": "https://i.example/spacer.gif", "thumb": "https://i.example/s"},      # sans image
+                            {"cover_image": "http://sans-https.example/a.jpg", "thumb": "https://i.example/t"},
+                            {"cover_image": "https://i.example/a.jpg", "thumb": "https://i.example/t", "title": "A-Trak - Ibanez"}]}
     monkeypatch.setattr(coversearch, "_json", fake)
+    assert [x["url"] for x in coversearch.candidates("A-Trak", "Ibanez", "jeton")] == ["https://cdn.example/xl.jpg", "https://i.example/a.jpg"]
+    asked.clear()
     assert user_client.get(f"/api/admin/releases/{rid}/cover/search").status_code == 403
     got = admin_client.get(f"/api/admin/releases/{rid}/cover/search").json()
     assert got["web"] is False and [x["source"] for x in got["items"]] == ["Deezer"] and len(asked) == 2 and "A-Trak" in asked[0]
