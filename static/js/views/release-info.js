@@ -7,6 +7,7 @@ const enc = encodeURIComponent;
 // correspondante ; le catalogue mène au label. `el` est injecté pour pouvoir tester sans navigateur.
 // Pastille de chaque valeur, colorée par type : `src` provenance (source, groupe), `cls` classement (artiste, année,
 // catégorie, genre), `ed` édition (label, catalogue), `num` mesures (date, taille, durée). Le titre reste en texte.
+// Une pastille sans lien est grise : seules les vertes se cliquent.
 export function infoRows(rel, el) {
   return [[t('Artiste'), rel.artist, (v) => `#/artists/${enc(v)}`, 'cls'], [t('Titre'), rel.title],
     [t('Source'), rel.source, (v) => `#/?source=${enc(v)}`, 'src'], [t('Année'), rel.year, (v) => `#/?year=${enc(v)}`, 'cls'],
@@ -16,7 +17,10 @@ export function infoRows(rel, el) {
     [t('Catégorie'), rel.category && catLabel(rel.category), () => `#/?category=${enc(rel.category)}`, 'cls'],
     [t('Genre'), rel.genre, (v) => `#/?genre=${enc(v)}`, 'cls'],
     [t('Taille'), rel.size == null ? null : fmtSize(rel.size), null, 'num'],
-    [t('Durée'), rel.duration == null ? null : fmtDuration(rel.duration), null, 'num']]
+    [t('Durée'), rel.duration == null ? null : fmtDuration(rel.duration), null, 'num'],
+    // lus dans le fichier de la première piste, après l'affichage de la fiche
+    [t('Fréquence'), rel.sample_rate ? `${(rel.sample_rate / 1000).toLocaleString()} kHz` : null, null, 'num'],
+    [t('Canaux'), rel.channels, null, 'num']]
     .filter(([, v]) => v != null && v !== '')
     // à plat : el() n'aplatit qu'un niveau
     .flatMap(([k, v, href, kind]) => [el('dt', {}, k), el('dd', {},

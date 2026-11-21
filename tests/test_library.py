@@ -833,3 +833,38 @@ def test_similar_follows_series_and_label_for_compilations(user_client, library,
     c.execute("UPDATE releases SET title='Glue', label='Ninja Tune' WHERE id=?", (b,))
     c.execute("UPDATE releases SET label='Ninja Tune' WHERE id=?", (va,)); c.commit(); c.close()
     assert names(va) == ["Bicep-Glue-(NT123)-WEB-2017-PWT"]              # même label
+
+
+def test_cover_search_proposes_signed_images_and_saves_the_chosen_one(admin_client, user_client, library, settings, monkeypatch):
+    import io
+    from PIL import Image
+    from app import coversearch
+    rid = user_client.get("/api/release-by-name", params={"name": A}).json()["id"]
+    asked = []
+    def fake(url, headers=None):
+        asked.append(url)
+        if "deezer" in url:
+            return {"data": [{"cover_xl": "https://cdn.example/xl.jpg", "cover_medium": "https://cdn.example/m.jpg", "title": "Ibanez", "artist": {"name": "A-Trak"}}]}
+        if "itunes" in url:
+            raise OSError("panne")                                        # une source en panne ne bloque pas les autres
+        return {"results": [{"properties": {"url": "http://sans-https.example/a.jpg"}, "thumbnail": {"src": "https://t.example/a"}}]}
+    monkeypatch.setattr(coversearch, "_json", fake)
+    assert user_client.get(f"/api/admin/releases/{rid}/cover/search").status_code == 403
+    got = admin_client.get(f"/api/admin/releases/{rid}/cover/search").json()
+    assert got["web"] is False and [x["source"] for x in got["items"]] == ["Deezer"] and len(asked) == 2 and "A-Trak" in asked[0]
+    pick = {"url": got["items"][0]["url"], "sig": got["items"][0]["sig"]}
+    buf = io.BytesIO(); Image.new("RGB", (40, 40), "red").save(buf, "PNG")
+    monkeypatch.setattr(coversearch, "fetch", lambda url: buf.getvalue())
+    post = lambda body: admin_client.post(f"/api/admin/releases/{rid}/cover/fetch", json=body).status_code
+    assert post({"url": "https://ailleurs.example/x.jpg", "sig": pick["sig"]}) == 400     # adresse jamais proposée
+    assert post(pick) == 204 and user_client.get(f"/api/releases/{rid}").json()["custom_cover"] is True
+    monkeypatch.undo()
+    # téléchargement : https, hôte public, jamais le serveur ni le réseau local
+    assert not coversearch.public_host("127.0.0.1") and not coversearch.public_host("192.168.1.10") and not coversearch.public_host("localhost")
+    for bad in ("http://example.com/a.jpg", "https://127.0.0.1/a.jpg", "file:///etc/passwd"):
+        try:
+            coversearch.fetch(bad); raise AssertionError(bad)
+        except ValueError:
+            pass
+    assert admin_client.post(f"/api/admin/releases/{rid}/cover/fetch",
+                             json={"url": "https://127.0.0.1/a.jpg", "sig": coversearch.sign(settings.secret_key, "https://127.0.0.1/a.jpg")}).status_code == 502

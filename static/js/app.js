@@ -135,6 +135,14 @@ $('search').addEventListener('input', (e) => {
   }, 250);
 });
 
+// Une fenêtre (réglages audio, détails techniques, playlist, correction) se ferme d'un clic ou d'un appui à côté :
+// un clic sur le fond a la fenêtre elle-même pour cible, hors de son cadre.
+document.addEventListener('click', (e) => {
+  if (!(e.target instanceof HTMLDialogElement) || !e.target.open) return;
+  const r = e.target.getBoundingClientRect();
+  if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) e.target.close();
+});
+
 initPlayer($('player'));
 initCast(player);
 addEventListener('hashchange', route);

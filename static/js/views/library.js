@@ -4,7 +4,7 @@ import { el } from '../dom.js';
 import { t as tr, catLabel } from '../i18n.js';
 import { releaseList } from './releases.js';
 import { navBar } from './admin.js';
-import { picker } from './release.js';
+import { picker, findCover } from './release.js';
 import { player } from '../player.js';
 import { area, columns, donut, shares } from '../charts.js';
 
@@ -103,7 +103,18 @@ export function render(container, params) {
       onPick();
     } });
     const { pick: picked, onPick, button: fix } = picker((p) => { all.textContent = p.size ? tr('Tout décocher') : tr('Tout cocher'); });
-    body.replaceChildren(el('p', { class: 'filters' }, fix, all), list);
+    // sans pochette : la recherche en propose pour chaque release, l'une après l'autre ; une release validée quitte
+    // la liste, une release passée y reste (d'où le décalage)
+    const refresh = () => dispatchEvent(new HashChangeEvent('hashchange'));
+    const review = async (skip = 0) => {
+      try {
+        const [rel] = (await api(`/admin/quality?kind=no_cover&offset=${skip}&limit=1`)).items;
+        if (!rel || dead) return refresh();
+        findCover(rel, (saved) => review(saved ? skip : skip + 1), refresh);
+      } catch (err) { player.flash(err.message); }
+    };
+    const covers = kind === 'no_cover' && el('button', { type: 'button', class: 'primary', onclick: () => review() }, tr('Chercher les pochettes'));
+    body.replaceChildren(el('p', { class: 'filters' }, covers, fix, all), list);
     dispose = releaseList(list, (offset, tri) => api(`/admin/quality?kind=${kind}&offset=${offset}&limit=50${tri}`),
       { empty: tr('Aucune release concernée.'), sort: ['name', 'asc'], pick: picked, onPick });
   }

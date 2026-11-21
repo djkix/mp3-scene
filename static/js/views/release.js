@@ -23,6 +23,13 @@ export function render(container, params) {
     if (dead) return;
     const nfo = el('div'), sim = el('div'), vers = el('div'), chap = el('div'), ser = el('div');
     container.replaceChildren(el('div', { class: 'detail' }, header(rel), ser, trackTable(rel), chap, vers, nfo, sim));
+    // fréquence et canaux : lus dans le fichier de la première piste
+    // ponytail: la première piste vaut pour la release ; toutes les lire si des releases mélangent les formats
+    if (rel.tracks.length) api(`/tracks/${rel.tracks[0].id}/tech`).then((d) => {
+      if (dead) return;
+      const channels = d.mode || { 1: t('Mono'), 2: t('Stéréo') }[d.channels] || d.channels;
+      container.querySelector('.detail-info')?.replaceChildren(...infoRows({ ...rel, sample_rate: d.sample_rate, channels }, el));
+    }).catch(() => {}); // facultatif
     // série (« Global Underground 47 ») : volume précédent, page de la série, volume suivant
     if (rel.series) api('/series?' + new URLSearchParams({ name: rel.series })).then((s) => {
       if (dead || s.items.length < 2) return;
@@ -119,14 +126,44 @@ function coverTools(rel) {
   const file = el('input', { type: 'file', accept: 'image/jpeg,image/png', hidden: true, onchange: () => { if (file.files[0]) send('PUT', file.files[0]); } });
   return el('p', { class: 'detail-admin' }, file,
     el('button', { type: 'button', onclick: () => file.click() }, rel.custom_cover ? t('Remplacer la pochette') : t('Ajouter une pochette')),
+    el('button', { type: 'button', onclick: () => findCover(rel) }, t('Chercher une pochette')),
     rel.custom_cover ? el('button', { type: 'button', onclick: () => send('DELETE') }, t('Retirer la pochette ajoutée')) : null, msg);
+}
+
+// Administrateur : pochettes proposées par la recherche du serveur (Deezer, iTunes, images du web avec une clé Brave).
+// Un clic sur une image la valide : le serveur la télécharge et la garde comme une pochette déposée à la main.
+// `next(validée)` (contrôle qualité) : passe à la release suivante ; `stop` : appelé à la fermeture.
+export async function findCover(rel, next = null, stop = null) {
+  dlg ??= document.body.appendChild(el('dialog'));
+  dlg.className = 'pl-add cover-dlg';
+  const msg = el('p', { class: 'status', role: 'status' }, t('Recherche…'));
+  const grid = el('div', { class: 'cover-grid' });
+  const leave = (then) => () => { dlg.close(); then?.(); };
+  dlg.replaceChildren(el('h2', {}, t('Chercher une pochette')), el('p', { class: 'cover-rel' }, relName(rel.name)), grid, msg,
+    el('div', { class: 'inline-form' }, next && el('button', { type: 'button', class: 'primary', onclick: () => next(false) }, t('Passer')),
+      el('button', { type: 'button', onclick: leave(stop) }, t('Fermer'))));
+  if (!dlg.open) dlg.showModal();
+  try {
+    const r = await api(`/admin/releases/${rel.id}/cover/search`);
+    msg.textContent = r.items.length ? t('Cliquez sur une image pour la valider.')
+      : t('Aucune pochette trouvée.') + (r.web ? '' : ' ' + t('La recherche d’images sur le web n’est pas activée (BRAVE_API_KEY).'));
+    grid.replaceChildren(...r.items.map((x) => el('button', { type: 'button', class: 'cover-pick', title: x.title, onclick: async () => {
+      msg.textContent = t('Chargement…');
+      try {
+        await api(`/admin/releases/${rel.id}/cover/fetch`, { method: 'POST', body: { url: x.url, sig: x.sig } });
+        if (next) next(true);
+        else location.reload(); // la pochette et sa vignette sont en cache dans le navigateur
+      } catch (err) { msg.textContent = err.message; }
+    } }, el('img', { src: x.thumb, alt: x.title, loading: 'lazy', referrerPolicy: 'no-referrer' }), el('small', {}, x.source))));
+  } catch (err) { msg.textContent = err.message; }
 }
 
 // Correction manuelle (administrateur) : artiste, catégorie, genre, année. Un champ vidé revient à la valeur automatique.
 // Avec `ids` (contrôle qualité), la même correction pour plusieurs releases : seuls les champs remplis comptent.
 let dlg = null;
 export async function correct(rel, ids = null) {
-  dlg ??= document.body.appendChild(el('dialog', { class: 'pl-add' }));
+  dlg ??= document.body.appendChild(el('dialog'));
+  dlg.className = 'pl-add';
   const f = await loadFilters().catch(() => ({ categories: [], genres: [] }));
   const msg = el('p', { class: 'status', role: 'status' });
   const artist = el('input', { value: rel?.artist || '', maxLength: 200 });
@@ -196,9 +233,7 @@ function trackTable(rel) {
   return el('div', { class: 'table-wrap' }, el('table', { class: 'tracks' },
     el('thead', {}, el('tr', {}, th(t('N°'), 'num'), th(t('Artiste - Titre')), th(t('Durée'), 'num'), th(t('Débit'), 'num col-bitrate'),
       th(t('Genre'), 'num col-bitrate'),
-      el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, t('Actions'))),
-      el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, t('Favori'))),
-      el('th', { scope: 'col', class: 'col-bitrate' }, el('span', { class: 'sr-only' }, t('Télécharger'))))),
+      th(t('Playlist'), 'num'), th(t('Favori'), 'num'), th(t('Télécharger (MP3)'), 'num col-bitrate'))),
     el('tbody', {}, rows)));
 }
 

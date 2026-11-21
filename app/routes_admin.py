@@ -6,7 +6,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from . import artists, backup, db, genres, nfo, scanner, security
+from . import artists, backup, coversearch, db, genres, nfo, scanner, security
 from .deps import MAX_INT, Id, get_conn, require_admin
 from .naming import parse_release_name
 from .routes_media import COVER_MAX, save_cover
@@ -17,7 +17,7 @@ _ACTIONS = {
     ("POST", "/users"): "Compte créé", ("PATCH", "/users/{user_id}"): "Compte modifié", ("DELETE", "/users/{user_id}"): "Compte supprimé",
     ("POST", "/scan"): "Scan lancé", ("PUT", "/scan/schedule"): "Scan quotidien réglé", ("POST", "/classify"): "Reclassement",
     ("PATCH", "/releases/{rid}"): "Correction", ("PATCH", "/releases"): "Correction en lot",
-    ("PUT", "/releases/{rid}/cover"): "Pochette ajoutée", ("DELETE", "/releases/{rid}/cover"): "Pochette retirée",
+    ("PUT", "/releases/{rid}/cover"): "Pochette ajoutée", ("POST", "/releases/{rid}/cover/fetch"): "Pochette ajoutée", ("DELETE", "/releases/{rid}/cover"): "Pochette retirée",
     ("PUT", "/releases/{rid}/keep"): "Version gardée", ("DELETE", "/releases/{rid}/keep"): "Versions réaffichées",
     ("PUT", "/artists/aliases"): "Artiste rattaché", ("DELETE", "/artists/aliases"): "Artiste détaché",
     ("PUT", "/labels/aliases"): "Label rattaché", ("DELETE", "/labels/aliases"): "Label détaché",
@@ -351,6 +351,40 @@ async def upload_cover(rid: Id, request: Request):
         conn.commit()
     finally:
         conn.close()
+
+
+@router.get("/releases/{rid}/cover/search")
+def search_cover(rid: Id, request: Request, conn=Depends(get_conn)):
+    """Pochettes proposées pour cette release, trouvées sur Deezer, iTunes et, avec une clé, la recherche d'images
+    Brave. Chaque adresse est signée : seule une image proposée ici peut ensuite être validée."""
+    r = conn.execute("SELECT COALESCE(tag_artist, artist) AS artist, title, year FROM releases WHERE id=?", (rid,)).fetchone()
+    if r is None:
+        raise HTTPException(404, "Release introuvable.")
+    settings = request.app.state.settings
+    items = coversearch.candidates(r["artist"], r["title"], r["year"], settings.brave_key)
+    return {"web": bool(settings.brave_key),
+            "items": [{**x, "sig": coversearch.sign(settings.secret_key, x["url"])} for x in items]}
+
+
+class CoverPick(BaseModel):
+    url: str = Field(max_length=2000)
+    sig: str = Field(max_length=64)
+
+
+@router.post("/releases/{rid}/cover/fetch", status_code=204)
+def fetch_cover(rid: Id, body: CoverPick, request: Request, conn=Depends(get_conn)):
+    """Valide une pochette proposée : le serveur la télécharge et la garde comme une pochette déposée à la main."""
+    settings = request.app.state.settings
+    if not coversearch.check(settings.secret_key, body.url, body.sig):
+        raise HTTPException(400, "Cette image n'a pas été proposée par la recherche.")
+    path = _release_path(conn, rid)
+    try:
+        save_cover(settings.data_dir, path, rid, coversearch.fetch(body.url))
+    except Exception:
+        raise HTTPException(502, "Image inaccessible ou illisible : essayez-en une autre.") from None
+    conn.execute("INSERT OR IGNORE INTO overrides(path) VALUES (?)", (path,))
+    conn.execute("UPDATE overrides SET cover=1 WHERE path=?", (path,))
+    conn.commit()
 
 
 @router.delete("/releases/{rid}/cover", status_code=204)

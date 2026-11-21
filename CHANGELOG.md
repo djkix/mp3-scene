@@ -4,6 +4,24 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.49.0](https://github.com/djkix/mp3-scene/compare/v1.48.0...v1.49.0) (2026-11-21)
+
+### Résumé
+
+**Recherche de pochettes, fréquence et canaux sur la fiche, fenêtres fermées d'un clic à côté.**
+
+- **Recherche de pochettes** (administrateur) : Administration › Contrôle qualité › Sans pochette › « Chercher les
+  pochettes » passe les releases une par une et propose des images ; un clic sur une image la valide, « Passer » va à
+  la suivante. Le même bouton existe sur la fiche d'une release (« Chercher une pochette »). L'image validée est gardée
+  comme une pochette déposée à la main : rien n'est écrit dans le dossier de musique.
+- Les images viennent de Deezer et d'iTunes, sans clé. Avec `BRAVE_API_KEY` (clé de l'API Brave Search), une
+  recherche d'images sur le web s'y ajoute, utile pour les lives et les émissions de radio. Seuls l'artiste, le titre
+  et l'année de la release sont envoyés à ces services. Le serveur ne télécharge que les images qu'il a lui-même
+  proposées (adresse signée, https, hôte public, 8 Mo au plus).
+- **Fiche d'une release** : fréquence d'échantillonnage et canaux dans les détails ; les pastilles non cliquables sont
+  grises ; les colonnes Playlist, Favori et Télécharger (MP3) ont un libellé au-dessus des pistes.
+- **Fenêtres** : un clic ou un appui en dehors d'une fenêtre la ferme, sur ordinateur comme sur mobile.
+
 ## [1.48.0](https://github.com/djkix/mp3-scene/compare/v1.47.1...v1.48.0) (2026-11-20)
 
 ### Résumé

@@ -9,6 +9,7 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}   # inutile une fois le compte créé
       PUBLIC_URL: https://mp3.exemple.fr   # adresse publique HTTPS, sans slash final (URL envoyées au Chromecast)
       TZ: Europe/Paris                     # heure des journaux, du scan quotidien et de la sauvegarde
+      # BRAVE_API_KEY: ${BRAVE_API_KEY}    # recherche d'images web pour les pochettes (facultatif)
       # Sauvegarde nocturne de la base (facultative) : décommentez avec les deux volumes plus bas.
       # BACKUP_DIR: /backup                # dossier des sauvegardes dans le conteneur
       # BACKUP_HOUR: "3"                   # heure à partir de laquelle la sauvegarde du jour est faite
