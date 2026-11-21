@@ -73,7 +73,7 @@ export function render(container, params) {
     }).catch(() => {}); // facultatif
     watch.mark();
     api(`/releases/${rel.id}/similar`).then((list) => {
-      if (!dead && list.length) sim.replaceChildren(el('h2', { class: 'nfo-h' }, t('Releases similaires')), el('ul', { class: 'rel-list' }, list.map(row)));
+      if (!dead && list.length) sim.replaceChildren(el('h2', { class: 'nfo-h' }, t('Releases similaires')), el('ul', { class: 'rel-list' }, list.map((x) => row(x))));
     }).catch(() => {}); // facultatif
     if (rel.has_nfo) loadNfo(rel.id, nfo, () => dead);
   }).catch((err) => {

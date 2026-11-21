@@ -4,6 +4,15 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.49.1](https://github.com/djkix/mp3-scene/compare/v1.49.0...v1.49.1) (2026-11-21)
+
+### Résumé
+
+**Releases similaires de nouveau affichées sous le NFO.**
+
+- Le bloc « Releases similaires » d'une fiche ne s'affichait plus dès que deux releases ou plus étaient proposées
+  (défaut présent depuis la 1.35.0, devenu visible partout avec les propositions par série et par label).
+
 ## [1.49.0](https://github.com/djkix/mp3-scene/compare/v1.48.0...v1.49.0) (2026-11-21)
 
 ### Résumé
