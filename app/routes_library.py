@@ -348,6 +348,9 @@ def series(name: str = Query(min_length=1, max_length=200), user=Depends(current
     return {"name": name, "items": items, "missing": missing if len(missing) <= 60 else []}
 
 
+_LIVE = re.compile(r"[^-]+-(.+?)_Live(?:_\(|-|$)")
+
+
 @router.get("/api/releases/{rid}/similar")
 def similar(rid: Id, user=Depends(current_user), conn=Depends(get_conn)):
     """Jusqu'à 12 releases proches : même artiste d'abord, puis même série (début du titre avant son numéro), même
@@ -365,6 +368,21 @@ def similar(rid: Id, user=Depends(current_user), conn=Depends(get_conn)):
         f" ORDER BY COALESCE({art}=?, 0) DESC, COALESCE(r.title LIKE ? ESCAPE '!', 0) DESC, COALESCE(r.label=?, 0) DESC,"
         f" COALESCE(r.grp=?, 0) DESC, r.added_at DESC, r.id DESC LIMIT 12",
         (rid, artist, like, label, r["genre"], r["year"], artist, like, label, r["grp"]))]
+    def more(where, params, order="r.added_at DESC, r.id DESC"):
+        """Complète jusqu'à 12 avec d'autres releases, sans reprendre celles déjà retenues."""
+        if len(ids) < 12:
+            ids.extend(x[0] for x in conn.execute(
+                f"SELECT r.id FROM releases r WHERE r.hidden=0 AND r.id NOT IN ({','.join('?' * (len(ids) + 1))}) AND ({where})"
+                f" ORDER BY {order} LIMIT ?", (rid, *ids, *params, 12 - len(ids))))
+    # set d'un festival (« Festival_2025-DJ_Untel_Live-STREAM… ») : l'artiste connu est le festival ; celui qui joue est
+    # dans le nom, avant « _Live ». Ses autres releases et ses autres sets suivent.
+    live = _LIVE.match(r["name"] or "")
+    if live:
+        who = live[1].replace("_", " ")
+        more(f"{art}=? COLLATE NOCASE OR r.name LIKE ? ESCAPE '!'", (who, "%-" + re.sub(r"([!%_])", r"!\1", live[1]) + "!_Live%"))
+    # en dernier recours le même genre, les années les plus proches d'abord
+    if r["genre"]:
+        more("r.genre=?", (r["genre"],), f"ABS(COALESCE(r.year, 0) - {int(r['year'] or 0)}), r.added_at DESC, r.id DESC")
     rows = {x["id"]: _release(x) for x in conn.execute(
         f"SELECT {RELEASE_COLS} FROM {RELEASE_FROM} WHERE r.id IN ({','.join('?' * len(ids))})", (user["id"], *ids))}
     return [rows[i] for i in ids]

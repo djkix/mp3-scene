@@ -330,9 +330,28 @@ export function render(container, params = {}) {
     const d = {};
     const n = (x) => x.toLocaleString(locale);
     const v = (key, f) => (d[key] ? f(d[key]) : '…');
+    // lancer le scan depuis la vue d'ensemble : le bloc suit l'état jusqu'à la fin (le statut n'arrive qu'après la
+    // réponse 202, d'où une seconde d'attente au moins avant de croire « au repos »)
+    const busy = (x) => x?.status === 'structure' || x?.status === 'tags';
+    let startedAt = 0;
+    const follow = async () => {
+      clearTimeout(pollTimer);
+      try { d.s = await api('/admin/scan'); } catch { return; }
+      if (dead) return;
+      paint();
+      if (busy(d.s) || Date.now() < startedAt + 1000) pollTimer = setTimeout(follow, 2000);
+      else { invalidateFilters(); api('/admin/library').then((x) => { d.l = x; paint(); }).catch(() => {}); } // scan terminé : totaux à jour
+    };
+    const quickScan = el('button', { type: 'button', class: 'primary', onclick: async () => {
+      quickScan.disabled = true;
+      try { await api('/admin/scan', { method: 'POST' }); } catch (err) { if (err.status !== 409 && alive()) status.textContent = err.message; }
+      startedAt = Date.now();
+      follow();
+    } }, t('Lancer le scan'));
     function paint() {
       if (dead) return;
       const { s, o, ver, b } = d;
+      quickScan.disabled = busy(s) || Date.now() < startedAt + 1000;
       totals.replaceChildren(...[[t('Releases'), v('l', (l) => n(l.releases))], [t('Pistes'), v('l', (l) => n(l.tracks))],
         [t('Stocké'), v('l', (l) => fmtSize(l.size))], [t('Artistes'), v('o', (x) => n(x.artists))]]
         .map(([k, val]) => el('div', { class: 'ad-metric' }, el('span', {}, k), el('b', {}, val))));
@@ -340,7 +359,7 @@ export function render(container, params = {}) {
         card(t('Scan'), s && (PHASES[s.status] || s.status), [[t('Dernier scan'), v('s', (x) => fmtTime(x.finished_at))],
           [t('Pistes restant à lire'), v('s', (x) => n(x.tracks_pending))],
           [t('Scan quotidien'), v('s', (x) => (x.daily_at == null ? t('Jamais') : `${String(x.daily_at).padStart(2, '0')}:00`))]],
-        link('#/admin/scan', t('Gérer le scan'))),
+        quickScan, link('#/admin/scan', t('Gérer le scan'))),
         card(t('Contrôle qualité'), null, QUALITY.map(([k, label]) => [t(label), v('q', (q) => n(q[k]))]), link('#/library?tab=quality', t('Tout voir'))),
         card(t('Corrections'), o?.overrides.total ? String(o.overrides.total) : null, [['artist', 'Artiste'], ['category', 'Catégorie'],
           ['genre', 'Genre'], ['year', 'Année'], ['hidden', 'Masquées']].map(([k, label]) => [t(label), v('o', (x) => x.overrides[k])]),

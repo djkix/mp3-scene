@@ -881,3 +881,17 @@ def test_cover_search_proposes_signed_images_and_saves_the_chosen_one(admin_clie
             pass
     assert admin_client.post(f"/api/admin/releases/{rid}/cover/fetch",
                              json={"url": "https://127.0.0.1/a.jpg", "sig": coversearch.sign(settings.secret_key, "https://127.0.0.1/a.jpg")}).status_code == 502
+
+
+def test_similar_falls_back_to_the_set_performer_then_the_genre(user_client, library, settings):
+    from app import db
+    names = lambda rid: [x["name"] for x in user_client.get(f"/api/releases/{rid}/similar").json()]
+    rel = {x["name"]: x for x in user_client.get("/api/releases").json()["items"]}
+    va, a = rel["VA-Big_Mix-2CD-2003-GRP"]["id"], rel[A]["id"]
+    c = db.connect(settings.data_dir)
+    # set d'un festival : l'artiste connu est le festival, celui qui joue est dans le nom avant « _Live »
+    c.execute("UPDATE releases SET name='Fest_2025-Bicep_Live-STREAM-08-16-2025-GRP', artist='Fest 2025', tag_artist=NULL,"
+              " title='STREAM-08-16', genre='Hardcore', year=2025, label=NULL WHERE id=?", (va,)); c.commit()
+    assert names(va) == ["Bicep-Glue-(NT123)-WEB-2017-PWT"]              # les releases de celui qui joue
+    c.execute("UPDATE releases SET genre='Hardcore', year=1999 WHERE id=?", (a,)); c.commit()
+    assert names(va) == ["Bicep-Glue-(NT123)-WEB-2017-PWT", A]           # puis le même genre, quelle que soit l'année

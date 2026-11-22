@@ -817,18 +817,19 @@ function update() {
     }
     ui.rel.href = ui.doc.href = t ? relHref(t.release_name, t.release_id) : '#/';
     // plein écran : source, débit et groupe de la release (absents d'une file enregistrée avant la 1.33.0)
-    // source, débit, groupe : seuls la source et le nom du groupe sont en pastille ; les points de séparation sont à part
+    // groupe, source, débit, fréquence, canaux : seuls le groupe et la source sont en pastille ; les points de séparation sont à part
     // fréquence et canaux : lus dans le fichier (une requête par piste), ajoutés dès qu'ils arrivent
     const d = t && tech.id === t.id ? tech.d : null;
     if (t && tech.id !== t.id) {
       tech = { id: t.id, d: null };
       api(`/tracks/${t.id}/tech`).then((r) => { if (tech.id === t.id) { tech.d = r; update(); } }).catch(() => {}); // facultatif
     }
-    const meta = !t ? [] : [t.source && el('span', { class: 'chip src' }, t.source),
-      t.bitrate && el('span', {}, `${Math.round(t.bitrate / 1000)} KBPS`),
-      d?.sample_rate && el('span', {}, `${(d.sample_rate / 1000).toLocaleString()} KHZ`),
-      d?.channels && el('span', {}, String({ 1: tr('Mono'), 2: tr('Stéréo') }[d.channels] || d.channels).toUpperCase()),
-      t.grp && el('span', { class: 'chip' }, t.grp)].filter(Boolean);
+    // un pictogramme devant chaque information (data-ico : masque dessiné en CSS)
+    const meta = !t ? [] : [t.grp && el('span', { class: 'chip', 'data-ico': 'users' }, t.grp),
+      t.source && el('span', { class: 'chip src', 'data-ico': 'disc' }, t.source),
+      t.bitrate && el('span', { 'data-ico': 'gauge' }, `${Math.round(t.bitrate / 1000)} KBPS`),
+      d?.sample_rate && el('span', { 'data-ico': 'sine' }, `${(d.sample_rate / 1000).toLocaleString()} KHZ`),
+      d?.channels && el('span', { 'data-ico': 'phones' }, String({ 1: tr('Mono'), 2: tr('Stéréo') }[d.channels] || d.channels).toUpperCase())].filter(Boolean);
     ui.meta.replaceChildren(...meta.flatMap((x, i) => (i ? [el('span', { class: 'sep', 'aria-hidden': 'true' }, '·'), x] : [x])));
     ui.fav.textContent = t?.favorite ? '♥︎' : '♡︎';
     ui.fav.setAttribute('aria-pressed', !!t?.favorite);

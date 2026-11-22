@@ -4,6 +4,20 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.53.0](https://github.com/djkix/mp3-scene/compare/v1.52.1...v1.53.0) (2026-11-22)
+
+### Résumé
+
+**Releases similaires pour les sets de festival, pictogrammes du lecteur, scan depuis la vue d'ensemble.**
+
+- **Releases similaires** : le set d'un festival (« Festival_2025-DJ_Untel_Live-STREAM… ») n'en proposait aucune,
+  son artiste connu étant le festival. La liste est maintenant complétée par les releases et les autres sets de
+  celui qui joue, lu dans le nom avant « _Live », puis par le même genre, les années les plus proches d'abord.
+  Toute fiche qui avait peu de propositions en reçoit ainsi jusqu'à douze.
+- **Lecteur plein écran** : groupe en premier, puis source, débit, fréquence et canaux, chacun précédé d'un
+  pictogramme ; les points de séparation disparaissent.
+- **Administration** : le bloc Scan de la vue d'ensemble a son bouton « Lancer le scan » et suit l'état jusqu'à la fin.
+
 ## [1.52.1](https://github.com/djkix/mp3-scene/compare/v1.52.0...v1.52.1) (2026-11-22)
 
 ### Résumé
