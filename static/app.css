@@ -300,6 +300,9 @@ google-cast-launcher:hover { background: var(--hover); }
   .filters { gap: 6px; }
   /* filtres sur deux colonnes : deux lignes au lieu de quatre ; la liste d'un filtre de droite s'ouvre vers la gauche */
   .filters .multi { flex: 1 1 calc(50% - 3px); }
+  /* correction en lot (cases à cocher, « Corriger la sélection », « Tout cocher ») : sur ordinateur seulement */
+  .rel-pick, .pick-btn { display: none; }
+  .filters:has(> .pick-btn):not(:has(> :not(.pick-btn))) { display: none; }
   .filters .smart { display: none; } /* « Playlist auto » : sur ordinateur seulement */
   .filters button.reset { flex: 0 0 auto; margin-inline: 25%; min-height: 36px; } /* seul sur sa ligne, centré sous les filtres */
   .multi-list { max-width: calc(100vw - 40px); }
@@ -312,7 +315,7 @@ google-cast-launcher:hover { background: var(--hover); }
   .rel-actions:not(:has(> :nth-child(4))) { flex-direction: column; gap: 0; align-self: center; margin-left: -6px; }
   .rel-actions:not(:has(> :nth-child(4))) .icon { min-width: 28px; height: 32px; min-height: 0; }
   /* nom et informations centrés en hauteur face à la colonne des boutons : une rangée libre au-dessus, une au-dessous */
-  .rel { grid-template-rows: 1fr auto auto 1fr; row-gap: 0; grid-template-areas: "thumb . act" "thumb name act" "thumb info act" "thumb . act"; }
+  .rel, .detail li.rel { grid-template-rows: 1fr auto auto 1fr; row-gap: 0; grid-template-areas: "thumb . act" "thumb name act" "thumb info act" "thumb . act"; }
   .rel-info { align-self: start; margin-top: 4px; }
   .rel-thumb { align-self: center; }
   .rel-date { grid-area: date; }
@@ -330,13 +333,14 @@ google-cast-launcher:hover { background: var(--hover); }
 
   /* Lecteur réduit : filet de progression, titre sur deux lignes, lecture/pause, suivant, cast */
   #player { bottom: var(--nav-h); padding-bottom: 0; }
-  .pl-progress { display: block; height: 3px;
-    background: linear-gradient(to right, var(--accent) calc(var(--p, 0) * 100%), var(--line) 0); }
+  /* barre de 6 px sous le titre, dans une zone d'appui de 22 px : un appui déplace la lecture */
+  .pl-progress { display: block; height: 22px; margin: -4px 12px 0; cursor: pointer;
+    background: linear-gradient(to right, var(--accent) calc(var(--p, 0) * 100%), var(--line) 0) center / 100% 6px no-repeat; }
   .pl-bar { display: flex; gap: 2px; min-height: 60px; padding: 4px 4px 4px 12px; }
   .pl-info { flex: 1 1 0; }
   .pl-cover { width: 40px; height: 40px; }
   /* barre réduite : le titre seul sur la première ligne, l'artiste dessous */
-  #player:not(.expanded) .pl-t-artist { display: none; }
+  #player .pl-t-artist { display: none; } /* mobile : l'artiste a sa propre ligne, réduit comme en plein écran */
   #player:not(.expanded) .pl-artist { display: block; max-width: 100%; color: var(--muted); font: 11px var(--mono); white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis; }
   #player:not(.expanded) .pl-artist:empty { display: none; }
@@ -377,6 +381,12 @@ google-cast-launcher:hover { background: var(--hover); }
   #player.expanded .pl-title { display: block; max-width: 100%; text-align: center; font: 600 22px/1.3 var(--sans);
     letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #player.expanded .pl-title:hover { text-decoration: none; }
+  /* plein écran : l'artiste au-dessus, le titre dessous (il défile s'il dépasse, comme dans la barre) */
+  #player.expanded .pl-cover { order: -3; }
+  #player.expanded .pl-artist { order: -2; display: block; max-width: 100%; color: var(--muted); font: 500 15px/1.3 var(--sans);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #player.expanded .pl-artist:empty { display: none; }
+  #player.expanded .pl-title { order: -1; margin-top: -4px; }
   #player.expanded .pl-rel { display: block; max-width: 100%; font-size: 12px; padding: 3px 8px; background: var(--panel);
     border-radius: 3px; }
   #player.expanded .pl-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 8px;
@@ -488,6 +498,12 @@ thead th { color: var(--muted); background: var(--panel); padding-block: 8px; wh
 .ad-pick { display: none; }
 @media (max-width: 699px) {
   .ad-nav :is(p, .ad-top, .ad-sub) { display: none; }
+  .tabs.kinds button { display: none; }
+  .tabs.kinds { padding-inline: 0; }
+  /* fiche : rien de coupé dans le bloc d'informations — colonnes resserrées, et une valeur longue passe sur deux lignes */
+  .detail-info { gap: 6px 8px; padding: 12px 10px; }
+  .detail-info dd:nth-of-type(odd) { padding-right: 8px; }
+  .detail-info .pill { padding: 2px 7px; border-radius: 10px; font-size: 11px; white-space: normal; overflow-wrap: anywhere; }
   .ad-pick { display: block; width: 100%; font: 600 14px var(--sans); }
 }
 .fx-help { min-width: 20px; width: 20px; height: 20px; min-height: 0; margin-left: 6px; padding: 0; border: 1px solid var(--line); border-radius: 50%;

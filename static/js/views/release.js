@@ -200,7 +200,7 @@ export async function correct(rel, ids = null) {
 // `also(pick)` est appelé à chaque changement de la sélection, et une première fois tout de suite.
 export function picker(also = () => {}) {
   const pick = new Set();
-  const button = el('button', { type: 'button', class: 'primary', onclick: () => correct(null, [...pick]) });
+  const button = el('button', { type: 'button', class: 'primary pick-btn', onclick: () => correct(null, [...pick]) });
   const onPick = () => { button.disabled = !pick.size; button.textContent = t('Corriger la sélection ({0})', pick.size); also(pick); };
   onPick();
   return { pick, onPick, button };

@@ -4,6 +4,22 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.52.1](https://github.com/djkix/mp3-scene/compare/v1.52.0...v1.52.1) (2026-11-22)
+
+### Résumé
+
+**Longs mixes FLAC et WAV sans attente, suite des retouches mobile.**
+
+- **Longs mixes en FLAC et WAV** : à partir de 20 minutes, le fichier est envoyé tel quel quand le navigateur sait le
+  lire. Sa conversion durait plus d'une minute et la lecture était abandonnée avant. Le fichier d'origine est lourd
+  (de l'ordre de 1 Go par heure en FLAC).
+- **Fiche sur mobile** : les cartes de « Autres versions » et de « Releases similaires » ne gardent plus un grand
+  vide en bas (défaut de la 1.52.0) ; plus aucune valeur coupée dans le bloc d'informations.
+- **Lecteur plein écran** : l'artiste sur une ligne, le titre dessous ; un titre trop long défile.
+- **Petit lecteur** : barre de progression sous le titre, plus épaisse ; un appui déplace la lecture.
+- **Contrôle qualité sur mobile** : les contrôles sont dans une liste déroulante, avec leur nombre.
+- **Correction en lot** (cases à cocher, « Corriger la sélection », « Tout cocher ») : sur ordinateur seulement.
+
 ## [1.52.0](https://github.com/djkix/mp3-scene/compare/v1.51.0...v1.52.0) (2026-11-22)
 
 ### Résumé

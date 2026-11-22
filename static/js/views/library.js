@@ -81,21 +81,25 @@ export function render(container, params) {
   const quality = params.tab === 'quality';
   const kind = KINDS.some(([k]) => k === params.kind) ? params.kind : KINDS[0][0];
   const body = el('div');
-  const kinds = el('div', { class: 'tabs', role: 'tablist', 'aria-label': tr('Contrôle qualité') });
+  const kinds = el('div', { class: 'tabs kinds', role: 'tablist', 'aria-label': tr('Contrôle qualité') });
   // même navigation que la page Administration, dont ces deux écrans sont des sections
   container.replaceChildren(el('div', { class: 'page admin' }, navBar(quality ? '#/library?tab=quality' : '#/library'),
     el('div', { class: 'ad-main' }, el('h1', {}, quality ? tr('Contrôle qualité') : tr('Statistiques')),
       ...(quality ? [kinds] : []), body)));
   if (!quality) stats(body, () => dead);
   else {
-    const paint = (counts) => kinds.replaceChildren(...KINDS.map(([k, label]) =>
-      tabBtn(counts ? `${tr(label)} (${counts[k]})` : tr(label), k === kind, `#/library?tab=quality&kind=${k}`)));
+    // mobile : les mêmes contrôles dans une liste déroulante (le bandeau d'onglets débordait de l'écran)
+    const text = (counts, k, label) => (counts ? `${tr(label)} (${counts[k]})` : tr(label));
+    const paint = (counts) => kinds.replaceChildren(
+      el('select', { class: 'ad-pick', 'aria-label': tr('Contrôle qualité'), onchange: (e) => { location.hash = `#/library?tab=quality&kind=${e.target.value}`; } },
+        KINDS.map(([k, label]) => el('option', { value: k, selected: k === kind }, text(counts, k, label)))),
+      ...KINDS.map(([k, label]) => tabBtn(text(counts, k, label), k === kind, `#/library?tab=quality&kind=${k}`)));
     paint(null);
     api('/admin/quality').then((c) => { if (!dead) paint(c); }).catch(() => {});
     // correction en lot : cocher des releases, puis leur donner le même artiste, la même catégorie ou le même genre
     const list = el('div');
     // tout cocher : toutes les releases de l'onglet, même celles que le défilement n'a pas encore chargées
-    const all = el('button', { type: 'button', onclick: async () => {
+    const all = el('button', { type: 'button', class: 'pick-btn', onclick: async () => {
       try {
         if (picked.size) picked.clear();
         else (await api(`/admin/quality?kind=${kind}&ids=1`)).ids.forEach((i) => picked.add(i));

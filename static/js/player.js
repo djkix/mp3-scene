@@ -181,13 +181,16 @@ const blobs = new Map();  // id de piste -> URL d'objet de la piste télécharg�
 let fetching = false, fetchRetry = 0;
 // Flux d'une piste. Un M4A, MP4 (vidéo : seul le son est lu), OGG ou Opus que ce navigateur sait lire est demandé tel quel : le convertir en MP3
 // n'apporterait rien et fait attendre plus d'une minute sur un long mix. FLAC et WAV, bien plus lourds, ne le sont
-// qu'avec le réglage « qualité d'origine » ; sinon le serveur envoie la piste convertie en MP3.
+// qu'avec le réglage « qualité d'origine » ; sinon le serveur envoie la piste convertie en MP3. Exception : un long mix
+// (20 minutes ou plus) est lu tel quel, car sa conversion dure plus d'une minute et la lecture était abandonnée avant.
+// ponytail: fichier d'origine entier pour les longs mixes (lourd en données mobiles) ; convertir au fil de l'eau avec
+// déplacement possible si le poids gêne. LONG : le même seuil que pour la reprise des longs mixes, plus bas.
 const LIGHT = new Set(['m4a', 'mp4', 'ogg', 'opus']);
 const NATIVE = { flac: 'audio/flac', wav: 'audio/wav', m4a: 'audio/mp4', mp4: 'audio/mp4', ogg: 'audio/ogg', opus: 'audio/ogg; codecs=opus' };
 const probe = typeof Audio === 'function' ? new Audio() : null;
 function streamUrl(t) {
   const ext = String(t.filename || '').split('.').pop().toLowerCase();
-  const type = (prefs.original || LIGHT.has(ext)) && NATIVE[ext];
+  const type = (prefs.original || LIGHT.has(ext) || t.duration >= LONG) && NATIVE[ext];
   return `/api/tracks/${encodeURIComponent(t.id)}/stream${type && probe?.canPlayType(type) ? '?original=1' : ''}`;
 }
 
@@ -968,7 +971,12 @@ export function initPlayer(footer) {
       el('button', { type: 'button', onclick: () => player.clear() }, tr('Vider la file')), ui.close),
     ui.list);
 
-  footer.replaceChildren(ui.panel, ui.msg, el('div', { class: 'pl-progress', 'aria-hidden': 'true' }),
+  // lecteur réduit (mobile) : barre de progression sous la ligne du titre ; un appui déplace la lecture à cet endroit
+  const progress = el('div', { class: 'pl-progress', 'aria-hidden': 'true', onclick: (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    if (duration()) player.seek(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * duration());
+  } });
+  footer.replaceChildren(ui.panel, ui.msg,
     el('div', { class: 'pl-bar' },
       el('div', { class: 'pl-top' }, ui.collapse, el('span', { class: 'pl-now' }, tr('En cours de lecture')), ui.doc),
       el('div', { class: 'pl-info' }, ui.cover, ui.title, ui.artist, ui.rel, ui.meta, ui.cast),
@@ -981,7 +989,7 @@ export function initPlayer(footer) {
       el('div', { class: 'pl-seek' }, ui.elapsed, ui.wave, ui.total),
       el('div', { class: 'pl-tools' }, ui.chap, ui.rate, volwrap, ui.fx, ui.fav, ui.qbtn,
         el('span', { id: 'cast-slot' })), // emplacement du bouton cast (cast.js)
-      el('p', { class: 'pl-hint' }, tr('Balayez pour changer de piste'))));
+      el('p', { class: 'pl-hint' }, tr('Balayez pour changer de piste'))), progress);
 
   // Plein écran : balayage vers la gauche = piste suivante, vers la droite = précédente.
   // Ignoré s'il part de la barre de progression ou de la file, ou s'il est plutôt vertical (défilement).
