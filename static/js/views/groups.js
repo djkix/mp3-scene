@@ -86,7 +86,7 @@ function categories(container, params) {
     cats.replaceChildren(...f.categories.map((c) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(c === category),
       onclick: () => { location.hash = '#/categories' + qs({ category: c === category ? '' : c, genre, year, source }); } }, catLabel(c))));
   }).catch(() => {});
-  const dispose = releases.render(list, { ...params, q: '', base: '#/categories', noCategory: true });
+  const dispose = releases.render(list, { ...params, q: '', base: '#/categories', noCategory: true, letters: true });
   return () => { dead = true; dispose(); };
 }
 

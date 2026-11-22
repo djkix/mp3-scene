@@ -139,15 +139,26 @@ def new_count(since: float = Query(ge=0, le=1e12), conn=Depends(get_conn)):
     return {"count": conn.execute("SELECT COUNT(*) FROM releases WHERE added_at>?", (since,)).fetchone()[0]}
 
 
+# première lettre du nom d'une release, sans le « VA- » des compilations (sinon elles commenceraient toutes par V)
+_INITIAL = ("upper(substr(ltrim(CASE WHEN upper(substr(r.name, 1, 3)) IN ('VA-', 'VA_') THEN substr(r.name, 4) ELSE r.name END,"
+            " '-_ .('), 1, 1))")
+
+
 @router.get("/api/releases")
 def list_releases(q: str = "", category: Many = None, genre: Many = None, grp: str | None = None,
                   artist: str | None = None, source: Many = None, appears: str | None = None,
                   decade: Years = None, collab: str | None = Query(None, max_length=200),
                   year: Years = None, favorites: int = Query(0, ge=0, le=1),
                   label: str | None = Query(None, max_length=200), sort: Sort | None = None, dir: Dir = "asc",
+                  letter: str | None = Query(None, pattern="^([A-Z]|#)$"),
                   offset: int = Query(0, ge=0, le=MAX_INT), limit: int = Query(50, ge=1, le=MAX_INT),
                   user=Depends(current_user), conn=Depends(get_conn)):
     conds, params = _release_conds(category, genre, year, grp, artist, source, decade, appears, collab, label)
+    if letter == "#":  # tout ce qui ne commence pas par une lettre
+        conds.append(f"{_INITIAL} NOT BETWEEN 'A' AND 'Z'")
+    elif letter:
+        conds.append(f"{_INITIAL}=?")
+        params.append(letter)
     if favorites:  # un favori reste visible même masqué
         conds.remove("r.hidden=0")
     if match := _fts_query(q):

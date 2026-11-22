@@ -4,6 +4,18 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.55.0](https://github.com/djkix/mp3-scene/compare/v1.54.1...v1.55.0) (2026-11-22)
+
+### Résumé
+
+**Initiales sur la page Catégories, nom des compilations datées aligné sur leur série.**
+
+- **Page Catégories** : la barre de lettres des artistes (Tous, #, A à Z) filtre les releases par initiale. Le « VA- »
+  d'une compilation est ignoré, sinon elles seraient toutes sous V. La lettre suit quand un filtre change.
+- **Compilations « année - série - titre »** de Ministry of Sound et Hed Kandi : leur nom affiché prend la forme du
+  reste de la série (« 1995_-_Ministry_of_Sound_-_The_Annual_1_[2CD] » devient
+  « VA-Ministry_of_Sound_The_Annual_1-2CD-1995 »). Seul le nom en base change, pas le dossier sur le disque.
+
 ## [1.54.1](https://github.com/djkix/mp3-scene/compare/v1.54.0...v1.54.1) (2026-11-22)
 
 ### Résumé

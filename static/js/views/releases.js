@@ -192,6 +192,7 @@ export function select(label, all, name, values, current, onChange, text = Strin
 // sur un groupe ou un artiste (params.pin = {key, value, base}, voir groups.js).
 export function render(container, params) {
   const { q = '', category = '', genre = '', year = '', source = '', pin = null } = params;
+  const letter = /^([A-Z]|#)$/.test(params.letter || '') ? params.letter : ''; // initiale choisie (params.letters : barre affichée)
   const bar = el('div', { class: 'filters' });
   const list = el('div');
   const inTracks = q && params.in === 'tracks';
@@ -202,10 +203,14 @@ export function render(container, params) {
   const tabs = q && el('div', { class: 'tabs', role: 'tablist', 'aria-label': tr('Rechercher') },
     tab(tr('Releases'), !inTracks, `#/search?q=${encodeURIComponent(q)}${kept}`),
     tab(tr('Pistes'), inTracks, `#/search?q=${encodeURIComponent(q)}&in=tracks${kept}`));
-  container.replaceChildren(...(tabs ? [tabs] : []), bar, list);
+  // initiales, comme sur les listes d'artistes : « # » réunit ce qui ne commence pas par une lettre
+  const letters = params.letters && el('div', { class: 'letters', role: 'group', 'aria-label': tr('Initiale') },
+    ['', '#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'].map((l) => el('button', { type: 'button', 'aria-pressed': String(l === letter),
+      onclick: () => setFilter('letter', l) }, l || tr('Tous'))));
+  container.replaceChildren(...(tabs ? [tabs] : []), bar, ...(letters ? [letters] : []), list);
 
   function setFilter(name, value) {
-    const next = { q, in: inTracks ? 'tracks' : '', category, genre, year, source, ...pin?.extra, ...(name ? { [name]: value } : { category: '', genre: '', year: '', source: '' }) };
+    const next = { q, in: inTracks ? 'tracks' : '', category, genre, year, source, letter, ...pin?.extra, ...(name ? { [name]: value } : { category: '', genre: '', year: '', source: '' }) };
     const qs = Object.entries(next).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
     location.hash = (pin ? pin.base : params.base || (q ? '#/search' : '#/')) + (qs ? '?' + qs : ''); // nouvelle entrée d'historique, pagination remise à zéro
   }
@@ -228,7 +233,7 @@ export function render(container, params) {
   const many = (v) => (v ? v.split('|') : []);
   const years = many(year);
   const filters = { category: many(category), genre: many(genre), year: years.filter((y) => !/s$/.test(y)),
-    decade: years.filter((y) => /s$/.test(y)).map((y) => parseInt(y, 10)), source: many(source), ...(pin && { [pin.key]: [pin.value] }) };
+    decade: years.filter((y) => /s$/.test(y)).map((y) => parseInt(y, 10)), source: many(source), letter: many(letter), ...(pin && { [pin.key]: [pin.value] }) };
   const toQuery = (extra = {}) => {
     const p = new URLSearchParams();
     for (const [k, vs] of Object.entries({ ...extra, ...filters })) for (const v of [].concat(vs)) if (v !== '') p.append(k, v);

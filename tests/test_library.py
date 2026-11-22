@@ -918,6 +918,10 @@ def test_dated_compilations_of_a_known_series_are_filed_like_the_series(user_cli
     db.categorize(c); c.commit()
     got = one(a)
     assert (got["artist"], got["title"], got["year"], got["label"]) == ("VA", "Hed Kandi Nu Cool Vol. 2", 1999, "Hed Kandi Records")
+    assert got["name"] == "VA-Hed_Kandi_Nu_Cool_Vol._2-2CD-1999"          # nom affiché : comme le reste de la série
+    names = lambda letter: [x["name"] for x in user_client.get("/api/releases", params={"letter": letter}).json()["items"]]
+    assert names("H") == [got["name"]] and got["name"] not in names("V")   # initiale sans le « VA- »
+    assert names("#") == ["2019 - Some Artist - An Album [2CD]"] and user_client.get("/api/releases?letter=ab").status_code == 422
     assert dict(c.execute("SELECT artist, title, year FROM releases WHERE id=?", (b,)).fetchone()) == before   # série inconnue : intacte
 
 
