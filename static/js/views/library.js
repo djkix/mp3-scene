@@ -67,7 +67,7 @@ function stats(box, isDead) {
     const t = (r) => hours(r.duration);
     ranks.replaceChildren(...(u ? [block(tr('Artistes les plus écoutés'), u.artists, undefined, t), block(tr('Releases les plus écoutées'), u.releases, undefined, t),
       block(tr('Pistes les plus écoutées'), u.tracks, undefined, t), block(tr('Par utilisateur'), u.users, undefined, t)] : []),
-    ...(s ? [block(tr('Par genre'), s.genres)] : []));
+    ...(s ? [block(tr('Par genre'), s.genres), block(tr('Par groupe'), s.groups)] : []));
   }
   const fail = (err) => { if (!isDead()) status.textContent = err.message; };
   const loadUsage = () => api(`/admin/usage?days=${sel.value}`).then((u) => { d.u = u; paint(); }).catch(fail);

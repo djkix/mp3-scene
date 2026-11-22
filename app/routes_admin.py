@@ -252,6 +252,7 @@ def library_stats(conn=Depends(get_conn)):
     total = dict(conn.execute("SELECT COUNT(*) AS releases, COALESCE(SUM(size), 0) AS size, COALESCE(SUM(track_count), 0)"
                               " AS tracks, COALESCE(SUM(duration), 0) AS duration FROM releases").fetchone())
     return {**total, "years": by("year", "1 DESC", 40), "genres": by("genre"), "sources": by("source"),
+            "groups": by("grp"),
             "categories": by("category"),
             "bitrates": rows("SELECT CASE WHEN bitrate>=320000 THEN '320' WHEN bitrate>=256000 THEN '256' WHEN bitrate>=192000"
                              " THEN '192' WHEN bitrate>=128000 THEN '128' ELSE '<128' END AS name, COUNT(*) AS n,"

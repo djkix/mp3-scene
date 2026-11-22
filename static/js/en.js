@@ -140,6 +140,7 @@ export const EN = {
   'Par catégorie': 'By category',
   'Pistes par débit': 'Tracks by bitrate',
   'Pistes par format': 'Tracks by format',
+  'Par groupe': 'By group',
   'Contrôle qualité': 'Quality check',
   'Bibliothèque': 'Library',
   'Tableau de bord': 'Dashboard',

@@ -4,6 +4,15 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.56.0](https://github.com/djkix/mp3-scene/compare/v1.55.0...v1.56.0) (2026-11-22)
+
+### Résumé
+
+**Statistiques par groupe.**
+
+- Administration › Statistiques : un classement « Par groupe », les quinze groupes qui ont le plus de releases, avec
+  leur nombre et leur poids.
+
 ## [1.55.0](https://github.com/djkix/mp3-scene/compare/v1.54.1...v1.55.0) (2026-11-22)
 
 ### Résumé
