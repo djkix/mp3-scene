@@ -3,7 +3,7 @@ import sqlite3
 from pathlib import Path
 
 from app import artists, genres, nfo
-from app.naming import album_like, group, kind, one_song
+from app.naming import album_like, group, kind, one_song, unwrap
 
 SCHEMA = Path(__file__).with_name("schema.sql")
 VERSION = 1  # PRAGMA user_version ; à incrémenter avec une migration si le schéma change
@@ -47,6 +47,11 @@ def init(data_dir: Path) -> None:
 def classify(conn) -> None:
     """Réapplique toutes les règles de classement aux releases en base : genres, groupes, année, artistes,
     catégories, puis corrections manuelles. Sans effet au second passage."""
+    # artistes lus dans les tags par une version antérieure : sans le symbole qui les encadre (« ✖ … ✖ »)
+    for table, col in (("tracks", "artist"), ("releases", "tag_artist")):
+        for (a,) in conn.execute(f"SELECT DISTINCT {col} FROM {table} WHERE {col} IS NOT NULL").fetchall():
+            if unwrap(a) != a:
+                conn.execute(f"UPDATE {table} SET {col}=? WHERE {col}=?", (unwrap(a), a))
     genres.apply(conn)
     # « AOV_INT » rejoint AOV, une année ou « 320 » passe en P2P, comme à l'analyse du nom
     for (g,) in conn.execute("SELECT DISTINCT grp FROM releases WHERE grp IS NOT NULL").fetchall():

@@ -925,3 +925,17 @@ def test_a_last_segment_starting_with_an_underscore_is_not_a_group():
     from app.naming import group
     assert group("_Ballroom_Tunes_6") == ("P2P", None)        # fin d'un titre
     assert group("_XDS") == ("XDS", None) and group("AOV_INT") == ("AOV", None)
+
+
+def test_a_tag_artist_wrapped_in_a_decorative_symbol_is_unwrapped(user_client, library, settings):
+    from app import db
+    from app.naming import unwrap
+    assert unwrap("✖ Tristan Garner ✖") == "Tristan Garner" and unwrap("★★ X ★★") == "X"
+    assert [unwrap(x) for x in ("A+", "200°", "Life+", "✖", "✖✖", None)] == ["A+", "200°", "Life+", "✖", "✖✖", None]
+    c = db.connect(settings.data_dir)
+    rid = user_client.get("/api/release-by-name", params={"name": A}).json()["id"]
+    c.execute("UPDATE tracks SET artist='✖ A-Trak ✖' WHERE release_id=?", (rid,))
+    c.execute("UPDATE releases SET tag_artist='✖ A-Trak ✖' WHERE id=?", (rid,)); c.commit()
+    db.classify(c); c.commit()
+    got = user_client.get(f"/api/releases/{rid}").json()
+    assert got["artist"] == "A-Trak" and {t["artist"] for t in got["tracks"]} == {"A-Trak"}

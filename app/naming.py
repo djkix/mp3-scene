@@ -1,6 +1,7 @@
 """Extraction des champs (artiste, titre, source, année, groupe) depuis un nom de release."""
 import datetime
 import re
+import unicodedata
 from collections import Counter
 
 SOURCES = frozenset(
@@ -30,6 +31,15 @@ _REPAIRS = {"2008 MTC": "MTC", "2008_MTC": "MTC", "MonoPol": "MonoPoly", "EiTheL
 _NOT_GROUPS = SOURCES | frozenset("VA INT HOUSE 320 200X THE_ULTIMATE_MILLENNIUM_MEGAMIX HOP_IN_60_MINUTES RECORDS ROCK"
                                   " CLASSIC BANGERS VOUS DJ_ PROMO_CDS".split())
 _NOT_GROUP = re.compile(r"\d{1,2}|CD\d|\dCD", re.I)
+
+
+def unwrap(s: str | None) -> str | None:
+    """Artiste d'un tag sans le symbole décoratif qui l'encadre : « ✖ Tristan Garner ✖ » -> « Tristan Garner ».
+
+    Seul un même symbole aux deux bouts est retiré : « A+ », « 200° » ou « Life+ » sont de vrais noms."""
+    while s and len(s) > 2 and s[0] == s[-1] and unicodedata.category(s[0]) == "So" and s[1:-1].strip():
+        s = s[1:-1].strip()
+    return s
 
 
 def group(raw: str | None) -> tuple[str | None, int | None]:

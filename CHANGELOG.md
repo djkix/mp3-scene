@@ -4,6 +4,15 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.54.1](https://github.com/djkix/mp3-scene/compare/v1.54.0...v1.54.1) (2026-11-22)
+
+### Résumé
+
+**Artiste encadré par un symbole décoratif.**
+
+- Un artiste lu dans les tags et encadré par un même symbole (« ✖ Tristan Garner ✖ ») est débarrassé de ce symbole,
+  à la lecture des fichiers et pour les données déjà en base. « A+ », « 200° » ou « Life+ » restent tels quels.
+
 ## [1.54.0](https://github.com/djkix/mp3-scene/compare/v1.53.2...v1.54.0) (2026-11-22)
 
 ### Résumé

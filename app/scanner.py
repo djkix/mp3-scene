@@ -14,7 +14,7 @@ import mutagen
 from mutagen.id3 import ID3
 
 from app import artists, backup, cue, db, genres, nfo
-from app.naming import parse_release_name
+from app.naming import parse_release_name, unwrap
 
 DISC_RE = re.compile(r"^(cd|disc|disk)[ _-]?(\d+)$", re.IGNORECASE)
 BATCH = 500
@@ -346,7 +346,7 @@ def _read_tags(path):
     if m is None:
         return None, None, None, None, None
     info = getattr(m, "info", None)
-    return (_first(m.tags, "title"), _first(m.tags, "artist"), genres.normalize(_first(m.tags, "genre")),
+    return (_first(m.tags, "title"), unwrap(_first(m.tags, "artist")), genres.normalize(_first(m.tags, "genre")),
             getattr(info, "length", None), getattr(info, "bitrate", None))
 
 
