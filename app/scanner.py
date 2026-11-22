@@ -16,7 +16,8 @@ from mutagen.id3 import ID3
 from app import artists, backup, cue, db, genres, nfo
 from app.naming import parse_release_name, unwrap
 
-DISC_RE = re.compile(r"^(cd|disc|disk)[ _-]?(\d+)$", re.IGNORECASE)
+# sous-dossier de disque : « CD1 », « Disc 2 », ou un simple numéro (« 1 », « 02 »)
+DISC_RE = re.compile(r"^(?:(?:cd|disc|disk)[ _-]?(\d+)|(\d{1,2}))$", re.IGNORECASE)
 BATCH = 500
 TAG_BATCH = 200
 # pistes indexées ; tout ce qui n'est pas du MP3 est converti à l'écoute (routes_media)
@@ -214,7 +215,7 @@ def _scan_structure(conn, root, now):
                 m = DISC_RE.match(name)
                 t = None
                 if m:
-                    t, s, _, n = _files(_list(e.path), name + "/", int(m.group(2)))
+                    t, s, _, n = _files(_list(e.path), name + "/", int(m.group(1) or m.group(2)))
                 if t:
                     tracks += t
                     size += s

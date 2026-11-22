@@ -4,6 +4,16 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.57.1](https://github.com/djkix/mp3-scene/compare/v1.57.0...v1.57.1) (2026-11-22)
+
+### Résumé
+
+**Sous-dossiers numérotés reconnus comme des disques.**
+
+- Un sous-dossier nommé d'un simple numéro (« 1 », « 2 », « 02 ») qui contient des pistes est lu comme un disque de
+  la release parente, comme « CD1 » ou « Disc 2 ». Les releases « 1 », « 2 », « 3 » indexées jusque-là à part
+  rejoignent leur album au scan suivant.
+
 ## [1.57.0](https://github.com/djkix/mp3-scene/compare/v1.56.0...v1.57.0) (2026-11-22)
 
 ### Résumé

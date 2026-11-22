@@ -53,6 +53,26 @@ def test_detects_releases_at_variable_depth(conn, music):
     assert {f["path"] for f in conn.execute("SELECT path FROM folders")} == {"Singles", "Singles/A", "Albums"}
 
 
+def test_numbered_subfolders_are_discs_and_a_former_disc_release_is_absorbed(conn, music):
+    mk(music, "Albums/VA-Annual-3CD-2018-P2P/1", ["01-a.mp3"]); mk(music, "Albums/VA-Annual-3CD-2018-P2P/02", ["01-b.mp3"])
+    mk(music, "Singles/2/Two-Song-WEB-2015-GRP", ["01-c.mp3"])                       # « 2 » sans piste directe : un dossier d'artiste
+    mk(music, "Albums/VA-Other-2CD-2003-GRP/2003", ["01-d.mp3"])                     # quatre chiffres : pas un disque
+    scan_structure(conn, music, now=1.0)
+    names = lambda: {r["name"] for r in conn.execute("SELECT name FROM releases")}
+    assert names() == {"VA-Annual-3CD-2018-P2P", "Two-Song-WEB-2015-GRP", "2003"}
+    assert [(t["disc"], t["relpath"]) for t in conn.execute(
+        "SELECT disc, relpath FROM tracks t JOIN releases r ON r.id=t.release_id WHERE r.name LIKE 'VA-Annual%' ORDER BY disc")] == [(1, "1/01-a.mp3"), (2, "02/01-b.mp3")]
+    # indexé avant cette règle : chaque disque était une release à part ; le scan suivant les réunit
+    conn.execute("DELETE FROM tracks WHERE release_id IN (SELECT id FROM releases WHERE name LIKE 'VA-Annual%')")
+    conn.execute("DELETE FROM releases WHERE name LIKE 'VA-Annual%'")
+    for d in ("1", "02"):
+        conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo)"
+                     " VALUES (?,?,?,?,0,0,0,1,0)", (f"Albums/VA-Annual-3CD-2018-P2P/{d}", d, "Albums/VA-Annual-3CD-2018-P2P", "Albums"))
+    conn.commit()
+    scan_structure(conn, music, now=2.0)
+    assert names() == {"VA-Annual-3CD-2018-P2P", "Two-Song-WEB-2015-GRP", "2003"}
+
+
 def test_multi_disc_merged(conn, music):
     mk(music, "Albums/VA-Big-2CD-2003-GRP/CD1", ["01-a.mp3"]); mk(music, "Albums/VA-Big-2CD-2003-GRP/cd2", ["01-b.mp3"])
     scan_structure(conn, music, now=1.0)
