@@ -356,11 +356,11 @@ async def upload_cover(rid: Id, request: Request):
 @router.get("/releases/{rid}/cover/search")
 def search_cover(rid: Id, request: Request, conn=Depends(get_conn)):
     """Pochettes proposées pour cette release, trouvées sur Deezer, iTunes et, avec un jeton, Discogs. Chaque adresse est signée : seule une image proposée ici peut ensuite être validée."""
-    r = conn.execute("SELECT COALESCE(tag_artist, artist) AS artist, title, year FROM releases WHERE id=?", (rid,)).fetchone()
+    r = conn.execute("SELECT COALESCE(tag_artist, artist) AS artist, title, name FROM releases WHERE id=?", (rid,)).fetchone()
     if r is None:
         raise HTTPException(404, "Release introuvable.")
     settings = request.app.state.settings
-    items = coversearch.candidates(r["artist"], r["title"], settings.discogs_token)
+    items = coversearch.candidates(r["artist"], r["title"], settings.discogs_token, r["name"])
     return {"web": bool(settings.discogs_token),
             "items": [{**x, "sig": coversearch.sign(settings.secret_key, x["url"])} for x in items]}
 

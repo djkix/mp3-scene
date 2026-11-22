@@ -20,7 +20,7 @@ DISC_RE = re.compile(r"^(cd|disc|disk)[ _-]?(\d+)$", re.IGNORECASE)
 BATCH = 500
 TAG_BATCH = 200
 # pistes indexées ; tout ce qui n'est pas du MP3 est converti à l'écoute (routes_media)
-AUDIO = {".mp3", ".flac", ".wav", ".m4a", ".wma", ".ogg", ".opus", ".aiff", ".aif", ".ape", ".wv"}
+AUDIO = {".mp3", ".flac", ".wav", ".m4a", ".mp4", ".wma", ".ogg", ".opus", ".aiff", ".aif", ".ape", ".wv"}
 IMAGES = (".jpg", ".jpeg", ".png")  # mêmes types que routes_media.IMAGE_TYPES
 log = logging.getLogger(__name__)
 

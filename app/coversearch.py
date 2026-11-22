@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import ipaddress
 import json
+import re
 import socket
 import urllib.error
 import urllib.parse
@@ -41,16 +42,34 @@ def _itunes(q: str) -> list[dict]:
             for a in data.get("results", []) if a.get("artworkUrl100")]
 
 
-def _discogs(artist: str | None, title: str, token: str) -> list[dict]:
-    args = {"type": "release", "release_title": title, "per_page": 6, **({"artist": artist} if artist else {})}
-    data = _json("https://api.discogs.com/database/search?" + urllib.parse.urlencode(args),
+_SUFFIX = re.compile(r"[-_ ]*\([^)]*\)\s*$|[-_ ](EP|WEB|VLS|CDS|CDM|Promo|Remixes)\b.*$", re.I)
+_CATNO = re.compile(r"\(([A-Z0-9][A-Z0-9 ._-]*\d[A-Z0-9 ._-]*)\)")  # « (BL-16188-X) », « (579_737-2) » dans le nom du dossier
+_DATE = re.compile(r"\d{1,2}-\d{1,2}-\d{2,4}$")
+
+
+def _discogs(token: str, **args) -> list[dict]:
+    data = _json("https://api.discogs.com/database/search?" + urllib.parse.urlencode({"type": "release", "per_page": 6, **args}),
                  {"Authorization": f"Discogs token={token}"})
     # sans image, Discogs renvoie un pixel « spacer.gif »
     return [{"url": r["cover_image"], "thumb": r["thumb"], "source": "Discogs", "title": r.get("title") or ""}
             for r in data.get("results", []) if r.get("thumb") and "spacer.gif" not in r.get("cover_image", "spacer.gif")]
 
 
-def candidates(artist: str | None, title: str | None, discogs_token: str | None) -> list[dict]:
+def _discogs_any(artist: str | None, title: str, name: str | None, token: str) -> list[dict]:
+    """Titre exact d'abord ; à défaut le titre sans son suffixe (« … EP », « …-(Remixes) »), puis la référence de
+    catalogue lue entre parenthèses dans le nom du dossier."""
+    who = {"artist": artist} if artist else {}
+    out = _discogs(token, release_title=title, **who)
+    short = _SUFFIX.sub("", title).strip()
+    if not out and short and short != title:
+        out = _discogs(token, release_title=short, **who)
+    cat = _CATNO.search(name or "")
+    if not out and cat and not _DATE.match(cat[1]):
+        out = _discogs(token, catno=cat[1].replace("_", " "))
+    return out
+
+
+def candidates(artist: str | None, title: str | None, discogs_token: str | None, name: str | None = None) -> list[dict]:
     """Images proposées, catalogues d'abord. Une source en panne ou muette est passée sans bruit."""
     va = (artist or "").lower() in ("", "va", "various", "various artists")
     q = " ".join(filter(None, [None if va else artist, title]))
@@ -59,7 +78,7 @@ def candidates(artist: str | None, title: str | None, discogs_token: str | None)
     # ponytail: sources interrogées l'une après l'autre (une à deux secondes en tout) ; en parallèle si c'est trop long
     out = []
     for search in (lambda: _deezer(q), lambda: _itunes(q),
-                   lambda: _discogs(None if va else artist, title, discogs_token) if discogs_token and title else []):
+                   lambda: _discogs_any(None if va else artist, title, name, discogs_token) if discogs_token and title else []):
         try:
             out += search()
         except (OSError, ValueError, KeyError, TypeError):  # réseau, JSON, réponse inattendue

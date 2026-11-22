@@ -4,7 +4,7 @@
 
 **Collection de releases MP3 « scene » — bibliothèque · lecteur web · Chromecast · PWA**
 
-[![Version](https://img.shields.io/badge/version-1.50.1-purple?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.51.0-purple?style=for-the-badge)](CHANGELOG.md)
 [![Stack](https://img.shields.io/badge/stack-FastAPI_·_SQLite_·_JavaScript_pur-blue?style=for-the-badge)](#stack-technique)
 [![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
 
@@ -130,7 +130,7 @@ Chromecast ──HTTPS /cast/ (URL signées)──▶            │            
 |--------|--------------|
 | Backend | Python 3.12, FastAPI, Starlette, Uvicorn |
 | Base de données | SQLite (WAL, FTS5) |
-| Audio et images | mutagen (tags ID3), flux HTTP avec `Range`, mpg123 (formes d'onde), ffmpeg (FLAC, WAV, WMA, M4A convertis en MP3 à l'écoute), Pillow (vignettes) |
+| Audio et images | mutagen (tags ID3), flux HTTP avec `Range`, mpg123 (formes d'onde), ffmpeg (FLAC, WAV, WMA convertis en MP3 à l'écoute), Pillow (vignettes) |
 | Sécurité | argon2-cffi, cookie de session, URL de cast signées |
 | Frontend | JavaScript pur (modules ES), CSS, service worker, Google Cast SDK |
 | Tests | pytest (serveur), `node --test` (interface) |
@@ -385,6 +385,10 @@ git tag v1.2.0 && git push origin v1.2.0
 ## Historique des versions
 
 Le détail est dans le [journal des modifications](CHANGELOG.md).
+
+### 1.51.0 — 22 novembre 2026
+
+Fichiers **`.mp4`** lus (son seul), recherche de pochettes **Discogs** plus large (titre raccourci, référence de catalogue).
 
 ### 1.50.0 — 21 novembre 2026
 

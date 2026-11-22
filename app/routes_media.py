@@ -79,7 +79,7 @@ def transcoded(src, cache: Path, track_id: int, mtime: float):
 
 
 # formats servis tels quels à la demande (réglage « qualité d'origine » du lecteur) ; WMA, APE, WavPack restent convertis
-ORIGINAL_TYPES = {".flac": "audio/flac", ".wav": "audio/wav", ".m4a": "audio/mp4", ".ogg": "audio/ogg", ".opus": "audio/ogg"}
+ORIGINAL_TYPES = {".flac": "audio/flac", ".wav": "audio/wav", ".m4a": "audio/mp4", ".mp4": "audio/mp4", ".ogg": "audio/ogg", ".opus": "audio/ogg"}
 
 
 def _track_file(request: Request, conn, track_id: int, download: bool = False, headers: dict | None = None,

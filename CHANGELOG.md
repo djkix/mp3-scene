@@ -4,6 +4,18 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.51.0](https://github.com/djkix/mp3-scene/compare/v1.50.1...v1.51.0) (2026-11-22)
+
+### Résumé
+
+**Fichiers `.mp4` lus, recherche de pochettes Discogs plus large.**
+
+- **Fichiers `.mp4`** : le scan les indexe comme des pistes et le lecteur en lit le son, sans conversion quand le
+  navigateur sait lire le format (le fichier entier est envoyé, image comprise). Ils apparaissent au scan suivant.
+- **Recherche de pochettes sur Discogs** : quand le titre exact ne donne rien, un second essai est fait sans son suffixe
+  (« … EP », « …-(Remixes) »), puis avec la référence de catalogue lue entre parenthèses dans le nom du dossier
+  (« (BL-16188-X) »).
+
 ## [1.50.1](https://github.com/djkix/mp3-scene/compare/v1.50.0...v1.50.1) (2026-11-22)
 
 ### Résumé

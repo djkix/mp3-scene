@@ -847,12 +847,17 @@ def test_cover_search_proposes_signed_images_and_saves_the_chosen_one(admin_clie
             return {"data": [{"cover_xl": "https://cdn.example/xl.jpg", "cover_medium": "https://cdn.example/m.jpg", "title": "Ibanez", "artist": {"name": "A-Trak"}}]}
         if "itunes" in url:
             raise OSError("panne")                                        # une source en panne ne bloque pas les autres
-        assert headers == {"Authorization": "Discogs token=jeton"} and "release_title=Ibanez" in url
+        assert headers == {"Authorization": "Discogs token=jeton"}
+        if "release_title=Ibanez" not in url:   # titre avec suffixe, titre raccourci : rien ; la référence de catalogue trouve
+            return {"results": [{"cover_image": "https://i.example/c.jpg", "thumb": "https://i.example/t"}] if "catno=BL-16188+X" in url else []}
         return {"results": [{"cover_image": "https://i.example/spacer.gif", "thumb": "https://i.example/s"},      # sans image
                             {"cover_image": "http://sans-https.example/a.jpg", "thumb": "https://i.example/t"},
                             {"cover_image": "https://i.example/a.jpg", "thumb": "https://i.example/t", "title": "A-Trak - Ibanez"}]}
     monkeypatch.setattr(coversearch, "_json", fake)
     assert [x["url"] for x in coversearch.candidates("A-Trak", "Ibanez", "jeton")] == ["https://cdn.example/xl.jpg", "https://i.example/a.jpg"]
+    assert [x["url"] for x in coversearch.candidates("A-Trak", "Autre EP", "jeton", "A-Trak-Autre_EP-(BL-16188_X)-WEB-2008-GRP")][-1] == "https://i.example/c.jpg"
+    assert [x for x in asked if "discogs" in x and "Autre" in x][-1].count("EP") == 0   # second essai sans « EP »
+    assert not [x for x in coversearch.candidates("X", "Live", "jeton", "X-Live_(18-11-1995)-TAPE") if x["source"] == "Discogs"]  # une date n'est pas une référence
     asked.clear()
     assert user_client.get(f"/api/admin/releases/{rid}/cover/search").status_code == 403
     got = admin_client.get(f"/api/admin/releases/{rid}/cover/search").json()
