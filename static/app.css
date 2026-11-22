@@ -748,3 +748,16 @@ tr.playing td:first-child::before { content: "▶"; font-size: 11px; color: var(
 .pl-meta [data-ico] { gap: 4px; }
 .pl-meta [data-ico]::before { width: 12px; height: 12px; }
 .pl-meta .sep { display: none; } /* les pictogrammes séparent déjà les informations : sans points, tout tient sur une ligne */
+
+/* cartes de release (mobile, et fiche à toute largeur) : un point médian entre les informations. Chaque information
+   porte son point à gauche ; celui d'un début de ligne tombe dans la marge rognée, donc aucune ligne ne commence par un point */
+.detail .rel-info { gap: 0; margin-left: -12px; clip-path: inset(0 0 0 12px); }
+.detail .rel-info > span { position: relative; padding-left: 12px; }
+.detail .rel-info > span:empty { display: none; }
+.detail .rel-info > span::before { content: "·"; position: absolute; left: 3px; color: var(--muted); }
+@media (max-width: 699px) {
+  .rel-info { gap: 0; margin-left: -12px; clip-path: inset(0 0 0 12px); }
+  .rel-info > span { position: relative; padding-left: 12px; }
+  .rel-info > span:empty { display: none; }
+  .rel-info > span::before { content: "·"; position: absolute; left: 3px; color: var(--muted); }
+}

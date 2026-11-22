@@ -4,6 +4,15 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.53.1](https://github.com/djkix/mp3-scene/compare/v1.53.0...v1.53.1) (2026-11-22)
+
+### Résumé
+
+**Points médians entre les informations d'une release.**
+
+- Sur les cartes de release (mobile, et cartes de la fiche à toute largeur), un point médian sépare le genre, la
+  date, les pistes, le débit, le poids et la catégorie. Aucune ligne ne commence par un point.
+
 ## [1.53.0](https://github.com/djkix/mp3-scene/compare/v1.52.1...v1.53.0) (2026-11-22)
 
 ### Résumé
