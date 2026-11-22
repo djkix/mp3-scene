@@ -4,6 +4,23 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.54.0](https://github.com/djkix/mp3-scene/compare/v1.53.2...v1.54.0) (2026-11-22)
+
+### Résumé
+
+**Compilations datées rangées avec leur série, artistes de balise vides de sens écartés, survol des lignes.**
+
+- **Compilations « année - série - titre »** de Ministry of Sound et Hed Kandi (« 1999 - Hed Kandi - Nu Cool Vol. 2
+  [2CD] ») : rangées comme le reste de leur série, avec l'artiste VA, l'année du nom, le label de la série et un
+  titre complet (« Hed Kandi Nu Cool Vol. 2 »). Elles rejoignent ainsi les pages de série.
+- **Artiste des tags vide de sens** (« [Notag] », « Artist », « No Artist », « Unknown », « Untitled », « Inconnu ») :
+  écarté ; l'artiste lu dans le nom de la release le remplace. Une correction manuelle garde la priorité.
+- **Groupes** : un dernier segment qui commence par un tiret bas (« …-_Ballroom_Tunes_6 ») est la fin d'un titre,
+  pas un groupe ; la release est rangée dans P2P.
+- **Survol** : sur ordinateur, la ligne sous le pointeur est surlignée dans tous les tableaux et dans la file
+  d'attente, comme les pistes d'une fiche.
+- **Fiche d'une release** : la fréquence est retirée, le format prend sa place et s'affiche sans attendre.
+
 ## [1.53.2](https://github.com/djkix/mp3-scene/compare/v1.53.1...v1.53.2) (2026-11-22)
 
 ### Résumé

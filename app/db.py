@@ -102,6 +102,30 @@ def merge_labels(conn) -> None:
 _KIND_FOLDER = {"live": r"live|radio", "comp": r"compil", "single": r"single"}
 
 
+# compilations rangées par année : « 1999 - Hed Kandi - Nu Cool Vol. 2 [2CD] ». Clé : le nom de la série réduit à ses
+# lettres (casse, ponctuation et la faute « Minisrry » ignorées) ; valeur : (série, label), comme les autres releases
+# de la série déjà dans la bibliothèque (artiste VA, label « Ministry of Sound » ou « Hed Kandi Records »).
+DATED_SERIES = {"ministryofsound": ("Ministry of Sound", "Ministry of Sound"), "minisrryofsound": ("Ministry of Sound", "Ministry of Sound"),
+                "hedkandi": ("Hed Kandi", "Hed Kandi Records")}
+_DATED = re.compile(r"(\d{4})[ _]-[ _](.+?)[ _]-[ _](.+)$")
+
+
+def dated_series(conn) -> None:
+    """Range les compilations « année - série - titre » comme le reste de leur série : artiste VA, année du nom,
+    label de la série, titre « série + titre » sans le suffixe « [2CD] ». L'artiste des tags est écarté."""
+    # ponytail: deux séries connues, en dur ; une table de séries si d'autres collections datées arrivent
+    for r in conn.execute("SELECT id, name, artist, tag_artist, title, year, label FROM releases"
+                          " WHERE name GLOB '[12][0-9][0-9][0-9][ _]-[ _]*'").fetchall():
+        m = _DATED.match(r["name"])
+        known = m and DATED_SERIES.get(re.sub(r"[^a-z]", "", m[2].lower()))
+        if not known:
+            continue
+        rest = re.sub(r"\s*\[[^\]]*\]\s*$", "", m[3].replace("_", " ")).strip()
+        new = ("VA", None, f"{known[0]} {rest}", int(m[1]), known[1])
+        if new != (r["artist"], r["tag_artist"], r["title"], r["year"], r["label"]):
+            conn.execute("UPDATE releases SET artist=?, tag_artist=?, title=?, year=?, label=? WHERE id=?", (*new, r["id"]))
+
+
 def categorize(conn) -> None:
     """Catégorie de chaque release : celle que les tags de son nom indiquent, sinon son dossier racine.
 
@@ -110,6 +134,7 @@ def categorize(conn) -> None:
 
     Une catégorie est toujours un dossier racine existant : « live » désigne celui dont le nom contient « live » ou
     « radio », etc. Sans dossier correspondant, la release garde le sien."""
+    dated_series(conn)
     rows = conn.execute("SELECT id, name, path, category, track_count FROM releases").fetchall()
     tops = sorted({r["path"].split("/", 1)[0] for r in rows})
     target = {k: next((t for t in tops if re.search(p, t, re.I)), None) for k, p in _KIND_FOLDER.items()}
@@ -134,10 +159,17 @@ def categorize(conn) -> None:
     apply_overrides(conn)
 
 
+# valeurs d'un tag « artiste » qui ne nomment personne : laissées par un encodeur ou un tagueur
+JUNK_ARTISTS = ("[notag]", "notag", "no tag", "artist", "no artist", "unknown", "unknown artist", "untitled", "inconnu",
+                "artiste inconnu")
+
+
 def apply_overrides(conn) -> None:
     """Corrections manuelles : elles l'emportent sur l'artiste, la catégorie, le genre et l'année calculés.
 
     Appelée en fin de categorize(), donc après chaque regroupement d'artistes et chaque lecture de tags."""
+    # un artiste de tag vide de sens (« [Notag] ») est écarté : l'artiste lu dans le nom de la release le remplace
+    conn.execute(f"UPDATE releases SET tag_artist=NULL WHERE lower(tag_artist) IN ({','.join('?' * len(JUNK_ARTISTS))})", JUNK_ARTISTS)
     conn.execute(
         "UPDATE releases SET tag_artist=COALESCE((SELECT artist FROM overrides WHERE path=releases.path), tag_artist),"
         " category=COALESCE((SELECT category FROM overrides WHERE path=releases.path), category),"

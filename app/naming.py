@@ -45,6 +45,8 @@ def group(raw: str | None) -> tuple[str | None, int | None]:
         grp = grp.lstrip("_")
     if not grp:
         return None, None
+    if grp.startswith("_"):  # « …-_Ballroom_Tunes_6 » : la fin d'un titre, pas un groupe
+        return "P2P", None
     if m := _YEAR.fullmatch(grp):
         return "P2P", int(m[1])
     if not re.fullmatch(r"[A-Za-z0-9_]+", grp) or grp.lstrip("_").upper() in _NOT_GROUPS or _NOT_GROUP.fullmatch(grp):

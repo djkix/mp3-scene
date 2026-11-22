@@ -23,12 +23,6 @@ export function render(container, params) {
     if (dead) return;
     const nfo = el('div'), sim = el('div'), vers = el('div'), chap = el('div'), ser = el('div');
     container.replaceChildren(el('div', { class: 'detail' }, header(rel), ser, trackTable(rel), chap, vers, nfo, sim));
-    // fréquence et format (MP3, FLAC…) : lus dans le fichier de la première piste
-    // ponytail: la première piste vaut pour la release ; toutes les lire si des releases mélangent les formats
-    if (rel.tracks.length) api(`/tracks/${rel.tracks[0].id}/tech`).then((d) => {
-      if (dead) return;
-      container.querySelector('.detail-info')?.replaceChildren(...infoRows({ ...rel, sample_rate: d.sample_rate, format: d.format }, el));
-    }).catch(() => {}); // facultatif
     // série (« Global Underground 47 ») : volume précédent, page de la série, volume suivant
     if (rel.series) api('/series?' + new URLSearchParams({ name: rel.series })).then((s) => {
       if (dead || s.items.length < 2) return;
@@ -94,7 +88,9 @@ function header(rel) {
       // pochette facultative : sans image (404), le lien disparaît
       el('a', { class: 'cover', href: `/api/releases/${rel.id}/cover`, target: '_blank', rel: 'noopener' },
         el('img', { src: `/api/releases/${rel.id}/cover`, alt: t('Pochette'), onerror: (e) => e.target.parentNode.remove() })),
-      el('dl', { class: 'detail-info' }, infoRows(rel, el))),
+      // format (MP3, FLAC…) : l'extension de la première piste
+      // ponytail: la première piste vaut pour la release ; les lire toutes si des releases mélangent les formats
+      el('dl', { class: 'detail-info' }, infoRows({ ...rel, format: /\.\w+$/.test(rel.tracks[0]?.filename || '') ? rel.tracks[0].filename.split('.').pop().toUpperCase() : null }, el))),
     session.user?.role === 'admin' ? coverTools(rel) : null,
     el('div', { class: 'detail-actions' },
       el('button', { type: 'button', class: 'primary', 'data-ico': 'play', disabled: !rel.tracks.length, onclick: play }, t('Lire')),

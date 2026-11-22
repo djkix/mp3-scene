@@ -895,3 +895,33 @@ def test_similar_falls_back_to_the_set_performer_then_the_genre(user_client, lib
     assert names(va) == ["Bicep-Glue-(NT123)-WEB-2017-PWT"]              # les releases de celui qui joue
     c.execute("UPDATE releases SET genre='Hardcore', year=1999 WHERE id=?", (a,)); c.commit()
     assert names(va) == ["Bicep-Glue-(NT123)-WEB-2017-PWT", A]           # puis le même genre, quelle que soit l'année
+
+
+def test_a_meaningless_tag_artist_gives_way_to_the_release_name(user_client, library, settings):
+    from app import db
+    c = db.connect(settings.data_dir)
+    c.execute("UPDATE releases SET tag_artist='[Notag]' WHERE name=?", (A,)); c.commit()
+    db.categorize(c); c.commit()
+    assert user_client.get("/api/release-by-name", params={"name": A}).json()["artist"] == "A-Trak"   # celui du nom
+    assert not [g for g in user_client.get("/api/groups?by=artist").json() if g["name"] == "[Notag]"]
+
+
+def test_dated_compilations_of_a_known_series_are_filed_like_the_series(user_client, library, settings):
+    from app import db
+    c = db.connect(settings.data_dir)
+    one = lambda rid: user_client.get(f"/api/releases/{rid}").json()
+    rel = {x["name"]: x for x in user_client.get("/api/releases").json()["items"]}
+    a, b = rel[A]["id"], rel["Bicep-Glue-(NT123)-WEB-2017-PWT"]["id"]
+    c.execute("UPDATE releases SET name='1999_-_Hed_kandi_-_Nu_Cool_Vol._2_[2CD]', artist='VA', tag_artist='Artist', title='Hed kandi', year=NULL, label=NULL WHERE id=?", (a,))
+    c.execute("UPDATE releases SET name='2019 - Some Artist - An Album [2CD]', tag_artist=NULL WHERE id=?", (b,)); c.commit()
+    before = dict(c.execute("SELECT artist, title, year FROM releases WHERE id=?", (b,)).fetchone())
+    db.categorize(c); c.commit()
+    got = one(a)
+    assert (got["artist"], got["title"], got["year"], got["label"]) == ("VA", "Hed Kandi Nu Cool Vol. 2", 1999, "Hed Kandi Records")
+    assert dict(c.execute("SELECT artist, title, year FROM releases WHERE id=?", (b,)).fetchone()) == before   # série inconnue : intacte
+
+
+def test_a_last_segment_starting_with_an_underscore_is_not_a_group():
+    from app.naming import group
+    assert group("_Ballroom_Tunes_6") == ("P2P", None)        # fin d'un titre
+    assert group("_XDS") == ("XDS", None) and group("AOV_INT") == ("AOV", None)

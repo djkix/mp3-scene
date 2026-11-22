@@ -766,3 +766,8 @@ tr.playing td:first-child::before { content: "▶"; font-size: 11px; color: var(
 }
 .pl-rate > * { display: block; text-align: center; line-height: 1.3; }
 .pl-rate b { color: var(--fg); font-weight: 600; }
+
+/* même repère que les pistes d'une fiche : la ligne sous le pointeur est surlignée, dans tous les tableaux et listes */
+@media (hover: hover) {
+  tbody tr:not(.disc):hover, .pl-queue li:hover, .chapters li:hover { background: var(--hover); }
+}

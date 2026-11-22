@@ -18,8 +18,6 @@ export function infoRows(rel, el) {
     [t('Genre'), rel.genre, (v) => `#/?genre=${enc(v)}`, 'cls'],
     [t('Taille'), rel.size == null ? null : fmtSize(rel.size), null, 'num'],
     [t('Durée'), rel.duration == null ? null : fmtDuration(rel.duration), null, 'num'],
-    // lus dans le fichier de la première piste, après l'affichage de la fiche
-    [t('Fréquence'), rel.sample_rate ? `${(rel.sample_rate / 1000).toLocaleString()} kHz` : null, null, 'num'],
     [t('Format'), rel.format, null, 'num']]
     .filter(([, v]) => v != null && v !== '')
     // à plat : el() n'aplatit qu'un niveau
