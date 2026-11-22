@@ -4,6 +4,19 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.57.0](https://github.com/djkix/mp3-scene/compare/v1.56.0...v1.57.0) (2026-11-22)
+
+### Résumé
+
+**Synthèse par catégorie sur la recherche, débit sur la fiche, anneau des groupes.**
+
+- **Recherche** : sous les onglets, le total des releases trouvées et leur détail par catégorie avec le poids
+  (« 15 releases · 1,1 Go : 12 Compilations (894 Mo) · 3 Live & Radio (190 Mo) »). Un clic sur une catégorie filtre ;
+  les chiffres suivent les filtres.
+- **Fiche d'une release** : le débit moyen, après le format.
+- **Statistiques** : un anneau « Par groupe » avec les autres anneaux (les cinq premiers groupes, puis « Autres ») ;
+  les classements des releases et des pistes les plus écoutées n'ont plus de barres, le nom prend la largeur.
+
 ## [1.56.0](https://github.com/djkix/mp3-scene/compare/v1.55.0...v1.56.0) (2026-11-22)
 
 ### Résumé

@@ -171,6 +171,20 @@ def list_releases(q: str = "", category: Many = None, genre: Many = None, grp: s
                  user["id"], offset, limit, _release)
 
 
+@router.get("/api/release-summary")
+def release_summary(q: str = "", category: Many = None, genre: Many = None, source: Many = None, decade: Years = None,
+                    year: Years = None, conn=Depends(get_conn)):
+    """Releases d'une recherche comptées par catégorie, avec leur poids : la ligne de synthèse au-dessus des résultats.
+    Mêmes filtres que la liste."""
+    conds, params = _release_conds(category, genre, year, None, None, source, decade)
+    if match := _fts_query(q):
+        conds.append("r.id IN (SELECT rowid FROM releases_fts WHERE releases_fts MATCH ?)")
+        params.append(match)
+    return [dict(x) for x in conn.execute(
+        "SELECT r.category AS name, COUNT(*) AS releases, COALESCE(SUM(r.size), 0) AS size FROM releases r WHERE "
+        + " AND ".join(conds) + " GROUP BY 1 ORDER BY releases DESC, 1", params)]
+
+
 # ordre d'affichage des catégories, partout : singles, albums, compilations, live et radio, puis les autres dossiers
 _CATEGORY_ORDER = (r"single", r"album", r"compil", r"live|radio")
 

@@ -207,7 +207,9 @@ export function render(container, params) {
   const letters = params.letters && el('div', { class: 'letters', role: 'group', 'aria-label': tr('Initiale') },
     ['', '#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'].map((l) => el('button', { type: 'button', 'aria-pressed': String(l === letter),
       onclick: () => setFilter('letter', l) }, l || tr('Tous'))));
-  container.replaceChildren(...(tabs ? [tabs] : []), bar, ...(letters ? [letters] : []), list);
+  // recherche : total des releases trouvées, puis le détail par catégorie (un clic filtre), comme sur la page d'un artiste
+  const found = q && !inTracks && el('p', { class: 'grp-kinds muted', role: 'status' });
+  container.replaceChildren(...(tabs ? [tabs] : []), ...(found ? [found] : []), bar, ...(letters ? [letters] : []), list);
 
   function setFilter(name, value) {
     const next = { q, in: inTracks ? 'tracks' : '', category, genre, year, source, letter, ...pin?.extra, ...(name ? { [name]: value } : { category: '', genre: '', year: '', source: '' }) };
@@ -239,6 +241,13 @@ export function render(container, params) {
     for (const [k, vs] of Object.entries({ ...extra, ...filters })) for (const v of [].concat(vs)) if (v !== '') p.append(k, v);
     return p;
   };
+  if (found) api('/release-summary?' + toQuery({ q })).then((rows) => {
+    if (dead || !rows.length) return;
+    const n = rows.reduce((s, c) => s + c.releases, 0);
+    found.replaceChildren(`${n} ${n > 1 ? tr('releases') : tr('release')} · ${fmtSize(rows.reduce((s, c) => s + c.size, 0))}`,
+      ...rows.flatMap((c, i) => [i ? ' · ' : ' : ', el('a', { href: '#', onclick: (e) => { e.preventDefault(); setFilter('category', c.name); } },
+        `${c.releases} ${catLabel(c.name)}`), ` (${fmtSize(c.size)})`]));
+  }).catch(() => {}); // facultatif
   // Playlist intelligente : les filtres affichés deviennent sa règle ; ses pistes suivent la bibliothèque.
   const smart = el('button', { type: 'button', class: 'smart', title: tr('Enregistrer ces filtres comme une playlist qui se met à jour seule'), onclick: async () => {
     const name = (prompt(tr('Nom de la playlist intelligente')) || '').trim();

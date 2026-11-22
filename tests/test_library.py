@@ -944,3 +944,11 @@ def test_a_tag_artist_wrapped_in_a_decorative_symbol_is_unwrapped(user_client, l
     db.classify(c); c.commit()
     got = user_client.get(f"/api/releases/{rid}").json()
     assert got["artist"] == "A-Trak" and {t["artist"] for t in got["tracks"]} == {"A-Trak"}
+
+
+def test_search_summary_counts_releases_by_category(user_client, library):
+    rows = user_client.get("/api/release-summary").json()
+    assert sum(r["releases"] for r in rows) == 3 and all(r["size"] > 0 for r in rows) and {r["name"] for r in rows} == {"Albums", "Singles"}
+    one = user_client.get("/api/release-summary", params={"q": "Ibanez"}).json()
+    assert len(one) == 1 and one[0]["releases"] == 1
+    assert user_client.get("/api/release-summary", params={"q": "Ibanez", "category": "Introuvable"}).json() == []

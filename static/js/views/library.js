@@ -15,11 +15,12 @@ const tabBtn = (label, on, hash) => el('button', { type: 'button', role: 'tab', 
   onclick: () => { location.hash = hash; } }, label);
 
 // Tableau à barres : nom, nombre (barre proportionnelle au plus grand), poids.
-// `last` : dernière colonne (poids par défaut ; durée d'écoute pour l'usage).
-function block(title, rows, name = (r) => String(r.name), last = (r) => fmtSize(r.size)) {
+// `last` : dernière colonne (poids par défaut ; durée d'écoute pour l'usage). `bar` : faux pour les classements aux
+// noms longs (releases, pistes), où la barre ne laisserait qu'une colonne étroite au nom.
+function block(title, rows, name = (r) => String(r.name), last = (r) => fmtSize(r.size), bar = true) {
   const max = Math.max(1, ...rows.map((r) => r.n));
   return el('section', {}, el('h2', {}, title), rows.length ? el('table', { class: 'groups bars' }, el('tbody', {}, rows.map((r) => el('tr', {},
-    el('td', {}, name(r)), el('td', { class: 'bar' }, el('span', { style: `width:${Math.round(100 * r.n / max)}%` })),
+    el('td', {}, name(r)), bar && el('td', { class: 'bar' }, el('span', { style: `width:${Math.round(100 * r.n / max)}%` })),
     el('td', { class: 'num' }, String(r.n)), el('td', { class: 'num' }, last(r)))))) : el('p', { class: 'status' }, tr('Aucune écoute')));
 }
 
@@ -57,6 +58,9 @@ function stats(box, isDead) {
       panel(tr('Par source'), s ? donut(tr('Par source'), shares(s.sources.map((r) => ({ ...r, detail: fmtSize(r.size) })), 5, tr('Autres'))) : el('p', {}, wait)),
       panel(tr('Pistes par débit'), s ? donut(tr('Pistes par débit'), rateClasses(s.bitrates).filter((r) => r.n)) : el('p', {}, wait)),
       panel(tr('Pistes par format'), s ? donut(tr('Pistes par format'), shares(s.formats.map((r) => ({ name: r.name.toUpperCase(), n: r.n, detail: fmtSize(r.size) })), 5, tr('Autres'))) : el('p', {}, wait)),
+      // groupes : les quinze premiers viennent du serveur, le reste de la bibliothèque rejoint « Autres »
+      panel(tr('Par groupe'), s ? donut(tr('Par groupe'), [...s.groups.slice(0, 5).map((r) => ({ ...r, detail: fmtSize(r.size) })),
+        { name: tr('Autres'), n: Math.max(0, s.releases - s.groups.slice(0, 5).reduce((n, r) => n + r.n, 0)) }].filter((r) => r.n)) : el('p', {}, wait)),
       panel(tr('Genres les plus écoutés'), u ? (u.genres.length ? donut(tr('Genres les plus écoutés'), shares(u.genres, 5, tr('Autres'))) : el('p', {}, tr('Aucune écoute'))) : el('p', {}, wait)));
     const byTime = (title, rows, color) => { // colonnes dans l'ordre du temps, bornes dessous
       const r = [...rows].sort((x, y) => String(x.name).localeCompare(String(y.name)));
@@ -65,8 +69,8 @@ function stats(box, isDead) {
     };
     time.replaceChildren(byTime(tr('Par année'), s ? s.years : [], 1), byTime(tr('Ajouts par mois'), s ? s.months : [], 2));
     const t = (r) => hours(r.duration);
-    ranks.replaceChildren(...(u ? [block(tr('Artistes les plus écoutés'), u.artists, undefined, t), block(tr('Releases les plus écoutées'), u.releases, undefined, t),
-      block(tr('Pistes les plus écoutées'), u.tracks, undefined, t), block(tr('Par utilisateur'), u.users, undefined, t)] : []),
+    ranks.replaceChildren(...(u ? [block(tr('Artistes les plus écoutés'), u.artists, undefined, t), block(tr('Releases les plus écoutées'), u.releases, undefined, t, false),
+      block(tr('Pistes les plus écoutées'), u.tracks, undefined, t, false), block(tr('Par utilisateur'), u.users, undefined, t)] : []),
     ...(s ? [block(tr('Par genre'), s.genres), block(tr('Par groupe'), s.groups)] : []));
   }
   const fail = (err) => { if (!isDead()) status.textContent = err.message; };
