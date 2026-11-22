@@ -28,7 +28,11 @@ const RULES = [['Catégories', 'categories', 'Les tags du nom décident (SAT, DV
 
 export function navBar(current) {
   // arborescence : le nom de la rubrique, puis ses liens (avec pictogramme) en retrait le long d'un trait
-  return el('nav', { class: 'ad-nav', 'aria-label': t('Administration') }, NAV.map(([group, links]) => [
+  // mobile : la même arborescence dans une liste déroulante (une ligne au lieu d'un bandeau à faire défiler)
+  const opt = ([href, label]) => el('option', { value: href, selected: href === current }, t(label));
+  const pick = el('select', { class: 'ad-pick', 'aria-label': t('Administration'), onchange: (e) => { location.hash = e.target.value; } },
+    NAV.map(([group, links]) => (group ? el('optgroup', { label: t(group) }, links.map(opt)) : links.map(opt))));
+  return el('nav', { class: 'ad-nav', 'aria-label': t('Administration') }, pick, NAV.map(([group, links]) => [
     group ? el('p', {}, t(group)) : null,
     el('div', { class: group ? 'ad-sub' : 'ad-top' }, links.map(([href, label, ico]) =>
       el('a', { href, 'data-ico': ico, 'aria-current': href === current ? 'page' : null }, t(label))))]).flat());

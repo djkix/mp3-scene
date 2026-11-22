@@ -256,6 +256,9 @@ def library_stats(conn=Depends(get_conn)):
             "bitrates": rows("SELECT CASE WHEN bitrate>=320000 THEN '320' WHEN bitrate>=256000 THEN '256' WHEN bitrate>=192000"
                              " THEN '192' WHEN bitrate>=128000 THEN '128' ELSE '<128' END AS name, COUNT(*) AS n,"
                              " SUM(size) AS size FROM tracks WHERE bitrate IS NOT NULL GROUP BY 1 ORDER BY MIN(bitrate) DESC"),
+            # extension du fichier : ce qui suit le dernier point du chemin
+            "formats": rows("SELECT lower(replace(relpath, rtrim(relpath, replace(relpath, '.', '')), '')) AS name,"
+                            " COUNT(*) AS n, SUM(size) AS size FROM tracks GROUP BY 1 ORDER BY n DESC"),
             "months": rows("SELECT strftime('%Y-%m', added_at, 'unixepoch') AS name, COUNT(*) AS n, SUM(size) AS size"
                            " FROM releases GROUP BY 1 ORDER BY 1 DESC LIMIT 24")}
 

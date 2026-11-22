@@ -4,6 +4,29 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.52.0](https://github.com/djkix/mp3-scene/compare/v1.51.0...v1.52.0) (2026-11-22)
+
+### Résumé
+
+**Mobile resserré, types d'un artiste, formats dans les statistiques.**
+
+- **Page d'un artiste** : sous le nom, ses releases par type (« 10 Singles (214 Mo) · 4 Albums (65 Mo) ») ; un clic
+  filtre la liste sur ce type.
+- **Statistiques** : anneau « Pistes par format » (MP3, FLAC, M4A…) avec le nombre et le poids.
+- **Autres versions** : une pastille « Garder cette version » à droite du titre remplace le bloc de boutons ; elle
+  devient « Tout réafficher » quand des versions sont masquées.
+- **Lignes de release** : un « i » cerclé remplace la flèche vers la fiche.
+- **Mobile** :
+  - filtres sur deux colonnes, « Réinitialiser » centré dessous, « Playlist auto » réservé à l'ordinateur ;
+  - cartes de release : texte plus large, centré en hauteur face aux boutons ;
+  - lecteur plein écran : fréquence et canaux, espace réparti autour des informations, boutons aléatoire et
+    répétition du même trait que précédent et suivant ;
+  - petit lecteur : titre et artiste centrés sur la pochette ;
+  - file d'attente : texte plus grand, boutons resserrés ;
+  - fiche : pochette centrée, tableau des pistes sans colonne playlist, un cœur pour l'en-tête « Favori » ;
+  - réglages audio : explications repliées derrière des « ? » ;
+  - administration : menu en liste déroulante.
+
 ## [1.51.0](https://github.com/djkix/mp3-scene/compare/v1.50.1...v1.51.0) (2026-11-22)
 
 ### Résumé

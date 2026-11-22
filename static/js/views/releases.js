@@ -55,8 +55,8 @@ export function row(rel, pick = null, onPick = () => {}) {
   const play = () => emit('play-release', { releaseId: rel.id });
   const queue = el('button', { type: 'button', class: 'icon', title: tr('Ajouter à la file'), 'aria-label': tr('Ajouter à la file'),
     onclick: () => emit('queue-release', { releaseId: rel.id }) }, '+');
-  const detail = el('a', { class: 'icon', href: relHref(rel.name, rel.id), title: tr('Détail de la release'),
-    'aria-label': tr('Détail de la release') }, '›');
+  const detail = el('a', { class: 'icon rel-doc', href: relHref(rel.name, rel.id), title: tr('Détail de la release'),
+    'aria-label': tr('Détail de la release') });
   return el('li', {
     class: 'rel', tabIndex: 0,
     onclick: (e) => { if (!e.target.closest('button, a, input')) play(); },
@@ -235,7 +235,7 @@ export function render(container, params) {
     return p;
   };
   // Playlist intelligente : les filtres affichés deviennent sa règle ; ses pistes suivent la bibliothèque.
-  const smart = el('button', { type: 'button', title: tr('Enregistrer ces filtres comme une playlist qui se met à jour seule'), onclick: async () => {
+  const smart = el('button', { type: 'button', class: 'smart', title: tr('Enregistrer ces filtres comme une playlist qui se met à jour seule'), onclick: async () => {
     const name = (prompt(tr('Nom de la playlist intelligente')) || '').trim();
     if (!name) return;
     const rules = Object.fromEntries(Object.entries(filters).filter(([k, v]) => v.length && RULE_KEYS.includes(k))

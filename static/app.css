@@ -256,8 +256,6 @@ google-cast-launcher:hover { background: var(--hover); }
   #player :is(.pl-shuffle, .pl-repeat, .pl-qbtn, .pl-fx) { font-size: 0; }
   #player :is(.pl-shuffle, .pl-repeat, .pl-qbtn, .pl-fx)::before { content: ""; width: 18px; height: 18px; background: currentColor;
     -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }
-  .pl-shuffle { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 7h3.5c3 0 4.5 2 6 5s3 5 6 5H21M3 17h3.5c1.6 0 2.8-.6 3.8-1.6M13.7 8.6c1-1 2.2-1.6 3.8-1.6H21M18 4l3 3-3 3M18 14l3 3-3 3'/%3E%3C/svg%3E"); }
-  .pl-repeat { position: relative; --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 12V9a3 3 0 0 1 3-3h11M15 3l3 3-3 3M20 12v3a3 3 0 0 1-3 3H6M9 21l-3-3 3-3'/%3E%3C/svg%3E"); }
   .pl-repeat[data-mode="one"]::after { content: "1"; position: absolute; top: -3px; right: -5px; min-width: 16px; padding: 1px 4px;
     border-radius: 8px; background: var(--accent); color: var(--on-accent); font: 600 10px/1.2 var(--mono); }
   .pl-fx { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 7h9M17 7h3M4 17h3M11 17h9'/%3E%3Ccircle cx='15' cy='7' r='2'/%3E%3Ccircle cx='9' cy='17' r='2'/%3E%3C/svg%3E"); }
@@ -293,22 +291,30 @@ google-cast-launcher:hover { background: var(--hover); }
 @media (max-width: 699px) {
   :root { --nav-h: calc(52px + env(safe-area-inset-bottom)); }
   .rel { grid-template-columns: 40px minmax(0, 1fr) auto; gap: 4px 10px; grid-template-areas: "thumb name act" "thumb info act";
-    margin: 8px 12px; padding: 10px 6px 10px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+    margin: 8px 12px; padding: 10px 2px 10px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
   .rel-thumb { grid-area: thumb; align-self: start; }
   .rel-head { display: none; }
   .filters { margin: 8px 12px 0; padding: 8px; }
   .rel-info { display: flex; flex-wrap: wrap; gap: 0 10px; grid-area: info; }
   .unit { display: inline; }
   .filters { gap: 6px; }
+  /* filtres sur deux colonnes : deux lignes au lieu de quatre ; la liste d'un filtre de droite s'ouvre vers la gauche */
+  .filters .multi { flex: 1 1 calc(50% - 3px); }
+  .filters .smart { display: none; } /* « Playlist auto » : sur ordinateur seulement */
+  .filters button.reset { flex: 0 0 auto; margin-inline: 25%; min-height: 36px; } /* seul sur sa ligne, centré sous les filtres */
+  .multi-list { max-width: calc(100vw - 40px); }
+  .filters .multi:nth-of-type(even) .multi-list { left: auto; right: 0; }
   .filters select { flex: 1 1 auto; padding-inline: 4px; font-family: var(--sans); letter-spacing: -.01em; } /* largeur selon le libellé : « Localisations » entier */
   .rel-name { grid-area: name; }
   .rel-actions { grid-area: act; }
   /* pictos en colonne étroite : le nom gagne la largeur. Avec quatre boutons ou plus (playlist : monter, descendre…),
      ils restent en ligne */
-  .rel-actions:not(:has(> :nth-child(4))) { flex-direction: column; gap: 0; align-self: center; }
-  .rel-actions:not(:has(> :nth-child(4))) .icon { min-width: 36px; height: 32px; min-height: 0; }
-  .rel { grid-template-rows: auto 1fr; } /* le nom garde sa hauteur, les informations suivent sans vide */
-  .rel-info { align-self: start; }
+  .rel-actions:not(:has(> :nth-child(4))) { flex-direction: column; gap: 0; align-self: center; margin-left: -6px; }
+  .rel-actions:not(:has(> :nth-child(4))) .icon { min-width: 28px; height: 32px; min-height: 0; }
+  /* nom et informations centrés en hauteur face à la colonne des boutons : une rangée libre au-dessus, une au-dessous */
+  .rel { grid-template-rows: 1fr auto auto 1fr; row-gap: 0; grid-template-areas: "thumb . act" "thumb name act" "thumb info act" "thumb . act"; }
+  .rel-info { align-self: start; margin-top: 4px; }
+  .rel-thumb { align-self: center; }
   .rel-date { grid-area: date; }
   .rel-cat { grid-area: cat; max-width: 7rem; }
   .rel-meta { grid-area: meta; white-space: normal; }
@@ -334,6 +340,11 @@ google-cast-launcher:hover { background: var(--hover); }
   #player:not(.expanded) .pl-artist { display: block; max-width: 100%; color: var(--muted); font: 11px var(--mono); white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis; }
   #player:not(.expanded) .pl-artist:empty { display: none; }
+  /* barre réduite : titre et artiste centrés en hauteur sur la pochette */
+  #player:not(.expanded) .pl-info { grid-template-rows: 1fr auto auto 1fr; row-gap: 0; }
+  #player:not(.expanded) .pl-cover { grid-row: 1 / -1; }
+  #player:not(.expanded) .pl-title { grid-row: 2; }
+  #player:not(.expanded) .pl-artist { grid-row: 3; }
   .pl-rel, .pl-seek, .pl-qbtn, .pl-fx, .pl-volwrap, .pl-chap, .pl-controls :is(.pl-shuffle, .pl-prev, .pl-repeat) { display: none; }
   /* plein écran : le chapitre en cours sur sa propre ligne, au-dessus des outils */
   #player.expanded .pl-tools { flex-wrap: wrap; }
@@ -350,15 +361,12 @@ google-cast-launcher:hover { background: var(--hover); }
   /* bandeau : réduire, « En cours de lecture », cast (placé ici depuis les outils), fiche de la release */
   #player.expanded .pl-top { display: flex; align-items: center; gap: 8px; }
   /* la pochette suit le bandeau ; l'espace libre passe sous les informations, les commandes restent en bas sous le pouce */
-  #player.expanded .pl-info { margin-bottom: auto; }
+  #player.expanded .pl-info { margin-block: auto; } /* l'espace libre se partage au-dessus et au-dessous */
   #player.expanded .pl-top .icon, #player.expanded #cast-slot > * { min-width: 40px; height: 40px; border-radius: 50%;
     background: var(--panel); border: 1px solid var(--line); }
   #player.expanded .pl-collapse { font-size: 16px; }
   .pl-now { flex: 1; text-align: center; color: var(--muted); font: 11px var(--mono); letter-spacing: .08em;
     text-transform: uppercase; }
-  .pl-doc::before { content: ""; width: 18px; height: 18px; background: currentColor;
-    -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat;
-    --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v6'/%3E%3Ccircle cx='12' cy='7.5' r='.6' fill='%23000'/%3E%3C/svg%3E"); } /* « i » : fiche de la release */
   #player.expanded #cast-slot { position: absolute; top: 8px; right: 64px; }
   #player.expanded #cast-slot:empty { display: none; }
   #player.expanded .pl-info { flex: none; grid-template-columns: minmax(0, 1fr); justify-items: center; row-gap: 8px; }
@@ -398,6 +406,13 @@ google-cast-launcher:hover { background: var(--hover); }
   #player.expanded .pl-controls .icon { display: inline-flex; min-width: 52px; height: 52px; font-size: 22px; }
   #player.expanded .pl-controls .pl-play { min-width: 72px; height: 72px; font-size: 28px; border-radius: 14px; }
   #player.expanded .pl-tools { justify-content: space-between; }
+  #player.expanded .pl-controls :is(.pl-shuffle, .pl-repeat) { font-size: 0; }
+  #player.expanded .pl-controls :is(.pl-shuffle, .pl-repeat)::before { content: ""; width: 26px; height: 26px; background: currentColor;
+    -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }
+  #player.expanded .pl-controls :is(.pl-shuffle, .pl-repeat)[aria-pressed="false"] { color: var(--muted); }
+  #player.expanded .pl-repeat[data-mode="one"]::after { content: "1"; position: absolute; top: 6px; right: 4px; min-width: 16px;
+    padding: 1px 4px; border-radius: 8px; background: var(--accent); color: var(--on-accent); font: 600 10px/1.2 var(--mono); }
+  .detail-top .cover { margin-inline: auto; } /* pochette centrée au-dessus des détails */
   #player.expanded :is(.pl-qbtn, .pl-fx, .pl-fav) { display: inline-flex; min-width: 48px; font-size: 20px; }
   #player.expanded :is(.pl-fx, .pl-fav) { height: 48px; }
 
@@ -405,6 +420,12 @@ google-cast-launcher:hover { background: var(--hover); }
   .pl-queue { position: fixed; inset: 0; z-index: 1; width: auto; max-height: none; border: 0; box-shadow: none;
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
   #player .pl-q-track { padding-block: 10px; }
+  /* file : texte plus grand, boutons monter / descendre / retirer resserrés pour lui laisser la largeur */
+  .pl-q-title { font-size: 15px; }
+  .pl-q-rel { font-size: 12px; }
+  #player li > :is(.pl-q-up, .pl-q-down, .pl-q-remove) { min-width: 30px; }
+  #player li > .pl-time { margin-inline: 2px; font-size: 11px; }
+  .pl-queue li { gap: 2px; }
 }
 
 /* Fiche, favoris, compte, administration */
@@ -461,6 +482,19 @@ thead th { color: var(--muted); background: var(--panel); padding-block: 8px; wh
 .groups td a { display: block; overflow-wrap: anywhere; }
 .groups .actions { justify-content: flex-end; flex-wrap: nowrap; }
 .groups td.muted, .grp-title .muted { color: var(--muted); }
+.nfo-h:has(.keep) { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.chip.keep { min-height: 0; border: 0; cursor: pointer; text-transform: none; letter-spacing: 0; }
+.chip.keep:hover { color: var(--accent-text); }
+.ad-pick { display: none; }
+@media (max-width: 699px) {
+  .ad-nav :is(p, .ad-top, .ad-sub) { display: none; }
+  .ad-pick { display: block; width: 100%; font: 600 14px var(--sans); }
+}
+.fx-help { min-width: 20px; width: 20px; height: 20px; min-height: 0; margin-left: 6px; padding: 0; border: 1px solid var(--line); border-radius: 50%;
+  background: none; color: var(--muted); font: 600 11px/1 var(--mono); vertical-align: middle; cursor: pointer; }
+.fx-help[aria-expanded="true"] { border-color: var(--accent); color: var(--accent-text); }
+.grp-kinds { margin: 4px 0 0; padding: 0 12px; font-size: 12px; }
+.grp-kinds a:hover { text-decoration: underline; }
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0 24px; padding: 0 12px 12px; }
 .stats h2 { margin: 20px 0 4px; color: var(--muted); }
 /* statistiques : rangées de panneaux à graphiques (anneau, courbe, colonnes) */
@@ -620,6 +654,13 @@ td .actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .hint { color: var(--muted); margin: 0 0 8px; }
 @media (max-width: 699px) {
   .col-bitrate { display: none; }
+  /* fiche : la largeur va au titre. Pas de colonne playlist (le bouton « Ajouter à une playlist » couvre la release),
+     un cœur à la place du libellé « Favori », colonnes d'action réduites à leur contenu */
+  .tracks .col-pl { display: none; }
+  .tracks th.col-fav { font-size: 0; }
+  .tracks th.col-fav::after { content: "♥\FE0E"; font-size: 12px; }
+  .tracks :is(th, td):not(.trk-title, :nth-child(2)) { width: 1%; padding-inline: 6px; white-space: nowrap; }
+  .tracks td.col-fav .icon { min-width: 36px; }
   .trk-rel { flex-basis: 100%; white-space: normal; overflow-wrap: anywhere; } /* la release sur sa propre ligne */
 }
 
@@ -672,3 +713,13 @@ td .actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 tr.playing td:first-child, li.playing { box-shadow: inset 3px 0 var(--accent); }
 tr.playing td:first-child { font-size: 0; }
 tr.playing td:first-child::before { content: "▶"; font-size: 11px; color: var(--accent-text); }
+
+/* aléatoire et répétition : icônes dessinées, du même trait que précédent et suivant (bureau et plein écran mobile) */
+.pl-shuffle { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 7h3.5c3 0 4.5 2 6 5s3 5 6 5H21M3 17h3.5c1.6 0 2.8-.6 3.8-1.6M13.7 8.6c1-1 2.2-1.6 3.8-1.6H21M18 4l3 3-3 3M18 14l3 3-3 3'/%3E%3C/svg%3E"); }
+.pl-repeat { position: relative; --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 12V9a3 3 0 0 1 3-3h11M15 3l3 3-3 3M20 12v3a3 3 0 0 1-3 3H6M9 21l-3-3 3-3'/%3E%3C/svg%3E"); }
+
+/* « i » cerclé : mène à la fiche de la release (lecteur plein écran, lignes de release) */
+.pl-doc::before, .rel-doc::before { content: ""; width: 18px; height: 18px; background: currentColor;
+  -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat;
+  --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v6'/%3E%3Ccircle cx='12' cy='7.5' r='.6' fill='%23000'/%3E%3C/svg%3E"); } /* « i » : fiche de la release */
+.rel-doc::before { width: 16px; height: 16px; }

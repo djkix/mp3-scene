@@ -64,11 +64,11 @@ export function render(container, params) {
       };
       const masked = rel.hidden || list.some((x) => x.hidden);
       // filter(Boolean) : replaceChildren écrirait « null » pour un élément absent
-      vers.replaceChildren(...[el('h2', { class: 'nfo-h' }, t('Autres versions')),
+      // à droite du titre, une pastille : garder cette version (les autres sont masquées), ou tout réafficher ensuite
+      vers.replaceChildren(...[el('h2', { class: 'nfo-h' }, t('Autres versions'),
+        session.user?.role !== 'admin' ? null : el('button', { type: 'button', class: 'chip keep', onclick: keep(masked ? 'DELETE' : 'PUT') },
+          masked ? t('Tout réafficher') : t('Garder cette version'))),
         rel.hidden ? el('p', { class: 'status' }, t('Cette version est masquée des listes : une autre est gardée.')) : null,
-        session.user?.role !== 'admin' ? null : el('p', { class: 'filters' },
-          el('button', { type: 'button', onclick: keep('PUT') }, t('Garder cette version, masquer les autres')),
-          masked ? el('button', { type: 'button', onclick: keep('DELETE') }, t('Tout réafficher')) : null),
         el('ul', { class: 'rel-list' }, list.map((x) => row(x)))].filter(Boolean));
     }).catch(() => {}); // facultatif
     watch.mark();
@@ -224,8 +224,8 @@ function trackTable(rel) {
     el('td', { class: 'num' }, tk.duration == null ? '—' : fmtDuration(tk.duration)),
     el('td', { class: 'num col-bitrate' }, tk.bitrate == null ? '—' : `${Math.round(tk.bitrate / 1000)} kbit/s`),
     el('td', { class: 'num col-bitrate' }, tk.genre ? el('span', { class: 'chip' }, tk.genre) : '—'), // même pastille que dans les listes
-    el('td', {}, addButton({ track_ids: [tk.id] }, null, [tk])),
-    el('td', {}, favButton(tk, 'track')),
+    el('td', { class: 'col-pl' }, addButton({ track_ids: [tk.id] }, null, [tk])),
+    el('td', { class: 'col-fav' }, favButton(tk, 'track')),
     el('td', { class: 'col-bitrate' }, el('a', { class: 'icon', href: `/api/tracks/${tk.id}/stream?download=1`, download: '',
       title: t('Télécharger la piste'), 'aria-label': t('Télécharger {0}', tk.filename) }, '⤓'))));
   });
@@ -233,7 +233,7 @@ function trackTable(rel) {
   return el('div', { class: 'table-wrap' }, el('table', { class: 'tracks' },
     el('thead', {}, el('tr', {}, th(t('N°'), 'num'), th(t('Artiste - Titre')), th(t('Durée'), 'num'), th(t('Débit'), 'num col-bitrate'),
       th(t('Genre'), 'num col-bitrate'),
-      th(t('Playlist'), 'num'), th(t('Favori'), 'num'), th(t('Télécharger (MP3)'), 'num col-bitrate'))),
+      th(t('Playlist'), 'num col-pl'), th(t('Favori'), 'num col-fav'), th(t('Télécharger (MP3)'), 'num col-bitrate'))),
     el('tbody', {}, rows)));
 }
 

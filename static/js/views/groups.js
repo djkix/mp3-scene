@@ -27,6 +27,7 @@ function detail(container, kind, params) {
   const total = el('span', { class: 'muted' });
   const list = el('div');
   const years = el('div', { class: 'letters years' });
+  const kinds = el('p', { class: 'grp-kinds muted' });
   // artiste : ses releases, celles dont le nom l'associe à un autre (feat, vs, &), ou celles des autres
   // (compilations) où il signe une piste
   const other = kind === 'artists' && { with: 'collab', appears: 'appears', mixes: 'mixes' }[params.in];
@@ -38,7 +39,7 @@ function detail(container, kind, params) {
     ...(kind === 'artists' ? [el('div', { class: 'tabs', role: 'tablist', 'aria-label': name },
       tabBtn(tr('Releases'), !other, base), tabBtn(tr('Avec'), other === 'collab', base + '?in=with'),
       tabBtn(tr('Apparitions'), other === 'appears', base + '?in=appears'), tabBtn(tr('Mixes'), other === 'mixes', base + '?in=mixes'))] : []),
-    ...(kind === 'artists' && !other ? [years] : []), list);
+    ...(kind === 'artists' && !other ? [kinds, years] : []), list);
   // chronologie : une pastille par année avec son nombre de releases ; un clic filtre la liste sur cette année
   if (kind === 'artists' && !other) api('/groups?' + new URLSearchParams({ by: 'year', artist: name })).then((rows) => {
     if (rows.length < 2) return;
@@ -56,6 +57,17 @@ function detail(container, kind, params) {
   one.set('name', name);
   if (!appears) api('/groups?' + one)
     .then(([g]) => { total.textContent = g ? `${count(g.releases)} · ${fmtSize(g.size)}` : ''; }).catch(() => {});
+  // artiste : ses releases par catégorie (albums, singles, compilations…), avec le nombre et le poids de chacune ;
+  // un clic filtre la liste sur cette catégorie
+  if (kind === 'artists' && !other) {
+    const cats = releases.multiQuery({ genre: params.genre, year: params.year });
+    cats.set('by', 'category');
+    cats.set('artist', name);
+    api('/groups?' + cats).then((rows) => {
+      kinds.replaceChildren(...rows.flatMap((c, i) => [i ? ' · ' : '',
+        el('a', { href: base + qs({ genre: params.genre, year: params.year, category: c.name }) }, `${c.releases} ${catLabel(c.name)}`), ` (${fmtSize(c.size)})`]));
+    }).catch(() => {}); // facultatif
+  }
   return releases.render(list, { ...params, q: '', pin: appears ? { key: other, value: name, base, extra: { in: params.in } } : { key: pin, value: name, base } });
 }
 

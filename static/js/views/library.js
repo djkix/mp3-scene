@@ -56,6 +56,7 @@ function stats(box, isDead) {
     parts.replaceChildren(
       panel(tr('Par source'), s ? donut(tr('Par source'), shares(s.sources.map((r) => ({ ...r, detail: fmtSize(r.size) })), 5, tr('Autres'))) : el('p', {}, wait)),
       panel(tr('Pistes par débit'), s ? donut(tr('Pistes par débit'), rateClasses(s.bitrates).filter((r) => r.n)) : el('p', {}, wait)),
+      panel(tr('Pistes par format'), s ? donut(tr('Pistes par format'), shares(s.formats.map((r) => ({ name: r.name.toUpperCase(), n: r.n, detail: fmtSize(r.size) })), 5, tr('Autres'))) : el('p', {}, wait)),
       panel(tr('Genres les plus écoutés'), u ? (u.genres.length ? donut(tr('Genres les plus écoutés'), shares(u.genres, 5, tr('Autres'))) : el('p', {}, tr('Aucune écoute'))) : el('p', {}, wait)));
     const byTime = (title, rows, color) => { // colonnes dans l'ordre du temps, bornes dessous
       const r = [...rows].sort((x, y) => String(x.name).localeCompare(String(y.name)));

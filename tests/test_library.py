@@ -147,6 +147,9 @@ def test_admin_library_and_quality(user_client, admin_client, library):
     assert s["releases"] == 3 and s["tracks"] == 5 and s["size"] > 0
     assert [y["name"] for y in s["years"]] == [2017, 2015, 2003] and {g["name"] for g in s["genres"]} == {"House", "Techno"}
     assert sum(b["n"] for b in s["bitrates"]) == 5 and len(s["months"]) >= 1 and {c["name"] for c in s["categories"]} == {"Albums", "Singles"}
+    assert [(f["name"], f["n"]) for f in s["formats"]] == [("mp3", 5)] and s["formats"][0]["size"] > 0
+    cats = user_client.get("/api/groups?by=category&artist=A-Trak").json()   # page d'un artiste : ses releases par catégorie
+    assert len(cats) == 1 and cats[0]["releases"] == 1 and cats[0]["size"] > 0
     q = admin_client.get("/api/admin/quality").json()
     assert q["no_nfo"] == 2 and q["no_tracks"] == 0 and q["no_year"] == 0
     names = [r["name"] for r in admin_client.get("/api/admin/quality?kind=no_nfo").json()["items"]]

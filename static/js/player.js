@@ -351,20 +351,27 @@ function openAudioPrefs() {
       applyPrefs();
       [...fades.children].forEach((x) => x.setAttribute('aria-pressed', String(x === fades.children[[0, 2, 4, 6, 8, 12].indexOf(sec)])));
     } }, sec ? tr('{0} s', sec) : tr('Aucun'))));
+  // explications repliées derrière un « ? » : un appui les affiche sous la ligne (une infobulle ne s'ouvre pas au doigt)
+  const help = (text) => {
+    const note = el('p', { class: 'hint', hidden: true }, text);
+    const btn = el('button', { type: 'button', class: 'fx-help', title: text, 'aria-label': tr('Aide'), 'aria-expanded': 'false',
+      onclick: (e) => { e.preventDefault(); note.hidden = !note.hidden; btn.setAttribute('aria-expanded', String(!note.hidden)); } }, '?');
+    return [btn, note];
+  };
+  const [eqHelp, eqNote] = help(tr("Sur iPhone, l'égaliseur et le nivellement peuvent couper le son écran verrouillé : remettez-les à zéro puis rechargez la page."));
+  const [fadeHelp, fadeNote] = help(canFade ? tr("Les pistes s'enchaînent sans blanc ; le fondu les fait se chevaucher.")
+    : tr("Les pistes s'enchaînent sans blanc. Le fondu n'est pas possible sur cet appareil."));
+  const [origHelp, origNote] = help(tr('Sans ce réglage, ces fichiers sont écoutés convertis en MP3 320 kbit/s, plus légers. Il s’applique à partir de la piste suivante.'));
   fxDlg.replaceChildren(el('h2', {}, tr('Réglages audio')),
     el('div', { class: 'fx' },
-      el('h3', {}, tr('Égaliseur')), slider(tr('Graves'), 0), slider(tr('Médiums'), 1), slider(tr('Aigus'), 2),
+      el('h3', {}, tr('Égaliseur'), eqHelp), eqNote, slider(tr('Graves'), 0), slider(tr('Médiums'), 1), slider(tr('Aigus'), 2),
       el('h3', {}, tr('Enchaînement')),
       el('label', { class: 'fx-line' }, tr('Niveler le volume entre les pistes'), el('input', { type: 'checkbox', class: 'switch', role: 'switch',
         checked: prefs.level, onchange: (e) => { prefs.level = e.target.checked; applyPrefs(); } })),
-      el('div', { class: 'fx-line' }, tr('Fondu enchaîné'), fades),
+      el('div', { class: 'fx-line' }, el('span', {}, tr('Fondu enchaîné'), fadeHelp), fades), fadeNote,
       el('h3', {}, tr('Qualité')),
-      el('label', { class: 'fx-line' }, tr('Qualité d’origine pour les FLAC, WAV et M4A'), el('input', { type: 'checkbox', class: 'switch', role: 'switch',
-        checked: prefs.original, onchange: (e) => { prefs.original = e.target.checked; applyPrefs(); } })),
-      el('p', { class: 'hint' }, tr('Sans ce réglage, ces fichiers sont écoutés convertis en MP3 320 kbit/s, plus légers. Il s’applique à partir de la piste suivante.')),
-      el('p', { class: 'hint' }, canFade ? tr("Les pistes s'enchaînent sans blanc ; le fondu les fait se chevaucher.")
-        : tr("Les pistes s'enchaînent sans blanc. Le fondu n'est pas possible sur cet appareil.")),
-      el('p', { class: 'hint' }, tr("Sur iPhone, l'égaliseur et le nivellement peuvent couper le son écran verrouillé : remettez-les à zéro puis rechargez la page."))),
+      el('label', { class: 'fx-line' }, el('span', {}, tr('Qualité d’origine pour les FLAC, WAV et M4A'), origHelp), el('input', { type: 'checkbox', class: 'switch', role: 'switch',
+        checked: prefs.original, onchange: (e) => { prefs.original = e.target.checked; applyPrefs(); } })), origNote),
     el('div', { class: 'fx-foot' },
       el('button', { type: 'button', onclick: () => { prefs.eq = [0, 0, 0]; prefs.level = false; prefs.fade = 0; prefs.original = false; applyPrefs(); openAudioPrefs(); } }, tr('Réinitialiser')),
       el('button', { type: 'button', class: 'primary', onclick: () => fxDlg.close() }, tr('Fermer'))));
@@ -624,6 +631,7 @@ if (ms) {
 }
 
 // --- Interface -----------------------------------------------------------------------------------
+let tech = { id: null, d: null }; // détails techniques de la piste en cours (plein écran)
 const REPEAT = {
   off: ['⇥', tr('Répétition désactivée')], // forme distincte de « toute la file », pas seulement la couleur
   all: ['↻︎', tr('Répéter toute la file')],
@@ -807,8 +815,16 @@ function update() {
     ui.rel.href = ui.doc.href = t ? relHref(t.release_name, t.release_id) : '#/';
     // plein écran : source, débit et groupe de la release (absents d'une file enregistrée avant la 1.33.0)
     // source, débit, groupe : seuls la source et le nom du groupe sont en pastille ; les points de séparation sont à part
+    // fréquence et canaux : lus dans le fichier (une requête par piste), ajoutés dès qu'ils arrivent
+    const d = t && tech.id === t.id ? tech.d : null;
+    if (t && tech.id !== t.id) {
+      tech = { id: t.id, d: null };
+      api(`/tracks/${t.id}/tech`).then((r) => { if (tech.id === t.id) { tech.d = r; update(); } }).catch(() => {}); // facultatif
+    }
     const meta = !t ? [] : [t.source && el('span', { class: 'chip src' }, t.source),
       t.bitrate && el('span', {}, `${Math.round(t.bitrate / 1000)} KBPS`),
+      d?.sample_rate && el('span', {}, `${(d.sample_rate / 1000).toLocaleString()} KHZ`),
+      d?.channels && el('span', {}, String({ 1: tr('Mono'), 2: tr('Stéréo') }[d.channels] || d.channels).toUpperCase()),
       t.grp && el('span', { class: 'chip' }, t.grp)].filter(Boolean);
     ui.meta.replaceChildren(...meta.flatMap((x, i) => (i ? [el('span', { class: 'sep', 'aria-hidden': 'true' }, '·'), x] : [x])));
     ui.fav.textContent = t?.favorite ? '♥︎' : '♡︎';
