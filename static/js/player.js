@@ -179,12 +179,15 @@ function stopAudio() {
 const AHEAD = 600;
 const blobs = new Map();  // id de piste -> URL d'objet de la piste téléchargée
 let fetching = false, fetchRetry = 0;
-// Flux d'une piste. Avec le réglage « qualité d'origine », un FLAC, WAV, M4A, OGG ou Opus que ce navigateur sait lire
-// est demandé tel quel ; sinon le serveur l'envoie converti en MP3.
+// Flux d'une piste. Un M4A, OGG ou Opus que ce navigateur sait lire est demandé tel quel : le convertir en MP3
+// n'apporterait rien et fait attendre plus d'une minute sur un long mix. FLAC et WAV, bien plus lourds, ne le sont
+// qu'avec le réglage « qualité d'origine » ; sinon le serveur envoie la piste convertie en MP3.
+const LIGHT = new Set(['m4a', 'ogg', 'opus']);
 const NATIVE = { flac: 'audio/flac', wav: 'audio/wav', m4a: 'audio/mp4', ogg: 'audio/ogg', opus: 'audio/ogg; codecs=opus' };
 const probe = typeof Audio === 'function' ? new Audio() : null;
 function streamUrl(t) {
-  const type = prefs.original && NATIVE[String(t.filename || '').split('.').pop().toLowerCase()];
+  const ext = String(t.filename || '').split('.').pop().toLowerCase();
+  const type = (prefs.original || LIGHT.has(ext)) && NATIVE[ext];
   return `/api/tracks/${encodeURIComponent(t.id)}/stream${type && probe?.canPlayType(type) ? '?original=1' : ''}`;
 }
 

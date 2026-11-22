@@ -4,6 +4,16 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.50.1](https://github.com/djkix/mp3-scene/compare/v1.50.0...v1.50.1) (2026-11-22)
+
+### Résumé
+
+**Longs mixes en M4A lus sans attente.**
+
+- Un long mix en M4A ne démarrait pas : sa conversion en MP3 durait plus d'une minute et la lecture était abandonnée
+  avant. Les fichiers M4A, OGG et Opus sont maintenant envoyés tels quels quand le navigateur sait les lire. FLAC et
+  WAV restent convertis, sauf avec le réglage « qualité d'origine ».
+
 ## [1.50.0](https://github.com/djkix/mp3-scene/compare/v1.49.1...v1.50.0) (2026-11-21)
 
 ### Résumé
