@@ -817,8 +817,8 @@ function update() {
     }
     ui.rel.href = ui.doc.href = t ? relHref(t.release_name, t.release_id) : '#/';
     // plein écran : source, débit et groupe de la release (absents d'une file enregistrée avant la 1.33.0)
-    // groupe, source, débit, fréquence, canaux : seuls le groupe et la source sont en pastille ; les points de séparation sont à part
-    // fréquence et canaux : lus dans le fichier (une requête par piste), ajoutés dès qu'ils arrivent
+    // groupe, source, débit, fréquence, format (MP3, FLAC…) : seuls le groupe et la source sont en pastille ; les points de séparation sont à part
+    // fréquence : lue dans le fichier (une requête par piste), ajoutés dès qu'ils arrivent
     const d = t && tech.id === t.id ? tech.d : null;
     if (t && tech.id !== t.id) {
       tech = { id: t.id, d: null };
@@ -829,13 +829,15 @@ function update() {
       t.source && el('span', { class: 'chip src', 'data-ico': 'disc' }, t.source),
       t.bitrate && el('span', { 'data-ico': 'gauge' }, `${Math.round(t.bitrate / 1000)} KBPS`),
       d?.sample_rate && el('span', { 'data-ico': 'sine' }, `${(d.sample_rate / 1000).toLocaleString()} KHZ`),
-      d?.channels && el('span', { 'data-ico': 'phones' }, String({ 1: tr('Mono'), 2: tr('Stéréo') }[d.channels] || d.channels).toUpperCase())].filter(Boolean);
+      /\.\w+$/.test(t.filename || '') && el('span', { 'data-ico': 'note' }, t.filename.split('.').pop().toUpperCase())].filter(Boolean);
     ui.meta.replaceChildren(...meta.flatMap((x, i) => (i ? [el('span', { class: 'sep', 'aria-hidden': 'true' }, '·'), x] : [x])));
     ui.fav.textContent = t?.favorite ? '♥︎' : '♡︎';
     ui.fav.setAttribute('aria-pressed', !!t?.favorite);
     label(ui.fav, t?.favorite ? tr('Retirer des favoris') : tr('Ajouter aux favoris'));
     ui.qbtn.dataset.n = q.tracks.length;
-    ui.rate.textContent = t?.bitrate ? `${Math.round(t.bitrate / 1000)} kbps` : '';
+    // bureau : le format (MP3, FLAC…) au-dessus du débit
+    const fmt = /\.\w+$/.test(t?.filename || '') ? t.filename.split('.').pop().toUpperCase() : '';
+    ui.rate.replaceChildren(...[fmt && el('b', {}, fmt), t?.bitrate && el('span', {}, `${Math.round(t.bitrate / 1000)} kbps`)].filter(Boolean));
     ui.play.dataset.ico = on ? 'pause' : 'play'; // icônes dessinées (CSS) : ces caractères deviennent des emoji orange sur Android
     label(ui.play, on ? tr('Pause') : tr('Lecture'));
     ui.cast.textContent = backend ? tr('Diffusion sur {0}', backend.name) : '';

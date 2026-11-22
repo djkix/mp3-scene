@@ -184,8 +184,6 @@ export const EN = {
   'Débit': 'Bitrate',
   'Favori': 'Favourite',
   'Télécharger (MP3)': 'Download (MP3)',
-  'Mono': 'Mono',
-  'Stéréo': 'Stereo',
   'Télécharger': 'Download',
   'Artiste': 'Artist',
   'Source': 'Source',

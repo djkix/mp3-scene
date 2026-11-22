@@ -23,12 +23,11 @@ export function render(container, params) {
     if (dead) return;
     const nfo = el('div'), sim = el('div'), vers = el('div'), chap = el('div'), ser = el('div');
     container.replaceChildren(el('div', { class: 'detail' }, header(rel), ser, trackTable(rel), chap, vers, nfo, sim));
-    // fréquence et canaux : lus dans le fichier de la première piste
+    // fréquence et format (MP3, FLAC…) : lus dans le fichier de la première piste
     // ponytail: la première piste vaut pour la release ; toutes les lire si des releases mélangent les formats
     if (rel.tracks.length) api(`/tracks/${rel.tracks[0].id}/tech`).then((d) => {
       if (dead) return;
-      const channels = d.mode || { 1: t('Mono'), 2: t('Stéréo') }[d.channels] || d.channels;
-      container.querySelector('.detail-info')?.replaceChildren(...infoRows({ ...rel, sample_rate: d.sample_rate, channels }, el));
+      container.querySelector('.detail-info')?.replaceChildren(...infoRows({ ...rel, sample_rate: d.sample_rate, format: d.format }, el));
     }).catch(() => {}); // facultatif
     // série (« Global Underground 47 ») : volume précédent, page de la série, volume suivant
     if (rel.series) api('/series?' + new URLSearchParams({ name: rel.series })).then((s) => {

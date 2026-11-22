@@ -27,7 +27,9 @@ function detail(container, kind, params) {
   const total = el('span', { class: 'muted' });
   const list = el('div');
   const years = el('div', { class: 'letters years' });
-  const kinds = el('p', { class: 'grp-kinds muted' });
+  // artiste : le total puis le détail par catégorie, sur une ligne sous les onglets
+  const split = el('span');
+  const kinds = el('p', { class: 'grp-kinds muted' }, total, split);
   // artiste : ses releases, celles dont le nom l'associe à un autre (feat, vs, &), ou celles des autres
   // (compilations) où il signe une piste
   const other = kind === 'artists' && { with: 'collab', appears: 'appears', mixes: 'mixes' }[params.in];
@@ -35,7 +37,7 @@ function detail(container, kind, params) {
   const tabBtn = (label, on, hash) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(on),
     onclick: () => { location.hash = hash; } }, label);
   container.replaceChildren(
-    el('h1', { class: 'grp-title' }, el('a', { href: `#/${kind}` + qs({ genre: params.genre, year: params.year }) }, tr(tab)), ' › ', name, ' ', total),
+    el('h1', { class: 'grp-title' }, el('a', { href: `#/${kind}` + qs({ genre: params.genre, year: params.year }) }, tr(tab)), ' › ', name, ' ', kind === 'artists' && !other ? null : total),
     ...(kind === 'artists' ? [el('div', { class: 'tabs', role: 'tablist', 'aria-label': name },
       tabBtn(tr('Releases'), !other, base), tabBtn(tr('Avec'), other === 'collab', base + '?in=with'),
       tabBtn(tr('Apparitions'), other === 'appears', base + '?in=appears'), tabBtn(tr('Mixes'), other === 'mixes', base + '?in=mixes'))] : []),
@@ -64,7 +66,7 @@ function detail(container, kind, params) {
     cats.set('by', 'category');
     cats.set('artist', name);
     api('/groups?' + cats).then((rows) => {
-      kinds.replaceChildren(...rows.flatMap((c, i) => [i ? ' · ' : '',
+      split.replaceChildren(...rows.flatMap((c, i) => [i ? ' · ' : ' : ',
         el('a', { href: base + qs({ genre: params.genre, year: params.year, category: c.name }) }, `${c.releases} ${catLabel(c.name)}`), ` (${fmtSize(c.size)})`]));
     }).catch(() => {}); // facultatif
   }

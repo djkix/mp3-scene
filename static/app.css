@@ -636,7 +636,10 @@ td.num { text-align: right; white-space: nowrap; font: 12px var(--mono); font-va
 .trk { cursor: pointer; }
 .trk:hover { background: var(--hover); }
 .trk-title { font: 13px var(--mono); overflow-wrap: anywhere; }
-.tracks .num { text-align: center; }
+/* toutes les colonnes sauf « Artiste - Titre » : centrées sous leur libellé et réduites à leur contenu, la largeur va au titre */
+.tracks :is(th, td):not(:nth-child(2)) { text-align: center; }
+@media (min-width: 700px) { .tracks :is(th, td):not(:nth-child(2)) { width: 1%; padding-inline: 12px; white-space: nowrap; } } /* mobile : réglé plus haut */
+.tracks tr.disc th { width: auto; text-align: left; }
 tr.disc th { background: var(--hover); color: var(--fg); padding-block: 8px; }
 .nfo-h { margin: 28px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line); color: var(--muted); }
 /* releases similaires de la fiche : lignes compactes (nom, détails dessous), comme sur mobile, quelle que soit la largeur */
@@ -740,11 +743,11 @@ tr.playing td:first-child::before { content: "▶"; font-size: 11px; color: var(
   --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v6'/%3E%3Ccircle cx='12' cy='7.5' r='.6' fill='%23000'/%3E%3C/svg%3E"); } /* « i » : fiche de la release */
 .rel-doc::before { width: 16px; height: 16px; }
 
-/* informations du lecteur plein écran : source, débit, fréquence, canaux */
+/* informations du lecteur plein écran : source, débit, fréquence, format */
 [data-ico="disc"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Ccircle cx='12' cy='12' r='2.5'/%3E%3C/svg%3E"); }
 [data-ico="gauge"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 17a8.5 8.5 0 1 1 16 0'/%3E%3Cpath d='M12 15l4-5'/%3E%3C/svg%3E"); }
 [data-ico="sine"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12c3-9 6-9 9 0s6 9 9 0'/%3E%3C/svg%3E"); }
-[data-ico="phones"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 14v-2a8 8 0 0 1 16 0v2'/%3E%3Crect x='3' y='14' width='4' height='6' rx='1.5'/%3E%3Crect x='17' y='14' width='4' height='6' rx='1.5'/%3E%3C/svg%3E"); }
+[data-ico="note"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18V6l10-2v12'/%3E%3Ccircle cx='6.5' cy='18' r='2.5'/%3E%3Ccircle cx='16.5' cy='16' r='2.5'/%3E%3C/svg%3E"); }
 .pl-meta [data-ico] { gap: 4px; }
 .pl-meta [data-ico]::before { width: 12px; height: 12px; }
 .pl-meta .sep { display: none; } /* les pictogrammes séparent déjà les informations : sans points, tout tient sur une ligne */
@@ -761,3 +764,5 @@ tr.playing td:first-child::before { content: "▶"; font-size: 11px; color: var(
   .rel-info > span:empty { display: none; }
   .rel-info > span::before { content: "·"; position: absolute; left: 3px; color: var(--muted); }
 }
+.pl-rate > * { display: block; text-align: center; line-height: 1.3; }
+.pl-rate b { color: var(--fg); font-weight: 600; }

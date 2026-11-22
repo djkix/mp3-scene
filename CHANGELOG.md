@@ -4,6 +4,18 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.53.2](https://github.com/djkix/mp3-scene/compare/v1.53.1...v1.53.2) (2026-11-22)
+
+### Résumé
+
+**Format à la place des canaux, tableau des pistes resserré.**
+
+- **Format** (MP3, FLAC…) à la place des canaux sur la fiche d'une release et dans le lecteur plein écran ; sur
+  ordinateur, le lecteur l'affiche au-dessus du débit.
+- **Tableau des pistes** : chaque colonne, sauf « Artiste - Titre », est centrée sous son libellé et réduite à son
+  contenu ; la largeur va au titre.
+- **Page d'un artiste** : le total (« 7 releases · 923 Mo ») passe sous les onglets, devant le détail par type.
+
 ## [1.53.1](https://github.com/djkix/mp3-scene/compare/v1.53.0...v1.53.1) (2026-11-22)
 
 ### Résumé

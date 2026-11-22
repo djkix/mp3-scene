@@ -20,7 +20,7 @@ export function infoRows(rel, el) {
     [t('Durée'), rel.duration == null ? null : fmtDuration(rel.duration), null, 'num'],
     // lus dans le fichier de la première piste, après l'affichage de la fiche
     [t('Fréquence'), rel.sample_rate ? `${(rel.sample_rate / 1000).toLocaleString()} kHz` : null, null, 'num'],
-    [t('Canaux'), rel.channels, null, 'num']]
+    [t('Format'), rel.format, null, 'num']]
     .filter(([, v]) => v != null && v !== '')
     // à plat : el() n'aplatit qu'un niveau
     .flatMap(([k, v, href, kind]) => [el('dt', {}, k), el('dd', {},
