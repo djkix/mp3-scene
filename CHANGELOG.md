@@ -4,6 +4,18 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.68.0](https://github.com/djkix/mp3-scene/compare/v1.67.0...v1.68.0) (2026-11-23)
+
+### Résumé
+
+**Onglet Titres dans Explorer.**
+
+- Entre Artistes et Genres, la liste des morceaux de la bibliothèque, toutes versions réunies (« Show Me Love »,
+  « Show Me Love (Club Mix) »…), avec leur nombre de pistes et leur poids ; mêmes lettres et même tri que la liste des
+  artistes, et un filtre Catégories en plus des genres et des années. Seuls les titres présents au moins deux fois
+  sont listés.
+- Un titre ouvre la liste de toutes ses pistes, quelles qu'en soient la version et la release.
+
 ## [1.67.0](https://github.com/djkix/mp3-scene/compare/v1.66.5...v1.67.0) (2026-11-23)
 
 ### Résumé

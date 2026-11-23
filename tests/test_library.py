@@ -1239,3 +1239,15 @@ def test_lowercase_only_artist_gets_capitals(user_client, library, settings):
     db.merge_track_artists(conn)
     assert conn.execute("SELECT COUNT(*) FROM tracks WHERE artist='Soul Vision'").fetchone()[0] == 1
     assert user_client.get("/api/artist-info", params={"name": "soul vision"}).json()["name"] == "Soul Vision"
+
+
+def test_titles_gather_every_version_of_a_song(user_client, library, settings):
+    conn = db.connect(settings.data_dir)
+    rel = conn.execute("SELECT release_id FROM tracks WHERE title='Glue'").fetchone()[0]
+    conn.execute("INSERT INTO tracks(release_id, relpath, size, title, artist) VALUES (?, 'g2.mp3', 5, 'Glue (Dub)', 'Bicep')", (rel,))
+    conn.commit()
+    rows = {r["name"]: r for r in user_client.get("/api/titles").json()}
+    assert rows["Glue"]["releases"] == 2 and "Ibanez Dub" not in rows
+    assert user_client.get("/api/titles", params={"song": "glue"}).json()[0]["releases"] == 2
+    assert sorted(t["title"] for t in user_client.get("/api/tracks", params={"song": "Glue"}).json()["items"]) == ["Glue", "Glue (Dub)"]
+    assert user_client.get("/api/titles", params={"category": "Albums"}).json() == []

@@ -11,9 +11,10 @@ const MAX_ROWS = 1000; // au-delà, on demande d'affiner (des dizaines de millie
 // route -> [onglet, en-tête de colonne, valeur de `by` côté serveur, paramètre de /releases qui épingle la liste]
 const KINDS = { groups: ['Groupes', 'Groupe', 'grp', 'grp'], artists: ['Artistes', 'Artiste', 'artist', 'artist'],
   labels: ['Labels', 'Label', 'label', 'label'], genres: ['Genres', 'Genre', 'genre', 'genre'],
-  series: ['Séries', 'Série', 'series', null] }; // une série ouvre sa propre page (volumes dans l'ordre), pas une liste épinglée
+  series: ['Séries', 'Série', 'series', null],
+  titles: ['Titres', 'Titre', 'title', null] }; // un titre (toutes ses versions) ouvre une liste de pistes // une série ouvre sa propre page (volumes dans l'ordre), pas une liste épinglée
 // Onglets d'Explorer, dans l'ordre affiché.
-const TABS = [['artists', 'Artistes'], ['genres', 'Genres'], ['categories', 'Catégories'], ['series', 'Séries'], ['labels', 'Labels'], ['groups', 'Groupes']];
+const TABS = [['artists', 'Artistes'], ['titles', 'Titres'], ['genres', 'Genres'], ['categories', 'Catégories'], ['series', 'Séries'], ['labels', 'Labels'], ['groups', 'Groupes']];
 export const tabs = (current, genre = '', year = '') => el('div', { class: 'tabs', role: 'tablist', 'aria-label': tr('Explorer') },
   TABS.map(([k, label]) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(k === current),
     onclick: () => { location.hash = `#/${k}` + qs({ genre: k === 'genres' ? '' : genre, year }); } }, tr(label))));
@@ -142,6 +143,19 @@ async function findPhoto(kind, name) {
   } catch (err) { msg.textContent = err.message; }
 }
 
+// Titre (#/titles/<nom>) : toutes les pistes de ce morceau, quelle qu'en soit la version ou la release. Mêmes
+// filtres que la liste des titres (genre, années, catégories), appliqués à la release de chaque piste.
+function title(container, params) {
+  const name = params.rest, { genre = '', year = '', category = '' } = params;
+  const total = el('span', { class: 'muted' }), list = el('div');
+  container.replaceChildren(tabs('titles', genre, year),
+    el('h1', { class: 'grp-title' }, el('a', { href: '#/titles' + qs({ genre, year, category }) }, tr('Titres')), ' › ', name, ' ', total), list);
+  const p = releases.multiQuery({ genre, year, category });
+  p.set('song', name);
+  api('/titles?' + p).then(([t]) => { total.textContent = t ? `${tr('{0} pistes', t.releases)} · ${fmtSize(t.size)}` : ''; }).catch(() => {});
+  return trackList(list, { path: '/tracks?' + p, empty: tr('Aucun résultat') });
+}
+
 // Catégories : un bloc par catégorie, centré sous les onglets et au-dessus des filtres ; les releases dessous.
 // Un clic choisit la catégorie, un second sur le même bloc revient à toutes les releases.
 function categories(container, params) {
@@ -250,12 +264,15 @@ export function render(container, params) {
   if (params.kind === 'series' && params.rest) return series(container, params);
   if (params.kind === 'series' && params.missing) return seriesMissing(container);
   if (params.kind === 'categories') return categories(container, params);
+  if (params.kind === 'titles' && params.rest) return title(container, params);
   const kind = KINDS[params.kind] ? params.kind : 'groups';
   const [, label, by, pin] = KINDS[kind];
   if (params.rest && pin) return detail(container, kind, params);
   const { genre = '', year = '' } = params;
-  const setFilter = (name, value) => { location.hash = `#/${kind}` + qs({ genre, year, [name]: value }); };
-  const HEAD = [[tr(label), 'name', 1], [tr('Releases'), 'releases', -1], [tr('Poids'), 'size', -1]]; // [libellé, clé, sens au premier clic]
+  const category = kind === 'titles' ? params.category || '' : ''; // titres : filtre Catégories en plus
+  const setFilter = (name, value) => { location.hash = `#/${kind}` + qs({ genre, year, category, [name]: value }); };
+  // [libellé, clé, sens au premier clic] ; un titre compte des pistes (ses versions), les autres des releases
+  const HEAD = [[tr(label), 'name', 1], [kind === 'titles' ? tr('Pistes') : tr('Releases'), 'releases', -1], [tr('Poids'), 'size', -1]];
   let rows = [], key = 'name', dir = 1, dead = false;
   // Lettres sous les filtres : « # » réunit ce qui ne commence pas par une lettre. La lettre choisie est dans
   // l'adresse (sans recharger la liste) pour la retrouver au retour d'une fiche.
@@ -266,7 +283,7 @@ export function render(container, params) {
       onclick: () => {
         letter = l;
         [...letters.children].forEach((b) => b.setAttribute('aria-pressed', String(b.textContent === (l || tr('Tous')))));
-        history.replaceState(null, '', `#/${kind}` + qs({ genre, year, letter }));
+        history.replaceState(null, '', `#/${kind}` + qs({ genre, year, category, letter }));
         paint();
       } }, l || tr('Tous'))));
   const find = el('input', { type: 'search', placeholder: tr('Filtrer la liste…'), 'aria-label': tr('Filtrer la liste…'), oninput: paint });
@@ -279,7 +296,7 @@ export function render(container, params) {
     tabs(kind, genre, year),
     bar, letters, el('div', { class: 'table-wrap' }, el('table', { class: 'groups' }, el('thead', {}, el('tr', {}, heads)), body)), status);
 
-  const href = (name) => `#/${kind}/${encodeURIComponent(name)}` + qs({ genre: kind === 'genres' ? '' : genre, year });
+  const href = (name) => `#/${kind}/${encodeURIComponent(name)}` + qs({ genre: kind === 'genres' ? '' : genre, year, category });
   function paint() {
     HEAD.forEach(([text, k], i) => { heads[i].firstChild.textContent = k === key ? `${text} ${dir > 0 ? '▲' : '▼'}` : text; });
     const needle = find.value.trim().toLowerCase();
@@ -290,7 +307,8 @@ export function render(container, params) {
         g.genres > 1 ? el('small', { class: 'muted' }, ' ' + tr('{0} genres', g.genres)) : null),
       el('td', { class: 'num' }, String(g.releases)), el('td', { class: 'num' }, fmtSize(g.size)))));
     status.textContent = !shown.length ? tr('Aucun résultat')
-      : tr('{0} lignes · {1} · {2}', shown.length, count(shown.reduce((n, g) => n + g.releases, 0)), fmtSize(shown.reduce((n, g) => n + g.size, 0)))
+      : tr('{0} lignes · {1} · {2}', shown.length, kind === 'titles' ? tr('{0} pistes', shown.reduce((n, g) => n + g.releases, 0))
+        : count(shown.reduce((n, g) => n + g.releases, 0)), fmtSize(shown.reduce((n, g) => n + g.size, 0)))
         + (shown.length > MAX_ROWS ? ' — ' + tr('seules les {0} premières sont affichées : filtrez pour affiner.', MAX_ROWS) : '');
   }
 
@@ -299,11 +317,12 @@ export function render(container, params) {
     // mêmes filtres à choix multiples que dans les listes de releases
     if (kind !== 'genres') bar.append(releases.multi(tr('Genre'), tr('Genres'), 'genre', f.genres, genre, setFilter));
     bar.append(releases.yearSelect(f, year, setFilter, releases.multi));
-    if (genre || year) bar.append(el('button', { type: 'button', class: 'reset', onclick: () => { location.hash = `#/${kind}`; } }, tr('Réinitialiser')));
+    if (kind === 'titles') bar.append(releases.multi(tr('Catégorie'), tr('Catégories'), 'category', f.categories, category, setFilter));
+    if (genre || year || category) bar.append(el('button', { type: 'button', class: 'reset', onclick: () => { location.hash = `#/${kind}`; } }, tr('Réinitialiser')));
   }).catch(() => {});
-  const all = releases.multiQuery({ genre: kind === 'genres' ? '' : genre, year });
-  all.set('by', by);
-  api('/groups?' + all).then((g) => { if (!dead) { rows = g; paint(); } })
+  const all = releases.multiQuery({ genre: kind === 'genres' ? '' : genre, year, category });
+  if (kind !== 'titles') all.set('by', by);
+  api((kind === 'titles' ? '/titles?' : '/groups?') + all).then((g) => { if (!dead) { rows = g; paint(); } })
     .catch((err) => { if (!dead) status.textContent = err.message; });
   return () => { dead = true; };
 }

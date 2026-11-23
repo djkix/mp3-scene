@@ -26,6 +26,7 @@ const ROUTES = {
   folders,
   groups,
   artists: { render: (c, p) => groups.render(c, { ...p, kind: 'artists' }) },
+  titles: { render: (c, p) => groups.render(c, { ...p, kind: 'titles' }) },
   genres: { render: (c, p) => groups.render(c, { ...p, kind: 'genres' }) },
   labels: { render: (c, p) => groups.render(c, { ...p, kind: 'labels' }) },
   categories: { render: (c, p) => groups.render(c, { ...p, kind: 'categories' }) },
@@ -111,7 +112,7 @@ async function route() {
   }).catch(() => {});
   document.querySelectorAll('#nav a').forEach((a) =>
     a.classList.toggle('active', a.dataset.route === name || (name === 'search' && a.dataset.route === '')
-      || (['artists', 'genres', 'labels', 'categories', 'series', 'folders'].includes(name) && a.dataset.route === 'groups')
+      || (['artists', 'titles', 'genres', 'labels', 'categories', 'series', 'folders'].includes(name) && a.dataset.route === 'groups')
       || (['library', 'admin'].includes(name) && a.dataset.route === 'account')));
   const search = $('search');
   if (name !== 'search' && search.value) search.value = '';

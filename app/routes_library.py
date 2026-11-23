@@ -232,6 +232,33 @@ def filters(conn=Depends(get_conn)):
 GROUP_BY = {"series": "title", "grp": "grp", "artist": "COALESCE(tag_artist, artist)", "genre": "genre", "label": "NULLIF(label, '')", "category": "category", "year": "year"}
 
 
+# titre d'un morceau sans sa version : « Crazy (Club Mix) », « Crazy [Dub] » -> « crazy » (onglet Titres d'Explorer)
+SONG = """lower(trim(CASE WHEN instr(t.title, '(') > 1 THEN substr(t.title, 1, instr(t.title, '(') - 1)
+  WHEN instr(t.title, '[') > 1 THEN substr(t.title, 1, instr(t.title, '[') - 1) ELSE t.title END))"""
+
+
+@router.get("/api/titles")
+def titles(genre: Many = None, year: Years = None, decade: Years = None, category: Many = None,
+           song: str | None = Query(None, max_length=300), conn=Depends(get_conn)):
+    """Morceaux de la bibliothèque, toutes versions réunies : le titre (graphie la plus répandue), le nombre de pistes
+    et leur poids. Seuls les titres présents au moins deux fois sont listés ; `song` donne le seul titre demandé."""
+    conds, params = _release_conds(category, genre, year, decade=decade)
+    conds.append("t.title IS NOT NULL")
+    having = "COUNT(*) >= 2"
+    if song is not None:
+        conds.append(f"{SONG}=lower(?)")
+        params.append(song.strip())
+        having = "1"
+    # ponytail: toutes les pistes regroupées à chaque appel (~0,5 s pour 340 000) ; table des titres si trop lent
+    # tout en capitales ou tout en minuscules (« GET UP ») : une capitale par mot (« Get Up »)
+    pretty = lambda t: t if not (t.isupper() or t.islower()) else artists.capitalize(t.lower())
+    return [{"name": pretty(r[1]), "releases": r[2], "size": r[3]} for r in conn.execute(
+        # nom affiché : le titre sans sa version, dans la graphie qui vient en premier (capitales avant minuscules)
+        f"SELECT {SONG} AS k, MIN({SONG[6:-1]}) AS shown, COUNT(*), COALESCE(SUM(t.size), 0)"
+        " FROM tracks t JOIN releases r ON r.id=t.release_id WHERE " + " AND ".join(conds)
+        + f" GROUP BY k HAVING {having} ORDER BY COUNT(*) DESC, k", params)]
+
+
 @router.get("/api/groups")
 def groups(by: Literal["grp", "artist", "genre", "label", "category", "year", "series"] = "grp", name: str | None = None, genre: Many = None,
            year: Years = None, decade: Years = None, artist: str | None = Query(None, max_length=200),
@@ -310,6 +337,7 @@ def _remix_conds(artist: str):
 def search_tracks(q: str = Query("", max_length=200), category: Many = None, genre: Many = None, year: Years = None,
                   decade: Years = None, source: Many = None, mixes: str | None = Query(None, min_length=1, max_length=200),
                   remixes: str | None = Query(None, min_length=1, max_length=200),
+                  song: str | None = Query(None, min_length=1, max_length=300),
                   offset: int = Query(0, ge=0, le=MAX_INT), summary: bool = False,
                   bpm_min: float | None = Query(None, ge=0, le=999), bpm_max: float | None = Query(None, ge=0, le=999),
                   limit: int = Query(50, ge=1, le=MAX_INT), user=Depends(current_user), conn=Depends(get_conn)):
@@ -317,7 +345,7 @@ def search_tracks(q: str = Query("", max_length=200), category: Many = None, gen
     ceux des listes de releases, appliqués à la release de la piste. `summary` : au lieu des pistes, leur nombre
     et leur poids par catégorie (la ligne de synthèse de l'onglet Pistes)."""
     words = [w for w in _WORDS.split(q) if w][:8]
-    if not words and not mixes and not remixes:
+    if not words and not mixes and not remixes and not song:
         return [] if summary else {"items": [], "has_more": False}
     # ponytail: LIKE parcourt toutes les pistes (~0,1 s pour 500 000) ; index FTS sur les pistes si trop lent
     # un titre ou un artiste de 30 caractères est peut-être coupé (ID3v1) : sa suite est dans le nom du fichier
@@ -333,6 +361,9 @@ def search_tracks(q: str = Query("", max_length=200), category: Many = None, gen
         # ponytail: égalité à la casse près sur l'artiste du chapitre ; « X feat. Y » n'est pas une apparition de X
         in_chapter, likes = "c.artist=? COLLATE NOCASE", [mixes]
         conds, params = f"t.id IN (SELECT c.track_id FROM chapters c WHERE {in_chapter})", [mixes]
+    if song:  # page d'un titre (Explorer › Titres) : toutes ses versions
+        in_chapter, likes = "0", []
+        conds, params = f"{SONG}=lower(?)", [song.strip()]
     if remixes:  # page d'un artiste : les pistes dont le titre le crédite d'une version (« Axwell Remix »)
         in_chapter, likes = "0", []
         conds, params = _remix_conds(remixes)
