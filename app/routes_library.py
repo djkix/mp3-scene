@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
 from PIL import Image
 
-from . import artists, coversearch
+from . import artists, coversearch, nfo
 from .naming import complete_title
 from .deps import MAX_INT, Id, current_user, get_conn
 from .security import safe_path
@@ -181,8 +181,9 @@ def list_releases(q: str = "", category: Many = None, genre: Many = None, grp: s
     where = "WHERE " + " AND ".join(conds) if conds else ""
     page = _page(conn, RELEASE_COLS, RELEASE_FROM, where, params, _order(sort, dir, "r.added_at DESC, r.id DESC"),
                  user["id"], offset, limit, _release)
-    if appears is not None:  # apparitions d'un artiste : ses pistes dans chaque release, affichées sous son nom
+    if appears is not None:  # apparitions d'un artiste : ses pistes dans chaque release, et son nom pour les afficher
         for x in page["items"]:
+            x["by_artist"] = appears
             x["by"] = [r[0] for r in conn.execute(
                 "SELECT title FROM tracks WHERE release_id=? AND artist=? AND title IS NOT NULL ORDER BY disc, relpath LIMIT 4",
                 (x["id"], appears))]
@@ -448,16 +449,20 @@ def group_info(by: Literal["label", "grp", "genre"], name: str = Query(min_lengt
             "others": top("r.grp" if by == "label" else "NULLIF(r.label, '')")}
 
 
-def artist_photo_path(data_dir, name: str):
-    """Fichier de la photo d'un artiste, dans les données de l'application (jamais dans le dossier de musique)."""
-    return data_dir / "artists" / (hashlib.sha1(artists.fold(name).encode()).hexdigest()[:20] + ".jpg")
+PHOTO_KINDS = Literal["artist", "label"]
 
 
-def store_artist_photo(data_dir, name: str, url: str) -> None:
+def photo_path(data_dir, kind: str, name: str):
+    """Fichier de la photo d'un artiste ou du logo d'un label, dans les données de l'application (jamais dans le
+    dossier de musique)."""
+    return data_dir / (kind + "s") / (hashlib.sha1(artists.fold(name).encode()).hexdigest()[:20] + ".jpg")
+
+
+def store_photo(data_dir, kind: str, name: str, url: str) -> None:
     """Télécharge la photo (adresse proposée par la recherche) et la garde, réduite, dans les données de l'application.
     Lève ValueError ou OSError si l'image est refusée ou illisible."""
     data = coversearch.fetch(url)
-    target = artist_photo_path(data_dir, name)
+    target = photo_path(data_dir, kind, name)
     with Image.open(io.BytesIO(data)) as img:
         img = img.convert("RGB")
         img.thumbnail((600, 600))
@@ -466,18 +471,29 @@ def store_artist_photo(data_dir, name: str, url: str) -> None:
     os.replace(target.with_suffix(".tmp"), target)
 
 
-@router.get("/api/artist-photo")
-def artist_photo(request: Request, name: str = Query(min_length=1, max_length=200)):
-    """Photo d'un artiste. À la première demande, la première photo Deezer au même nom est prise d'office ; un fichier
-    vide retient qu'il n'y en a pas (ou qu'un administrateur l'a retirée) : pas de nouvelle recherche."""
-    data_dir = request.app.state.settings.data_dir
-    path = artist_photo_path(data_dir, name)
-    if not path.exists() and artists.fold(name) not in artists._VA | {""}:
-        # ponytail: une recherche Deezer à la première visite de chaque artiste ; rien n'est retenu d'une panne réseau
+def photo_candidates(settings, kind: str, name: str) -> list[dict]:
+    """Photos proposées : Deezer pour un artiste, Discogs pour un label (avec un jeton DISCOGS_TOKEN)."""
+    if kind == "label":
+        return coversearch.label_photos(name, settings.discogs_token) if settings.discogs_token else []
+    return coversearch.artist_photos(name)
+
+
+@router.get("/api/photo")
+def photo(request: Request, kind: PHOTO_KINDS, name: str = Query(min_length=1, max_length=200)):
+    """Photo d'un artiste ou logo d'un label. À la première demande, la première proposition au même nom est prise
+    d'office ; un fichier vide retient qu'il n'y en a pas (ou qu'un administrateur l'a retirée) : pas de nouvelle
+    recherche."""
+    settings = request.app.state.settings
+    path = photo_path(settings.data_dir, kind, name)
+    same = (lambda a, b: nfo.label_key(a) == nfo.label_key(b)) if kind == "label" else (lambda a, b: artists.fold(a) == artists.fold(b))
+    # un label sans jeton Discogs n'est pas cherché, et rien n'est retenu : il le sera une fois le jeton posé
+    searchable = kind == "artist" or settings.discogs_token
+    if searchable and not path.exists() and artists.fold(name) not in artists._VA | {""}:
+        # ponytail: une recherche à la première visite de chaque page ; rien n'est retenu d'une panne réseau
         try:
-            hit = next((x for x in coversearch.artist_photos(name) if artists.fold(x["title"]) == artists.fold(name)), None)
+            hit = next((x for x in photo_candidates(settings, kind, name) if same(x["title"], name)), None)
             if hit:
-                store_artist_photo(data_dir, name, hit["url"])
+                store_photo(settings.data_dir, kind, name, hit["url"])
             else:
                 path.parent.mkdir(exist_ok=True)
                 path.write_bytes(b"")

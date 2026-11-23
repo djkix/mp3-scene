@@ -108,6 +108,19 @@ def artist_photos(name: str) -> list[dict]:
             and str(a.get("picture_medium", "")).startswith("https://") and "/artist//" not in a["picture_xl"]]
 
 
+def label_photos(name: str, token: str) -> list[dict]:
+    """Logos proposés pour un label, d'après Discogs ; une panne ou un silence donne une liste vide."""
+    try:
+        data = _json("https://api.discogs.com/database/search?" + urllib.parse.urlencode({"type": "label", "q": name, "per_page": 6}),
+                     {"Authorization": f"Discogs token={token}"})
+    except (OSError, ValueError):
+        return []
+    # Discogs : « Nom (2) » pour un homonyme ; sans image, un pixel « spacer.gif »
+    return [{"url": r["cover_image"], "thumb": r.get("thumb") or r["cover_image"], "source": "Discogs",
+             "title": re.sub(r"\s*\(\d+\)$", "", r.get("title") or "")}
+            for r in data.get("results", []) if str(r.get("cover_image", "")).startswith("https://") and "spacer.gif" not in r["cover_image"]]
+
+
 _VARIOUS = {"va", "various", "variousartists"}
 
 

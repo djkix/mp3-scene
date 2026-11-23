@@ -110,7 +110,7 @@ def kind(name: str) -> str | None:
     f = parse_release_name(name)
     # tag de diffusion : un segment entier (« -SAT- »), pas un mot du titre (« Slam_FM_Presents »)
     tags = {s.upper() for s in name.split("-")}
-    if tags & {"SAT", "CABLE", "DAB", "FM", "LINE"}:
+    if tags & {"SAT", "CABLE", "DAB", "FM", "LINE", "RADIO"}:
         return "live"
     if re.match(r"(VA|Various(_Artists)?)(_?-|$)", name, re.I):
         return "comp"
@@ -130,9 +130,18 @@ def _clean(s):
     return s.replace("_", " ").strip() or None
 
 
+_ORNAMENT = re.compile(r"^[-_ ]*=+[-_ ]*|[-_ ]*=+[-_ ]*$")
+
+
 def parse_release_name(name: str, legacy: bool = False) -> dict:
     """`legacy` : l'analyse d'avant la 1.58.0 (fin de titre prise pour un groupe, « _-_ » coupant après VA, compilation
-    mixée rangée sous son titre), pour reconnaître en base les valeurs qu'elle a laissées (db.classify)."""
+    mixée rangée sous son titre, ornement « -=_ … _=- » gardé dans le titre), pour reconnaître en base les valeurs
+    qu'elle a laissées (db.classify)."""
+    # nom encadré de « -=_ … _=- » (« -=_Tomorrowland_2013_=- ») : un dossier d'événement ; le nom entier, sans
+    # l'ornement, est le titre
+    adorned = not legacy and _ORNAMENT.search(name) and _ORNAMENT.sub("", name)
+    if adorned:
+        name = adorned
     segs = name.split("-")
     skip = {i for i, s in enumerate(segs) if s.startswith("(") and s.endswith(")")}
     grp = year = None
@@ -167,6 +176,8 @@ def parse_release_name(name: str, legacy: bool = False) -> dict:
     # « ultra dance 03 - mixed by johnny vicious » : une compilation mixée, dont le début du nom est le titre
     if not legacy and artist.strip(" _") and re.match(r"[ _]*mixed[ _]by[ _]", title, re.I):
         artist, title = "VA", f"{artist.strip(' _')} - {title.strip(' _')}"
+    if adorned:
+        artist, title = "", name
     return dict(artist=_clean(artist), title=_clean(title), source=source, year=year, grp=grp)
 
 

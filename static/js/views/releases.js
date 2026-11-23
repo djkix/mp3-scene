@@ -73,7 +73,7 @@ export function row(rel, pick = null, onPick = () => {}) {
     since() && rel.added_at > since() ? el('span', { class: 'new' }, tr('nouveau')) : null,
     rel.hidden ? el('span', { class: 'new' }, tr('masquée')) : null, relName(rel.name),
     // apparitions d'un artiste : ses pistes dans cette release (trois au plus), comme le chapitre d'un mix
-    rel.by?.length ? el('small', { class: 'trk-chapter' }, `↳ ${rel.by.slice(0, 3).join(' · ')}${rel.by.length > 3 ? ' …' : ''}`) : null),
+    rel.by?.length ? el('small', { class: 'trk-chapter' }, `↳ ${rel.by.slice(0, 3).map((x) => `${rel.by_artist} - ${x}`).join(' · ')}${rel.by.length > 3 ? ' …' : ''}`) : null),
   // même ordre que HEAD ; sur mobile, .rel-info devient une ligne de détails sous le nom
   el('span', { class: 'rel-info' },
     el('span', { class: 'mid' }, rel.genre ? el('span', { class: 'chip' }, rel.genre) : ''),
@@ -140,9 +140,10 @@ export function releaseList(container, fetchPage, { empty = tr('Aucun résultat'
         li.classList.add(`kind-${k < 0 ? 4 : k}`);
         if (r.category === lastCat) return [li];
         lastCat = r.category;
-        const n = el('span');
-        counts?.then((c) => { if (c[r.category]) n.textContent = ` · ${c[r.category]}`; }).catch(() => {});
-        return [el('li', { class: `rel-cap kind-${k < 0 ? 4 : k}` }, catLabel(r.category), n), li];
+        // même pastille que les années de l'artiste : la catégorie, son nombre de releases en petit
+        const n = el('small');
+        counts?.then((c) => { if (c[r.category]) n.textContent = ` ${c[r.category]}`; }).catch(() => {});
+        return [el('li', { class: `rel-cap kind-${k < 0 ? 4 : k}` }, el('span', { class: 'cap-pill' }, catLabel(r.category), n)), li];
       }));
       offset += page.items.length;
       done = !page.has_more;

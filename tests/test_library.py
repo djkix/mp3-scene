@@ -1153,7 +1153,7 @@ def test_appearances_list_names_the_artist_tracks(user_client, library, settings
     conn.execute("INSERT INTO tracks(release_id, relpath, size, title, artist) VALUES (?, 'g.mp3', 1, 'Guest Track', 'A-Trak')", (rid,))
     conn.commit()
     items = user_client.get("/api/releases", params={"appears": "A-Trak"}).json()["items"]
-    assert [(x["id"], x["by"]) for x in items] == [(rid, ["Guest Track"])]
+    assert [(x["id"], x["by_artist"], x["by"]) for x in items] == [(rid, "A-Trak", ["Guest Track"])]
     assert "by" not in user_client.get("/api/releases").json()["items"][0]
 
 
@@ -1197,8 +1197,13 @@ def test_artist_photo_is_taken_from_the_first_matching_result(app, user_client, 
                                                                     {"url": "https://x/b.jpg", "thumb": "t", "title": "bob sinclar"}])
     got = []
     monkeypatch.setattr(coversearch, "fetch", lambda url: got.append(url) or buf.getvalue())
-    assert user_client.get("/api/artist-photo", params={"name": "Bob Sinclar"}).status_code == 200 and got == ["https://x/b.jpg"]
-    assert user_client.get("/api/artist-photo", params={"name": "VA"}).status_code == 404
-    assert user_client.get("/api/artist-photo", params={"name": "Personne"}).status_code == 404 and len(got) == 1
-    assert admin_client.delete("/api/admin/artists/photo", params={"name": "Bob Sinclar"}, headers={"X-CSRF": "1"}).status_code == 204
-    assert user_client.get("/api/artist-photo", params={"name": "Bob Sinclar"}).status_code == 404 and len(got) == 1  # retirée : pas remise
+    photo = lambda name, kind="artist": user_client.get("/api/photo", params={"kind": kind, "name": name}).status_code
+    assert photo("Bob Sinclar") == 200 and got == ["https://x/b.jpg"]
+    assert photo("VA") == 404 and photo("Personne") == 404 and len(got) == 1
+    assert admin_client.delete("/api/admin/photo", params={"kind": "artist", "name": "Bob Sinclar"}, headers={"X-CSRF": "1"}).status_code == 204
+    assert photo("Bob Sinclar") == 404 and len(got) == 1  # retirée : pas remise
+    # label : Discogs, avec un jeton ; « Defected Records » et « Defected (2) » désignent le même label
+    monkeypatch.setattr(coversearch, "label_photos", lambda name, token: [{"url": "https://x/l.jpg", "thumb": "t", "title": "Defected"}])
+    assert photo("Defected Records", "label") == 404  # sans jeton : pas de recherche
+    app.state.settings = app.state.settings.__class__(**{**app.state.settings.__dict__, "discogs_token": "t"})
+    assert photo("Defected Records", "label") == 200 and got[-1] == "https://x/l.jpg"

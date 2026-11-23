@@ -13,7 +13,7 @@ from . import artists, backup, coversearch, db, genres, nfo, scanner, security
 from .deps import MAX_INT, Id, get_conn, require_admin
 from .naming import parse_release_name
 from .routes_media import COVER_MAX, save_cover
-from .routes_library import RELEASE_COLS, RELEASE_FROM, Dir, Sort, _order, _page, _release, artist_photo_path, store_artist_photo
+from .routes_library import RELEASE_COLS, RELEASE_FROM, Dir, Sort, _order, _page, _release, photo_candidates, photo_path, store_photo
 
 # libellé au journal d'activité de chaque action d'administration : (méthode, route) -> libellé
 _ACTIONS = {
@@ -290,34 +290,36 @@ def drop_series_rule(name: str = Query(max_length=200), conn=Depends(get_conn)):
 
 
 class PhotoPick(BaseModel):
+    kind: Literal["artist", "label"] = "artist"
     name: str = Field(min_length=1, max_length=200)
     url: str = Field(max_length=2000)
     sig: str = Field(max_length=64)
 
 
-@router.get("/artists/photo/search")
-def search_artist_photo(request: Request, name: str = Query(min_length=1, max_length=200)):
-    """Photos proposées pour cet artiste (Deezer). Chaque adresse est signée : seule une image proposée ici peut être validée."""
-    key = request.app.state.settings.secret_key
-    return {"items": [{**x, "sig": coversearch.sign(key, x["url"])} for x in coversearch.artist_photos(name)]}
+@router.get("/photo/search")
+def search_photo(request: Request, kind: Literal["artist", "label"], name: str = Query(min_length=1, max_length=200)):
+    """Photos proposées pour un artiste (Deezer) ou un label (Discogs). Chaque adresse est signée : seule une image
+    proposée ici peut être validée."""
+    settings = request.app.state.settings
+    return {"items": [{**x, "sig": coversearch.sign(settings.secret_key, x["url"])} for x in photo_candidates(settings, kind, name)]}
 
 
-@router.post("/artists/photo", status_code=204)
-def save_artist_photo(body: PhotoPick, request: Request):
+@router.post("/photo", status_code=204)
+def save_photo(body: PhotoPick, request: Request):
     """Télécharge la photo choisie et la garde dans les données de l'application."""
     settings = request.app.state.settings
     if not coversearch.check(settings.secret_key, body.url, body.sig):
         raise HTTPException(400, "Cette image n'a pas été proposée par la recherche.")
     try:
-        store_artist_photo(settings.data_dir, body.name, body.url)
+        store_photo(settings.data_dir, body.kind, body.name, body.url)
     except (ValueError, OSError) as e:
         raise HTTPException(400, f"Photo refusée : {e}") from None
 
 
-@router.delete("/artists/photo", status_code=204)
-def drop_artist_photo(request: Request, name: str = Query(min_length=1, max_length=200)):
+@router.delete("/photo", status_code=204)
+def drop_photo(request: Request, kind: Literal["artist", "label"], name: str = Query(min_length=1, max_length=200)):
     """Retire la photo ; un fichier vide empêche la recherche automatique de la remettre."""
-    path = artist_photo_path(request.app.state.settings.data_dir, name)
+    path = photo_path(request.app.state.settings.data_dir, kind, name)
     path.parent.mkdir(exist_ok=True)
     path.write_bytes(b"")
 

@@ -31,3 +31,16 @@ def test_year_bounds():
 @pytest.mark.parametrize("name", ["", "---", "-", "--", "été-ñ-WEB-2010-Ω", "a-b-²³⁴⁵-c", "x\udcff-y-WEB-2010-Z"])
 def test_never_raises(name):
     assert set(p(name)) == {"artist", "title", "source", "year", "grp"}
+
+
+def test_radio_tag_is_a_live():
+    from app.naming import kind
+    assert kind("Martin_Solveig_-_Royal_Summer_Party_(Contact_FM)-08-21-RADIO-2003-OXD") == "live"
+    assert kind("VA-DJ_Adamski_Yearmix_2005_(Paradise_FM)-RADIO-2005-iMC") == "live"
+    assert kind("Artist-Radio_Edit-WEB-2010-GRP") is None  # « Radio » dans un titre n'est pas un tag
+
+
+def test_ornament_around_the_name_is_not_in_the_title():
+    assert p("-=_Tomorrowland_2013_=-")["title"] == "Tomorrowland 2013"
+    assert p("-=_INOX_Electronique_Festival_2013_=-")["title"] == "INOX Electronique Festival 2013"
+    assert p("-=_Tomorrowland_2013_=-", legacy=True)["title"] != "Tomorrowland 2013"  # ancienne lecture : relue au démarrage

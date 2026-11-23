@@ -45,13 +45,16 @@ function detail(container, kind, params) {
       ...(cells[key] = [el('td', {}, '…'), el('td')])))));
   const chips = el('div', { class: 'art-chips' });
   // photo de l'artiste, si une a été validée ; un administrateur peut en chercher une (Deezer) ou la retirer
-  const photo = el('img', { class: 'art-photo', alt: '', src: '/api/artist-photo?' + new URLSearchParams({ name }), onerror: (e) => e.target.remove() });
-  const photoBtn = kind === 'artists' && session.user?.role === 'admin'
-    && el('button', { type: 'button', class: 'chip keep', onclick: () => findPhoto(name).catch(() => {}) }, tr('Chercher une photo'));
+  // photo de l'artiste ou logo du label, prise d'office ; un administrateur peut en choisir une autre ou la retirer
+  const photoKind = { artists: 'artist', labels: 'label' }[kind];
+  const photo = photoKind && el('img', { class: photoKind === 'label' ? 'art-photo logo' : 'art-photo', alt: '', src: '/api/photo?' + new URLSearchParams({ kind: photoKind, name }), onerror: (e) => e.target.remove() });
+  const photoBtn = photoKind && session.user?.role === 'admin'
+    && el('button', { type: 'button', class: 'chip keep', onclick: () => findPhoto(photoKind, name).catch(() => {}) }, tr('Chercher une photo'));
   const head = el('div', { class: 'art-head' }, el('div', {}, photo, table, photoBtn), chips);
   // label ou groupe : le même bloc en deux colonnes, résumé à gauche, ce qu'on y trouve le plus à droite
   const facts = el('table', { class: 'art-sum' }), found = el('div', { class: 'art-chips' });
-  const info = (kind === 'labels' || kind === 'groups' || kind === 'genres') && el('div', { class: 'art-head' }, facts, found);
+  const info = (kind === 'labels' || kind === 'groups' || kind === 'genres') && el('div', { class: 'art-head' },
+    kind === 'labels' ? el('div', {}, photo, facts, photoBtn) : facts, found);
   // genre : sa famille (« House » réunit « Deep House », « Tech House »…), un bloc par genre comme pour les séries ;
   // un clic s'y limite, un second revient à l'ensemble. La liste attend de connaître la famille.
   const sub = kind === 'genres' ? params.sub || '' : '';
@@ -114,7 +117,7 @@ function detail(container, kind, params) {
 
 // Administrateur : photos proposées pour un artiste ; un clic en valide une, gardée dans les données de l'application.
 let dlg = null;
-async function findPhoto(name) {
+async function findPhoto(kind, name) {
   dlg ??= document.body.appendChild(el('dialog'));
   dlg.className = 'pl-add cover-dlg';
   const msg = el('p', { class: 'status', role: 'status' }, tr('Recherche…'));
@@ -123,16 +126,16 @@ async function findPhoto(name) {
   dlg.replaceChildren(el('h2', {}, tr('Chercher une photo')), el('p', { class: 'cover-rel' }, name), grid, msg,
     el('div', { class: 'inline-form' },
       el('button', { type: 'button', onclick: async () => {
-        try { await api('/admin/artists/photo?' + new URLSearchParams({ name }), { method: 'DELETE' }); reload(); } catch (err) { msg.textContent = err.message; }
+        try { await api('/admin/photo?' + new URLSearchParams({ kind, name }), { method: 'DELETE' }); reload(); } catch (err) { msg.textContent = err.message; }
       } }, tr('Retirer la photo')),
       el('button', { type: 'button', onclick: () => dlg.close() }, tr('Fermer'))));
   dlg.showModal();
   try {
-    const r = await api('/admin/artists/photo/search?' + new URLSearchParams({ name }));
+    const r = await api('/admin/photo/search?' + new URLSearchParams({ kind, name }));
     msg.textContent = r.items.length ? tr('Cliquez sur une image pour la valider.') : tr('Aucune photo trouvée.');
     grid.replaceChildren(...r.items.map((x) => el('button', { type: 'button', class: 'cover-pick', title: x.title, onclick: async () => {
       msg.textContent = tr('Chargement…');
-      try { await api('/admin/artists/photo', { method: 'POST', body: { name, url: x.url, sig: x.sig } }); reload(); } catch (err) { msg.textContent = err.message; }
+      try { await api('/admin/photo', { method: 'POST', body: { kind, name, url: x.url, sig: x.sig } }); reload(); } catch (err) { msg.textContent = err.message; }
     } }, el('img', { src: x.thumb, alt: x.title, loading: 'lazy', referrerPolicy: 'no-referrer' }), el('small', {}, x.title))));
   } catch (err) { msg.textContent = err.message; }
 }

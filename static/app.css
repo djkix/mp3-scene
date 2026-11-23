@@ -546,8 +546,12 @@ dialog.compare { max-width: min(96vw, 1100px); }
 .subs { flex-wrap: wrap; padding: 8px 12px 0; }
 .subs small { opacity: .65; }
 .art-photo { display: block; width: 96px; height: 96px; margin: 0 0 8px; border-radius: 50%; object-fit: cover; }
+.art-photo.logo { border-radius: 6px; object-fit: contain; background: #fff; }
 .art-head .chip.keep { margin-top: 8px; }
-.rel-cap { padding: 4px 12px; background: var(--hover); border-bottom: 1px solid var(--line); border-left: 3px solid var(--kind); color: var(--muted); font-size: 11px; }
+.rel-cap { padding: 5px 12px; background: var(--hover); border-bottom: 1px solid var(--line); border-left: 3px solid var(--kind); }
+.cap-pill { display: inline-block; min-width: 28px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel);
+  font: 600 11px var(--mono); } /* comme les pastilles d'années */
+.cap-pill small { color: var(--muted); font-weight: 400; }
 .rel[class*="kind-"] { border-left: 3px solid var(--kind); }
 .kind-0 { --kind: #22c55e; } .kind-1 { --kind: #3b82f6; } .kind-2 { --kind: #f59e0b; } .kind-3 { --kind: #a855f7; } .kind-4 { --kind: var(--line); }
 .versions button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }

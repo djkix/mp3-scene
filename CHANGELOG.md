@@ -4,6 +4,20 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.66.4](https://github.com/djkix/mp3-scene/compare/v1.66.3...v1.66.4) (2026-11-23)
+
+### Résumé
+
+**Logo des labels, intertitres au style des années, RADIO dans Live & Radio, dossiers ornés « -= … =- ».**
+
+- Le logo d'un label est pris d'office sur Discogs (jeton DISCOGS_TOKEN) à la première visite de sa page ; un
+  administrateur peut le changer ou le retirer.
+- Page d'un artiste : les intertitres de catégorie prennent la forme des pastilles d'années (« Albums 3 ») ; sous
+  chaque apparition, l'artiste précède les titres (« Axwell - Feel The Vibe »).
+- Un nom de release qui porte le tag RADIO est rangé dans Live & Radio.
+- Les dossiers encadrés de « -= … =- » (« -= Tomorrowland 2013 =- ») ont pour titre leur nom sans l'ornement : leur
+  série devient « Tomorrowland ».
+
 ## [1.66.3](https://github.com/djkix/mp3-scene/compare/v1.66.2...v1.66.3) (2026-11-23)
 
 ### Résumé
