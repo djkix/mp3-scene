@@ -952,3 +952,25 @@ def test_search_summary_counts_releases_by_category(user_client, library):
     one = user_client.get("/api/release-summary", params={"q": "Ibanez"}).json()
     assert len(one) == 1 and one[0]["releases"] == 1
     assert user_client.get("/api/release-summary", params={"q": "Ibanez", "category": "Introuvable"}).json() == []
+
+
+def test_track_search_summary_counts_tracks_by_category(user_client, library):
+    rows = user_client.get("/api/tracks", params={"q": "a", "summary": 1}).json()
+    listed = user_client.get("/api/tracks", params={"q": "a", "limit": 500}).json()["items"]
+    assert rows and sum(r["tracks"] for r in rows) == len(listed) and all(r["size"] > 0 for r in rows)
+    assert user_client.get("/api/tracks", params={"summary": 1}).json() == []
+
+
+def test_classify_rereads_titles_left_by_the_old_parser(tmp_path):
+    import sqlite3
+    from app import db
+    from app.naming import parse_release_name
+    name = "VA-La_Rocca_-_Ballroom_Tunes_6"
+    assert parse_release_name(name, legacy=True)["title"] == "La Rocca"
+    db.init(tmp_path)
+    conn = db.connect(tmp_path)
+    for path, title in (("a", "La Rocca"), ("b", "Corrigé à la main")):
+        conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, artist, title)"
+                     " VALUES (?,?,'','Compilations',0,0,1,0,0,'VA',?)", (path, name, title))
+    db.classify(conn)
+    assert [r[0] for r in conn.execute("SELECT title FROM releases ORDER BY path")] == ["La Rocca - Ballroom Tunes 6", "Corrigé à la main"]

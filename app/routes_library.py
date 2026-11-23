@@ -238,13 +238,14 @@ def groups(by: Literal["grp", "artist", "genre", "label", "category", "year"] = 
 @router.get("/api/tracks")
 def search_tracks(q: str = Query("", max_length=200), category: Many = None, genre: Many = None, year: Years = None,
                   decade: Years = None, source: Many = None, mixes: str | None = Query(None, min_length=1, max_length=200),
-                  offset: int = Query(0, ge=0, le=MAX_INT),
+                  offset: int = Query(0, ge=0, le=MAX_INT), summary: bool = False,
                   limit: int = Query(50, ge=1, le=MAX_INT), user=Depends(current_user), conn=Depends(get_conn)):
     """Recherche dans les tags : chaque mot doit figurer dans le titre ou l'artiste de la piste. Les filtres sont
-    ceux des listes de releases, appliqués à la release de la piste."""
+    ceux des listes de releases, appliqués à la release de la piste. `summary` : au lieu des pistes, leur nombre
+    et leur poids par catégorie (la ligne de synthèse de l'onglet Pistes)."""
     words = [w for w in _WORDS.split(q) if w][:8]
     if not words and not mixes:
-        return {"items": [], "has_more": False}
+        return [] if summary else {"items": [], "has_more": False}
     # ponytail: LIKE parcourt toutes les pistes (~0,1 s pour 500 000) ; index FTS sur les pistes si trop lent
     # un titre ou un artiste de 30 caractères est peut-être coupé (ID3v1) : sa suite est dans le nom du fichier
     conds = " AND ".join("(t.title LIKE ? OR t.artist LIKE ? OR ((length(t.title)=30 OR length(t.artist)=30)"
@@ -261,6 +262,10 @@ def search_tracks(q: str = Query("", max_length=200), category: Many = None, gen
         conds, params = f"t.id IN (SELECT c.track_id FROM chapters c WHERE {in_chapter})", [mixes]
     more, extra = _release_conds(category, genre, year, source=source, decade=decade)
     conds, params = " AND ".join([conds, *more]), params + extra
+    if summary:
+        return [dict(x) for x in conn.execute(
+            "SELECT r.category AS name, COUNT(*) AS tracks, COALESCE(SUM(t.size), 0) AS size FROM tracks t"
+            f" JOIN releases r ON r.id=t.release_id WHERE {conds} GROUP BY 1 ORDER BY tracks DESC, 1", params)]
     page = _page(conn, TRACK_COLS, TRACK_FROM, "WHERE " + conds, params,
                  "COALESCE(t.title, t.relpath) COLLATE NOCASE, t.artist COLLATE NOCASE, t.id",  # par titre, puis par artiste
                  user["id"], offset, limit, _track)

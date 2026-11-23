@@ -3,7 +3,7 @@ import sqlite3
 from pathlib import Path
 
 from app import artists, genres, nfo
-from app.naming import album_like, group, kind, one_song, unwrap
+from app.naming import album_like, group, kind, one_song, parse_release_name, unwrap
 
 SCHEMA = Path(__file__).with_name("schema.sql")
 VERSION = 1  # PRAGMA user_version ; à incrémenter avec une migration si le schéma change
@@ -52,6 +52,14 @@ def classify(conn) -> None:
         for (a,) in conn.execute(f"SELECT DISTINCT {col} FROM {table} WHERE {col} IS NOT NULL").fetchall():
             if unwrap(a) != a:
                 conn.execute(f"UPDATE {table} SET {col}=? WHERE {col}=?", (unwrap(a), a))
+    # artiste et titre lus du nom par une version antérieure : relus, s'ils n'ont pas été corrigés depuis
+    # ponytail: deux analyses par release à chaque passage (~1 s pour 45 000) ; à retirer quand les bases sont à jour
+    for r in conn.execute("SELECT id, name, artist, title FROM releases").fetchall():
+        old, new = parse_release_name(r["name"], legacy=True), parse_release_name(r["name"])
+        for col in ("artist", "title"):
+            # à la casse près : « ultra dance 03 » est devenu « Ultra Dance 03 » en rejoignant les autres artistes
+            if old[col] != new[col] and (r[col] or "").casefold() == (old[col] or "").casefold():
+                conn.execute(f"UPDATE releases SET {col}=? WHERE id=?", (new[col], r["id"]))
     genres.apply(conn)
     # « AOV_INT » rejoint AOV, une année ou « 320 » passe en P2P, comme à l'analyse du nom
     for (g,) in conn.execute("SELECT DISTINCT grp FROM releases WHERE grp IS NOT NULL").fetchall():

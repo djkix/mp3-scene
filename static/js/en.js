@@ -198,7 +198,6 @@ export const EN = {
   'Format': 'Format',
   'Fréquence': 'Sample rate',
   'Résolution': 'Bit depth',
-  'Canaux': 'Channels',
   'Encodeur': 'Encoder',
   'Tags': 'Tags',
   'BPM': 'BPM',

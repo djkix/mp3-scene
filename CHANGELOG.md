@@ -4,6 +4,21 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.58.0](https://github.com/djkix/mp3-scene/compare/v1.57.1...v1.58.0) (2026-11-23)
+
+### Résumé
+
+**Titres mieux lus dans les noms de release, synthèse par catégorie sur l'onglet Pistes de la recherche.**
+
+- **Titres** : un dernier segment qui n'a pas la forme d'un groupe reste dans le titre (« VA-La_Rocca_-_Ballroom_Tunes_6 »
+  donne « La Rocca - Ballroom Tunes 6 », « Live At La Rocca (08-06-06) » n'est plus coupé à « (08-06 »). Après « VA- »,
+  le premier tiret sépare l'artiste du titre : « VA-Buddha-Bar_IX_-_By_Ravin » n'a plus l'artiste « VA-Buddha-Bar IX ».
+  Une compilation « titre - mixed by X » est rangée sous VA, avec son nom complet pour titre.
+- Les releases déjà en base sont relues au démarrage, sauf celles dont l'artiste ou le titre a été corrigé à la main.
+- **Recherche** : l'onglet Pistes affiche la même ligne que l'onglet Releases, le nombre de pistes et leur poids par
+  catégorie, un clic filtrant sur la catégorie.
+- **Détails techniques** : la ligne « Canaux » est retirée, le format suffit.
+
 ## [1.57.1](https://github.com/djkix/mp3-scene/compare/v1.57.0...v1.57.1) (2026-11-22)
 
 ### Résumé

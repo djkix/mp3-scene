@@ -12,6 +12,13 @@ from app.naming import parse_release_name as p
      dict(artist="A Man Called S", title="Difficult", source="WEB", year=2013, grp="YOU")),
     ("A-Trax-A_Dream_Within-(SAMPMS_4120)-Vinyl-1997-XXX",
      dict(artist="A", title="Trax-A Dream Within", source="VINYL", year=1997, grp="XXX")),  # ambiguïté assumée
+    # dernier segment qui finit le titre, et « _-_ » après VA
+    ("VA-La_Rocca_-_Ballroom_Tunes_6", dict(artist="VA", title="La Rocca - Ballroom Tunes 6", source=None, year=None, grp="P2P")),
+    ("Erick Morillo - Live At La Rocca (08-06-06)",
+     dict(artist="Erick Morillo", title="Live At La Rocca (08-06-06)", source=None, year=None, grp="P2P")),
+    # compilation mixée : le début du nom est le titre
+    ("ultra dance 03 - mixed by johnny vicious - cd1",
+     dict(artist="VA", title="ultra dance 03 - mixed by johnny vicious", source=None, year=None, grp="P2P")),
     ("n'importe quoi", dict(artist=None, title=None, source=None, year=None, grp=None)),
 ])
 def test_parse(name, expected):

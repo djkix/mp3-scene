@@ -130,13 +130,18 @@ def _clean(s):
     return s.replace("_", " ").strip() or None
 
 
-def parse_release_name(name: str) -> dict:
+def parse_release_name(name: str, legacy: bool = False) -> dict:
+    """`legacy` : l'analyse d'avant la 1.58.0 (fin de titre prise pour un groupe, « _-_ » coupant après VA, compilation
+    mixée rangée sous son titre), pour reconnaître en base les valeurs qu'elle a laissées (db.classify)."""
     segs = name.split("-")
     skip = {i for i, s in enumerate(segs) if s.startswith("(") and s.endswith(")")}
     grp = year = None
     if len(segs) >= 3:
         grp, year = group(segs[-1])
-        skip.add(len(segs) - 1)
+        # un dernier segment qui n'a pas la forme d'un groupe (« _Ballroom_Tunes_6 », « 06) ») est la fin du titre
+        last = _TAIL.sub("", segs[-1]).strip()
+        if legacy or not (grp == "P2P" and year is None and (last.startswith("_") or not re.fullmatch(r"[A-Za-z0-9_]+", last))):
+            skip.add(len(segs) - 1)
 
     for i in range(len(segs) - 1, -1, -1):
         s = segs[i]
@@ -152,12 +157,16 @@ def parse_release_name(name: str) -> dict:
         skip.add(si)
 
     rest = "-".join(s for i, s in enumerate(segs) if i not in skip)
-    for sep in ("--", "_-_", "-"):
+    # « VA-La_Rocca_-_Ballroom_Tunes_6 » : après VA, le premier tiret sépare, « _-_ » fait partie du titre
+    for sep in ("-",) if not legacy and re.match(r"(VA|Various(_Artists)?)-", rest, re.I) else ("--", "_-_", "-"):
         if sep in rest:
             artist, title = rest.split(sep, 1)
             break
     else:
         artist = title = ""
+    # « ultra dance 03 - mixed by johnny vicious » : une compilation mixée, dont le début du nom est le titre
+    if not legacy and artist.strip(" _") and re.match(r"[ _]*mixed[ _]by[ _]", title, re.I):
+        artist, title = "VA", f"{artist.strip(' _')} - {title.strip(' _')}"
     return dict(artist=_clean(artist), title=_clean(title), source=source, year=year, grp=grp)
 
 

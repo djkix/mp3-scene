@@ -13,7 +13,7 @@ async function techDialog(track) {
   const kb = (n) => `${Math.round(n / 1000)} kbit/s`;
   const rows = [[tr('Format'), d.format], [tr('Débit'), d.bitrate && kb(d.bitrate) + (d.bitrate_mode ? ` · ${d.bitrate_mode}` : '')],
     [tr('Fréquence'), d.sample_rate && `${(d.sample_rate / 1000).toLocaleString()} kHz`], [tr('Résolution'), d.bits && `${d.bits} bits`],
-    [tr('Canaux'), d.mode || d.channels], [tr('Encodeur'), d.encoder], [tr('Tags'), d.tags], [tr('BPM'), d.bpm], [tr('Tonalité'), d.key],
+    [tr('Encodeur'), d.encoder], [tr('Tags'), d.tags], [tr('BPM'), d.bpm], [tr('Tonalité'), d.key],
     [tr('Taille'), d.size && `${(d.size / 1048576).toLocaleString(undefined, { maximumFractionDigits: 1 })} Mo`], [tr('Fichier'), track.filename]]
     .filter(([, v]) => v);
   dlg.replaceChildren(el('h2', {}, tr('Détails techniques')),
