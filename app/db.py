@@ -61,6 +61,7 @@ def classify(conn) -> None:
             # à la casse près : « ultra dance 03 » est devenu « Ultra Dance 03 » en rejoignant les autres artistes
             if old[col] != new[col] and (r[col] or "").casefold() == (old[col] or "").casefold():
                 conn.execute(f"UPDATE releases SET {col}=? WHERE id=?", (new[col], r["id"]))
+    merge_track_artists(conn)
     genres.apply(conn)
     # « AOV_INT » rejoint AOV, une année ou « 320 » passe en P2P, comme à l'analyse du nom
     for (g,) in conn.execute("SELECT DISTINCT grp FROM releases WHERE grp IS NOT NULL").fetchall():
@@ -72,6 +73,19 @@ def classify(conn) -> None:
     year_from_nfo(conn)
     artists.apply(conn)
     categorize(conn)
+
+
+def merge_track_artists(conn) -> None:
+    """Artistes des pistes qui ne diffèrent que par la casse (« AXWELL » / « Axwell ») : la graphie la plus fréquente
+    pour tous. Sans effet au second passage ; une relecture des tags rend la graphie du fichier jusqu'au passage suivant."""
+    seen = {}
+    for a, n in conn.execute("SELECT artist, COUNT(*) FROM tracks WHERE artist IS NOT NULL GROUP BY artist"):
+        seen.setdefault(a.casefold(), []).append((n, a))
+    for names in seen.values():
+        if len(names) > 1:
+            # à égalité, la graphie mixte passe avant le tout-majuscules ou le tout-minuscules
+            best = max(names, key=lambda x: (x[0], not (x[1].isupper() or x[1].islower()), x[1]))[1]
+            conn.executemany("UPDATE tracks SET artist=? WHERE artist=?", [(best, a) for _, a in names if a != best])
 
 
 def merge_case(conn, col: str) -> None:

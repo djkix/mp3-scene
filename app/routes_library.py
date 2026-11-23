@@ -366,6 +366,23 @@ def artist_info(name: str = Query(min_length=1, max_length=200), user=Depends(cu
             "with": [{"name": spelling[k], "tracks": n} for k, n in sorted(others.items(), key=lambda kv: (-kv[1], kv[0]))[:8]]}
 
 
+@router.get("/api/group-info")
+def group_info(by: Literal["label", "grp"], name: str = Query(min_length=1, max_length=200), conn=Depends(get_conn)):
+    """En-tête de la page d'un label ou d'un groupe : nombre, poids, années couvertes, et ce qu'on y trouve le plus
+    (artistes, genres, puis les groupes d'un label ou les labels d'un groupe)."""
+    mine = f"r.hidden=0 AND r.{by}=?"
+    total = dict(conn.execute(f"SELECT COUNT(*) AS n, COALESCE(SUM(r.size), 0) AS size, MIN(r.year) AS first, MAX(r.year) AS last"
+                              f" FROM releases r WHERE {mine}", (name,)).fetchone())
+
+    def top(col, extra="1"):
+        return [dict(x) for x in conn.execute(
+            f"SELECT {col} AS name, COUNT(*) AS releases FROM releases r WHERE {mine} AND {col} IS NOT NULL AND {extra}"
+            " GROUP BY 1 ORDER BY releases DESC, 1 COLLATE NOCASE LIMIT 8", (name,))]
+    art = "COALESCE(r.tag_artist, r.artist)"
+    return {**total, "artists": top(art, f"lower({art}) NOT IN ('va', 'various', 'various artists')"), "genres": top("r.genre"),
+            "others": top("r.grp" if by == "label" else "NULLIF(r.label, '')")}
+
+
 @router.get("/api/folders")
 def folders(path: str = "", sort: Sort | None = None, dir: Dir = "asc", offset: int = Query(0, ge=0, le=MAX_INT), limit: int = Query(50, ge=1, le=MAX_INT),
             user=Depends(current_user), conn=Depends(get_conn)):

@@ -4,6 +4,23 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.63.0](https://github.com/djkix/mp3-scene/compare/v1.62.0...v1.63.0) (2026-11-23)
+
+### Résumé
+
+**Liens externes et chemin sur la fiche, contrôle « Sans genre », versions côte à côte, en-tête des labels et des groupes.**
+
+- **Fiche** : le chemin du dossier dans la bibliothèque, avec un bouton pour le copier, et trois liens qui cherchent
+  la release sur Discogs, Beatport et YouTube.
+- **Sans genre** : nouveau contrôle qualité. « Proposer des genres » donne à chaque release le genre le plus fréquent
+  de son artiste, à défaut de son label, quand il est net ; le nombre et des exemples sont montrés avant d'appliquer.
+- **Comparer** : depuis « Autres versions », un tableau met les versions côte à côte (groupe, source, pistes, débit,
+  taille, NFO, liste des pistes), le meilleur débit en évidence.
+- **Labels et groupes** : leur page reçoit le même en-tête que celle d'un artiste (releases, poids, années, artistes,
+  genres, groupes ou labels associés).
+- **Artistes des pistes** : ceux qui ne diffèrent que par la casse (« AXWELL », « Axwell ») prennent la graphie la plus
+  fréquente.
+
 ## [1.62.0](https://github.com/djkix/mp3-scene/compare/v1.61.0...v1.62.0) (2026-11-23)
 
 ### Résumé

@@ -1064,3 +1064,25 @@ def test_remixes_of_an_artist_and_exact_cover_match(user_client, library, settin
     assert coversearch.exact("Bob Sinclar", "Love Generation", "Bob Sinclar (2) - Love Génération!")
     assert coversearch.exact("VA", "Big Mix", "Various - Big Mix") and not coversearch.exact("VA", "Big Mix", "Someone - Big Mix")
     assert not coversearch.exact("Bob Sinclar", "Love Generation", "Bob Sinclar - Love Generation (Remixes)")
+
+
+def test_genre_guess_group_info_and_track_artist_case(admin_client, settings):
+    conn = db.connect(settings.data_dir)
+    rows = [("Bob", "House", "Yellow", "GRP"), ("Bob", "House", "Yellow", "GRP"), ("Bob", "Techno", "Yellow", "XYZ"), ("Bob", None, None, "GRP"),
+            ("VA", "Pop", None, "GRP"), ("VA", "Pop", None, "GRP"), ("VA", None, None, "GRP"), ("Seul", None, "Yellow", "GRP")]
+    for i, (artist, genre, label, grp) in enumerate(rows):
+        conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, artist, genre, label, grp, year)"
+                     " VALUES (?,?,'','Singles',0,0,5,1,0,?,?,?,?,?)", (f"q{i}", f"q{i}", artist, genre, label, grp, 2000 + i))
+        conn.execute("INSERT INTO tracks(release_id, relpath, size, artist) SELECT id, 'a.mp3', 1, ? FROM releases WHERE path=?",
+                     ("AXWELL" if i else "Axwell", f"q{i}"))
+    conn.commit()
+    assert admin_client.get("/api/admin/quality").json()["no_genre"] == 3
+    g = admin_client.get("/api/admin/genres/guess").json()  # Bob : House domine ; Seul : le label Yellow ; VA : rien
+    assert g["count"] == 2 and {x["genre"] for x in g["sample"]} == {"House"}
+    assert admin_client.post("/api/admin/genres/guess", headers={"X-CSRF": "1"}).status_code == 204
+    assert admin_client.get("/api/admin/quality").json()["no_genre"] == 1
+    info = admin_client.get("/api/group-info", params={"by": "label", "name": "Yellow"}).json()
+    assert (info["n"], info["first"], info["last"]) == (4, 2000, 2007) and info["artists"][0] == {"name": "Bob", "releases": 3}
+    assert info["others"] == [{"name": "GRP", "releases": 3}, {"name": "XYZ", "releases": 1}]
+    db.merge_track_artists(conn)
+    assert [r[0] for r in conn.execute("SELECT DISTINCT artist FROM tracks WHERE artist LIKE 'axwell'")] == ["AXWELL"]  # la plus fréquente

@@ -589,6 +589,7 @@ QUALITY = {
     "unreadable": "r.id IN (SELECT release_id FROM tracks WHERE tags_read=1 AND duration IS NULL)",
     "low_bitrate": "(SELECT AVG(bitrate) FROM tracks WHERE release_id=r.id)<192000",
     "no_year": "r.year IS NULL",
+    "no_genre": "r.genre IS NULL AND r.track_count>0",
     # NULL : pas encore vérifié par le scan ; une pochette déposée à la main compte
     "no_cover": "r.has_cover=0 AND r.path NOT IN (SELECT path FROM overrides WHERE cover=1)",
     "no_artist": "COALESCE(r.tag_artist, r.artist) IS NULL",
@@ -599,8 +600,45 @@ QUALITY = {
 }
 
 
+def _genre_guesses(conn) -> dict:
+    """{identifiant: genre proposé} pour les releases sans genre : le genre le plus fréquent de leur artiste (hors
+    compilations), à défaut de leur label, s'il couvre au moins la moitié de ses releases classées et deux d'entre elles."""
+    def majority(col, skip=()):
+        seen = {}
+        for who, genre, n in conn.execute(f"SELECT {col}, genre, COUNT(*) FROM releases r WHERE genre IS NOT NULL AND {col} IS NOT NULL"
+                                          " GROUP BY 1, 2"):
+            seen.setdefault(who, {})[genre] = n
+        return {who: max(g, key=g.get) for who, g in seen.items()
+                if who.lower() not in skip and max(g.values()) >= 2 and 2 * max(g.values()) >= sum(g.values())}
+    artist, label = majority("COALESCE(r.tag_artist, r.artist)", ("va", "various", "various artists")), majority("NULLIF(r.label, '')")
+    out = {}
+    for r in conn.execute("SELECT r.id, COALESCE(r.tag_artist, r.artist) AS artist, NULLIF(r.label, '') AS label FROM releases r WHERE "
+                          + QUALITY["no_genre"]):
+        if g := artist.get(r["artist"]) or label.get(r["label"]):
+            out[r["id"]] = g
+    return out
+
+
+@router.get("/genres/guess")
+def guess_genres(conn=Depends(get_conn)):
+    """Genres proposés pour les releases sans genre : combien en recevraient un, et quelques exemples."""
+    found = _genre_guesses(conn)
+    names = dict(conn.execute(f"SELECT id, name FROM releases WHERE id IN ({','.join('?' * min(len(found), 8))})", list(found)[:8]).fetchall()) if found else {}
+    return {"count": len(found), "sample": [{"name": names[i], "genre": found[i]} for i in names]}
+
+
+@router.post("/genres/guess", status_code=204)
+def apply_genres(conn=Depends(get_conn)):
+    """Applique les genres proposés, comme autant de corrections manuelles (gardées après les scans, modifiables)."""
+    by_genre = {}
+    for rid, g in _genre_guesses(conn).items():
+        by_genre.setdefault(g, []).append(rid)
+    for g, rids in by_genre.items():
+        _correct(conn, rids, {"genre": g})
+
+
 @router.get("/quality")
-def quality(kind: Literal["no_nfo", "no_tracks", "no_tags", "unreadable", "low_bitrate", "no_year", "no_cover", "no_artist", "dupes"] | None = None,
+def quality(kind: Literal["no_nfo", "no_tracks", "no_tags", "unreadable", "low_bitrate", "no_year", "no_genre", "no_cover", "no_artist", "dupes"] | None = None,
             sort: Sort | None = None, dir: Dir = "asc", offset: int = Query(0, ge=0, le=MAX_INT),
             limit: int = Query(50, ge=1, le=MAX_INT), ids: int = Query(0, ge=0, le=1),
             user=Depends(require_admin), conn=Depends(get_conn)):

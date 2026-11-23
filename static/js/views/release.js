@@ -1,4 +1,4 @@
-import { api, fmtDuration, session } from '../api.js';
+import { api, fmtDuration, fmtSize, session } from '../api.js';
 import { t, catLabel } from '../i18n.js';
 import { el, relName, relHref } from '../dom.js';
 import { player, watchPlaying } from '../player.js';
@@ -59,6 +59,7 @@ export function render(container, params) {
       // filter(Boolean) : replaceChildren écrirait « null » pour un élément absent
       // à droite du titre, une pastille : garder cette version (les autres sont masquées), ou tout réafficher ensuite
       vers.replaceChildren(...[el('h2', { class: 'nfo-h' }, t('Autres versions'),
+        el('button', { type: 'button', class: 'chip keep', onclick: () => compare(rel, list).catch((err) => player.flash(err.message)) }, t('Comparer')),
         session.user?.role !== 'admin' ? null : el('button', { type: 'button', class: 'chip keep', onclick: keep(masked ? 'DELETE' : 'PUT') },
           masked ? t('Tout réafficher') : t('Garder cette version'))),
         rel.hidden ? el('p', { class: 'status' }, t('Cette version est masquée des listes : une autre est gardée.')) : null,
@@ -95,6 +96,16 @@ function header(rel) {
       el('a', { class: 'cover', href: `/api/releases/${rel.id}/cover`, target: '_blank', rel: 'noopener' },
         el('img', { src: `/api/releases/${rel.id}/cover`, alt: t('Pochette'), onerror: (e) => e.target.parentNode.remove() })),
       info),
+    // emplacement du dossier dans la bibliothèque (à copier pour l'ouvrir sur le NAS) et recherches de cette release
+    // sur des sites extérieurs : simples liens, rien n'est envoyé tant qu'on ne clique pas
+    el('p', { class: 'detail-links' },
+      el('code', { title: t('Emplacement du dossier') }, rel.path),
+      el('button', { type: 'button', class: 'icon', title: t('Copier le chemin'), 'aria-label': t('Copier le chemin'), onclick: async () => {
+        try { await navigator.clipboard.writeText(rel.path); player.flash(t('Chemin copié.')); } catch { player.flash(t('Copie impossible dans ce navigateur.')); }
+      } }, '⧉'),
+      ...[['Discogs', 'https://www.discogs.com/search/?type=release&q='], ['Beatport', 'https://www.beatport.com/search?q='],
+        ['YouTube', 'https://www.youtube.com/results?search_query=']].map(([site, url]) => el('a', { class: 'chip', target: '_blank', rel: 'noopener noreferrer',
+        href: url + encodeURIComponent([/^(va|various( artists)?)$/i.test(rel.artist || '') ? '' : rel.artist, rel.title].filter(Boolean).join(' ')) }, site))),
     session.user?.role === 'admin' ? coverTools(rel) : null,
     el('div', { class: 'detail-actions' },
       el('button', { type: 'button', class: 'primary', 'data-ico': 'play', disabled: !rel.tracks.length, onclick: play }, t('Lire')),
@@ -155,6 +166,33 @@ export async function findCover(rel, next = null, stop = null) {
       } catch (err) { msg.textContent = err.message; }
     } }, el('img', { src: x.thumb, alt: x.title, loading: 'lazy', referrerPolicy: 'no-referrer' }), el('small', {}, x.source))));
   } catch (err) { msg.textContent = err.message; }
+}
+
+// Versions d'une même release côte à côte : une colonne par version (celle de la fiche d'abord, quatre au plus),
+// leurs caractéristiques puis leurs pistes, pour choisir laquelle garder.
+async function compare(rel, others) {
+  dlg ??= document.body.appendChild(el('dialog'));
+  dlg.className = 'pl-add compare';
+  const all = [rel, ...await Promise.all(others.slice(0, 3).map((x) => api(`/releases/${x.id}`)))];
+  const kb = (b) => (b ? `${Math.round(b / 1000)} kbit/s` : '—');
+  const facts = [[t('Groupe'), (r) => r.grp], [t('Source'), (r) => r.source], [t('Année'), (r) => r.year], [t('Pistes'), (r) => r.tracks.length],
+    [t('Durée'), (r) => (r.duration == null ? null : fmtDuration(r.duration))], [t('Débit'), (r) => kb(r.bitrate)],
+    [t('Taille'), (r) => fmtSize(r.size)], ['NFO', (r) => (r.has_nfo ? t('Oui') : t('Non'))], [t('Label'), (r) => r.label]];
+  // en vert : la meilleure valeur de la ligne, quand elle se compare (débit, nombre de pistes)
+  const best = (get) => Math.max(...all.map((r) => Number(get(r)) || 0));
+  const top = { [t('Débit')]: best((r) => r.bitrate), [t('Pistes')]: best((r) => r.tracks.length) };
+  const raw = { [t('Débit')]: (r) => r.bitrate, [t('Pistes')]: (r) => r.tracks.length };
+  dlg.replaceChildren(el('h2', {}, t('Comparer les versions')),
+    el('div', { class: 'table-wrap' }, el('table', { class: 'groups cmp' },
+      el('thead', {}, el('tr', {}, el('th'), all.map((r, i) => el('th', { scope: 'col' },
+        el('a', { href: relHref(r.name, r.id), onclick: () => dlg.close() }, relName(r.name)), i ? null : el('small', {}, ` (${t('cette fiche')})`))))),
+      el('tbody', {}, facts.map(([label, get]) => el('tr', {}, el('th', { scope: 'row' }, label),
+        all.map((r) => el('td', { class: raw[label] && top[label] && raw[label](r) === top[label] && all.some((x) => raw[label](x) !== top[label]) ? 'best' : '' },
+          String(get(r) ?? '—'))))),
+      el('tr', {}, el('th', { scope: 'row' }, t('Pistes')), all.map((r) => el('td', {}, el('ol', {}, r.tracks.map((tk) => el('li', {},
+        tk.title || tk.filename, el('small', {}, ` ${tk.duration == null ? '' : fmtDuration(tk.duration)} · ${kb(tk.bitrate)}`)))))))))),
+    el('div', { class: 'fx-foot' }, el('span'), el('button', { type: 'button', class: 'primary', onclick: () => dlg.close() }, t('Fermer'))));
+  dlg.showModal();
 }
 
 // Correction manuelle (administrateur) : artiste, catégorie, genre, année. Un champ vidé revient à la valeur automatique.

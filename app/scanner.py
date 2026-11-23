@@ -409,6 +409,7 @@ def _scan_tags(conn, root, should_stop):
         # releases sans piste en attente mais pas agrégées (ex. piste supprimée par la phase structure)
         _aggregate(conn, [r[0] for r in conn.execute("SELECT id FROM releases WHERE tags_done=0")])
         conn.commit()
+    db.merge_track_artists(conn)  # « AXWELL » et « Axwell » : une seule graphie
     artists.apply(conn)  # les artistes des tags rejoignent la graphie majoritaire
     db.categorize(conn)  # les titres lus départagent album et single à nombreuses versions
     conn.commit()

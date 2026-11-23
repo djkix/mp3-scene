@@ -1,6 +1,6 @@
 // Administration de la bibliothèque (#/library) : tableau de bord et contrôle qualité (#/library?tab=quality&kind=…).
 import { api, fmtSize } from '../api.js';
-import { el } from '../dom.js';
+import { el, relName } from '../dom.js';
 import { t as tr, catLabel } from '../i18n.js';
 import { releaseList } from './releases.js';
 import { navBar } from './admin.js';
@@ -9,7 +9,7 @@ import { player } from '../player.js';
 import { area, columns, donut, shares } from '../charts.js';
 
 const KINDS = [['no_nfo', 'Sans NFO'], ['no_tags', 'Sans tags'], ['unreadable', 'Pistes illisibles'], ['low_bitrate', 'Débit inférieur à 192 kbit/s'],
-  ['no_year', 'Sans année'], ['no_cover', 'Sans pochette'], ['no_tracks', 'Sans piste'], ['no_artist', 'Sans artiste'],
+  ['no_year', 'Sans année'], ['no_genre', 'Sans genre'], ['no_cover', 'Sans pochette'], ['no_tracks', 'Sans piste'], ['no_artist', 'Sans artiste'],
   ['dupes', 'Doublons possibles']];
 const tabBtn = (label, on, hash) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(on),
   onclick: () => { location.hash = hash; } }, label);
@@ -147,7 +147,19 @@ export function render(container, params) {
       refresh();
     } }, tr('Pochettes automatiques'));
     const autoMsg = el('span', { class: 'hint', role: 'status' });
-    body.replaceChildren(el('p', { class: 'filters' }, covers, auto, fix, all, autoMsg), list);
+    // sans genre : le genre le plus fréquent de l'artiste ou du label, proposé pour toutes les releases où il est net
+    const guess = kind === 'no_genre' && el('button', { type: 'button', class: 'primary', onclick: async () => {
+      try {
+        const g = await api('/admin/genres/guess');
+        if (!g.count) return player.flash(tr('Aucun genre à proposer : ni l’artiste ni le label de ces releases n’a de genre dominant.'));
+        const sample = g.sample.map((x) => `${relName(x.name)} → ${x.genre}`).join('\n');
+        if (!confirm(tr('{0} releases recevraient le genre le plus fréquent de leur artiste ou de leur label. Exemples :', g.count) + '\n\n' + sample + '\n\n' + tr('Appliquer ces genres ?'))) return;
+        guess.disabled = true;
+        await api('/admin/genres/guess', { method: 'POST' });
+        refresh();
+      } catch (err) { player.flash(err.message); guess.disabled = false; }
+    } }, tr('Proposer des genres'));
+    body.replaceChildren(el('p', { class: 'filters' }, covers, auto, guess, fix, all, autoMsg), list);
     dispose = releaseList(list, (offset, tri) => api(`/admin/quality?kind=${kind}&offset=${offset}&limit=50${tri}`),
       { empty: tr('Aucune release concernée.'), sort: ['name', 'asc'], pick: picked, onPick });
   }

@@ -532,6 +532,14 @@ thead th { color: var(--muted); background: var(--panel); padding-block: 8px; wh
 .filters.bpm input { width: 5.5rem; }
 .ad-hints p { margin: 2px 0; }
 .groups td.wrap { white-space: normal; }
+.detail-links { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 8px 0; font-size: 12px; }
+.detail-links code { overflow-wrap: anywhere; opacity: .8; }
+.detail-links a.chip:hover { text-decoration: underline; }
+dialog.compare { max-width: min(96vw, 1100px); }
+.cmp th, .cmp td { vertical-align: top; text-align: left; white-space: normal; }
+.cmp td.best { color: var(--accent-text); font-weight: 600; }
+.cmp ol { margin: 0; padding-left: 1.4em; font-size: 12px; }
+.cmp small { opacity: .65; }
 .versions button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
 .versions small { opacity: .7; }
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0 24px; padding: 0 12px 12px; }

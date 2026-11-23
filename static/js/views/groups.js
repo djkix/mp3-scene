@@ -45,9 +45,21 @@ function detail(container, kind, params) {
       ...(cells[key] = [el('td', {}, '…'), el('td')])))));
   const chips = el('div', { class: 'art-chips' });
   const head = el('div', { class: 'art-head' }, table, chips);
+  // label ou groupe : le même bloc en deux colonnes, résumé à gauche, ce qu'on y trouve le plus à droite
+  const facts = el('table', { class: 'art-sum' }), found = el('div', { class: 'art-chips' });
+  const info = (kind === 'labels' || kind === 'groups') && el('div', { class: 'art-head' }, facts, found);
+  if (info) api('/group-info?' + new URLSearchParams({ by, name })).then((g) => {
+    const line = (label, value) => el('tr', {}, el('th', { scope: 'row' }, label), el('td', {}, value));
+    facts.replaceChildren(el('tbody', {}, line(tr('Releases'), String(g.n)), line(tr('Poids'), fmtSize(g.size)),
+      g.first ? line(tr('Années'), g.first === g.last ? String(g.first) : `${g.first} – ${g.last}`) : null));
+    const group = (label, route, rows) => (rows.length ? [el('p', {}, label), el('div', {}, rows.map((r) => el('a', { class: 'chip',
+      href: `#/${route}/${encodeURIComponent(r.name)}` }, r.name, el('small', {}, String(r.releases)))))] : []);
+    found.replaceChildren(...group(tr('Artistes'), 'artists', g.artists), ...group(tr('Genres'), 'genres', g.genres),
+      ...(kind === 'labels' ? group(tr('Groupes'), 'groups', g.others) : group(tr('Labels'), 'labels', g.others)));
+  }).catch(() => {}); // facultatif
   container.replaceChildren(
-    el('h1', { class: 'grp-title' }, el('a', { href: `#/${kind}` + qs({ genre: params.genre, year: params.year }) }, tr(tab)), ' › ', name, ' ', kind === 'artists' ? null : total),
-    ...(kind === 'artists' ? [head] : []), ...(kind === 'artists' && !other ? [years] : []), list);
+    el('h1', { class: 'grp-title' }, el('a', { href: `#/${kind}` + qs({ genre: params.genre, year: params.year }) }, tr(tab)), ' › ', name, ' ', kind === 'artists' || info ? null : total),
+    ...(kind === 'artists' ? [head] : []), ...(info ? [info] : []), ...(kind === 'artists' && !other ? [years] : []), list);
   // chronologie : une pastille par année avec son nombre de releases ; un clic filtre la liste sur cette année
   if (kind === 'artists' && !other) api('/groups?' + new URLSearchParams({ by: 'year', artist: name })).then((rows) => {
     if (rows.length < 2) return;
