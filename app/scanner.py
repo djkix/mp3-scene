@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Callable
 
 import mutagen
+from mutagen.easyid3 import EasyID3
 from mutagen.id3 import ID3
 
 from app import artists, backup, cue, db, genres, nfo
@@ -24,6 +25,9 @@ TAG_BATCH = 200
 AUDIO = {".mp3", ".flac", ".wav", ".m4a", ".mp4", ".wma", ".ogg", ".opus", ".aiff", ".aif", ".ape", ".wv"}
 IMAGES = (".jpg", ".jpeg", ".png")  # mêmes types que routes_media.IMAGE_TYPES
 log = logging.getLogger(__name__)
+
+
+EasyID3.RegisterTextKey("initialkey", "TKEY")  # tonalité : absente des clés « faciles » de mutagen pour l'ID3
 
 
 class ScanError(Exception):
@@ -333,7 +337,7 @@ class _Watched:
 
 
 def _read_tags(path):
-    """(titre, artiste, genre, durée, débit) du fichier, champs None s'il n'est pas lisible.
+    """(titre, artiste, genre, durée, débit, BPM, tonalité) du fichier, champs None s'il n'est pas lisible.
 
     Lève OSError si le fichier ne peut pas être lu (absent, NFS indisponible) : la piste reste à lire."""
     with open(path, "rb") as raw:  # lecture seule : mutagen ne reçoit qu'un fichier ouvert en 'rb'
@@ -345,10 +349,18 @@ def _read_tags(path):
         if f.error is not None:  # erreur d'E/S, quoi que mutagen en ait fait (avalée, enveloppée…)
             raise f.error
     if m is None:
-        return None, None, None, None, None
+        return None, None, None, None, None, None, None
     info = getattr(m, "info", None)
     return (_first(m.tags, "title"), unwrap(_first(m.tags, "artist")), genres.normalize(_first(m.tags, "genre")),
-            getattr(info, "length", None), getattr(info, "bitrate", None))
+            getattr(info, "length", None), getattr(info, "bitrate", None), _bpm(_first(m.tags, "bpm")),
+            _first(m.tags, "initialkey"))
+
+
+def _bpm(v):
+    """Tempo du tag en nombre : « 128 », « 127.98 », « 128,0 BPM » ; None s'il n'est pas plausible (0, « ? »)."""
+    m = re.match(r"\d+(?:[.,]\d+)?", v or "")
+    n = float(m[0].replace(",", ".")) if m else 0
+    return round(n, 1) if 40 <= n <= 300 else None
 
 
 def _aggregate(conn, rids):
@@ -388,7 +400,7 @@ def _scan_tags(conn, root, should_stop):
                 done.append((*_read_tags(Path(root, t["path"], t["relpath"])), t["id"]))
             except OSError as e:
                 log.warning("piste illisible, relue au prochain scan : %s/%s (%s)", t["path"], t["relpath"], e)
-        conn.executemany("UPDATE tracks SET title=?, artist=?, genre=?, duration=?, bitrate=?, tags_read=1"
+        conn.executemany("UPDATE tracks SET title=?, artist=?, genre=?, duration=?, bitrate=?, bpm=?, key=?, tags_read=1"
                          " WHERE id=?", done)
         read += len(done)
         _aggregate(conn, {t["release_id"] for t in rows})

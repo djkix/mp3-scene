@@ -7,6 +7,7 @@ from functools import lru_cache
 _FEAT = re.compile(r"\s*[(\[]?\s*\b(?:feat|ft|featuring)\b\.?\s.*$", re.I)
 _VS = re.compile(r"\s+(?:vs|versus)\b\.?\s.*$", re.I)
 _AMP = re.compile(r"\s+(?:&|and|\+)\s+", re.I)
+_SUFFIX = re.compile(r"\s+-\s+\S|\s*\[")  # début d'une mention après l'artiste : « - Live », « [groupe] »
 _VA = {"va", "various", "variousartists"}
 _JUNK = {"unknown", "unknownartist"}
 
@@ -50,6 +51,9 @@ def _step(pairs: dict, aliases: dict, keep=frozenset()) -> dict:
         # tag tronqué (« A » pour A-Trak, « DJ » pour DJ Sneak) : l'artiste du nom fait foi
         if name and tag and len(tag) <= 2 and tag != "VA" and len(name) > len(tag) \
                 and name.lower().startswith(tag.lower()) and not name[len(tag)].isalnum():
+            tag = None
+        # tag qui ajoute une mention à l'artiste du nom (« Daft Punk - Live », « Daft Punk [BMi D0MiNAti0N] ») : idem
+        if name and tag and (m := _SUFFIX.search(tag)) and fold(tag[:m.start()]) == fold(name):
             tag = None
         out[i] = name, tag
     count = Counter(key(a) for n, t in out.values() if (a := t or n))  # releases par artiste affiché

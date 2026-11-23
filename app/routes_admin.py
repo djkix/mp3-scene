@@ -1,4 +1,5 @@
 import os
+import re
 import sqlite3
 import time
 from typing import Literal
@@ -132,6 +133,17 @@ def start_scan(request: Request):
     return {"started": True}
 
 
+@router.post("/scan/retag", status_code=202)
+def reread_tags(request: Request, conn=Depends(get_conn)):
+    """Relit les tags de toutes les pistes (BPM et tonalité, indexés depuis la 1.61.0). Les valeurs déjà lues restent
+    affichées jusqu'à leur relecture ; rien n'est écrit dans le dossier de musique."""
+    conn.execute("UPDATE tracks SET tags_read=0")
+    conn.commit()
+    if not request.app.state.runner._launch(structure=False):
+        raise HTTPException(409, "Un scan est déjà en cours : la relecture suivra au prochain scan.")
+    return {"started": True}
+
+
 class Schedule(BaseModel):
     hour: int | None = Field(default=None, ge=0, le=23)
 
@@ -231,7 +243,43 @@ def overview(request: Request, conn=Depends(get_conn)):
             "users": one("SELECT COUNT(*) FROM users"),
             "db_size": size(data.glob("mp3scene.db*")),
             # ponytail: parcourt data/thumbs/ à chaque appel (une entrée par release, ~0,1 s pour 45 000)
-            "thumbs_size": size((data / "thumbs").glob("*")) if (data / "thumbs").is_dir() else 0}
+            "thumbs_size": size((data / "thumbs").glob("*")) if (data / "thumbs").is_dir() else 0,
+            "transcode_size": size((data / "transcode").glob("*")) if (data / "transcode").is_dir() else 0}
+
+
+@router.delete("/transcode", status_code=204)
+def clear_transcode(request: Request):
+    """Vide le cache des pistes converties pour la lecture (data/transcode) ; une piste relue est reconvertie."""
+    for p in (request.app.state.settings.data_dir / "transcode").glob("*"):
+        if p.is_file():
+            p.unlink(missing_ok=True)
+
+
+_LABEL_WORDS = re.compile(r"(?<=...)(?:productions?|recordings?|records?|recs?|music|digital|limited|ltd|inc)$")
+
+
+@router.get("/suggestions")
+def suggestions(conn=Depends(get_conn)):
+    """Rapprochements proposés : labels et artistes qui ne diffèrent que par « & » / « and », un mot final de label
+    (« Productions », « Digital »…) ou un « The » / « DJ » initial. Le plus fourni reçoit les autres ; rien n'est
+    rattaché sans un clic (PUT …/aliases)."""
+    def pairs(sql, key, skip=frozenset()):
+        groups = {}
+        for name, n in conn.execute(sql):
+            if artists.norm(name) not in skip and (k := key(name)):
+                groups.setdefault(k, []).append((n, name))
+        out = []
+        for names in groups.values():
+            if len(names) > 1:
+                (tn, target), *rest = sorted(names, key=lambda x: (-x[0], x[1]))
+                out += [{"alias": a, "releases": n, "target": target, "target_releases": tn} for n, a in rest]
+        return sorted(out, key=lambda x: (-x["target_releases"], x["target"].casefold(), x["alias"].casefold()))[:100]
+    keep = frozenset(artists.norm(n) for (n,) in conn.execute("SELECT name FROM artist_separate"))
+    return {
+        "labels": pairs("SELECT label, COUNT(*) FROM releases WHERE NULLIF(label, '') IS NOT NULL GROUP BY 1",
+                        lambda v: _LABEL_WORDS.sub("", artists.fold(v))),
+        "artists": pairs("SELECT COALESCE(tag_artist, artist), COUNT(*) FROM releases WHERE COALESCE(tag_artist, artist) IS NOT NULL"
+                         " GROUP BY 1", lambda v: artists.fold(re.sub(r"^(?:the|dj)[\s_.]+", "", v.strip(), flags=re.I)), keep)}
 
 
 @router.get("/scan")

@@ -28,7 +28,7 @@ RELEASE_COLS = """r.id, r.name, r.path, r.category, r.added_at, """ + DATE + """
   """ + BITRATE + """ AS bitrate, (f.item_id IS NOT NULL) AS favorite"""
 RELEASE_FROM = "releases r LEFT JOIN favorites f ON f.user_id=? AND f.kind='release' AND f.item_id=r.id"
 TRACK_COLS = """t.id, t.release_id, r.name AS release_name, r.source, r.grp, t.relpath, t.disc, t.size, t.title, t.artist,
-  t.genre, t.duration, t.bitrate, (f.item_id IS NOT NULL) AS favorite"""
+  t.genre, t.duration, t.bitrate, t.bpm, t.key, (f.item_id IS NOT NULL) AS favorite"""
 TRACK_FROM = ("tracks t JOIN releases r ON r.id=t.release_id "
               "LEFT JOIN favorites f ON f.user_id=? AND f.kind='track' AND f.item_id=t.id")
 
@@ -230,16 +230,8 @@ def groups(by: Literal["grp", "artist", "genre", "label", "category", "year", "s
         params += [d, d + 9]
     if when:
         conds.append("(" + " OR ".join(when) + ")")
-    if by == "series":  # début de titre commun (voir _series) : calculé ici, pas en SQL ; trois volumes au moins
-        # ponytail: tous les titres relus à chaque appel (~0,1 s pour 45 000) ; colonne releases.series si trop lent
-        found = {}
-        for title, size in conn.execute("SELECT title, size FROM releases WHERE " + " AND ".join(conds), params):
-            # « Live at Electric Zoo (New York » : coupé dans une parenthèse, ce n'est pas un nom de série
-            if (name := _series(title)) and name.count("(") == name.count(")"):
-                g = found.setdefault(name.casefold(), {"name": name, "releases": 0, "size": 0})
-                g["releases"] += 1
-                g["size"] += size or 0
-        return sorted((g for g in found.values() if g["releases"] >= 3), key=lambda g: (-g["releases"], g["name"].casefold()))
+    if by == "series":
+        return [{k: g[k] for k in ("name", "releases", "size")} for g in _all_series(conn, conds, params)]
     # ponytail: liste entière sans pagination (l'interface n'affiche que les 1000 premières lignes) ; paginer si lourd
     return [dict(r) for r in conn.execute(
         f"SELECT {col} AS name, COUNT(*) AS releases, SUM(size) AS size FROM releases WHERE " + " AND ".join(conds)
@@ -250,6 +242,7 @@ def groups(by: Literal["grp", "artist", "genre", "label", "category", "year", "s
 def search_tracks(q: str = Query("", max_length=200), category: Many = None, genre: Many = None, year: Years = None,
                   decade: Years = None, source: Many = None, mixes: str | None = Query(None, min_length=1, max_length=200),
                   offset: int = Query(0, ge=0, le=MAX_INT), summary: bool = False,
+                  bpm_min: float | None = Query(None, ge=0, le=999), bpm_max: float | None = Query(None, ge=0, le=999),
                   limit: int = Query(50, ge=1, le=MAX_INT), user=Depends(current_user), conn=Depends(get_conn)):
     """Recherche dans les tags : chaque mot doit figurer dans le titre ou l'artiste de la piste. Les filtres sont
     ceux des listes de releases, appliqués à la release de la piste. `summary` : au lieu des pistes, leur nombre
@@ -273,6 +266,9 @@ def search_tracks(q: str = Query("", max_length=200), category: Many = None, gen
         conds, params = f"t.id IN (SELECT c.track_id FROM chapters c WHERE {in_chapter})", [mixes]
     more, extra = _release_conds(category, genre, year, source=source, decade=decade)
     conds, params = " AND ".join([conds, *more]), params + extra
+    for op, v in ((">=", bpm_min), ("<=", bpm_max)):  # tempo du tag ; une piste sans BPM sort dès qu'une borne est posée
+        if v is not None:
+            conds, params = f"{conds} AND t.bpm{op}?", params + [v]
     if summary:
         return [dict(x) for x in conn.execute(
             "SELECT r.category AS name, COUNT(*) AS tracks, COALESCE(SUM(t.size), 0) AS size FROM tracks t"
@@ -436,6 +432,54 @@ def _series(title: str | None) -> str | None:
     return " ".join(short if ok(short) else words)
 
 
+def _all_series(conn, conds=("hidden=0",), params=()):
+    """Séries d'au moins trois volumes : [{name, releases, size, volumes}], les plus fournies d'abord. Le nom est le
+    début de titre commun (voir _series), calculé ici et non en SQL."""
+    # ponytail: tous les titres relus à chaque appel (~0,1 s pour 45 000) ; colonne releases.series si trop lent
+    found = {}
+    for title, size in conn.execute("SELECT title, size FROM releases WHERE " + " AND ".join(conds), list(params)):
+        # « Live at Electric Zoo (New York » : coupé dans une parenthèse, ce n'est pas un nom de série
+        if (name := _series(title)) and name.count("(") == name.count(")"):
+            g = found.setdefault(name.casefold(), {"name": name, "releases": 0, "size": 0, "volumes": set()})
+            g["releases"] += 1
+            g["size"] += size or 0
+            g["volumes"].add(int(re.search(r"\d+", title[len(name):])[0]))
+    return sorted((g for g in found.values() if g["releases"] >= 3), key=lambda g: (-g["releases"], g["name"].casefold()))
+
+
+def _missing(vols) -> list:
+    """Numéros absents entre le plus petit et le plus grand volume présents."""
+    vols = {v for v in vols if v < 1000}  # une année (« Hed Kandi 2005 ») n'est pas un numéro de volume
+    # ponytail: à partir de trois volumes ; rien au-delà de 60 trous, où le nombre n'est sans doute pas un volume
+    missing = sorted(set(range(min(vols), max(vols))) - vols) if len(vols) >= 3 else []
+    return missing if len(missing) <= 60 else []
+
+
+@router.get("/api/series-missing")
+def series_missing(conn=Depends(get_conn)):
+    """Volumes à compléter : les séries où il manque des numéros, celles où il en manque le moins d'abord."""
+    rows = [{"name": g["name"], "releases": g["releases"], "missing": m} for g in _all_series(conn) if (m := _missing(g["volumes"]))]
+    return sorted(rows, key=lambda r: (len(r["missing"]), r["name"].casefold()))
+
+
+@router.get("/api/suggest")
+def suggest(q: str = Query("", max_length=200), conn=Depends(get_conn)):
+    """Artistes, labels et séries dont le nom contient tous les mots cherchés, les plus fournis d'abord (cinq de
+    chaque) : accès direct à leur page depuis la recherche."""
+    words = [w for w in _WORDS.split(q) if w][:8]
+    if not words or len("".join(words)) < 2:
+        return {"artists": [], "labels": [], "series": []}
+
+    def top(col):
+        return [dict(r) for r in conn.execute(
+            f"SELECT {col} AS name, COUNT(*) AS releases FROM releases WHERE hidden=0 AND "
+            + " AND ".join(f"{col} LIKE ?" for _ in words) + " GROUP BY 1 ORDER BY releases DESC, 1 COLLATE NOCASE LIMIT 5",
+            [f"%{w}%" for w in words])]  # mots sans % ni _ : _WORDS les a retirés
+    has = lambda name: all(w.casefold() in name.casefold() for w in words)
+    return {"artists": top("COALESCE(tag_artist, artist)"), "labels": top("NULLIF(label, '')"),
+            "series": [{"name": g["name"], "releases": g["releases"]} for g in _all_series(conn) if has(g["name"])][:5]}
+
+
 @router.get("/api/series")
 def series(name: str = Query(min_length=1, max_length=200), user=Depends(current_user), conn=Depends(get_conn)):
     """Volumes d'une série, dans l'ordre de leur numéro, et les numéros absents de la bibliothèque."""
@@ -447,12 +491,7 @@ def series(name: str = Query(min_length=1, max_length=200), user=Depends(current
     for x in items:
         x["volume"] = int(re.search(r"\d+", x["title"][len(name):])[0])
     items.sort(key=lambda x: (x["volume"], x["year"] or 0, x["name"].lower()))
-    vols = {x["volume"] for x in items}
-    vols = {v for v in vols if v < 1000}  # une année (« Hed Kandi 2005 ») n'est pas un numéro de volume
-    # ponytail: numéros absents entre le plus petit et le plus grand présents, à partir de trois volumes ; rien au-delà
-    # de 60 trous, où le nombre n'est sans doute pas un volume
-    missing = sorted(set(range(min(vols), max(vols))) - vols) if len(vols) >= 3 else []
-    return {"name": name, "items": items, "missing": missing if len(missing) <= 60 else []}
+    return {"name": name, "items": items, "missing": _missing({x["volume"] for x in items}) if items else []}
 
 
 _LIVE = re.compile(r"[^-]+-(.+?)_Live(?:_\(|-|$)")

@@ -113,8 +113,35 @@ function series(container, params) {
   return () => { dead = true; };
 }
 
+// Volumes à compléter (#/series?missing=1) : les séries où il manque des numéros, avec la liste à copier.
+function seriesMissing(container) {
+  const body = el('tbody'), status = el('p', { class: 'status', role: 'status' }, tr('Chargement…'));
+  let rows = [], dead = false;
+  const copy = el('button', { type: 'button', onclick: async () => {
+    try {
+      await navigator.clipboard.writeText(rows.map((s) => `${s.name} : ${s.missing.join(', ')}`).join('\n'));
+      status.textContent = tr('Liste copiée.');
+    } catch { status.textContent = tr('Copie impossible dans ce navigateur.'); }
+  } }, tr('Copier la liste'));
+  container.replaceChildren(tabs('series'),
+    el('h1', { class: 'grp-title' }, el('a', { href: '#/series' }, tr('Séries')), ' › ', tr('Volumes à compléter')),
+    el('div', { class: 'filters' }, copy),
+    el('div', { class: 'table-wrap' }, el('table', { class: 'groups' },
+      el('thead', {}, el('tr', {}, el('th', { scope: 'col' }, tr('Série')), el('th', { scope: 'col', class: 'num' }, tr('Releases')),
+        el('th', { scope: 'col' }, tr('Volumes absents')))), body)), status);
+  api('/series-missing').then((list) => {
+    if (dead) return;
+    rows = list;
+    body.replaceChildren(...list.map((s) => el('tr', {}, el('td', {}, el('a', { href: `#/series/${encodeURIComponent(s.name)}` }, s.name)),
+      el('td', { class: 'num' }, String(s.releases)), el('td', { class: 'wrap' }, s.missing.join(', ')))));
+    status.textContent = list.length ? tr('{0} séries à compléter · {1} volumes absents', list.length, list.reduce((n, s) => n + s.missing.length, 0)) : tr('Aucun résultat');
+  }).catch((err) => { if (!dead) status.textContent = err.message; });
+  return () => { dead = true; };
+}
+
 export function render(container, params) {
   if (params.kind === 'series' && params.rest) return series(container, params);
+  if (params.kind === 'series' && params.missing) return seriesMissing(container);
   if (params.kind === 'categories') return categories(container, params);
   const kind = KINDS[params.kind] ? params.kind : 'groups';
   const [, label, by, pin] = KINDS[kind];
@@ -136,7 +163,7 @@ export function render(container, params) {
         paint();
       } }, l || tr('Tous'))));
   const find = el('input', { type: 'search', placeholder: tr('Filtrer la liste…'), 'aria-label': tr('Filtrer la liste…'), oninput: paint });
-  const bar = el('div', { class: 'filters' }, find);
+  const bar = el('div', { class: 'filters' }, find, kind === 'series' ? el('a', { class: 'btn', href: '#/series?missing=1' }, tr('Volumes à compléter')) : null);
   const body = el('tbody');
   const status = el('p', { class: 'status', role: 'status' }, tr('Chargement…'));
   const heads = HEAD.map(([text, k, first], i) => el('th', { scope: 'col', class: i ? 'num' : '' },

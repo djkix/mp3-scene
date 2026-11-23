@@ -1009,3 +1009,43 @@ def test_artist_info_gives_years_labels_partners_and_top(user_client, library, s
     assert info["lists"]["releases"]["n"] == 1 and info["lists"]["releases"]["size"] > 0 and info["lists"]["mixes"] == {"n": 0, "size": 0}
     assert set(info["lists"]) == {"releases", "with", "appears", "mixes"} and info["labels"] == [{"name": "Fool's Gold", "releases": 1}]
     assert info["with"] == [{"name": "Andrew Wyatt", "tracks": 1}] and [(x["id"], x["plays"]) for x in info["top"]] == [(rid, 1)]
+
+
+def test_tag_that_adds_a_mention_to_the_name_artist_is_dropped():
+    from app import artists
+    pairs = {1: ("Daft Punk", "Daft Punk - Live"), 2: ("Daft Punk", "Daft Punk [BMi D0MiNAti0N]"), 3: ("Daft Punk", "Daft Punk"),
+             4: ("VA", "Bob Sinclar - Live")}  # un autre artiste que celui du nom : gardé
+    assert artists._step(pairs, {}) == {1: ("Daft Punk", None), 2: ("Daft Punk", None), 3: ("Daft Punk", "Daft Punk"),
+                                         4: ("VA", "Bob Sinclar - Live")}
+
+
+def test_series_missing_suggest_and_bpm_filter(user_client, library, settings):
+    conn = db.connect(settings.data_dir)
+    for i, t in enumerate(["Serious Beats 1", "Serious Beats 2", "Serious Beats 5"]):
+        conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, artist, title, label)"
+                     " VALUES (?,?,'','Compilations',0,0,10,0,0,'VA',?,'Serious Label')", (f"m{i}", f"VA-m{i}", t))
+    conn.execute("UPDATE tracks SET bpm=128 WHERE title='Ibanez'")
+    conn.commit()
+    assert user_client.get("/api/series-missing").json() == [{"name": "Serious Beats", "releases": 3, "missing": [3, 4]}]
+    s = user_client.get("/api/suggest", params={"q": "serious"}).json()
+    assert s["series"] == [{"name": "Serious Beats", "releases": 3}] and s["labels"] == [{"name": "Serious Label", "releases": 3}]
+    assert user_client.get("/api/suggest", params={"q": "trak"}).json()["artists"][0]["name"] == "A-Trak"
+    got = user_client.get("/api/tracks", params={"q": "ibanez", "bpm_min": 120, "bpm_max": 130}).json()["items"]
+    assert [(t["title"], t["bpm"]) for t in got] == [("Ibanez", 128.0)]
+
+
+def test_admin_suggests_merges_and_clears_transcode_cache(admin_client, settings):
+    conn = db.connect(settings.data_dir)
+    for i, (artist, label) in enumerate([("Prodigy", "Yellow Productions"), ("Prodigy", "Yellow Productions"), ("The Prodigy", "Yellow"),
+                                         ("Autre", "Bits & Pieces"), ("Autre", "Bits And Pieces"), ("Autre", "Bits & Pieces")]):
+        conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, artist, label)"
+                     " VALUES (?,?,'','Singles',0,0,1,0,0,?,?)", (f"g{i}", f"g{i}", artist, label))
+    conn.commit()
+    s = admin_client.get("/api/admin/suggestions").json()
+    assert s["artists"] == [{"alias": "The Prodigy", "releases": 1, "target": "Prodigy", "target_releases": 2}]
+    assert {(x["alias"], x["target"]) for x in s["labels"]} == {("Yellow", "Yellow Productions"), ("Bits And Pieces", "Bits & Pieces")}
+    cache = settings.data_dir / "transcode"
+    cache.mkdir()
+    (cache / "1-1.mp3").write_bytes(b"x" * 10)
+    assert admin_client.get("/api/admin/overview").json()["transcode_size"] == 10
+    assert admin_client.delete("/api/admin/transcode", headers={"X-CSRF": "1"}).status_code == 204 and not list(cache.iterdir())

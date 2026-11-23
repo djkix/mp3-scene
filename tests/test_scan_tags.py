@@ -222,3 +222,8 @@ def test_runner_stores_warning_but_stays_idle_and_logs(settings, conn, music, ma
     monkeypatch.setattr(sc, "_list", real); monkeypatch.setattr(sc, "_storable", lambda name: True)
     assert r.start() is True; r._thread.join(5)
     assert r.status(conn)["error"] is None
+
+
+def test_bpm_tag_is_read_as_a_plausible_number():
+    from app.scanner import _bpm
+    assert [_bpm(v) for v in ("128", "127.98", "128,0 BPM", "0", "?", None, "999")] == [128.0, 128.0, 128.0, None, None, None, None]

@@ -4,6 +4,25 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.61.0](https://github.com/djkix/mp3-scene/compare/v1.60.1...v1.61.0) (2026-11-23)
+
+### Résumé
+
+**Accès direct depuis la recherche, rapprochements suggérés, volumes à compléter, BPM et tonalité, cache de conversion.**
+
+- **Recherche** : au-dessus des résultats, les artistes, labels et séries dont le nom contient les mots cherchés
+  (cinq de chaque, avec leur nombre de releases) ; un clic ouvre leur page.
+- **Rapprochements suggérés** (Administration › Règles) : labels et artistes qui ne diffèrent que par « & » / « and »,
+  un mot final de label (« Productions », « Digital »…) ou un « The » / « DJ » initial, à rattacher d'un clic.
+- **Volumes à compléter** : depuis l'onglet Séries, le tableau des séries où il manque des numéros, avec la liste à
+  copier.
+- **BPM et tonalité** : lus au scan avec les autres tags, affichés sur la fiche d'une release et dans les listes de
+  pistes ; filtre par plage de BPM sur l'onglet Pistes de la recherche. Les pistes indexées avant cette version les
+  reçoivent par « Relire tous les tags » (Administration › Scan).
+- **Cache de conversion** : sa taille figure dans la vue d'ensemble, avec un bouton pour le vider.
+- **Artistes** : un tag qui ajoute une mention à l'artiste du nom (« Daft Punk - Live », « Daft Punk [BMi D0MiNAti0N] »)
+  ne crée plus un artiste à part.
+
 ## [1.60.1](https://github.com/djkix/mp3-scene/compare/v1.60.0...v1.60.1) (2026-11-23)
 
 ### Résumé

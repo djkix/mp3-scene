@@ -205,13 +205,37 @@ export function render(container, params = {}) {
       el('p', { class: 'hint' }, t('Le genre et la durée apparaissent au fur et à mesure de la lecture des tags.')),
       scanBtn, scanOut, scanMsg,
       el('h2', {}, t('Scan quotidien')),
-      el('p', { class: 'inline-form' }, el('label', {}, t('Lancer chaque jour à'), daily), serverTime));
+      el('p', { class: 'inline-form' }, el('label', {}, t('Lancer chaque jour à'), daily), serverTime),
+      el('h2', {}, t('BPM et tonalité')),
+      el('p', { class: 'hint' }, t('Ils sont lus avec les autres tags. Les pistes indexées avant la version 1.61.0 ne les ont pas : relire tous les tags les ajoute. C’est long sur une grande bibliothèque ; les listes restent utilisables pendant ce temps.')),
+      el('button', { type: 'button', onclick: async (e) => {
+        if (!confirm(t('Relire les tags de toutes les pistes ?'))) return;
+        e.target.disabled = true;
+        try { await api('/admin/scan/retag', { method: 'POST' }); } catch (err) { scanMsg.textContent = err.message; }
+        scanning = true;
+        refreshScan();
+      } }, t('Relire tous les tags')));
     refreshScan();
   } else if (section === 'rules') {
     const counts = Object.fromEntries(RULES.map(([, key]) => [key, el('span', { class: 'chip' }, '…')]));
     // rattachements manuels (artistes ou labels) : un tableau avec « Détacher »
-    const aliasTable = (path, first, empty) => {
+    const aliasTable = (path, first, empty, kind) => {
       const rows = el('tbody'), msg = el('p', { class: 'status', role: 'status' });
+      // rapprochements proposés par le serveur : un clic rattache, la proposition disparaît
+      const hints = el('div', { class: 'ad-hints' });
+      const suggest = () => api('/admin/suggestions').then((s) => {
+        if (dead) return;
+        const list = s[kind];
+        hints.replaceChildren(...(list.length ? [el('p', { class: 'hint' }, t('Rapprochements suggérés :')),
+          ...list.map((x) => el('p', {}, `${x.alias} (${x.releases}) → ${x.target} (${x.target_releases}) `,
+            el('button', { type: 'button', onclick: async (e) => {
+              e.target.disabled = true;
+              try { await api(path, { method: 'PUT', body: { alias: x.alias, target: x.target } }); } catch (err) { msg.textContent = err.message; }
+              load();
+              suggest();
+            } }, t('Rattacher'))))] : []));
+      }).catch(() => {}); // facultatif
+      suggest();
       const load = () => api(path).then((list) => {
         if (dead) return;
         msg.textContent = list.length ? '' : empty;
@@ -235,7 +259,7 @@ export function render(container, params = {}) {
         } catch (err) { msg.textContent = err.message; }
         load();
       } }, from, to, el('button', { type: 'submit' }, t('Rattacher')));
-      return [form, el('div', { class: 'table-wrap' }, el('table', { class: 'users' },
+      return [hints, form, el('div', { class: 'table-wrap' }, el('table', { class: 'users' },
         el('thead', {}, el('tr', {}, th(first), th(t('Rattaché à')), th(t('Actions')))), rows)), msg];
     };
     // graphies à ne jamais fusionner (« Florida » n'est pas « Flo Rida »)
@@ -260,10 +284,10 @@ export function render(container, params = {}) {
       ...RULES.map(([title, key, text]) => el('section', { class: 'ad-card' }, el('h3', {}, t(title), counts[key]), el('p', {}, t(text)))),
       classBtn, classMsg,
       el('h2', {}, t('Artistes rattachés')),
-      ...aliasTable('/admin/artists/aliases', t('Artiste'), t('Aucun artiste rattaché à la main.')),
+      ...aliasTable('/admin/artists/aliases', t('Artiste'), t('Aucun artiste rattaché à la main.'), 'artists'),
       el('h2', {}, t('Labels rattachés')),
       el('p', { class: 'hint' }, t('Détacher rend son label d’origine à chaque release au prochain scan.')),
-      ...aliasTable('/admin/labels/aliases', t('Label'), t('Aucun label rattaché à la main.')),
+      ...aliasTable('/admin/labels/aliases', t('Label'), t('Aucun label rattaché à la main.'), 'labels'),
       el('h2', {}, t('Artistes à ne jamais fusionner')),
       el('p', { class: 'hint' }, t('Une graphie listée ici garde ses releases au lieu de rejoindre un artiste au nom proche, à ce scan et aux suivants.')),
       sepForm,
@@ -372,7 +396,8 @@ export function render(container, params = {}) {
           link('#/admin/shares', t('Gérer les liens'))));
       sys.replaceChildren(card(t('Version'), ver && (ver.update ? t('Mise à jour disponible') : ver.latest ? t('À jour') : null),
         [[t('Version installée'), ver ? ver.version : '…'], [t('Base de données'), v('o', (x) => fmtSize(x.db_size))],
-          [t('Vignettes'), v('o', (x) => fmtSize(x.thumbs_size))]],
+          [t('Vignettes'), v('o', (x) => fmtSize(x.thumbs_size))], [t('Cache de conversion'), v('o', (x) => fmtSize(x.transcode_size))]],
+        o?.transcode_size ? clearCache : null,
         link('#/library', t('Statistiques')), ver?.update && el('a', { class: 'btn', href: ver.url, target: '_blank', rel: 'noopener' }, t('Voir les nouveautés'))),
       // sauvegarde de la base vers le NAS : dernière tentative, retard éventuel, lancement à la main
       card(t('Sauvegarde'), b && (!b.configured ? t('Non configurée') : b.late ? t('En retard') : b.last?.ok ? t('À jour') : null),
@@ -381,6 +406,13 @@ export function render(container, params = {}) {
           [t('Chaque jour à'), v('b', (x) => (x.configured ? `${String(x.hour).padStart(2, '0')}:00` : '—'))]],
         b?.configured ? backupBtn : null));
     }
+    // pistes converties pour la lecture (FLAC, WAV…) : gardées pour ne pas les reconvertir, plafonnées par le serveur
+    const clearCache = el('button', { type: 'button', onclick: async () => {
+      clearCache.disabled = true;
+      try { await api('/admin/transcode', { method: 'DELETE' }); status.textContent = t('Cache de conversion vidé.'); } catch (err) { status.textContent = err.message; }
+      clearCache.disabled = false;
+      api('/admin/overview').then((x) => { d.o = x; paint(); }).catch(() => {});
+    } }, t('Vider le cache'));
     const backupBtn = el('button', { type: 'button', onclick: async () => {
       backupBtn.disabled = true;
       status.textContent = t('Sauvegarde en cours…');

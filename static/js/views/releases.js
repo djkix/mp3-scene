@@ -209,10 +209,23 @@ export function render(container, params) {
       onclick: () => setFilter('letter', l) }, l || tr('Tous'))));
   // recherche : total des releases trouvées, puis le détail par catégorie (un clic filtre), comme sur la page d'un artiste
   const found = q && el('p', { class: 'grp-kinds muted', role: 'status' });
-  container.replaceChildren(...(tabs ? [tabs] : []), ...(found ? [found] : []), bar, ...(letters ? [letters] : []), list);
+  // recherche : artistes, labels et séries dont le nom contient les mots cherchés, en accès direct
+  const direct = q && el('p', { class: 'grp-kinds direct' });
+  // onglet Pistes : plage de tempo (les pistes sans BPM sortent dès qu'une borne est posée)
+  const bpm = (name, label) => el('input', { type: 'number', min: 40, max: 300, placeholder: label, 'aria-label': label, value: params[name] || '',
+    onchange: (e) => setFilter(name, e.target.value) });
+  const tempo = inTracks && el('div', { class: 'filters bpm' }, el('span', {}, 'BPM'), bpm('bpm_min', tr('de')), bpm('bpm_max', tr('à')));
+  container.replaceChildren(...(tabs ? [tabs] : []), ...(direct ? [direct] : []), ...(found ? [found] : []), bar, ...(tempo ? [tempo] : []),
+    ...(letters ? [letters] : []), list);
+  if (direct) api('/suggest?' + new URLSearchParams({ q })).then((s) => {
+    if (dead) return;
+    const group = (label, route, rows) => (rows.length ? [el('span', { class: 'muted' }, label + ' '),
+      ...rows.map((r) => el('a', { class: 'chip', href: `#/${route}/${encodeURIComponent(r.name)}` }, r.name, el('small', {}, String(r.releases)))), ' '] : []);
+    direct.replaceChildren(...group(tr('Artistes'), 'artists', s.artists), ...group(tr('Labels'), 'labels', s.labels), ...group(tr('Séries'), 'series', s.series));
+  }).catch(() => {}); // facultatif
 
   function setFilter(name, value) {
-    const next = { q, in: inTracks ? 'tracks' : '', category, genre, year, source, letter, ...pin?.extra, ...(name ? { [name]: value } : { category: '', genre: '', year: '', source: '' }) };
+    const next = { q, in: inTracks ? 'tracks' : '', category, genre, year, source, letter, bpm_min: params.bpm_min, bpm_max: params.bpm_max, ...pin?.extra, ...(name ? { [name]: value } : { category: '', genre: '', year: '', source: '' }) };
     const qs = Object.entries(next).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
     location.hash = (pin ? pin.base : params.base || (q ? '#/search' : '#/')) + (qs ? '?' + qs : ''); // nouvelle entrée d'historique, pagination remise à zéro
   }
@@ -272,6 +285,7 @@ export function render(container, params) {
   }
 
   const query = toQuery({ q });
+  if (inTracks) for (const k of ['bpm_min', 'bpm_max']) if (Number(params[k]) > 0) query.set(k, Number(params[k]));
   // onglet Pistes de la recherche : mêmes filtres, appliqués à la release de chaque piste
   const dispose = inTracks ? trackList(list, { path: `/tracks?${query}`, empty: tr('Aucun résultat') }) : releaseList(list, (offset, tri) => {
     query.set('offset', offset);

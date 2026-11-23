@@ -209,9 +209,10 @@ function trackTable(rel) {
   if (!rel.tracks.length) return el('p', { class: 'status' }, t('Aucune piste.'));
   const rows = [];
   let disc = null;
+  const hasBpm = rel.tracks.some((x) => x.bpm); // colonne BPM (et tonalité) seulement si une piste en a un
   rel.tracks.forEach((tk, i) => {
     if (rel.tracks.some((x) => x.disc !== rel.tracks[0].disc) && tk.disc !== disc) {
-      rows.push(el('tr', { class: 'disc' }, el('th', { scope: 'rowgroup', colspan: 8 }, `CD ${tk.disc}`)));
+      rows.push(el('tr', { class: 'disc' }, el('th', { scope: 'rowgroup', colspan: hasBpm ? 9 : 8 }, `CD ${tk.disc}`)));
     }
     disc = tk.disc;
     const label = tk.title ? (tk.artist ? `${tk.artist} - ${tk.title}` : tk.title) : tk.filename;
@@ -223,6 +224,7 @@ function trackTable(rel) {
     el('td', { class: 'num' }, tk.duration == null ? '—' : fmtDuration(tk.duration)),
     el('td', { class: 'num col-bitrate' }, tk.bitrate == null ? '—' : `${Math.round(tk.bitrate / 1000)} kbit/s`),
     el('td', { class: 'num col-bitrate' }, tk.genre ? el('span', { class: 'chip' }, tk.genre) : '—'), // même pastille que dans les listes
+    hasBpm && el('td', { class: 'num col-bitrate' }, tk.bpm ? [String(Math.round(tk.bpm)), tk.key].filter(Boolean).join(' · ') : '—'),
     el('td', { class: 'col-pl' }, addButton({ track_ids: [tk.id] }, null, [tk])),
     el('td', { class: 'col-fav' }, favButton(tk, 'track')),
     el('td', { class: 'col-bitrate' }, el('a', { class: 'icon', href: `/api/tracks/${tk.id}/stream?download=1`, download: '',
@@ -231,7 +233,7 @@ function trackTable(rel) {
   const th = (txt, cls) => el('th', { scope: 'col', class: cls }, txt);
   return el('div', { class: 'table-wrap' }, el('table', { class: 'tracks' },
     el('thead', {}, el('tr', {}, th(t('N°'), 'num'), th(t('Artiste - Titre')), th(t('Durée'), 'num'), th(t('Débit'), 'num col-bitrate'),
-      th(t('Genre'), 'num col-bitrate'),
+      th(t('Genre'), 'num col-bitrate'), hasBpm && th('BPM', 'num col-bitrate'),
       th(t('Playlist'), 'num col-pl'), th(t('Favori'), 'num col-fav'), th(t('Télécharger (MP3)'), 'num col-bitrate'))),
     el('tbody', {}, rows)));
 }
