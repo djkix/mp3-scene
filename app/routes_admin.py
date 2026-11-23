@@ -273,10 +273,11 @@ def series_rules(conn=Depends(get_conn)):
 
 @router.put("/series/rules", status_code=204)
 def set_series_rule(body: SeriesRule, conn=Depends(get_conn)):
-    """Rattache une série à une famille, ou (famille vide) la garde à part ; au nom d'une famille, vide la défait."""
+    """Rattache une série à une famille, ou (famille vide) la garde à part ; au nom d'une famille, vide la défait.
+    Un nom rattaché à lui-même (« Kontor » -> « Kontor ») réunit toutes les séries qui commencent par ce nom."""
     name, family = body.name.strip(), body.family.strip()
-    if not name or name.casefold() == family.casefold():
-        raise HTTPException(400, "Choisissez une autre famille que la série elle-même.")
+    if not name:
+        raise HTTPException(400, "Nom de série manquant.")
     conn.execute("INSERT OR REPLACE INTO series_rules(key, name, family) VALUES (?,?,?)", (name.casefold(), name, family))
     conn.commit()
 

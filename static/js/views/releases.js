@@ -71,7 +71,9 @@ export function row(rel, pick = null, onPick = () => {}) {
     pick && el('input', { type: 'checkbox', class: 'rel-pick', value: rel.id, checked: pick.has(rel.id), 'aria-label': tr('Sélectionner {0}', rel.name),
       onchange: (e) => { if (e.target.checked) pick.add(rel.id); else pick.delete(rel.id); onPick(); } }),
     since() && rel.added_at > since() ? el('span', { class: 'new' }, tr('nouveau')) : null,
-    rel.hidden ? el('span', { class: 'new' }, tr('masquée')) : null, relName(rel.name)),
+    rel.hidden ? el('span', { class: 'new' }, tr('masquée')) : null, relName(rel.name),
+    // apparitions d'un artiste : ses pistes dans cette release (trois au plus), comme le chapitre d'un mix
+    rel.by?.length ? el('small', { class: 'trk-chapter' }, `↳ ${rel.by.slice(0, 3).join(' · ')}${rel.by.length > 3 ? ' …' : ''}`) : null),
   // même ordre que HEAD ; sur mobile, .rel-info devient une ligne de détails sous le nom
   el('span', { class: 'rel-info' },
     el('span', { class: 'mid' }, rel.genre ? el('span', { class: 'chip' }, rel.genre) : ''),
@@ -83,21 +85,25 @@ export function row(rel, pick = null, onPick = () => {}) {
   el('span', { class: 'rel-actions' }, queue, favButton(rel), detail));
 }
 
+// même ordre que le tri « kind » du serveur : albums, singles, compilations, live et radio
+const KIND = [/album/i, /single/i, /compil/i, /live|radio/i];
+
 // Liste infinie par pages de 50. fetchPage(offset, tri) -> {items, has_more}, où `tri` vaut '&sort=…&dir=…'.
 // `sort` : tri affiché au départ, [clé, sens]. Retourne la fonction de nettoyage.
 // ponytail: le tri choisi n'est pas dans l'adresse (perdu au retour arrière) ; le passer en paramètre de hash si besoin.
-export function releaseList(container, fetchPage, { empty = tr('Aucun résultat'), sort = ['date', 'desc'], pick = null, onPick } = {}) {
+// `counts` (promesse de {catégorie: nombre}) : complète les intertitres de l'ordre « kind » (page d'un artiste).
+export function releaseList(container, fetchPage, { empty = tr('Aucun résultat'), sort = ['date', 'desc'], pick = null, onPick, counts = null } = {}) {
   const list = el('ul', { class: 'rel-list' });
   const status = el('p', { class: 'status', role: 'status' });
   const sentinel = el('div', { class: 'sentinel' });
   let [sortKey, sortDir] = sort;
-  let offset = 0, loading = false, done = false, dead = false, gen = 0;
+  let offset = 0, loading = false, done = false, dead = false, gen = 0, lastCat = null;
   // en-têtes de colonnes (bureau) : un clic trie, un second inverse
   const heads = HEAD.map(([text, key, first]) => el('button', { type: 'button', onclick: () => {
     sortDir = sortKey === key ? (sortDir === 'asc' ? 'desc' : 'asc') : first;
     sortKey = key;
     paintHead();
-    gen++; offset = 0; done = false; loading = false; // la réponse d'un tri précédent sera ignorée
+    gen++; offset = 0; done = false; loading = false; lastCat = null; // la réponse d'un tri précédent sera ignorée
     list.replaceChildren();
     load();
   } }, text));
@@ -125,7 +131,19 @@ export function releaseList(container, fetchPage, { empty = tr('Aucun résultat'
     try {
       const page = await fetchPage(offset, `&sort=${sortKey}&dir=${sortDir}`);
       if (dead || g !== gen) return; // réponse d'une vue remplacée ou d'un tri abandonné
-      list.append(...page.items.map((r) => row(r, pick, onPick)));
+      // ordre par catégorie (page d'un artiste) : un petit intertitre au début de chaque groupe, et un liseré de
+      // couleur à gauche de ses lignes ; rien de tel dès qu'on trie par une colonne
+      list.append(...page.items.flatMap((r) => {
+        const li = row(r, pick, onPick);
+        if (sortKey !== 'kind') return [li];
+        const k = KIND.findIndex((re) => re.test(r.category || ''));
+        li.classList.add(`kind-${k < 0 ? 4 : k}`);
+        if (r.category === lastCat) return [li];
+        lastCat = r.category;
+        const n = el('span');
+        counts?.then((c) => { if (c[r.category]) n.textContent = ` · ${c[r.category]}`; }).catch(() => {});
+        return [el('li', { class: `rel-cap kind-${k < 0 ? 4 : k}` }, catLabel(r.category), n), li];
+      }));
       offset += page.items.length;
       done = !page.has_more;
       status.textContent = done ? (offset ? tr('Fin de la liste') : empty) : '';
@@ -298,6 +316,14 @@ export function render(container, params) {
   // derniers ajouts (accueil sans filtre) par date d'ajout, même si la colonne Date montre celle du NFO ; recherche, filtre, groupe ou artiste par ordre alphabétique
   }, { empty: tr('Aucun résultat'), // un artiste : ses albums d'abord, puis ses singles, ses compilations et ses lives, chaque groupe par nom
     sort: pin?.key === 'artist' ? ['kind', 'asc'] : q || pin || category || genre || year || source ? ['name', 'asc'] : ['added', 'desc'],
-    pick: sel?.pick, onPick: sel?.onPick });
+    pick: sel?.pick, onPick: sel?.onPick,
+    // nombre de releases de l'artiste par catégorie, pour ses intertitres (les filtres Catégorie et Source n'y sont
+    // pas : sans nombre plutôt qu'un nombre faux)
+    counts: pin?.key === 'artist' && !category && !source ? (() => {
+      const p = multiQuery({ genre, year });
+      p.set('by', 'category');
+      p.set('artist', pin.value);
+      return api('/groups?' + p).then((rows) => Object.fromEntries(rows.map((c) => [c.name, c.releases])));
+    })() : null });
   return () => { dead = true; dispose(); };
 }

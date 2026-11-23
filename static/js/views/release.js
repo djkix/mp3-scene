@@ -105,7 +105,9 @@ function header(rel) {
       } }, '⧉'),
       ...[['Discogs', 'https://www.discogs.com/search/?type=release&q='], ['Beatport', 'https://www.beatport.com/search?q='],
         ['YouTube', 'https://www.youtube.com/results?search_query=']].map(([site, url]) => el('a', { class: 'chip', target: '_blank', rel: 'noopener noreferrer',
-        href: url + encodeURIComponent([/^(va|various( artists)?)$/i.test(rel.artist || '') ? '' : rel.artist, rel.title].filter(Boolean).join(' ')) }, site))),
+        // titre sans le nombre de disques collé à la fin (« Mystery Land 2010-2CD »), comme la recherche de pochettes
+        href: url + encodeURIComponent([/^(va|various( artists)?)$/i.test(rel.artist || '') ? '' : rel.artist,
+          (rel.title || '').replace(/[-_ ]+\(?\d*x?(?:CD|DVD)\d*\)?\s*$/i, '')].filter(Boolean).join(' ')) }, site))),
     session.user?.role === 'admin' ? coverTools(rel) : null,
     el('div', { class: 'detail-actions' },
       el('button', { type: 'button', class: 'primary', 'data-ico': 'play', disabled: !rel.tracks.length, onclick: play }, t('Lire')),

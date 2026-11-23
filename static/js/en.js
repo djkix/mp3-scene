@@ -162,7 +162,7 @@ export const EN = {
   'Retirer la photo': 'Remove the photo',
   'Aucune photo trouvée.': 'No photo found.',
   'Familles de séries': 'Series families',
-  'Les séries qui partagent leur début sont réunies en famille. Ici : rattacher une série à une famille, la garder à part (famille vide), ou défaire une famille entière (son nom, famille vide).': 'Series sharing their first words are grouped into a family. Here: attach a series to a family, keep it apart (empty family), or undo a whole family (its name, empty family).',
+  'Les séries qui partagent leur début sont réunies en famille. Ici : rattacher une série à une famille, la garder à part (famille vide), défaire une famille entière (son nom, famille vide), ou réunir toutes les séries qui commencent par un nom (ce nom des deux côtés, par exemple Kontor et Kontor).': 'Series sharing their first words are grouped into a family. Here: attach a series to a family, keep it apart (empty family), undo a whole family (its name, empty family), or group every series starting with a name (that name on both sides, for example Kontor and Kontor).',
   'Famille': 'Family',
   'Famille (vide : à part)': 'Family (empty: apart)',
   'Aucune famille réglée à la main.': 'No family set by hand.',

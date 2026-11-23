@@ -4,6 +4,24 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.66.0](https://github.com/djkix/mp3-scene/compare/v1.65.0...v1.66.0) (2026-11-23)
+
+### Résumé
+
+**Chapitres lus dans la tracklist des NFO, familles de séries par début de nom, catégories démarquées sur la page
+d'un artiste.**
+
+- **Chapitres** : sans fichier .cue, la tracklist minutée du NFO (« 1. Artiste - Titre 4:00 », « [00:00] … ») devient
+  les chapitres des longs mixes, un disque par piste, quand elle tient dans leur durée.
+- **Familles de séries** : une règle qui rattache un nom à lui-même (« Kontor » → « Kontor ») réunit toutes les séries
+  qui commencent par ce nom.
+- **Page d'un artiste** : un intertitre (« Albums · 3 ») et un liseré de couleur marquent chaque catégorie ; sous
+  chaque apparition, les titres de l'artiste dans la release.
+- **Recherches** : le nombre de disques collé au titre (« Mystery Land 2010-2CD ») n'est plus envoyé aux recherches de
+  pochettes ni aux liens Discogs, Beatport et YouTube.
+- **Fiche** : les cartes des autres versions et des releases similaires donnent genre, catégorie, pistes, débit,
+  poids, puis date.
+
 ## [1.65.0](https://github.com/djkix/mp3-scene/compare/v1.64.0...v1.65.0) (2026-11-23)
 
 ### Résumé

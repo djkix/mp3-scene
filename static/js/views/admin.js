@@ -312,7 +312,7 @@ export function render(container, params = {}) {
       el('p', { class: 'hint' }, t('Détacher rend son label d’origine à chaque release au prochain scan.')),
       ...aliasTable('/admin/labels/aliases', t('Label'), t('Aucun label rattaché à la main.'), 'labels'),
       el('h2', {}, t('Familles de séries')),
-      el('p', { class: 'hint' }, t('Les séries qui partagent leur début sont réunies en famille. Ici : rattacher une série à une famille, la garder à part (famille vide), ou défaire une famille entière (son nom, famille vide).')),
+      el('p', { class: 'hint' }, t('Les séries qui partagent leur début sont réunies en famille. Ici : rattacher une série à une famille, la garder à part (famille vide), défaire une famille entière (son nom, famille vide), ou réunir toutes les séries qui commencent par un nom (ce nom des deux côtés, par exemple Kontor et Kontor).')),
       famForm, el('div', { class: 'table-wrap' }, el('table', { class: 'users' },
         el('thead', {}, el('tr', {}, th(t('Série')), th(t('Famille')), th(t('Actions')))), fams)), famMsg,
       el('h2', {}, t('Artistes à ne jamais fusionner')),

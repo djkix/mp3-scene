@@ -176,8 +176,14 @@ def list_releases(q: str = "", category: Many = None, genre: Many = None, grp: s
     if favorites:
         conds.append("f.item_id IS NOT NULL")
     where = "WHERE " + " AND ".join(conds) if conds else ""
-    return _page(conn, RELEASE_COLS, RELEASE_FROM, where, params, _order(sort, dir, "r.added_at DESC, r.id DESC"),
+    page = _page(conn, RELEASE_COLS, RELEASE_FROM, where, params, _order(sort, dir, "r.added_at DESC, r.id DESC"),
                  user["id"], offset, limit, _release)
+    if appears is not None:  # apparitions d'un artiste : ses pistes dans chaque release, affichées sous son nom
+        for x in page["items"]:
+            x["by"] = [r[0] for r in conn.execute(
+                "SELECT title FROM tracks WHERE release_id=? AND artist=? AND title IS NOT NULL ORDER BY disc, relpath LIMIT 4",
+                (x["id"], appears))]
+    return page
 
 
 # recherche : dans le nom des releases, ou (nfo=1) dans le texte de leur NFO
@@ -582,8 +588,16 @@ def _families(every, rules=None) -> dict:
     # règles manuelles : une famille défaite (règle vide à son nom), une série gardée à part ou rattachée ailleurs
     rules = rules or {}
     out = {k: f for k, f in out.items() if rules.get(f.casefold()) != ""}
+    # règle dont la famille porte son propre nom (« Kontor » -> « Kontor ») : toutes les séries qui commencent par ce
+    # nom la rejoignent, quel que soit le mot suivant
+    prefixes = [(k, f) for k, f in rules.items() if f and k == f.casefold()]
     for g in every:
-        if (family := rules.get(g["name"].casefold())) is not None:
+        name = g["name"].casefold()
+        for k, f in prefixes:
+            if name.startswith(k + " ") or name.startswith(k + "-"):
+                out[name] = f
+    for g in every:
+        if (family := rules.get(g["name"].casefold())) is not None and g["name"].casefold() != family.casefold():
             out.pop(g["name"].casefold(), None)
             if family:
                 out[g["name"].casefold()] = family

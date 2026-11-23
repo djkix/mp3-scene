@@ -104,3 +104,53 @@ def label_key(v: str) -> str:
     final (« Defected », « DEFECTED », « Defected Records », « De-fected », « ZYX », « ZYX Music » ne font qu'un)."""
     k = "".join(c for c in unicodedata.normalize("NFKD", v).casefold() if c.isalnum())
     return re.sub(r"(?<=..)(?:records?|recordings?|recs?|music)$", "", k) or k
+
+
+_DISC = re.compile(r"^\W*(?:cd|disc|disk)\s*0*(\d+)\b", re.I)
+_TIME = r"\[?\(?(?:(\d{1,2}):)?(\d{1,3}):(\d{2})\)?\]?"
+_AFTER = re.compile(rf"^\s*\d{{1,3}}\s*[.)\-]?\s+(.+?)\s+{_TIME}\s*$")          # « 1. Artiste - Titre    4:00 »
+_BEFORE = re.compile(rf"^\s*{_TIME}\s+(?:\d{{1,3}}\s*[.)\-]?\s+)?(.+?)\s*$")       # « [00:00] 01. Artiste - Titre »
+
+
+def tracklist(text: str) -> list[list[dict]]:
+    """Tracklist minutée du NFO, un tableau par disque : [{artist, title, start (secondes)}].
+
+    Les temps sont des durées (« 4:00 » en fin de ligne) ou des débuts (« [00:00] » en tête de ligne, ou une suite
+    croissante qui part de zéro) ; les débuts sont recalculés depuis les durées. Une ligne qui ne commence que par une
+    parenthèse prolonge le titre précédent (« (Tommyboy Remix) »). Un disque de moins de deux morceaux est ignoré."""
+    discs, cur = [], []
+    for line in text.splitlines():
+        if (d := _DISC.match(line)) and not _AFTER.match(line):
+            if cur:
+                discs.append(cur)
+            cur = []
+            continue
+        m, before = _AFTER.match(line), False
+        if not m and (m := _BEFORE.match(line)):
+            before = True
+        if m:
+            h, mi, se = (m.group(1), m.group(2), m.group(3)) if before else (m.group(2), m.group(3), m.group(4))
+            name = m.group(4) if before else m.group(1)
+            secs = int(h or 0) * 3600 + int(mi) * 60 + int(se)
+            artist, sep, title = re.split(r"\s+[-\u2013]\s+", name.strip(), maxsplit=1)[0], " - ", ""
+            parts = re.split(r"\s+[-\u2013]\s+", name.strip(), maxsplit=1)
+            artist, title = (parts[0], parts[1]) if len(parts) == 2 else ("", parts[0])
+            cur.append({"artist": artist.strip()[:200], "title": title.strip()[:300], "t": secs, "before": before})
+        elif cur and line.strip().startswith("("):
+            cur[-1]["title"] = (cur[-1]["title"] + " " + line.strip())[:300]
+    if cur:
+        discs.append(cur)
+    out = []
+    for parts in discs:
+        if len(parts) < 2:
+            continue
+        times = [p["t"] for p in parts]
+        starts = parts[0]["before"] or (times[0] == 0 and all(a < b for a, b in zip(times, times[1:])))
+        if not starts:  # durées : chaque morceau commence où le précédent finit
+            acc, times = 0, []
+            for p in parts:
+                times.append(acc)
+                acc += p["t"]
+        out.append([{"artist": p["artist"], "title": p["title"], "start": t, "length": None if starts else p["t"]}
+                    for p, t in zip(parts, times)])
+    return out

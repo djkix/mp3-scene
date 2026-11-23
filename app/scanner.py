@@ -457,11 +457,33 @@ def _scan_dates(conn, root, should_stop):
         conn.commit()
 
 
+def _nfo_chapters(conn, rid, text):
+    """Chapitres des longs mixes d'une release lus dans la tracklist minutée de son NFO, quand aucun .cue n'en donne :
+    un disque de la tracklist par piste, dans l'ordre. Rien si le nombre de disques ne correspond pas aux pistes, ou
+    si les temps ne tiennent pas dans la durée de la piste (une tracklist d'album n'est pas celle d'un mix)."""
+    tracks = conn.execute("SELECT id, duration FROM tracks WHERE release_id=? ORDER BY disc, relpath", (rid,)).fetchall()
+    if not tracks or conn.execute("SELECT 1 FROM chapters c JOIN tracks t ON t.id=c.track_id WHERE t.release_id=? LIMIT 1",
+                                  (rid,)).fetchone():
+        return
+    discs = nfo.tracklist(text)
+    if len(discs) != len(tracks):
+        return
+    rows = []
+    for (tid, duration), parts in zip(tracks, discs):
+        end = parts[-1]["start"] + (parts[-1]["length"] or 0)
+        # ponytail: tolérance fixe (deux minutes ou 5 %) ; une tracklist approximative peut dépasser et être écartée
+        if not duration or duration < 600 or parts[-1]["start"] >= duration or abs(end - duration) > max(120, 0.05 * duration) \
+                and parts[-1]["length"] is not None:
+            return
+        rows += [(tid, i, c["start"], c["artist"], c["title"]) for i, c in enumerate(parts)]
+    conn.executemany("INSERT INTO chapters(track_id, pos, start, artist, title) VALUES (?,?,?,?,?)", rows)
+
+
 def _scan_nfo_text(conn, root, should_stop):
     """Indexe le texte du NFO des releases qui ne l'ont pas encore été (recherche dans les NFO)."""
     last = 0
     while not should_stop():
-        rows = conn.execute("SELECT id, path FROM releases WHERE has_nfo=1 AND nfo_indexed IS NULL AND id>? ORDER BY id LIMIT ?",
+        rows = conn.execute("SELECT id, path FROM releases WHERE has_nfo=1 AND COALESCE(nfo_indexed, 0)<2 AND id>? ORDER BY id LIMIT ?",
                             (last, TAG_BATCH)).fetchall()
         if not rows:
             break
@@ -480,7 +502,9 @@ def _scan_nfo_text(conn, root, should_stop):
         for rid, text in done:
             conn.execute("DELETE FROM nfo_fts WHERE rowid=?", (rid,))
             conn.execute("INSERT INTO nfo_fts(rowid, text) VALUES (?, ?)", (rid, text))
-        conn.executemany("UPDATE releases SET nfo_indexed=1 WHERE id=?", [(rid,) for rid, _ in done])
+            _nfo_chapters(conn, rid, text)
+        # 2 : texte indexé et tracklist lue (1 : texte seul, avant la 1.66.0)
+        conn.executemany("UPDATE releases SET nfo_indexed=2 WHERE id=?", [(rid,) for rid, _ in done])
         conn.commit()
 
 
@@ -570,7 +594,7 @@ class Runner:
             conn.execute("UPDATE scan_state SET status='idle' WHERE status='tags'")
             conn.commit()
             pending = (conn.execute("SELECT 1 FROM tracks WHERE tags_read=0 LIMIT 1").fetchone()
-                       or conn.execute("SELECT 1 FROM releases WHERE has_nfo=1 AND nfo_indexed IS NULL LIMIT 1").fetchone()
+                       or conn.execute("SELECT 1 FROM releases WHERE has_nfo=1 AND COALESCE(nfo_indexed, 0)<2 LIMIT 1").fetchone()
                        or conn.execute("SELECT 1 FROM releases WHERE has_cover IS NULL LIMIT 1").fetchone()
                        or conn.execute("SELECT 1 FROM releases WHERE has_nfo=1 AND (released_at IS NULL OR label IS NULL) LIMIT 1").fetchone())
         finally:

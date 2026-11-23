@@ -1119,7 +1119,10 @@ def test_series_rules_genre_families_plays_and_nfo_search(admin_client, library,
     assert series() == {"Hed Kandi": 2, "Serious Beats": 1}
     assert put("Serious Beats", "Hed Kandi") == 204 and series() == {"Hed Kandi": 3}          # rattachée
     assert put("Hed Kandi Nu Cool", "") == 204 and series() == {"Hed Kandi": 2, "Hed Kandi Nu Cool": 1}  # gardée à part
-    assert put("Hed Kandi", "") == 204 and len(series()) == 3 and put("X", "x") == 400         # famille défaite
+    assert put("Hed Kandi", "") == 204 and len(series()) == 3 and put(" ", "x") == 400         # famille défaite
+    # tout ce qui commence par Hed, sauf les séries qui ont leur propre règle (à part, ou rattachée ailleurs)
+    assert put("Hed", "Hed") == 204 and series() == {"Hed": 1, "Hed Kandi": 1, "Hed Kandi Nu Cool": 1}
+    assert admin_client.delete("/api/admin/series/rules", params={"name": "Hed"}, headers={"X-CSRF": "1"}).status_code == 204
     assert admin_client.delete("/api/admin/series/rules", params={"name": "Hed Kandi"}, headers={"X-CSRF": "1"}).status_code == 204
     # genres : « Deep House » rejoint « House », la page du genre donne les deux
     genres = {g["name"]: g for g in admin_client.get("/api/groups", params={"by": "genre"}).json()}
@@ -1143,3 +1146,43 @@ def test_series_rules_genre_families_plays_and_nfo_search(admin_client, library,
     assert admin_client.get("/api/releases", params={"q": "ascii"}).json()["items"] == []
     assert admin_client.get("/api/release-summary", params={"q": "ascii", "nfo": 1}).json()[0]["releases"] == 1
     assert admin_client.get("/api/artist-photo", params={"name": "Personne"}).status_code == 404
+
+
+def test_appearances_list_names_the_artist_tracks(user_client, library, settings):
+    conn = db.connect(settings.data_dir)
+    rid = conn.execute("SELECT release_id FROM tracks WHERE title='Glue'").fetchone()[0]
+    conn.execute("INSERT INTO tracks(release_id, relpath, size, title, artist) VALUES (?, 'g.mp3', 1, 'Guest Track', 'A-Trak')", (rid,))
+    conn.commit()
+    items = user_client.get("/api/releases", params={"appears": "A-Trak"}).json()["items"]
+    assert [(x["id"], x["by"]) for x in items] == [(rid, ["Guest Track"])]
+    assert "by" not in user_client.get("/api/releases").json()["items"][0]
+
+
+def test_search_title_drops_disc_count_and_nfo_tracklist_gives_chapters(app, settings):
+    from app import coversearch, nfo, scanner
+    assert [coversearch.clean_title(t) for t in ("Mystery Land 2010-2CD", "Best Of (3CD)", "Album CD1", "CD", "Plain")] == \
+        ["Mystery Land 2010", "Best Of", "Album", "CD", "Plain"]
+    assert coversearch.exact("VA", "Mystery Land 2010-2CD", "Various - Mystery Land 2010")
+    text = """[ Tracklist ]
+CD 1/2
+1.  An21 & MaxVangeli - Swedish Beauty          4:00
+2.  Sander van Doorn - Reach Out                4:02
+4.  Tommyboy & Agebeat Pres. Crazibiza - Spinning Around   3:37
+    (Tommyboy Remix)
+CD 2/2
+1.  A - B    5:00
+2.  C - D    6:00
+"""
+    d1, d2 = nfo.tracklist(text)
+    assert [(c["artist"], c["start"]) for c in d1] == [("An21 & MaxVangeli", 0), ("Sander van Doorn", 240), ("Tommyboy & Agebeat Pres. Crazibiza", 482)]
+    assert d1[2]["title"] == "Spinning Around (Tommyboy Remix)" and [c["start"] for c in d2] == [0, 300]
+    assert [c["start"] for c in nfo.tracklist("[00:00] A - B\n[03:30] C - D\n[10:05] E - F")[0]] == [0, 210, 605]
+    conn = db.connect(settings.data_dir)
+    rid = conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo)"
+                       " VALUES ('m', 'm', '', 'Compilations', 0, 0, 1, 2, 1)").lastrowid
+    for disc, length in ((1, 720), (2, 660)):
+        conn.execute("INSERT INTO tracks(release_id, relpath, disc, size, duration) VALUES (?, ?, ?, 1, ?)", (rid, f"cd{disc}.mp3", disc, length))
+    scanner._nfo_chapters(conn, rid, text)
+    assert conn.execute("SELECT COUNT(*) FROM chapters").fetchone()[0] == 5
+    scanner._nfo_chapters(conn, rid, text)  # déjà des chapitres : rien de plus
+    assert conn.execute("SELECT COUNT(*) FROM chapters").fetchone()[0] == 5

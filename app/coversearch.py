@@ -70,8 +70,17 @@ def _discogs_any(artist: str | None, title: str, name: str | None, token: str) -
     return out
 
 
+_DISCS = re.compile(r"[-_ ]+\(?\d*x?(?:CD|DVD)\d*\)?\s*$", re.I)
+
+
+def clean_title(title: str | None) -> str | None:
+    """Titre sans le nombre de disques collé à la fin : « Mystery Land 2010-2CD » -> « Mystery Land 2010 »."""
+    return _DISCS.sub("", title).strip() or title if title else title
+
+
 def candidates(artist: str | None, title: str | None, discogs_token: str | None, name: str | None = None) -> list[dict]:
     """Images proposées, catalogues d'abord. Une source en panne ou muette est passée sans bruit."""
+    title = clean_title(title)
     va = (artist or "").lower() in ("", "va", "various", "various artists")
     q = " ".join(filter(None, [None if va else artist, title]))
     if not q.strip():
@@ -109,6 +118,7 @@ def _key(s: str | None) -> str:
 def exact(artist: str | None, title: str | None, found: str) -> bool:
     """Vrai si la proposition (« Artiste - Titre ») désigne sans doute la release : même artiste et même titre, à la
     casse, aux accents et à la ponctuation près. Une compilation n'accepte qu'un « Various »."""
+    title = clean_title(title)
     who, sep, what = found.partition(" - ")
     who = re.sub(r"\s*\(\d+\)$|\*$", "", who.strip())  # Discogs : « Artiste (2) », « Artiste* »
     if not sep or not _key(title) or _key(what) != _key(title):
