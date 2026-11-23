@@ -4,6 +4,18 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.66.3](https://github.com/djkix/mp3-scene/compare/v1.66.2...v1.66.3) (2026-11-23)
+
+### Résumé
+
+**Photo d'artiste automatique, « Various Artists » en toutes lettres, fusion d'artistes plus simple.**
+
+- La photo d'un artiste est prise d'office à la première visite de sa page : la première photo Deezer à son nom
+  exact. Un administrateur peut la changer ou la retirer (elle n'est alors pas remise).
+- « VA » s'affiche « Various Artists » (titre de la page, liste des artistes, fiche, pastilles) ; la base et les
+  adresses gardent « VA ».
+- Administration › Règles : la rubrique devient « Fusionner des artistes » et propose les noms pendant la frappe.
+
 ## [1.66.2](https://github.com/djkix/mp3-scene/compare/v1.66.1...v1.66.2) (2026-11-23)
 
 ### Résumé

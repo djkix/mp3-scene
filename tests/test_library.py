@@ -1145,7 +1145,6 @@ def test_series_rules_genre_families_plays_and_nfo_search(admin_client, library,
     assert [x["id"] for x in admin_client.get("/api/releases", params={"q": "ascii", "nfo": 1}).json()["items"]] == [nfo_rid]
     assert admin_client.get("/api/releases", params={"q": "ascii"}).json()["items"] == []
     assert admin_client.get("/api/release-summary", params={"q": "ascii", "nfo": 1}).json()[0]["releases"] == 1
-    assert admin_client.get("/api/artist-photo", params={"name": "Personne"}).status_code == 404
 
 
 def test_appearances_list_names_the_artist_tracks(user_client, library, settings):
@@ -1186,3 +1185,20 @@ CD 2/2
     assert conn.execute("SELECT COUNT(*) FROM chapters").fetchone()[0] == 5
     scanner._nfo_chapters(conn, rid, text)  # déjà des chapitres : rien de plus
     assert conn.execute("SELECT COUNT(*) FROM chapters").fetchone()[0] == 5
+
+
+def test_artist_photo_is_taken_from_the_first_matching_result(app, user_client, admin_client, settings, monkeypatch):
+    import io
+    from PIL import Image
+    from app import coversearch
+    buf = io.BytesIO()
+    Image.new("RGB", (40, 40), "red").save(buf, "JPEG")
+    monkeypatch.setattr(coversearch, "artist_photos", lambda name: [{"url": "https://x/a.jpg", "thumb": "t", "title": "Bob Sinclar & Co"},
+                                                                    {"url": "https://x/b.jpg", "thumb": "t", "title": "bob sinclar"}])
+    got = []
+    monkeypatch.setattr(coversearch, "fetch", lambda url: got.append(url) or buf.getvalue())
+    assert user_client.get("/api/artist-photo", params={"name": "Bob Sinclar"}).status_code == 200 and got == ["https://x/b.jpg"]
+    assert user_client.get("/api/artist-photo", params={"name": "VA"}).status_code == 404
+    assert user_client.get("/api/artist-photo", params={"name": "Personne"}).status_code == 404 and len(got) == 1
+    assert admin_client.delete("/api/admin/artists/photo", params={"name": "Bob Sinclar"}, headers={"X-CSRF": "1"}).status_code == 204
+    assert user_client.get("/api/artist-photo", params={"name": "Bob Sinclar"}).status_code == 404 and len(got) == 1  # retirée : pas remise

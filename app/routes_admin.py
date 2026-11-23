@@ -13,7 +13,7 @@ from . import artists, backup, coversearch, db, genres, nfo, scanner, security
 from .deps import MAX_INT, Id, get_conn, require_admin
 from .naming import parse_release_name
 from .routes_media import COVER_MAX, save_cover
-from .routes_library import RELEASE_COLS, RELEASE_FROM, Dir, Sort, _order, _page, _release, artist_photo_path
+from .routes_library import RELEASE_COLS, RELEASE_FROM, Dir, Sort, _order, _page, _release, artist_photo_path, store_artist_photo
 
 # libellé au journal d'activité de chaque action d'administration : (méthode, route) -> libellé
 _ACTIONS = {
@@ -309,21 +309,17 @@ def save_artist_photo(body: PhotoPick, request: Request):
     if not coversearch.check(settings.secret_key, body.url, body.sig):
         raise HTTPException(400, "Cette image n'a pas été proposée par la recherche.")
     try:
-        data = coversearch.fetch(body.url)
-        with Image.open(io.BytesIO(data)) as img:
-            img = img.convert("RGB")
-            img.thumbnail((600, 600))
-            target = artist_photo_path(settings.data_dir, body.name)
-            target.parent.mkdir(exist_ok=True)
-            img.save(target.with_suffix(".tmp"), "JPEG", quality=88)
-        os.replace(target.with_suffix(".tmp"), target)
+        store_artist_photo(settings.data_dir, body.name, body.url)
     except (ValueError, OSError) as e:
         raise HTTPException(400, f"Photo refusée : {e}") from None
 
 
 @router.delete("/artists/photo", status_code=204)
 def drop_artist_photo(request: Request, name: str = Query(min_length=1, max_length=200)):
-    artist_photo_path(request.app.state.settings.data_dir, name).unlink(missing_ok=True)
+    """Retire la photo ; un fichier vide empêche la recherche automatique de la remettre."""
+    path = artist_photo_path(request.app.state.settings.data_dir, name)
+    path.parent.mkdir(exist_ok=True)
+    path.write_bytes(b"")
 
 
 @router.get("/suggestions")

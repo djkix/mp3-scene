@@ -1,5 +1,5 @@
 import { fmtDate, fmtDuration, fmtSize } from '../api.js';
-import { t, catLabel } from '../i18n.js';
+import { t, catLabel, artistLabel } from '../i18n.js';
 
 const enc = encodeURIComponent;
 
@@ -27,7 +27,8 @@ export function infoRows(rel, el) {
     .filter(([, v]) => v != null && v !== '')
     // à plat : el() n'aplatit qu'un niveau
     .flatMap(([k, v, href, kind, extra]) => {
-      const pill = !kind ? String(v) : el(href ? 'a' : 'span', { class: `pill pill-${kind}`, href: href ? href(v) : null }, String(v));
+      const pill = !kind ? String(v) : el(href ? 'a' : 'span', { class: `pill pill-${kind}`, href: href ? href(v) : null },
+        String(k === t('Artiste') ? artistLabel(v) : v));
       // série : volume précédent et suivant de part et d'autre de son nom
       const step = (x, text, label) => x && el('a', { class: 'pill pill-num', href: `#/release/${enc(String(x.name).replace(/ /g, '_'))}?id=${x.id}`,
         title: t(label, x.volume), 'aria-label': t(label, x.volume) }, text);

@@ -3,7 +3,7 @@
 // releases correspondantes. Les filtres Genre et Année sont dans l'adresse et suivent d'une page à l'autre.
 import { api, fmtSize, session } from '../api.js';
 import { el, relName, relHref } from '../dom.js';
-import { t as tr, catLabel } from '../i18n.js';
+import { t as tr, catLabel, artistLabel } from '../i18n.js';
 import * as releases from './releases.js';
 import { trackList } from './tracklist.js';
 
@@ -69,12 +69,12 @@ function detail(container, kind, params) {
     facts.replaceChildren(el('tbody', {}, line(tr('Releases'), String(g.n)), line(tr('Poids'), fmtSize(g.size)),
       g.first ? line(tr('Années'), g.first === g.last ? String(g.first) : `${g.first} – ${g.last}`) : null));
     const group = (label, route, rows) => (rows.length ? [el('p', {}, label), el('div', {}, rows.map((r) => el('a', { class: 'chip',
-      href: `#/${route}/${encodeURIComponent(r.name)}` }, r.name, el('small', {}, String(r.releases)))))] : []);
+      href: `#/${route}/${encodeURIComponent(r.name)}` }, route === 'artists' ? artistLabel(r.name) : r.name, el('small', {}, String(r.releases)))))] : []);
     found.replaceChildren(...group(tr('Artistes'), 'artists', g.artists), ...group(tr('Genres'), 'genres', g.genres),
       ...(kind === 'labels' ? group(tr('Groupes'), 'groups', g.others) : group(tr('Labels'), 'labels', g.others)));
   }).catch(() => {}); // facultatif
   container.replaceChildren(
-    el('h1', { class: 'grp-title' }, el('a', { href: `#/${kind}` + qs({ genre: params.genre, year: params.year }) }, tr(tab)), ' › ', name, ' ', kind === 'artists' || info ? null : total),
+    el('h1', { class: 'grp-title' }, el('a', { href: `#/${kind}` + qs({ genre: params.genre, year: params.year }) }, tr(tab)), ' › ', kind === 'artists' ? artistLabel(name) : name, ' ', kind === 'artists' || info ? null : total),
     ...(kind === 'genres' ? [blocks] : []), ...(kind === 'artists' ? [head] : []), ...(info ? [info] : []), ...(kind === 'artists' && !other ? [years] : []), list);
   // chronologie : une pastille par année avec son nombre de releases ; un clic filtre la liste sur cette année
   if (kind === 'artists' && !other) api('/groups?' + new URLSearchParams({ by: 'year', artist: name })).then((rows) => {
@@ -281,7 +281,7 @@ export function render(container, params) {
     const shown = rows.filter((g) => g.name.toLowerCase().includes(needle) && (!letter || initial(g.name) === letter))
       .sort((a, b) => dir * (key === 'name' ? a.name.localeCompare(b.name) : a[key] - b[key]) || a.name.localeCompare(b.name));
     body.replaceChildren(...shown.slice(0, MAX_ROWS).map((g) => el('tr', {},
-      el('td', {}, el('a', { href: href(g.name) }, g.name), g.series > 1 ? el('small', { class: 'muted' }, ' ' + tr('{0} séries', g.series)) : null,
+      el('td', {}, el('a', { href: href(g.name) }, kind === 'artists' ? artistLabel(g.name) : g.name), g.series > 1 ? el('small', { class: 'muted' }, ' ' + tr('{0} séries', g.series)) : null,
         g.genres > 1 ? el('small', { class: 'muted' }, ' ' + tr('{0} genres', g.genres)) : null),
       el('td', { class: 'num' }, String(g.releases)), el('td', { class: 'num' }, fmtSize(g.size)))));
     status.textContent = !shown.length ? tr('Aucun résultat')

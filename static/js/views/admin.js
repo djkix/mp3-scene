@@ -248,8 +248,17 @@ export function render(container, params = {}) {
       }).catch((err) => { if (!dead) msg.textContent = err.message; });
       load();
       // rattacher : le nom à rattacher, puis celui qui le reçoit ; la règle est gardée après les scans
-      const from = el('input', { required: true, maxLength: 200, placeholder: first, 'aria-label': first });
-      const to = el('input', { required: true, maxLength: 200, placeholder: t('Rattaché à'), 'aria-label': t('Rattaché à') });
+      // noms proposés pendant la frappe (artistes ou labels de la bibliothèque, les plus fournis d'abord)
+      const names = el('datalist', { id: `names-${kind}` });
+      let typing;
+      const suggestNames = (e) => {
+        clearTimeout(typing);
+        typing = setTimeout(() => api('/suggest?' + new URLSearchParams({ q: e.target.value })).then((s) => {
+          names.replaceChildren(...s[kind].map((x) => el('option', { value: x.name }, `${x.releases} releases`)));
+        }).catch(() => {}), 200);
+      };
+      const from = el('input', { required: true, maxLength: 200, placeholder: first, 'aria-label': first, list: names.id, oninput: suggestNames });
+      const to = el('input', { required: true, maxLength: 200, placeholder: t('Rattaché à'), 'aria-label': t('Rattaché à'), list: names.id, oninput: suggestNames });
       const form = el('form', { class: 'inline-form', onsubmit: async (e) => {
         e.preventDefault();
         try {
@@ -258,7 +267,7 @@ export function render(container, params = {}) {
           msg.textContent = '';
         } catch (err) { msg.textContent = err.message; }
         load();
-      } }, from, to, el('button', { type: 'submit' }, t('Rattacher')));
+      } }, from, to, names, el('button', { type: 'submit' }, t('Rattacher')));
       return [hints, form, el('div', { class: 'table-wrap' }, el('table', { class: 'users' },
         el('thead', {}, el('tr', {}, th(first), th(t('Rattaché à')), th(t('Actions')))), rows)), msg];
     };
@@ -306,7 +315,8 @@ export function render(container, params = {}) {
       el('p', { class: 'hint' }, t('Appliquées à chaque scan et à chaque démarrage. Les corrections manuelles l’emportent toujours.')),
       ...RULES.map(([title, key, text]) => el('section', { class: 'ad-card' }, el('h3', {}, t(title), counts[key]), el('p', {}, t(text)))),
       classBtn, classMsg,
-      el('h2', {}, t('Artistes rattachés')),
+      el('h2', {}, t('Fusionner des artistes')),
+      el('p', { class: 'hint' }, t('Le premier artiste rejoint le second : ses releases passent sous son nom, à ce scan et aux suivants. Détacher annule la fusion.')),
       ...aliasTable('/admin/artists/aliases', t('Artiste'), t('Aucun artiste rattaché à la main.'), 'artists'),
       el('h2', {}, t('Labels rattachés')),
       el('p', { class: 'hint' }, t('Détacher rend son label d’origine à chaque release au prochain scan.')),

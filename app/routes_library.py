@@ -1,4 +1,6 @@
 import hashlib
+import io
+import os
 import re
 import time
 from collections import Counter
@@ -7,8 +9,9 @@ from typing import Annotated, Literal
 from pydantic import Field
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
+from PIL import Image
 
-from . import artists
+from . import artists, coversearch
 from .naming import complete_title
 from .deps import MAX_INT, Id, current_user, get_conn
 from .security import safe_path
@@ -450,12 +453,39 @@ def artist_photo_path(data_dir, name: str):
     return data_dir / "artists" / (hashlib.sha1(artists.fold(name).encode()).hexdigest()[:20] + ".jpg")
 
 
+def store_artist_photo(data_dir, name: str, url: str) -> None:
+    """Télécharge la photo (adresse proposée par la recherche) et la garde, réduite, dans les données de l'application.
+    Lève ValueError ou OSError si l'image est refusée ou illisible."""
+    data = coversearch.fetch(url)
+    target = artist_photo_path(data_dir, name)
+    with Image.open(io.BytesIO(data)) as img:
+        img = img.convert("RGB")
+        img.thumbnail((600, 600))
+        target.parent.mkdir(exist_ok=True)
+        img.save(target.with_suffix(".tmp"), "JPEG", quality=88)
+    os.replace(target.with_suffix(".tmp"), target)
+
+
 @router.get("/api/artist-photo")
 def artist_photo(request: Request, name: str = Query(min_length=1, max_length=200)):
-    path = artist_photo_path(request.app.state.settings.data_dir, name)
-    if not path.is_file():
+    """Photo d'un artiste. À la première demande, la première photo Deezer au même nom est prise d'office ; un fichier
+    vide retient qu'il n'y en a pas (ou qu'un administrateur l'a retirée) : pas de nouvelle recherche."""
+    data_dir = request.app.state.settings.data_dir
+    path = artist_photo_path(data_dir, name)
+    if not path.exists() and artists.fold(name) not in artists._VA | {""}:
+        # ponytail: une recherche Deezer à la première visite de chaque artiste ; rien n'est retenu d'une panne réseau
+        try:
+            hit = next((x for x in coversearch.artist_photos(name) if artists.fold(x["title"]) == artists.fold(name)), None)
+            if hit:
+                store_artist_photo(data_dir, name, hit["url"])
+            else:
+                path.parent.mkdir(exist_ok=True)
+                path.write_bytes(b"")
+        except (ValueError, OSError):
+            pass
+    if not path.is_file() or not path.stat().st_size:
         raise HTTPException(404, "Pas de photo.")
-    return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=3600"})
+    return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "private, no-cache"})
 
 
 @router.get("/api/folders")

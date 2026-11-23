@@ -156,6 +156,8 @@ export const EN = {
   'Réinitialiser': 'Reset',
   "Les pistes s'enchaînent sans blanc ; le fondu les fait se chevaucher, sauf entre deux pistes d'une même release.": 'Tracks play back to back without a gap; crossfade makes them overlap, except between two tracks of the same release.',
   'Séries': 'Series',
+  'Fusionner des artistes': 'Merge artists',
+  'Le premier artiste rejoint le second : ses releases passent sous son nom, à ce scan et aux suivants. Détacher annule la fusion.': 'The first artist joins the second: its releases move under that name, at this scan and the following ones. Detach undoes the merge.',
   'Retirer': 'Remove',
   '{0} genres': '{0} genres',
   'Chercher une photo': 'Find a photo',

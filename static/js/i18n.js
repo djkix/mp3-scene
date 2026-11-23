@@ -23,6 +23,8 @@ export function t(fr, ...args) {
 
 // Libellé d'une catégorie (dossier racine) : « 02.Various Artists - Compilations » -> « Compilations ».
 // « 03.Various Artists - Live And Radio » -> « Live & Radio ».
+// « VA » des noms de release, affiché en toutes lettres (les liens et la base gardent « VA »)
+export const artistLabel = (a) => (/^(va|various)$/i.test(String(a ?? '').trim()) ? 'Various Artists' : a);
 export const catLabel = (c) => String(c ?? '').replace(/^\d+\.\s*/, '').replace(/^Various Artists - /i, '')
   .replace(/^live and radio$/i, 'Live & Radio');
 
