@@ -316,15 +316,19 @@ export function render(container, params) {
     return api('/releases?' + query + tri);
   // derniers ajouts (accueil sans filtre) par date d'ajout, même si la colonne Date montre celle du NFO ; recherche, filtre, groupe ou artiste par ordre alphabétique
   }, { empty: tr('Aucun résultat'), // un artiste : ses albums d'abord, puis ses singles, ses compilations et ses lives, chaque groupe par nom
-    sort: pin?.key === 'artist' ? ['kind', 'asc'] : q || pin || category || genre || year || source ? ['name', 'asc'] : ['added', 'desc'],
+    // page d'un artiste, d'un label, d'un groupe, d'un genre, recherche : albums d'abord, puis singles, compilations,
+    // live, chaque groupe par nom ; derniers ajouts par date d'ajout
+    sort: q || pin ? ['kind', 'asc'] : category || genre || year || source ? ['name', 'asc'] : ['added', 'desc'],
     pick: sel?.pick, onPick: sel?.onPick,
     // nombre de releases de l'artiste par catégorie, pour ses intertitres (les filtres Catégorie et Source n'y sont
     // pas : sans nombre plutôt qu'un nombre faux)
-    counts: pin?.key === 'artist' && !category && !source ? (() => {
-      const p = multiQuery({ genre, year });
-      p.set('by', 'category');
-      p.set('artist', pin.value);
-      return api('/groups?' + p).then((rows) => Object.fromEntries(rows.map((c) => [c.name, c.releases])));
-    })() : null });
+    counts: category || source ? null : q ? api('/release-summary?' + toQuery({ q, ...(inNfo && { nfo: 1 }) }))
+      .then((rows) => Object.fromEntries(rows.map((c) => [c.name, c.releases]))).catch(() => ({}))
+      : ['artist', 'label', 'grp', 'genre'].includes(pin?.key) ? (() => {
+        const p = multiQuery({ genre: pin.key === 'genre' ? [].concat(pin.value).join('|') : genre, year });
+        p.set('by', 'category');
+        if (pin.key !== 'genre') p.set(pin.key, pin.value);
+        return api('/groups?' + p).then((rows) => Object.fromEntries(rows.map((c) => [c.name, c.releases])));
+      })() : null });
   return () => { dead = true; dispose(); };
 }

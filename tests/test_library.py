@@ -1221,3 +1221,21 @@ def test_artist_page_ignores_case_and_caps_lock_spellings_merge(user_client, lib
         conn.execute("INSERT INTO tracks(release_id, relpath, size, artist) VALUES (?, 'c.mp3', 1, ?)", (rel, a))
     db.merge_track_artists(conn)
     assert [r[0] for r in conn.execute("SELECT DISTINCT artist FROM tracks WHERE artist LIKE 'cutee b.'")] == ["Cutee B."]
+
+
+def test_category_counts_of_a_label_or_a_group(user_client, library, settings):
+    conn = db.connect(settings.data_dir)
+    conn.execute("UPDATE releases SET label='Tiger Records'")
+    conn.commit()
+    rows = user_client.get("/api/groups", params={"by": "category", "label": "Tiger Records"}).json()
+    assert sum(r["releases"] for r in rows) == 3
+    assert user_client.get("/api/groups", params={"by": "category", "grp": "WUS"}).json()[0]["releases"] == 1
+
+
+def test_lowercase_only_artist_gets_capitals(user_client, library, settings):
+    conn = db.connect(settings.data_dir)
+    rel = conn.execute("SELECT release_id FROM tracks LIMIT 1").fetchone()[0]
+    conn.execute("INSERT INTO tracks(release_id, relpath, size, artist) VALUES (?, 's.mp3', 1, 'soul vision')", (rel,))
+    db.merge_track_artists(conn)
+    assert conn.execute("SELECT COUNT(*) FROM tracks WHERE artist='Soul Vision'").fetchone()[0] == 1
+    assert user_client.get("/api/artist-info", params={"name": "soul vision"}).json()["name"] == "Soul Vision"

@@ -83,10 +83,11 @@ def merge_track_artists(conn) -> None:
     for a, n in conn.execute("SELECT artist, COUNT(*) FROM tracks WHERE artist IS NOT NULL GROUP BY artist"):
         seen.setdefault(a.casefold(), []).append((n, a))
     for names in seen.values():
-        if len(names) > 1:
-            # une graphie mixte l'emporte sur le tout-majuscules ou le tout-minuscules, puis la plus fréquente
-            best = max(names, key=lambda x: (not (x[1].isupper() or x[1].islower()), x[0], x[1]))[1]
-            conn.executemany("UPDATE tracks SET artist=? WHERE artist=?", [(best, a) for _, a in names if a != best])
+        # une graphie mixte l'emporte sur le tout-majuscules ou le tout-minuscules, puis la plus fréquente ; sans
+        # graphie mixte, le tout-minuscules prend des capitales (« soul vision » -> « Soul Vision »)
+        best = max(names, key=lambda x: (not (x[1].isupper() or x[1].islower()), x[0], x[1]))[1]
+        best = artists.capitalize(best)
+        conn.executemany("UPDATE tracks SET artist=? WHERE artist=?", [(best, a) for _, a in names if a != best])
 
 
 def merge_case(conn, col: str) -> None:

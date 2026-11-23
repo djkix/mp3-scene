@@ -4,6 +4,19 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.67.0](https://github.com/djkix/mp3-scene/compare/v1.66.5...v1.67.0) (2026-11-23)
+
+### Résumé
+
+**Écran allumé dans l'application installée, albums d'abord sur toutes les pages, capitales des artistes.**
+
+- **Écran** : installée sur l'écran d'accueil (Android, iOS 16.4 et plus), l'application empêche la mise en veille
+  tant qu'elle est affichée ; interrupteur « Garder l'écran allumé » dans les réglages audio.
+- **Listes** : les pages d'un label, d'un groupe, d'un genre et la recherche s'ouvrent comme celle d'un artiste —
+  albums, singles, compilations, live — avec intertitres et liseré de couleur.
+- **Artistes** : un artiste de piste écrit tout en minuscules prend des capitales (« soul vision » -> « Soul Vision »),
+  comme les artistes associés de la page d'un artiste.
+
 ## [1.66.5](https://github.com/djkix/mp3-scene/compare/v1.66.4...v1.66.5) (2026-11-23)
 
 ### Résumé

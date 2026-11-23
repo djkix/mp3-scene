@@ -310,13 +310,35 @@ function swap(x) {
 // jusqu'au rechargement de la page.
 // ponytail: nivellement = compresseur (réduit les écarts de volume), pas une analyse ReplayGain piste par piste.
 const PREFS = KEY + '.audio';
-const prefs = { eq: [0, 0, 0], level: false, fade: 0, original: false };
+const prefs = { eq: [0, 0, 0], level: false, fade: 0, original: false, awake: true };
 try { Object.assign(prefs, JSON.parse(localStorage.getItem(PREFS))); } catch { /* absent ou corrompu */ }
 if (!Array.isArray(prefs.eq) || prefs.eq.length !== 3) prefs.eq = [0, 0, 0];
 let ctx = null, fx = null;
 
+// Écran allumé : dans l'application installée (écran d'accueil), tant qu'elle est affichée, l'écran ne se met pas en
+// veille (API Screen Wake Lock : Chrome sur Android, Safari depuis iOS 16.4). Le verrou tombe quand l'application passe
+// en arrière-plan ; il est repris à son retour.
+const canWake = 'wakeLock' in navigator;
+const installed = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+let wakeLock = null;
+async function keepAwake() {
+  const want = canWake && prefs.awake && installed() && document.visibilityState === 'visible';
+  if (want && !wakeLock) {
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } catch { wakeLock = null; } // refusé (batterie faible, réglage du système)
+  } else if (!want && wakeLock) {
+    wakeLock.release().catch(() => {});
+    wakeLock = null;
+  }
+}
+document.addEventListener('visibilitychange', keepAwake);
+keepAwake();
+
 function applyPrefs() {
   try { localStorage.setItem(PREFS, JSON.stringify(prefs)); } catch { /* navigation privée */ }
+  keepAwake();
   const AC = globalThis.AudioContext || globalThis.webkitAudioContext;
   if (!ctx && AC && (prefs.level || prefs.eq.some(Boolean))) {
     ctx = new AC();
@@ -365,6 +387,7 @@ function openAudioPrefs() {
   const [eqHelp, eqNote] = help(tr("Sur iPhone, l'égaliseur et le nivellement peuvent couper le son écran verrouillé : remettez-les à zéro puis rechargez la page."));
   const [fadeHelp, fadeNote] = help(canFade ? tr("Les pistes s'enchaînent sans blanc ; le fondu les fait se chevaucher, sauf entre deux pistes d'une même release.")
     : tr("Les pistes s'enchaînent sans blanc. Le fondu n'est pas possible sur cet appareil."));
+  const [awakeHelp, awakeNote] = help(tr('Dans l’application installée sur l’écran d’accueil, l’écran ne se met pas en veille tant qu’elle est affichée. Sans effet dans un onglet du navigateur.'));
   const [origHelp, origNote] = help(tr('Sans ce réglage, ces fichiers sont écoutés convertis en MP3 320 kbit/s, plus légers. Il s’applique à partir de la piste suivante.'));
   fxDlg.replaceChildren(el('h2', {}, tr('Réglages audio')),
     el('div', { class: 'fx' },
@@ -375,7 +398,10 @@ function openAudioPrefs() {
       el('div', { class: 'fx-line' }, el('span', {}, tr('Fondu enchaîné'), fadeHelp), fades), fadeNote,
       el('h3', {}, tr('Qualité')),
       el('label', { class: 'fx-line' }, el('span', {}, tr('Qualité d’origine pour les FLAC, WAV et M4A'), origHelp), el('input', { type: 'checkbox', class: 'switch', role: 'switch',
-        checked: prefs.original, onchange: (e) => { prefs.original = e.target.checked; applyPrefs(); } })), origNote),
+        checked: prefs.original, onchange: (e) => { prefs.original = e.target.checked; applyPrefs(); } })), origNote,
+      ...(canWake ? [el('h3', {}, tr('Écran')),
+        el('label', { class: 'fx-line' }, el('span', {}, tr('Garder l’écran allumé'), awakeHelp), el('input', { type: 'checkbox', class: 'switch', role: 'switch',
+          checked: prefs.awake, onchange: (e) => { prefs.awake = e.target.checked; applyPrefs(); } })), awakeNote] : [])),
     el('div', { class: 'fx-foot' },
       el('button', { type: 'button', onclick: () => { prefs.eq = [0, 0, 0]; prefs.level = false; prefs.fade = 0; prefs.original = false; applyPrefs(); openAudioPrefs(); } }, tr('Réinitialiser')),
       el('button', { type: 'button', class: 'primary', onclick: () => fxDlg.close() }, tr('Fermer'))));

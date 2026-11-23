@@ -36,6 +36,12 @@ def _clean(artist):
     return main(artist)
 
 
+def capitalize(artist: str) -> str:
+    """Capitale au début de chaque mot d'un nom tout en minuscules : « soul vision » -> « Soul Vision ». Contrairement à
+    str.title(), rien après un signe (« $uperchrome », « d'layna » -> « D'layna ») ; un nom déjà mixte est rendu tel quel."""
+    return re.sub(r"(^|\s)([^\W\d_])", lambda m: m[1] + m[2].upper(), artist) if artist.islower() else artist
+
+
 def norm(artist: str) -> str:
     """Graphie comparée à celles à ne jamais fusionner : sans casse, soulignés ni espaces en double."""
     return " ".join(artist.replace("_", " ").casefold().split())

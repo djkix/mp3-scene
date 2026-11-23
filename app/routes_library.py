@@ -234,7 +234,8 @@ GROUP_BY = {"series": "title", "grp": "grp", "artist": "COALESCE(tag_artist, art
 
 @router.get("/api/groups")
 def groups(by: Literal["grp", "artist", "genre", "label", "category", "year", "series"] = "grp", name: str | None = None, genre: Many = None,
-           year: Years = None, decade: Years = None, artist: str | None = Query(None, max_length=200), conn=Depends(get_conn)):
+           year: Years = None, decade: Years = None, artist: str | None = Query(None, max_length=200),
+           label: str | None = Query(None, max_length=200), grp: str | None = Query(None, max_length=200), conn=Depends(get_conn)):
     """Releases regroupées par groupe, artiste, genre ou label : nombre et poids total, restreints au genre / à l'année."""
     col = GROUP_BY[by]
     conds, params = [f"{col} IS NOT NULL", "hidden=0"], []
@@ -244,6 +245,10 @@ def groups(by: Literal["grp", "artist", "genre", "label", "category", "year", "s
     if artist is not None:  # chronologie d'un artiste : ses releases par année (by=year)
         conds.append("COALESCE(tag_artist, artist)=? COLLATE NOCASE")
         params.append(artist)
+    for col_, val in (("label", label), ("grp", grp)):  # catégories d'un label ou d'un groupe (intertitres de sa liste)
+        if val is not None:
+            conds.append(f"{col_}=?")
+            params.append(val)
     if genre:  # plusieurs genres, années ou décennies : l'un ou l'autre, comme dans les listes
         conds.append(f"genre IN ({','.join('?' * len(genre))})")
         params += genre
@@ -420,8 +425,14 @@ def artist_info(name: str = Query(min_length=1, max_length=200), user=Depends(cu
     top = [dict(x) for x in conn.execute(
         f"SELECT r.id, r.name, r.title, COUNT(*) AS plays FROM plays p JOIN tracks t ON t.id=p.track_id JOIN releases r ON r.id=t.release_id"
         f" WHERE p.user_id=? AND {mine} GROUP BY r.id ORDER BY plays DESC, r.name COLLATE NOCASE LIMIT 5", (user["id"], name))]
-    return {"name": canon[0] if canon else name, "lists": lists, "labels": labels, "top": top,
-            "with": [{"name": spelling[k], "tracks": n} for k, n in sorted(others.items(), key=lambda kv: (-kv[1], kv[0]))[:8]]}
+    # graphie des artistes associés : celle de leurs releases s'ils en ont, sinon des capitales à un nom tout en minuscules
+    def shown(n):
+        r = conn.execute("SELECT COALESCE(tag_artist, artist) FROM releases WHERE COALESCE(tag_artist, artist)=? COLLATE NOCASE"
+                         " LIMIT 1", (n,)).fetchone()
+        return r[0] if r else artists.capitalize(n)
+    partners = [{"name": shown(spelling[k]), "tracks": n} for k, n in sorted(others.items(), key=lambda kv: (-kv[1], kv[0]))[:8]]
+    return {"name": canon[0] if canon else artists.capitalize(name), "lists": lists, "labels": labels, "top": top,
+            "with": partners}
 
 
 @router.get("/api/group-info")
