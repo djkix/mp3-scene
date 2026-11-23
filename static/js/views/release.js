@@ -21,18 +21,14 @@ export function render(container, params) {
   const byName = () => api(/^\d+$/.test(id) ? `/releases/${id}` : `/release-by-name?name=${encodeURIComponent(id)}`);
   (/^\d+$/.test(params.id || '') ? api(`/releases/${params.id}`).catch((err) => { if (err.status === 404) return byName(); throw err; }) : byName()).then((rel) => {
     if (dead) return;
-    const nfo = el('div'), sim = el('div'), vers = el('div'), chap = el('div'), ser = el('div');
-    container.replaceChildren(el('div', { class: 'detail' }, header(rel), ser, trackTable(rel), chap, vers, nfo, sim));
-    // série (« Global Underground 47 ») : volume précédent, page de la série, volume suivant
+    const nfo = el('div'), sim = el('div'), vers = el('div'), chap = el('div');
+    container.replaceChildren(el('div', { class: 'detail' }, header(rel), trackTable(rel), chap, vers, nfo, sim));
+    // série (« Global Underground 47 ») : ligne du bloc d'informations, avec volume précédent et suivant
     if (rel.series) api('/series?' + new URLSearchParams({ name: rel.series, exact: 1 })).then((s) => {
       if (dead || s.items.length < 2) return;
-      container.querySelector('.detail-info')?.paint({ series_name: s.name });
+      // série dans le bloc d'informations, avec le volume précédent et le suivant
       const i = s.items.findIndex((x) => x.id === rel.id);
-      const step = (x, text) => x && el('a', { class: 'btn', href: relHref(x.name, x.id), title: relName(x.name) }, text);
-      ser.replaceChildren(el('nav', { class: 'series-nav', 'aria-label': t('Série') },
-        i > 0 && step(s.items[i - 1], `‹ ${t('Volume {0}', s.items[i - 1].volume)}`),
-        el('a', { href: `#/series/${encodeURIComponent(s.name)}` }, t('Série : {0} ({1})', s.name, s.items.length)),
-        i >= 0 && step(s.items[i + 1], `${t('Volume {0}', s.items[i + 1]?.volume)} ›`)));
+      container.querySelector('.detail-info')?.paint({ series_name: s.name, series_prev: s.items[i - 1], series_next: i >= 0 ? s.items[i + 1] : null });
     }).catch(() => {}); // facultatif
     // chapitres d'un long mix, lus dans le fichier .cue de la release : un clic lance la piste à cet endroit
     api(`/releases/${rel.id}/chapters`).then((byTrack) => {
@@ -102,10 +98,13 @@ function header(rel) {
     // emplacement du dossier dans la bibliothèque (à copier pour l'ouvrir sur le NAS) et recherches de cette release
     // sur des sites extérieurs : simples liens, rien n'est envoyé tant qu'on ne clique pas
     el('p', { class: 'detail-links' },
+      el('span', { class: 'path-ico', 'data-ico': 'folder', 'aria-hidden': 'true' }),
       el('code', { title: t('Emplacement du dossier') }, rel.path),
       el('button', { type: 'button', class: 'icon', title: t('Copier le chemin'), 'aria-label': t('Copier le chemin'), onclick: async () => {
         try { await navigator.clipboard.writeText(rel.path); player.flash(t('Chemin copié.')); } catch { player.flash(t('Copie impossible dans ce navigateur.')); }
-      } }, '⧉'),
+      } }, '⧉')),
+    // recherches de cette release sur des sites extérieurs : simples liens, rien n'est envoyé tant qu'on ne clique pas
+    el('p', { class: 'detail-links' },
       ...[['Discogs', 'https://www.discogs.com/search/?type=release&q='], ['Beatport', 'https://www.beatport.com/search?q='],
         ['YouTube', 'https://www.youtube.com/results?search_query=']].map(([site, url]) => el('a', { class: 'chip', target: '_blank', rel: 'noopener noreferrer',
         // titre sans le nombre de disques collé à la fin (« Mystery Land 2010-2CD »), comme la recherche de pochettes

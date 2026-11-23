@@ -4,6 +4,18 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.66.2](https://github.com/djkix/mp3-scene/compare/v1.66.1...v1.66.2) (2026-11-23)
+
+### Résumé
+
+**Pochette remplacée visible tout de suite, liens sous le chemin, série dans le bloc d'informations.**
+
+- Une pochette ajoutée, remplacée ou retirée s'affiche aussitôt : le navigateur revalide les pochettes et les
+  vignettes au lieu de les garder une journée.
+- Sur la fiche, un picto dossier précède le chemin ; les liens Discogs, Beatport et YouTube passent dessous.
+- La barre de série sous les boutons disparaît : la ligne Série du bloc d'informations mène au volume précédent et au
+  suivant.
+
 ## [1.66.1](https://github.com/djkix/mp3-scene/compare/v1.66.0...v1.66.1) (2026-11-23)
 
 ### Résumé

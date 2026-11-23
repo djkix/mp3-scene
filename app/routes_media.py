@@ -122,7 +122,9 @@ def stream(track_id: Id, request: Request, download: bool = False, original: boo
 
 IMAGE_TYPES = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
 COVER_MAX = 8 * 1024 * 1024
-COVER_CACHE = {"Cache-Control": "private, max-age=86400"}
+# revalidée à chaque affichage (réponse 304 si l'image n'a pas changé) : une pochette ajoutée, remplacée ou retirée
+# se voit tout de suite, sans attendre l'expiration du cache du navigateur
+COVER_CACHE = {"Cache-Control": "private, no-cache"}
 _FRONT = ("front", "cover", "folder")
 _NOT_FRONT = ("back", "inlay", "inside", "cd", "cd1", "cd2", "disc", "booklet", "proof")
 

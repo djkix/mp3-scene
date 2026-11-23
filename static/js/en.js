@@ -332,7 +332,6 @@ export const EN = {
   'Apparitions': 'Appearances',
   'Aucun mix où cet artiste figure dans un chapitre.': 'No mix where this artist appears in a chapter.',
   'Série': 'Series',
-  'Série : {0} ({1})': 'Series: {0} ({1})',
   'Volume {0}': 'Volume {0}',
   'Avec': 'With',
   'Initiale': 'Initial',

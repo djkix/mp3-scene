@@ -16,7 +16,7 @@ export function infoRows(rel, el) {
     [t('Catalogue'), rel.catalog, rel.label ? () => `#/labels/${enc(rel.label)}` : null, 'ed'],
     [t('Catégorie'), rel.category && catLabel(rel.category), () => `#/?category=${enc(rel.category)}`, 'cls'],
     // série : ajoutée une fois ses volumes connus (deux au moins), elle mène à la page de la série
-    [t('Série'), rel.series_name, (v) => `#/series/${enc(v)}`, 'cls'],
+    [t('Série'), rel.series_name, (v) => `#/series/${enc(v)}`, 'cls', 'series'],
     [t('Genre'), rel.genre, (v) => `#/?genre=${enc(v)}`, 'cls'],
     [t('Taille'), rel.size == null ? null : fmtSize(rel.size), null, 'num'],
     [t('Durée'), rel.duration == null ? null : fmtDuration(rel.duration), null, 'num'],
@@ -26,6 +26,12 @@ export function infoRows(rel, el) {
     [t('Fréquence'), rel.sample_rate ? `${(rel.sample_rate / 1000).toLocaleString()} kHz` : null, null, 'num']]
     .filter(([, v]) => v != null && v !== '')
     // à plat : el() n'aplatit qu'un niveau
-    .flatMap(([k, v, href, kind]) => [el('dt', {}, k), el('dd', {},
-      !kind ? String(v) : el(href ? 'a' : 'span', { class: `pill pill-${kind}`, href: href ? href(v) : null }, String(v)))]);
+    .flatMap(([k, v, href, kind, extra]) => {
+      const pill = !kind ? String(v) : el(href ? 'a' : 'span', { class: `pill pill-${kind}`, href: href ? href(v) : null }, String(v));
+      // série : volume précédent et suivant de part et d'autre de son nom
+      const step = (x, text, label) => x && el('a', { class: 'pill pill-num', href: `#/release/${enc(String(x.name).replace(/ /g, '_'))}?id=${x.id}`,
+        title: t(label, x.volume), 'aria-label': t(label, x.volume) }, text);
+      return [el('dt', {}, k), el('dd', {}, ...(extra === 'series'
+        ? [step(rel.series_prev, '‹', 'Volume {0}'), pill, step(rel.series_next, '›', 'Volume {0}')].filter(Boolean) : [pill]))];
+    });
 }
