@@ -15,12 +15,14 @@ export function infoRows(rel, el) {
     [t('Label'), rel.label, (v) => `#/labels/${enc(v)}`, 'ed'],
     [t('Catalogue'), rel.catalog, rel.label ? () => `#/labels/${enc(rel.label)}` : null, 'ed'],
     [t('Catégorie'), rel.category && catLabel(rel.category), () => `#/?category=${enc(rel.category)}`, 'cls'],
+    // série : ajoutée une fois ses volumes connus (deux au moins), elle mène à la page de la série
+    [t('Série'), rel.series_name, (v) => `#/series/${enc(v)}`, 'cls'],
     [t('Genre'), rel.genre, (v) => `#/?genre=${enc(v)}`, 'cls'],
     [t('Taille'), rel.size == null ? null : fmtSize(rel.size), null, 'num'],
     [t('Durée'), rel.duration == null ? null : fmtDuration(rel.duration), null, 'num'],
     [t('Format'), rel.format, null, 'num'],
     [t('Débit'), rel.bitrate ? `${Math.round(rel.bitrate / 1000)} kbit/s` : null, null, 'num'],
-    [t('Écoutes'), rel.plays ? `${rel.plays} · ${fmtDate(rel.last_played)}` : null, null, 'num'],
+    [t('Écoutes'), rel.plays || null, null, 'num'],
     [t('Fréquence'), rel.sample_rate ? `${(rel.sample_rate / 1000).toLocaleString()} kHz` : null, null, 'num']]
     .filter(([, v]) => v != null && v !== '')
     // à plat : el() n'aplatit qu'un niveau

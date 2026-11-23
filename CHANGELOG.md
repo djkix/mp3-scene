@@ -4,6 +4,15 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.66.1](https://github.com/djkix/mp3-scene/compare/v1.66.0...v1.66.1) (2026-11-23)
+
+### Résumé
+
+**Série sur la fiche d'une release, écoutes sans date.**
+
+- La fiche indique la série de la release (au moins deux volumes), avec un lien vers sa page.
+- La ligne Écoutes ne donne plus que le nombre.
+
 ## [1.66.0](https://github.com/djkix/mp3-scene/compare/v1.65.0...v1.66.0) (2026-11-23)
 
 ### Résumé

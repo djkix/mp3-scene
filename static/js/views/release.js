@@ -26,6 +26,7 @@ export function render(container, params) {
     // série (« Global Underground 47 ») : volume précédent, page de la série, volume suivant
     if (rel.series) api('/series?' + new URLSearchParams({ name: rel.series, exact: 1 })).then((s) => {
       if (dead || s.items.length < 2) return;
+      container.querySelector('.detail-info')?.paint({ series_name: s.name });
       const i = s.items.findIndex((x) => x.id === rel.id);
       const step = (x, text) => x && el('a', { class: 'btn', href: relHref(x.name, x.id), title: relName(x.name) }, text);
       ser.replaceChildren(el('nav', { class: 'series-nav', 'aria-label': t('Série') },
@@ -87,8 +88,10 @@ function header(rel) {
   // ponytail: la première piste vaut pour la release ; les lire toutes si des releases mélangent les formats
   const shown = { ...rel, format: /\.\w+$/.test(rel.tracks[0]?.filename || '') ? rel.tracks[0].filename.split('.').pop().toUpperCase() : null };
   const info = el('dl', { class: 'detail-info' }, infoRows(shown, el));
+  // valeurs connues plus tard (fréquence lue dans le fichier, série) : le bloc est redessiné avec elles
+  info.paint = (extra) => { Object.assign(shown, extra); info.replaceChildren(...infoRows(shown, el)); };
   if (rel.tracks[0]) api(`/tracks/${rel.tracks[0].id}/tech`)
-    .then((d) => info.replaceChildren(...infoRows({ ...shown, sample_rate: d.sample_rate }, el))).catch(() => {}); // facultatif
+    .then((d) => info.paint({ sample_rate: d.sample_rate })).catch(() => {}); // facultatif
   return el('header', { class: 'detail-head' },
     el('h1', { class: 'detail-name' }, relName(rel.name)),
     el('div', { class: 'detail-top' },
