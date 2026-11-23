@@ -71,7 +71,8 @@ def _step(pairs: dict, aliases: dict, keep=frozenset()) -> dict:
     for pair in out.values():
         for a in {*pair} - {None}:
             spellings[key(a)][a.title() if a.islower() else a] += 1
-    best = {k: min(c, key=lambda s: (-c[s], s)) for k, c in spellings.items()}
+    # la graphie la plus répandue, sauf le tout-majuscules (« BOB SINCLAR ») qui cède à toute graphie mixte
+    best = {k: min(c, key=lambda s: (s.isupper() and len(c) > 1, -c[s], s)) for k, c in spellings.items()}
     return {i: (n and best[key(n)], t and best[key(t)]) for i, (n, t) in out.items()}
 
 

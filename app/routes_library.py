@@ -117,14 +117,15 @@ def _release_conds(category=None, genre=None, year=None, grp=None, artist=None, 
         conds.append("(" + " OR ".join(when) + ")")
     if appears is not None:  # releases d'un autre artiste (compilations surtout) où celui-ci signe une piste
         # ponytail: égalité stricte sur le tag de la piste ; « X feat. Y » n'est pas une apparition de X
-        conds.append("COALESCE(r.tag_artist, r.artist, '')!=? AND r.id IN (SELECT release_id FROM tracks WHERE artist=?)")
+        conds.append("COALESCE(r.tag_artist, r.artist, '')!=? COLLATE NOCASE AND r.id IN (SELECT release_id FROM tracks"
+                     " WHERE artist=? COLLATE NOCASE)")
         params += [appears, appears]
     if collab is not None:  # releases dont le nom associe cet artiste à un autre (feat, vs, &)
         # ponytail: fonction Python appelée pour chaque release (~0,1 s pour 45 000)
         conds.append("collab(r.name, ?)")
         params.append(collab)
     if artist is not None:
-        conds.append("COALESCE(r.tag_artist, r.artist)=?")
+        conds.append("COALESCE(r.tag_artist, r.artist)=? COLLATE NOCASE")  # « BOB SINCLAR » ouvre Bob Sinclar
         params.append(artist)
     return conds, params
 
@@ -238,10 +239,10 @@ def groups(by: Literal["grp", "artist", "genre", "label", "category", "year", "s
     col = GROUP_BY[by]
     conds, params = [f"{col} IS NOT NULL", "hidden=0"], []
     if name is not None:
-        conds.append(f"{col}=?")
+        conds.append(f"{col}=?" + (" COLLATE NOCASE" if by == "artist" else ""))
         params.append(name)
     if artist is not None:  # chronologie d'un artiste : ses releases par année (by=year)
-        conds.append("COALESCE(tag_artist, artist)=?")
+        conds.append("COALESCE(tag_artist, artist)=? COLLATE NOCASE")
         params.append(artist)
     if genre:  # plusieurs genres, années ou décennies : l'un ou l'autre, comme dans les listes
         conds.append(f"genre IN ({','.join('?' * len(genre))})")
@@ -383,7 +384,10 @@ def artist_info(name: str = Query(min_length=1, max_length=200), user=Depends(cu
     """Fiche d'un artiste : nombre et poids de ses quatre listes (ses releases, celles où le nom l'associe à un
     autre, celles des autres où il signe une piste, les longs mixes dont un chapitre est de lui), ses labels, les
     artistes avec qui il signe le plus de pistes, et ses releases les plus écoutées par l'utilisateur."""
-    mine = "COALESCE(r.tag_artist, r.artist)=? AND r.hidden=0"
+    mine = "COALESCE(r.tag_artist, r.artist)=? COLLATE NOCASE AND r.hidden=0"
+    # graphie en base de l'artiste demandé (« BOB SINCLAR » -> « Bob Sinclar ») : la page s'y range
+    canon = conn.execute("SELECT COALESCE(tag_artist, artist) FROM releases WHERE COALESCE(tag_artist, artist)=? COLLATE NOCASE"
+                         " GROUP BY 1 ORDER BY COUNT(*) DESC LIMIT 1", (name,)).fetchone()
 
     def total(**cond):  # mêmes conditions que les listes affichées sous l'en-tête
         conds, params = _release_conds(**cond)
@@ -416,7 +420,7 @@ def artist_info(name: str = Query(min_length=1, max_length=200), user=Depends(cu
     top = [dict(x) for x in conn.execute(
         f"SELECT r.id, r.name, r.title, COUNT(*) AS plays FROM plays p JOIN tracks t ON t.id=p.track_id JOIN releases r ON r.id=t.release_id"
         f" WHERE p.user_id=? AND {mine} GROUP BY r.id ORDER BY plays DESC, r.name COLLATE NOCASE LIMIT 5", (user["id"], name))]
-    return {"lists": lists, "labels": labels, "top": top,
+    return {"name": canon[0] if canon else name, "lists": lists, "labels": labels, "top": top,
             "with": [{"name": spelling[k], "tracks": n} for k, n in sorted(others.items(), key=lambda kv: (-kv[1], kv[0]))[:8]]}
 
 

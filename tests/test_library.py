@@ -1085,7 +1085,7 @@ def test_genre_guess_group_info_and_track_artist_case(admin_client, settings):
     assert (info["n"], info["first"], info["last"]) == (4, 2000, 2007) and info["artists"][0] == {"name": "Bob", "releases": 3}
     assert info["others"] == [{"name": "GRP", "releases": 3}, {"name": "XYZ", "releases": 1}]
     db.merge_track_artists(conn)
-    assert [r[0] for r in conn.execute("SELECT DISTINCT artist FROM tracks WHERE artist LIKE 'axwell'")] == ["AXWELL"]  # la plus fréquente
+    assert [r[0] for r in conn.execute("SELECT DISTINCT artist FROM tracks WHERE artist LIKE 'axwell'")] == ["Axwell"]  # la mixte l'emporte
 
 
 def test_series_sharing_their_first_words_form_a_family(user_client, settings):
@@ -1207,3 +1207,17 @@ def test_artist_photo_is_taken_from_the_first_matching_result(app, user_client, 
     assert photo("Defected Records", "label") == 404  # sans jeton : pas de recherche
     app.state.settings = app.state.settings.__class__(**{**app.state.settings.__dict__, "discogs_token": "t"})
     assert photo("Defected Records", "label") == 200 and got[-1] == "https://x/l.jpg"
+
+
+def test_artist_page_ignores_case_and_caps_lock_spellings_merge(user_client, library, settings):
+    from app import artists
+    rid = user_client.get("/api/releases", params={"artist": "A-TRAK"}).json()["items"]
+    assert len(rid) == 1 and user_client.get("/api/artist-info", params={"name": "a-trak"}).json()["name"] == "A-Trak"
+    pairs = {1: ("BOB SINCLAR", None), 2: ("BOB SINCLAR", None), 3: ("Bob Sinclar", None)}
+    assert {v[0] for v in artists._step(pairs, {}).values()} == {"Bob Sinclar"}
+    conn = db.connect(settings.data_dir)
+    rel = conn.execute("SELECT release_id FROM tracks LIMIT 1").fetchone()[0]
+    for a in ("CUTEE B.", "CUTEE B.", "Cutee B."):
+        conn.execute("INSERT INTO tracks(release_id, relpath, size, artist) VALUES (?, 'c.mp3', 1, ?)", (rel, a))
+    db.merge_track_artists(conn)
+    assert [r[0] for r in conn.execute("SELECT DISTINCT artist FROM tracks WHERE artist LIKE 'cutee b.'")] == ["Cutee B."]

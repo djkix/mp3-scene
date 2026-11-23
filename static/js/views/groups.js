@@ -89,6 +89,8 @@ function detail(container, kind, params) {
     `${y.name} `, el('small', {}, String(y.releases)))));
   }).catch(() => {});
   if (kind === 'artists') api('/artist-info?' + new URLSearchParams({ name })).then((a) => {
+    // lien écrit dans une autre casse (« BOB SINCLAR ») : la page se range sous la graphie en base
+    if (a.name !== name) { location.replace(base.replace(encodeURIComponent(name), encodeURIComponent(a.name)) + location.hash.replace(/^[^?]*/, '')); return; }
     for (const [key] of LISTS) {
       cells[key][0].textContent = String(a.lists[key].n);
       cells[key][1].textContent = a.lists[key].n ? fmtSize(a.lists[key].size) : '';

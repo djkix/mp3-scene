@@ -44,3 +44,10 @@ def test_ornament_around_the_name_is_not_in_the_title():
     assert p("-=_Tomorrowland_2013_=-")["title"] == "Tomorrowland 2013"
     assert p("-=_INOX_Electronique_Festival_2013_=-")["title"] == "INOX Electronique Festival 2013"
     assert p("-=_Tomorrowland_2013_=-", legacy=True)["title"] != "Tomorrowland 2013"  # ancienne lecture : relue au démarrage
+
+
+def test_source_word_inside_a_long_title_stays_in_the_title():
+    n = "Junior_Jack_-_Live_Royal_Summer_Party_at_Contact_Fm-08-18-Radio-2003-OXD"
+    assert p(n)["title"] == "Live Royal Summer Party at Contact Fm-08-18-Radio" and p(n)["source"] == "FM"
+    assert p(n, legacy=True)["title"] == "08-18-Radio"  # ancienne lecture : relue au démarrage
+    assert p("Artist-Title-Promo_CDM-2007-GRP")["title"] == "Title"  # segment court : toujours retiré

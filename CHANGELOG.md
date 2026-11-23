@@ -4,6 +4,17 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.66.5](https://github.com/djkix/mp3-scene/compare/v1.66.4...v1.66.5) (2026-11-23)
+
+### Résumé
+
+**Artistes sans souci de casse, titres coupés par un mot de source.**
+
+- La page d'un artiste ignore la casse : ouverte en capitales (« BOB SINCLAR »), elle se range sous la graphie en base.
+- Une graphie tout en capitales cède à la graphie mixte, pour les artistes des releases comme pour ceux des pistes.
+- Un mot de source au milieu d'un long bout de titre (« …Party_at_Contact_Fm ») compte pour la catégorie sans couper
+  le titre : environ 1 200 titres sont mieux lus, relus au démarrage.
+
 ## [1.66.4](https://github.com/djkix/mp3-scene/compare/v1.66.3...v1.66.4) (2026-11-23)
 
 ### Résumé

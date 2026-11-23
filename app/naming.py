@@ -162,7 +162,9 @@ def parse_release_name(name: str, legacy: bool = False) -> dict:
 
     skip |= {i for i, s in enumerate(segs) if i and s.upper() in ("FLAC", "LOSSLESS")}  # format, pas un bout de titre
     source, si = _source(segs, skip)
-    if si is not None:
+    # le segment de la source quitte le titre, sauf un long bout de titre où le mot n'est qu'un mot parmi d'autres
+    # (« Live_Royal_Summer_Party_at_Contact_Fm ») : la source compte pour la catégorie, le titre reste entier
+    if si is not None and (legacy or len([w for w in segs[si].split("_") if w]) <= 3):
         skip.add(si)
 
     rest = "-".join(s for i, s in enumerate(segs) if i not in skip)
