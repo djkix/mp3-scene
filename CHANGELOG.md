@@ -4,6 +4,19 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.70.0](https://github.com/djkix/mp3-scene/compare/v1.69.1...v1.70.0) (2026-11-23)
+
+### Résumé
+
+**Page d'un titre : pistes groupées par artiste, tri au clic, filtres.**
+
+- Les pistes d'un titre sont rangées par artiste, les graphies d'un même crédit réunies (« Axwell & Ingrosso »,
+  « Axwell /\\ Ingrosso », « Axwell and Ingrosso »), avec un intertitre à chaque artiste.
+- Les en-têtes de colonnes (artiste, genre, durée, débit, release) trient au clic, ici et dans l'onglet Pistes de la
+  recherche.
+- La page d'un titre a les mêmes filtres que la liste des titres (genres, années, catégories).
+- Les guillemets autour d'un titre (« 'Strong in Love' ») sont ignorés ; le bouton de lecture aléatoire est retiré.
+
 ## [1.69.1](https://github.com/djkix/mp3-scene/compare/v1.69.0...v1.69.1) (2026-11-23)
 
 ### Résumé

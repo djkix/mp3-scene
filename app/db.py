@@ -229,5 +229,6 @@ def connect(data_dir: Path) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys=ON")
     conn.execute("PRAGMA busy_timeout=5000")
     conn.create_function("remixed", 2, artists.remixed, deterministic=True)  # ligne « Remixes » de la page d'un artiste
+    conn.create_function("group_key", 1, artists.group_key, deterministic=True)  # pistes d'un titre, groupées par artiste  # ligne « Remixes » de la page d'un artiste
     conn.create_function("collab", 2, artists.collab, deterministic=True)  # filtre « Avec » de la page d'un artiste
     return conn

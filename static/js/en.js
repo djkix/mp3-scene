@@ -158,8 +158,6 @@ export const EN = {
   'Séries': 'Series',
   'Détail des pistes': 'Track details',
   'Tapez un mot du titre pour voir les pistes.': 'Type a word of the title to see the tracks.',
-  'Lecture aléatoire': 'Shuffle play',
-  'Aucune piste à lire.': 'No track to play.',
   'Fusionner des titres': 'Merge titles',
   'Dans l’onglet Titres, le premier titre rejoint le second (« Show Me Love 2009 » dans « Show Me Love »). Les versions entre parenthèses ou après un tiret sont déjà réunies.': 'In the Titles tab, the first title joins the second ("Show Me Love 2009" into "Show Me Love"). Versions in brackets or after a dash are already grouped.',
   'Aucun titre fusionné à la main.': 'No title merged by hand.',

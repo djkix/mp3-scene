@@ -580,7 +580,7 @@ def detach_artist(alias: str = Query(max_length=200), conn=Depends(get_conn)):
 
 def _title_key(t: str) -> str:
     """Clé d'un titre, comme dans l'onglet Titres : minuscules, sans la version entre parenthèses ou après un tiret."""
-    t = t.lstrip("_.-*~#>| ").replace("_", " ")
+    t = t.lstrip("_.-*~#>| ").replace("_", " ").strip(" '\"")
     return re.split(r"\s*[(\[]|\s+-\s+", t.strip(), maxsplit=1)[0].strip().lower()
 
 

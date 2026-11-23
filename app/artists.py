@@ -42,6 +42,17 @@ def capitalize(artist: str) -> str:
     return re.sub(r"(^|\s)([^\W\d_])", lambda m: m[1] + m[2].upper(), artist) if artist.islower() else artist
 
 
+_LINKS = {"and", "vs", "versus", "x", "feat", "ft", "featuring", "with", "pres", "presents", "meets"}
+
+
+def group_key(artist: str | None) -> str:
+    """Clé de regroupement des crédits d'une liste de pistes : lettres et chiffres seuls, sans les mots de liaison.
+    « Axwell & Ingrosso », « Axwell /\\ Ingrosso », « Axwell and Ingrosso » -> « axwellingrosso » ; « Funkstar De Luxe » et
+    « Funkstar Deluxe » aussi. Même calcul que dans static/js/views/tracklist.js (intertitres)."""
+    a = "".join(c for c in unicodedata.normalize("NFKD", artist or "") if not unicodedata.combining(c)).casefold()
+    return "".join(w for w in re.findall(r"[^\W_]+", a) if w not in _LINKS)
+
+
 def norm(artist: str) -> str:
     """Graphie comparée à celles à ne jamais fusionner : sans casse, soulignés ni espaces en double."""
     return " ".join(artist.replace("_", " ").casefold().split())

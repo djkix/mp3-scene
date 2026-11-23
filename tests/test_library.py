@@ -1283,3 +1283,17 @@ def test_nfo_tracklist_names_tracks_without_tags(app, settings):
     scanner._nfo_titles(conn, rid, text)
     assert [tuple(r) for r in conn.execute("SELECT artist, title FROM tracks WHERE release_id=? ORDER BY relpath", (rid,))] == \
         [("Alpha", "One"), ("Beta", "Two (Club Mix)")]
+
+
+def test_tracks_of_a_title_are_grouped_by_artist_and_sortable(user_client, library, settings):
+    from app import artists
+    assert artists.group_key("Axwell /\\ Ingrosso") == artists.group_key("Axwell and Ingrosso") == artists.group_key("Axwell & Ingrosso") == "axwellingrosso"
+    assert artists.group_key("Funkstar De Luxe") == artists.group_key("Funkstar Deluxe")
+    conn = db.connect(settings.data_dir)
+    rel = conn.execute("SELECT release_id FROM tracks WHERE title='Glue'").fetchone()[0]
+    for a, br in (("Zed", 128000), ("Axwell and Ingrosso", 320000), ("Axwell /\\ Ingrosso", 192000)):
+        conn.execute("INSERT INTO tracks(release_id, relpath, size, title, artist, bitrate) VALUES (?, 'g.mp3', 1, 'Glue', ?, ?)", (rel, a, br))
+    conn.commit()
+    got = lambda **p: [t["artist"] for t in user_client.get("/api/tracks", params={"song": "Glue", **p}).json()["items"]]
+    assert got()[:2] == ["Axwell /\\ Ingrosso", "Axwell and Ingrosso"] or got()[:2] == ["Axwell and Ingrosso", "Axwell /\\ Ingrosso"]
+    assert got()[-1] == "Zed" and got(sort="bitrate", dir="desc")[0] == "Axwell and Ingrosso"

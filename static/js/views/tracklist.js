@@ -8,10 +8,16 @@ import { favButton } from './releases.js'; // import croisé : appelé au rendu 
 
 const PAGE = 50;
 
+// même clé que artists.group_key côté serveur : lettres et chiffres, sans accents ni mots de liaison
+const LINKS = new Set(['and', 'vs', 'versus', 'x', 'feat', 'ft', 'featuring', 'with', 'pres', 'presents', 'meets']);
+export const groupKey = (a) => (String(a ?? '').normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().match(/[\p{L}\p{N}]+/gu) || [])
+  .filter((w) => !LINKS.has(w)).join('');
+
 // path : route d'API renvoyant {items, has_more}. history : heure d'écoute à la place de la durée, bouton d'effacement.
 // remove : {url(piste), icon, label} — bouton qui retire la piste de la liste. onPage(page) : appelé à chaque page reçue.
 // move(piste, 'up'|'down') -> route d'API (POST) qui échange la piste avec sa voisine : ajoute les boutons ▲ ▼.
-export function trackList(container, { path, empty, history = false, remove = null, onPage = null, move = null }) {
+// sort : [clé, sens] — en-têtes cliquables (route /tracks seulement) ; trié par artiste, un intertitre par crédit.
+export function trackList(container, { path, empty, history = false, remove = null, onPage = null, move = null, sort = null }) {
   const list = el('ul', { class: 'rel-list' });
   const status = el('p', { class: 'status', role: 'status' });
   const sentinel = el('div', { class: 'sentinel' });
@@ -29,8 +35,23 @@ export function trackList(container, { path, empty, history = false, remove = nu
     status.textContent = empty;
   } }, tr("Effacer l'historique")));
   // même présentation que les lignes de releases : vignette, nom, genre, durée (ou date d'écoute), débit, release, actions
-  const head = el('div', { class: 'rel-head trk' }, el('span'), el('span', { class: 'mid' }, tr('Artiste - Titre')),
-    [tr('Genre'), history ? tr('Date') : tr('Durée'), tr('Débit'), tr('Release')].map((x) => el('span', { class: 'mid' }, x)), el('span'));
+  // [libellé, clé de tri du serveur, sens au premier clic]
+  const COLS = [[tr('Artiste - Titre'), 'artist', 'asc'], [tr('Genre'), 'genre', 'asc'], [history ? tr('Date') : tr('Durée'), 'duration', 'desc'],
+    [tr('Débit'), 'bitrate', 'desc'], [tr('Release'), 'release', 'asc']];
+  let [sortKey, sortDir] = sort || [null, 'asc'], lastGroup = null;
+  const heads = COLS.map(([text, key, first]) => (sort ? el('button', { type: 'button', class: 'mid', onclick: () => {
+    sortDir = sortKey === key ? (sortDir === 'asc' ? 'desc' : 'asc') : first;
+    sortKey = key;
+    paintHead();
+    dead = true; observer.disconnect(); // la page en cours d'un tri précédent est ignorée
+    tracks.length = 0; offset = 0; done = false; dead = false; lastGroup = null;
+    list.replaceChildren();
+    observer.observe(sentinel);
+    load();
+  } }, text) : el('span', { class: 'mid' }, text)));
+  const paintHead = () => sort && COLS.forEach(([text, key], i) => { heads[i].textContent = key === sortKey ? `${text} ${sortDir === 'asc' ? '▲' : '▼'}` : text; });
+  paintHead();
+  const head = el('div', { class: 'rel-head trk' }, el('span'), ...heads, el('span'));
   if (move) container.style.setProperty('--acts', '136px');
   if (history) container.style.setProperty('--when', '9.5rem');
   container.replaceChildren(...(clear ? [clear] : []), head, list, status, sentinel);
@@ -94,11 +115,18 @@ export function trackList(container, { path, empty, history = false, remove = nu
     loading = true;
     status.replaceChildren(tr('Chargement…'));
     try {
-      const page = await api(`${path}${path.includes('?') ? '&' : '?'}offset=${offset}&limit=${PAGE}`);
+      const page = await api(`${path}${path.includes('?') ? '&' : '?'}offset=${offset}&limit=${PAGE}${sort ? `&sort=${sortKey}&dir=${sortDir}` : ''}`);
       if (dead) return;
       onPage?.(page);
       tracks.push(...page.items);
-      list.append(...page.items.map(row));
+      // trié par artiste : un intertitre à chaque nouveau crédit (« Axwell & Ingrosso », puis « Bob Marley »…)
+      list.append(...page.items.flatMap((t) => {
+        if (!sort || sortKey !== 'artist') return [row(t)];
+        const k = groupKey(t.artist);
+        if (k === lastGroup) return [row(t)];
+        lastGroup = k;
+        return [el('li', { class: 'rel-cap kind-4' }, el('span', { class: 'cap-pill' }, t.artist || '—')), row(t)];
+      }));
       watch.mark();
       offset += page.items.length;
       done = !page.has_more;

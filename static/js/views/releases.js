@@ -310,7 +310,8 @@ export function render(container, params) {
   const query = toQuery({ q, ...(inNfo && { nfo: 1 }) });
   if (inTracks) for (const k of ['bpm_min', 'bpm_max']) if (Number(params[k]) > 0) query.set(k, Number(params[k]));
   // onglet Pistes de la recherche : mêmes filtres, appliqués à la release de chaque piste
-  const dispose = inTracks ? trackList(list, { path: `/tracks?${query}`, empty: tr('Aucun résultat') }) : releaseList(list, (offset, tri) => {
+  // onglet Pistes : en-têtes cliquables ; sans tri choisi, par titre puis par artiste
+  const dispose = inTracks ? trackList(list, { path: `/tracks?${query}`, empty: tr('Aucun résultat'), sort: ['title', 'asc'] }) : releaseList(list, (offset, tri) => {
     query.set('offset', offset);
     query.set('limit', PAGE);
     return api('/releases?' + query + tri);

@@ -244,7 +244,7 @@ GROUP_BY = {"series": "title", "grp": "grp", "artist": "COALESCE(tag_artist, art
 
 
 # titre d'un morceau sans sa version : « Crazy (Club Mix) », « Crazy [Dub] », « Crazy - Club Mix » -> « crazy »
-_T = """replace(ltrim(t.title, '_.-*~#>| '), '_', ' ')"""  # « _All_These_Things », « ....On The Radio » : dès la première lettre
+_T = """trim(replace(ltrim(t.title, '_.-*~#>| '), '_', ' '), ' ''"')"""  # « 'Strong in Love' » : sans les guillemets  # « _All_These_Things », « ....On The Radio » : dès la première lettre
 
 
 def _raw(c: str) -> str:
@@ -374,6 +374,7 @@ def search_tracks(q: str = Query("", max_length=200), category: Many = None, gen
                   decade: Years = None, source: Many = None, mixes: str | None = Query(None, min_length=1, max_length=200),
                   remixes: str | None = Query(None, min_length=1, max_length=200),
                   song: str | None = Query(None, min_length=1, max_length=300),
+                  sort: Literal["title", "artist", "genre", "duration", "bitrate", "release"] | None = None, dir: Dir = "asc",
                   offset: int = Query(0, ge=0, le=MAX_INT), summary: bool = False,
                   bpm_min: float | None = Query(None, ge=0, le=999), bpm_max: float | None = Query(None, ge=0, le=999),
                   limit: int = Query(50, ge=1, le=MAX_INT), user=Depends(current_user), conn=Depends(get_conn)):
@@ -412,9 +413,14 @@ def search_tracks(q: str = Query("", max_length=200), category: Many = None, gen
         return [dict(x) for x in conn.execute(
             "SELECT r.category AS name, COUNT(*) AS tracks, COALESCE(SUM(t.size), 0) AS size FROM tracks t"
             f" JOIN releases r ON r.id=t.release_id WHERE {conds} GROUP BY 1 ORDER BY tracks DESC, 1", params)]
-    page = _page(conn, TRACK_COLS, TRACK_FROM, "WHERE " + conds, params,
-                 "COALESCE(t.title, t.relpath) COLLATE NOCASE, t.artist COLLATE NOCASE, t.id",  # par titre, puis par artiste
-                 user["id"], offset, limit, _track)
+    # tri au clic sur les en-têtes ; « artist » regroupe les graphies d'un même crédit (group_key), puis par titre.
+    # Sans tri choisi : par titre puis par artiste, ou par artiste pour les versions d'un titre
+    d = dir.upper()
+    order = {"artist": f"group_key(t.artist) {d}, COALESCE(t.title, t.relpath) COLLATE NOCASE",
+             "title": f"COALESCE(t.title, t.relpath) COLLATE NOCASE {d}, t.artist COLLATE NOCASE",
+             "genre": f"t.genre COLLATE NOCASE {d}", "duration": f"t.duration {d}", "bitrate": f"t.bitrate {d}",
+             "release": f"r.name COLLATE NOCASE {d}"}[sort or ("artist" if song else "title")] + ", t.id"
+    page = _page(conn, TRACK_COLS, TRACK_FROM, "WHERE " + conds, params, order, user["id"], offset, limit, _track)
     for item in page["items"]:  # le chapitre trouvé, pour l'afficher et lancer la piste à cet endroit
         c = conn.execute(f"SELECT c.start, c.artist, c.title FROM chapters c WHERE c.track_id=? AND {in_chapter} ORDER BY c.pos LIMIT 1",
                          (item["id"], *likes)).fetchone()
