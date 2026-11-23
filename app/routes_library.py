@@ -2,6 +2,7 @@ import hashlib
 import io
 import os
 import re
+import threading
 import time
 from collections import Counter
 from typing import Annotated, Literal
@@ -13,7 +14,7 @@ from PIL import Image
 
 from . import artists, coversearch, nfo
 from .naming import complete_title
-from .routes_media import IMAGE_ERRORS
+from .routes_media import DECODE, IMAGE_ERRORS
 from .deps import MAX_INT, Id, current_user, get_conn
 from .security import safe_path
 
@@ -366,8 +367,10 @@ def _remix_conds(artist: str):
     """Condition SQL des pistes remixées par cet artiste. Le LIKE sur son mot le plus long écarte presque tout avant
     la fonction Python remixed()."""
     # ponytail: LIKE sans index sur toutes les pistes (~0,1 s pour 500 000)
-    word = max(_WORDS.split(artist), key=len)
-    return "t.title LIKE ? AND remixed(t.title, ?)", [f"%{word}%", artist]
+    words = [w for w in _WORDS.split(artist) if w]
+    if not words:  # que de la ponctuation : aucune piste (et pas de parcours complet)
+        return "0", []
+    return "t.title LIKE ? AND remixed(t.title, ?)", [f"%{max(words, key=len)}%", artist]
 
 
 @router.get("/api/tracks")
@@ -552,12 +555,13 @@ def store_photo(data_dir, kind: str, name: str, url: str) -> None:
     Lève ValueError ou OSError si l'image est refusée ou illisible."""
     data = coversearch.fetch(url)
     target = photo_path(data_dir, kind, name)
-    with Image.open(io.BytesIO(data)) as img:
+    with DECODE, Image.open(io.BytesIO(data)) as img:
         img = img.convert("RGB")
         img.thumbnail((600, 600))
         target.parent.mkdir(exist_ok=True)
-        img.save(target.with_suffix(".tmp"), "JPEG", quality=88)
-    os.replace(target.with_suffix(".tmp"), target)
+        tmp = target.with_name(f"{target.stem}.{threading.get_ident()}.tmp")  # deux demandes simultanées : deux fichiers
+        img.save(tmp, "JPEG", quality=88)
+    os.replace(tmp, target)
 
 
 def photo_candidates(settings, kind: str, name: str) -> list[dict]:
@@ -568,7 +572,7 @@ def photo_candidates(settings, kind: str, name: str) -> list[dict]:
 
 
 @router.get("/api/photo")
-def photo(request: Request, kind: PHOTO_KINDS, name: str = Query(min_length=1, max_length=200)):
+def photo(request: Request, kind: PHOTO_KINDS, name: str = Query(min_length=1, max_length=200), conn=Depends(get_conn)):
     """Photo d'un artiste ou logo d'un label. À la première demande, la première proposition au même nom est prise
     d'office ; un fichier vide retient qu'il n'y en a pas (ou qu'un administrateur l'a retirée) : pas de nouvelle
     recherche."""
@@ -577,6 +581,13 @@ def photo(request: Request, kind: PHOTO_KINDS, name: str = Query(min_length=1, m
     same = (lambda a, b: nfo.label_key(a) == nfo.label_key(b)) if kind == "label" else (lambda a, b: artists.fold(a) == artists.fold(b))
     # un label sans jeton Discogs n'est pas cherché, et rien n'est retenu : il le sera une fois le jeton posé
     searchable = kind == "artist" or settings.discogs_token
+    if not path.exists():
+        # un nom absent de la bibliothèque : ni recherche ni fichier (sinon tout compte remplirait /data et le quota)
+        known = conn.execute("SELECT 1 FROM releases WHERE COALESCE(tag_artist, artist)=? COLLATE NOCASE LIMIT 1", (name,)).fetchone() \
+            or conn.execute("SELECT 1 FROM tracks WHERE artist=? LIMIT 1", (name,)).fetchone() if kind == "artist" \
+            else conn.execute("SELECT 1 FROM releases WHERE label=? COLLATE NOCASE LIMIT 1", (name,)).fetchone()
+        if not known:
+            raise HTTPException(404, "Pas de photo.")
     if searchable and not path.exists() and artists.fold(name) not in artists._VA | {""}:
         # ponytail: une recherche à la première visite de chaque page ; rien n'est retenu d'une panne réseau
         try:
@@ -667,7 +678,7 @@ def _series(title: str | None) -> str | None:
     Les mots avant le premier qui contient un chiffre ; None s'il y en a moins de deux ou moins de huit caractères."""
     words = []
     for w in (title or "").split():
-        if any(c.isdigit() for c in w):
+        if any("0" <= c <= "9" for c in w):  # « ² » n'est pas un numéro de volume (comme [0-9] plus bas)
             break
         words.append(w)
     ok = lambda ws: len(ws) >= 2 and len(" ".join(ws)) >= 8
@@ -689,7 +700,7 @@ def _all_series(conn, conds=("hidden=0",), params=()):
             g = found.setdefault(name.casefold(), {"name": name, "releases": 0, "size": 0, "volumes": set()})
             g["releases"] += 1
             g["size"] += size or 0
-            g["volumes"].add(int(re.search(r"\d+", title[len(name):])[0]))
+            g["volumes"].add(int(re.search(r"[0-9]+", title[len(name):])[0]))
     return sorted((g for g in found.values() if g["releases"] >= 3), key=lambda g: (-g["releases"], g["name"].casefold()))
 
 
@@ -791,7 +802,7 @@ def series(name: str = Query(min_length=1, max_length=200), exact: bool = False,
         items = [x for x in items if (_series(x["title"]) or "").casefold() in subs]
         for x in items:
             x["series"] = subs[_series(x["title"]).casefold()]["name"]
-            x["volume"] = int(re.search(r"\d+", x["title"][len(x["series"]):])[0])
+            x["volume"] = int(re.search(r"[0-9]+", x["title"][len(x["series"]):])[0])
         items.sort(key=lambda x: (x["series"].casefold(), x["volume"], x["year"] or 0, x["name"].lower()))
         return {"name": name, "items": items, "missing": [],
                 "subs": [{"name": g["name"], "releases": g["releases"], "missing": _missing(g["volumes"])}
@@ -799,7 +810,7 @@ def series(name: str = Query(min_length=1, max_length=200), exact: bool = False,
     # « Global Underground Nubreed 8 » commence comme « Global Underground » : c'est une autre série
     items = [x for x in items if (_series(x["title"]) or "").casefold() == name.casefold()] if _series(name + " 1") else []
     for x in items:
-        x["volume"] = int(re.search(r"\d+", x["title"][len(name):])[0])
+        x["volume"] = int(re.search(r"[0-9]+", x["title"][len(name):])[0])
     items.sort(key=lambda x: (x["volume"], x["year"] or 0, x["name"].lower()))
     return {"name": name, "items": items, "missing": _missing({x["volume"] for x in items}) if items else [], "subs": []}
 

@@ -22,7 +22,8 @@ async function load() {
     if (res.ok) {
       const rel = await res.json();
       latest = String(rel.tag_name).replace(/^v/, '');
-      url = rel.html_url;
+      // seul un lien vers les publications de ce dépôt est affiché
+      url = typeof rel.html_url === 'string' && rel.html_url.startsWith(`https://github.com/${REPO}/`) ? rel.html_url : null;
     }
   } catch { /* hors ligne */ }
   return { version, latest, url, update: latest !== null && isNewer(latest, version) };

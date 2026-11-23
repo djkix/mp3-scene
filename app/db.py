@@ -1,3 +1,4 @@
+import os
 import re
 import sqlite3
 from pathlib import Path
@@ -20,6 +21,8 @@ def init(data_dir: Path) -> None:
                                f"de cette application ({VERSION}) : mettez l'application à jour ou restaurez une "
                                "sauvegarde de data/.")
         conn.execute("PRAGMA journal_mode=WAL")  # persistant dans le fichier
+        for p in data_dir.glob("mp3scene.db*"):  # base créée par une version antérieure (0644) : lisible par l'appli seule
+            os.chmod(p, 0o600)
         # base neuve, ou existante non marquée (0) : le schéma actuel est la version 1
         conn.executescript(SCHEMA.read_text(encoding="utf-8"))
         # colonne ajoutée en 1.17.0 ; sans changer VERSION, pour qu'une image plus ancienne ouvre encore la base

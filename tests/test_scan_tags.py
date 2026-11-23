@@ -168,6 +168,10 @@ def test_read_error_after_open_stays_pending(conn, music, make_mp3, monkeypatch,
                 return Flaky(f.read())
         return real_open(path, *a, **k)
     monkeypatch.setattr(builtins, "open", fake_open)
+    from app import security
+    real_regular = security.open_regular  # le scan ouvre les fichiers par security.open_regular (sans suivre de lien)
+    monkeypatch.setattr(security, "open_regular", lambda path, root=None: fake_open(path) if str(path) == str(d / "01-a.mp3")
+                        else real_regular(path, root))
     assert scan_tags(conn, music) == 0
     assert conn.execute("SELECT tags_read FROM tracks").fetchone()[0] == 0
 
@@ -227,3 +231,23 @@ def test_runner_stores_warning_but_stays_idle_and_logs(settings, conn, music, ma
 def test_bpm_tag_is_read_as_a_plausible_number():
     from app.scanner import _bpm
     assert [_bpm(v) for v in ("128", "127.98", "128,0 BPM", "0", "?", None, "999")] == [128.0, 128.0, 128.0, None, None, None, None]
+
+
+def test_scan_never_follows_a_symlinked_nfo_or_cue(conn, music, make_mp3, tmp_path):
+    """SEC-01 : un lien « 00.nfo » ou « evil.cue » vers un fichier hors de la bibliothèque n'est jamais lu."""
+    import os
+    from app import cue, scanner
+    secret = tmp_path / "secret.txt"
+    secret.write_text("SECRET_KEY=topsecretvalue\nFILE \"01-a.mp3\" MP3\n  TRACK 01 AUDIO\n    INDEX 01 00:00:00\n"
+                      "  TRACK 02 AUDIO\n    INDEX 01 01:00:00\n")
+    d = release(music, make_mp3, ("01-a.mp3", dict(title="Alpha")))
+    (d / "99-ok.nfo").write_text("ok nfo")
+    os.symlink(secret, d / "00-evil.nfo")
+    os.symlink(secret, d / "evil.cue")
+    scan_structure(conn, music, now=1.0)
+    rid = conn.execute("SELECT id FROM releases").fetchone()[0]
+    scanner._scan_nfo_text(conn, music, lambda: False)
+    assert conn.execute("SELECT COUNT(*) FROM nfo_fts WHERE nfo_fts MATCH 'topsecretvalue'").fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM nfo_fts WHERE nfo_fts MATCH 'ok'").fetchone()[0] == 1
+    tid = conn.execute("SELECT id, relpath FROM tracks").fetchone()
+    assert cue.for_tracks(d, [(tid[0], tid[1])]) == {}

@@ -193,7 +193,15 @@ export function render(container, params = {}) {
   const usersBlock = () => [
     el('div', { class: 'table-wrap' }, el('table', { class: 'users' },
       el('thead', {}, el('tr', {}, th(t('Identifiant')), th(t('Rôle')), th(t('Actions')))), tbody)), listMsg,
-    el('h3', {}, t('Créer un utilisateur')), createForm, createMsg];
+    el('h3', {}, t('Créer un utilisateur')), createForm, createMsg,
+    // après une fuite : changer SECRET_KEY ne ferme pas les sessions ; ce bouton si
+    el('h3', {}, t('Sessions')), el('p', { class: 'hint' }, t('Ferme les sessions ouvertes de tous les comptes, sauf la vôtre : chacun devra se reconnecter.')),
+    el('button', { type: 'button', onclick: async (e) => {
+      if (!confirm(t('Fermer toutes les autres sessions ?'))) return;
+      e.target.disabled = true;
+      try { await api('/admin/sessions/revoke', { method: 'POST' }); listMsg.textContent = t('Toutes les autres sessions sont fermées.'); } catch (err) { listMsg.textContent = err.message; }
+      e.target.disabled = false;
+    } }, t('Fermer toutes les autres sessions'))];
   const body = el('div', { class: 'ad-main' });
   container.replaceChildren(el('div', { class: 'page admin' }, navBar(section ? `#/admin/${section}` : '#/admin'), body));
 
@@ -438,7 +446,7 @@ export function render(container, params = {}) {
         [[t('Version installée'), ver ? ver.version : '…'], [t('Base de données'), v('o', (x) => fmtSize(x.db_size))],
           [t('Vignettes'), v('o', (x) => fmtSize(x.thumbs_size))], [t('Cache de conversion'), v('o', (x) => fmtSize(x.transcode_size))]],
         o?.transcode_size ? clearCache : null,
-        link('#/library', t('Statistiques')), ver?.update && el('a', { class: 'btn', href: ver.url, target: '_blank', rel: 'noopener' }, t('Voir les nouveautés'))),
+        link('#/library', t('Statistiques')), ver?.update && el('a', { class: 'btn', href: ver.url, target: '_blank', rel: 'noopener noreferrer' }, t('Voir les nouveautés'))),
       // sauvegarde de la base vers le NAS : dernière tentative, retard éventuel, lancement à la main
       card(t('Sauvegarde'), b && (!b.configured ? t('Non configurée') : b.late ? t('En retard') : b.last?.ok ? t('À jour') : null),
         [[t('Dernière réussie'), v('b', (x) => fmtTime(x.last_ok_at))],

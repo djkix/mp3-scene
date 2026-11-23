@@ -285,13 +285,14 @@ def test_user_crud(admin_client, settings):
     r = admin_client.post("/api/admin/users", json={"username": "  bob ", "password": "12345678", "role": "user"})
     assert r.status_code == 201 and r.json()["username"] == "bob"
     assert admin_client.post("/api/admin/users", json={"username": "bob", "password": "12345678", "role": "user"}).status_code == 409
-    assert admin_client.post("/api/admin/users", json={"username": "Bob", "password": "12345678", "role": "user"}).status_code == 201
+    # « Bob » et « bob » : un seul compte (SEC-14)
+    assert admin_client.post("/api/admin/users", json={"username": "Bob", "password": "12345678", "role": "user"}).status_code == 409
     assert admin_client.post("/api/admin/users", json={"username": "carl", "password": "1234567", "role": "user"}).status_code == 400
     assert admin_client.post("/api/admin/users", json={"username": "   ", "password": "12345678", "role": "user"}).status_code == 400
     assert admin_client.post("/api/admin/users", json={"username": "x" * 65, "password": "12345678", "role": "user"}).status_code == 400
     assert admin_client.post("/api/admin/users", json={"username": "z", "password": "12345678", "role": "root"}).status_code == 422
     users = admin_client.get("/api/admin/users").json()
-    assert {u["username"] for u in users} == {"admin", "bob", "Bob"} and all(set(u) == {"id", "username", "role"} for u in users)
+    assert {u["username"] for u in users} == {"admin", "bob"} and all(set(u) == {"id", "username", "role"} for u in users)
 
     uid = _uid(admin_client, "bob")
     bob = TestClient(admin_client.app, base_url="https://testserver", headers={"X-CSRF": "1"})
@@ -364,6 +365,27 @@ def test_forwarded_for_is_ignored_from_an_internet_peer():
     req = lambda peer: Request({"type": "http", "headers": [(b"x-forwarded-for", b"10.0.0.9")], "client": (peer, 1)})
     assert client_ip(req("172.18.0.2")) == "10.0.0.9"      # le proxy, dans le réseau Docker
     assert client_ip(req("203.0.114.5")) == "203.0.114.5"  # connexion directe depuis Internet : l'en-tête est ignoré
+    assert client_ip(req("::ffff:203.0.114.5")) == "203.0.114.5"  # IPv4 vue en IPv6 : toujours une adresse d'Internet
+    assert client_ip(req("100.64.0.7")) == "100.64.0.7"     # CGNAT : pas un proxy de confiance par défaut
+    bad = Request({"type": "http", "headers": [(b"x-forwarded-for", b"<script>")], "client": ("172.18.0.2", 1)})
+    assert client_ip(bad) == "172.18.0.2"                   # valeur qui n'est pas une adresse : ignorée
+
+
+def test_ipv6_addresses_of_one_slash64_share_their_limit(client):
+    for i in range(5):
+        h = {"X-Forwarded-For": f"2001:db8:1:2::{i + 1}", "X-CSRF": "1"}
+        assert _login(client, f"x{i}", "bad", headers=h).status_code == 401
+    h = {"X-Forwarded-For": "2001:db8:1:2::99", "X-CSRF": "1"}
+    assert _login(client, "admin", "adminpass", headers=h).status_code == 429   # même /64 : bloqué
+    assert _login(client, "admin", "adminpass").status_code == 200
+
+
+def test_owner_address_is_never_locked_by_a_spread_attack(client):
+    assert _login(client, "admin", "adminpass", headers={"X-Forwarded-For": "198.51.100.50", "X-CSRF": "1"}).status_code == 200
+    for i in range(60):  # 60 adresses différentes : le plafond global de l'identifiant (50) est atteint
+        assert _login(client, "admin", "bad", headers={"X-Forwarded-For": f"203.0.113.{i}", "X-CSRF": "1"}).status_code in (401, 429)
+    assert _login(client, "admin", "bad", headers={"X-Forwarded-For": "203.0.114.200", "X-CSRF": "1"}).status_code == 429
+    assert _login(client, "admin", "adminpass", headers={"X-Forwarded-For": "198.51.100.50", "X-CSRF": "1"}).status_code == 200
 
 
 def test_security_headers(client):
@@ -385,3 +407,25 @@ def test_huge_image_is_refused():
     except IMAGE_ERRORS:
         refused = True
     assert refused
+
+
+
+def test_password_change_is_rate_limited_and_logged(admin_client):
+    for _ in range(5):
+        assert admin_client.post("/api/me/password", json={"current": "mauvais", "new": "nouveau-mdp-1"}, headers={"X-CSRF": "1"}).status_code == 400
+    assert admin_client.post("/api/me/password", json={"current": "adminpass", "new": "nouveau-mdp-1"}, headers={"X-CSRF": "1"}).status_code == 429
+
+
+def test_account_changes_are_logged_with_the_account_name(admin_client):
+    uid = admin_client.post("/api/admin/users", json={"username": "carla", "password": "12345678", "role": "user"}).json()["id"]
+    admin_client.patch(f"/api/admin/users/{uid}", json={"role": "admin"}, headers={"X-CSRF": "1"})
+    admin_client.delete(f"/api/admin/users/{uid}", headers={"X-CSRF": "1"})
+    log = [(r["action"], r["detail"]) for r in admin_client.get("/api/admin/activity").json()["items"]]
+    assert ("Compte créé", "carla (user)") in log and ("Compte modifié", "carla, rôle admin") in log and ("Compte supprimé", "carla") in log
+
+
+
+def test_admin_can_close_every_other_session(admin_client, user_client):
+    assert user_client.get("/api/me").status_code == 200
+    assert admin_client.post("/api/admin/sessions/revoke", headers={"X-CSRF": "1"}).status_code == 204
+    assert user_client.get("/api/me").status_code == 401 and admin_client.get("/api/me").status_code == 200

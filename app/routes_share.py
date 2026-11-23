@@ -32,7 +32,7 @@ class Share(BaseModel):
 @router.post("/api/share")
 def create_share(body: Share, request: Request, user=Depends(current_user), conn=Depends(get_conn)):
     kind = body.kind[0]
-    row = conn.execute(NAME[kind] + (" AND user_id=?" if kind == "p" else ""),
+    row = conn.execute(NAME[kind] + (" AND user_id=? AND rules IS NULL" if kind == "p" else ""),
                        (body.id, user["id"]) if kind == "p" else (body.id,)).fetchone()
     if row is None:
         raise HTTPException(404, "Élément introuvable.")
@@ -108,6 +108,7 @@ def share_track(token: str, track_id: int, request: Request):
     try:
         if not 1 <= track_id <= MAX_INT or all(t["id"] != track_id for t in conn.execute(TRACKS[kind], (item_id,))):
             raise HTTPException(404, "Piste introuvable.")  # le jeton ne donne accès qu'à ses propres pistes
-        return _track_file(request, conn, track_id)
+        # formats lus par les navigateurs servis tels quels : un lien public ne déclenche pas de conversion ffmpeg
+        return _track_file(request, conn, track_id, original=True)
     finally:
         conn.close()

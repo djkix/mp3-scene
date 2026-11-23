@@ -4,7 +4,7 @@
 
 **Collection de releases MP3 « scene » — bibliothèque · lecteur web · Chromecast · PWA**
 
-[![Version](https://img.shields.io/badge/version-1.71.0-purple?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.72.0-purple?style=for-the-badge)](CHANGELOG.md)
 [![Stack](https://img.shields.io/badge/stack-FastAPI_·_SQLite_·_JavaScript_pur-blue?style=for-the-badge)](#stack-technique)
 [![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
 
@@ -244,7 +244,9 @@ Exigences, quel que soit le proxy :
 - **HTTPS** obligatoire, y compris depuis le réseau local (cookie de session `Secure`, PWA, cast). Tout le trafic passe par le proxy.
 - Transmettre l'en-tête **`Range`** (lecture et déplacement dans les pistes) sans le retirer.
 - **Pas de mise en tampon** des réponses pour `/api/tracks/`, `/api/releases/*/zip`, `/cast/` et `/s/` (flux audio et zip à la volée).
-- Transmettre **`X-Forwarded-For`** (et `X-Forwarded-Proto`). L'appli lit le dernier élément de `X-Forwarded-For` pour son anti-force brute.
+- Transmettre **`X-Forwarded-For`** (et `X-Forwarded-Proto`). L'appli lit le dernier élément de `X-Forwarded-For` pour son anti-force brute, et seulement si la connexion vient d'un proxy de confiance (`TRUSTED_PROXIES`, par défaut la boucle locale et les réseaux privés).
+- Ajouter **`Strict-Transport-Security`** (HSTS) aux réponses HTTPS.
+- Limiter la taille des requêtes à **10 Mo** (l'appli refuse elle-même au-delà de 1 Mo, 8 Mo pour une pochette).
 - Délai de lecture long (≥ 1 h) pour les téléchargements de zip.
 - Aucune authentification ni filtrage IP au niveau du proxy : le Chromecast doit atteindre les URL `/cast/` et l'appli gère elle-même les accès.
 - Le port 8000 ne doit être joignable **que par le proxy**, et il doit y avoir **exactement un proxy** devant l'appli : avec deux proxys en cascade ou un port ouvert, l'anti-force brute verrait une mauvaise adresse IP (voire une adresse choisie par l'attaquant).
@@ -264,7 +266,8 @@ location / {
     proxy_request_buffering off;
     proxy_read_timeout 3600s;
     proxy_send_timeout 3600s;
-    client_max_body_size 1m;
+    client_max_body_size 10m;                            # pochettes déposées : 8 Mo au plus
+    add_header Strict-Transport-Security "max-age=63072000" always;
 }
 ```
 
@@ -308,9 +311,10 @@ La coquille de l'interface est mise en cache pour démarrer vite ; la musique et
 ## Sécurité
 
 - Session par cookie valable 30 jours, prolongée à l'usage.
-- 5 échecs de connexion pour un même identifiant ou une même adresse IP : blocage 15 minutes. Conséquence : quiconque connaît un identifiant peut tenir ce compte bloqué, 15 minutes à la fois, en ratant 5 connexions. Choisissez un `ADMIN_USER` peu devinable (pas `admin`) et gardez un second compte administrateur.
+- 5 échecs de connexion depuis une même adresse (une adresse IPv6 compte pour tout son /64), pour un identifiant ou pour tous : blocage 15 minutes de cette adresse. Un identifiant seul n'est bloqué qu'après 50 échecs en 15 minutes depuis des adresses différentes, et jamais pour une adresse d'où ce compte s'est connecté dans les 30 derniers jours. Le changement de mot de passe suit la même limite.
 - Changer le mot de passe administrateur après la première connexion ; `ADMIN_PASSWORD` n'est lu qu'à la création du premier compte, retirez-le de `.env` après le premier démarrage (le compose n'en a plus besoin ; d'ici là il est en clair dans `.env` et dans l'environnement du conteneur), puis `docker compose up -d`.
-- Changer `SECRET_KEY` invalide toutes les sessions, tous les liens de cast et tous les liens de partage en cours.
+- Changer `SECRET_KEY` invalide les liens de cast et les propositions de pochettes en cours, **pas les sessions** (jetons aléatoires gardés en base) ni les liens de partage. Pour fermer toutes les sessions après une fuite : Administration › Utilisateurs › « Fermer toutes les autres sessions ».
+- Fichiers de l'application (base, sauvegardes, vignettes) créés lisibles par elle seule (0600).
 - **Liens de partage** (`/s/…`) : tout utilisateur connecté peut en créer pour une release ou pour l'une de ses playlists. Ils donnent accès, sans compte, aux seules pistes partagées, pendant 7 jours. Leur auteur peut les révoquer depuis la page Compte.
 - `.env` contient des secrets : il est ignoré par git, ne le publiez pas.
 
@@ -318,7 +322,7 @@ La coquille de l'interface est mise en cache pour démarrer vite ; la musique et
 
 Sauvegardez uniquement `./data` (base SQLite : comptes, favoris, index ; les sous-dossiers `thumbs/` des vignettes et `transcode/` des pistes converties peuvent être exclus, ils se reconstruisent). Sans elle, il faut refaire un scan complet et les comptes et favoris sont perdus ; la musique n'est pas touchée. Pour une copie cohérente : `docker compose stop mp3-scene`, copier `data/`, `docker compose start mp3-scene`.
 
-**Sauvegarde intégrée (facultative).** Avec `BACKUP_DIR` et un dossier du NAS monté sur ce chemin, l'application copie chaque jour, à partir de l'heure `BACKUP_HOUR` (3 h par défaut), la base dans un dossier daté (`2026-11-20/mp3scene.db`), copie à chaud et vérifiée. Sept jours sont gardés ; une nuit manquée est rattrapée au redémarrage. Si le dossier de la pile est monté sur `/stack` en lecture seule, son fichier compose et son `.env` sont copiés aussi (en clair : le `.env` contient la clé secrète). Ni la musique, ni les vignettes, ni les pistes converties ne sont copiées. Administration › Vue d'ensemble affiche la dernière sauvegarde, alerte après 36 heures sans réussite et permet d'en lancer une. Pour restaurer : arrêter le conteneur, remplacer `data/mp3scene.db` par la copie voulue, supprimer `data/mp3scene.db-wal` et `data/mp3scene.db-shm` s'ils existent, redémarrer.
+**Sauvegarde intégrée (facultative).** Avec `BACKUP_DIR` et un dossier du NAS monté sur ce chemin, l'application copie chaque jour, à partir de l'heure `BACKUP_HOUR` (3 h par défaut), la base dans un dossier daté (`2026-11-20/mp3scene.db`), copie à chaud et vérifiée. Sept jours sont gardés ; une nuit manquée est rattrapée au redémarrage. Si le dossier de la pile est monté sur `/stack` en lecture seule, son fichier compose est copié aussi ; son `.env` (clé secrète, mots de passe, jeton) seulement avec `BACKUP_ENV=1`, en clair. Les copies sont lisibles par l'application seule (0600). Ni la musique, ni les vignettes, ni les pistes converties ne sont copiées. Administration › Vue d'ensemble affiche la dernière sauvegarde, alerte après 36 heures sans réussite et permet d'en lancer une. Pour restaurer : arrêter le conteneur, remplacer `data/mp3scene.db` par la copie voulue, supprimer `data/mp3scene.db-wal` et `data/mp3scene.db-shm` s'ils existent, redémarrer.
 
 Vider réellement l'index (le scan refuse de retirer toutes les releases d'un coup) : `docker compose stop mp3-scene`, supprimer `data/mp3scene.db*`, `docker compose start mp3-scene`, puis relancer un scan. **Tout** est perdu : index, comptes (l'administrateur est recréé depuis `ADMIN_USER` / `ADMIN_PASSWORD`, à remettre dans `.env`) et favoris de tous les utilisateurs.
 
@@ -330,13 +334,15 @@ Une base créée par une version plus récente de l'appli est refusée au démar
 
 | Variable | Obligatoire | Rôle |
 |----------|-------------|------|
-| `SECRET_KEY` | oui | Signe les sessions et les liens de cast ; 32 caractères au moins. La changer invalide toutes les sessions |
+| `SECRET_KEY` | oui | Signe les liens de cast et les propositions de pochettes ; 32 caractères au moins. La changer ne ferme pas les sessions |
 | `ADMIN_USER` | non (`admin`) | Identifiant du premier compte administrateur |
 | `ADMIN_PASSWORD` | au premier démarrage | Mot de passe du premier compte, 8 caractères au moins ; lu seulement tant qu'aucun compte n'existe |
 | `PUBLIC_URL` | pour le cast | Adresse publique HTTPS, sans slash final |
 | `TZ` | non | Fuseau des journaux du serveur |
 | `MUSIC_ROOT` | non (`/music`) | Dossier des releases dans le conteneur |
 | `DATA_DIR` | non (`/data`) | Dossier de la base SQLite |
+| `TRUSTED_PROXIES` | non (boucle locale, réseaux privés) | Réseaux (CIDR, séparés par des virgules) d'où `X-Forwarded-For` est cru : l'adresse du reverse proxy |
+| `BACKUP_ENV` | non | `1` : la sauvegarde copie aussi le `.env` de la pile (en clair) |
 
 ---
 
@@ -385,6 +391,10 @@ git tag v1.2.0 && git push origin v1.2.0
 ## Historique des versions
 
 Le détail est dans le [journal des modifications](CHANGELOG.md).
+
+### 1.72.0 — 23 novembre 2026
+
+**Corrections de l'audit de sécurité externe** (fichiers, requêtes, comptes, sauvegardes, hors ligne).
 
 ### 1.71.0 — 23 novembre 2026
 

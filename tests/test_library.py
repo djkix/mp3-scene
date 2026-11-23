@@ -666,7 +666,9 @@ def test_backup_daily_copy_rotation_and_admin(admin_client, user_client, library
     assert days == [f"2026-11-0{d}" for d in range(3, 10)]
     last = settings.backup_dir / "2026-11-09"
     copy = sqlite3.connect(last / "mp3scene.db")
-    assert copy.execute("SELECT COUNT(*) FROM releases").fetchone()[0] == 3 and sorted(p.name for p in (last / "config").iterdir()) == [".env", "compose.yaml"]
+    # .env (secrets) seulement sur demande expresse (BACKUP_ENV=1) ; le reste en 0600
+    assert copy.execute("SELECT COUNT(*) FROM releases").fetchone()[0] == 3 and sorted(p.name for p in (last / "config").iterdir()) == ["compose.yaml"]
+    assert oct((last / "mp3scene.db").stat().st_mode & 0o777) == "0o600"
     copy.close()
     assert not backup.due(c, settings, at(9, 5)) and backup.due(c, settings, at(10, 9))        # faite ; puis nuit manquée rattrapée
     # un dossier illisible : l'échec est inscrit, rien n'est supprimé, pas de nouvelle tentative avant une heure
@@ -1197,7 +1199,13 @@ def test_artist_photo_is_taken_from_the_first_matching_result(app, user_client, 
                                                                     {"url": "https://x/b.jpg", "thumb": "t", "title": "bob sinclar"}])
     got = []
     monkeypatch.setattr(coversearch, "fetch", lambda url: got.append(url) or buf.getvalue())
+    c = db.connect(settings.data_dir)
+    for i, (artist, label) in enumerate([("Bob Sinclar", None), ("Personne", None), ("X", "Defected Records")]):
+        c.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, artist, label)"
+                  " VALUES (?,?,'','Singles',0,0,1,0,0,?,?)", (f"p{i}", f"p{i}", artist, label))
+    c.commit()
     photo = lambda name, kind="artist": user_client.get("/api/photo", params={"kind": kind, "name": name}).status_code
+    assert photo("Inconnu Absolu") == 404 and photo("Label Absent", "label") == 404  # absent de la base : rien n'est cherché
     assert photo("Bob Sinclar") == 200 and got == ["https://x/b.jpg"]
     assert photo("VA") == 404 and photo("Personne") == 404 and len(got) == 1
     assert admin_client.delete("/api/admin/photo", params={"kind": "artist", "name": "Bob Sinclar"}, headers={"X-CSRF": "1"}).status_code == 204
@@ -1306,3 +1314,45 @@ def test_library_extras_counts_enrichments(admin_client, library, settings):
     x = admin_client.get("/api/admin/library/extras").json()
     assert x["bpm"] == 1 and x["tracks"] >= 3 and x["bpm_ranges"] == [{"name": 120, "n": 1}]
     assert {"titles", "series", "families", "artist_photos", "label_logos", "top_titles", "top_series"} <= set(x)
+
+
+
+def test_audit_fixes_body_limit_cross_site_busy_superscript_and_signatures(admin_client, user_client, library, settings, monkeypatch):
+    from app import artists, coversearch, routes_media
+    # SEC-05 : corps trop gros refusé avant lecture, longueur invalide refusée
+    r = admin_client.post("/api/login", content=b"x" * (1024 * 1024 + 10), headers={"X-CSRF": "1", "Content-Type": "application/json"})
+    assert r.status_code == 413
+    rid = db.connect(settings.data_dir).execute("SELECT id FROM releases LIMIT 1").fetchone()[0]
+    assert admin_client.put(f"/api/admin/releases/{rid}/cover", content=b"x", headers={"X-CSRF": "1", "Content-Length": "abc"}).status_code == 400
+    # SEC-07 : requête venue d'un autre site refusée, même en GET
+    assert user_client.get("/api/me", headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
+    assert user_client.get("/api/me", headers={"Sec-Fetch-Site": "same-origin"}).status_code == 200
+    # SEC-02 : calcul déjà en cours -> 503 rapide, la santé répond toujours
+    monkeypatch.setattr(routes_media, "LOCK_WAIT", 0.05)
+    routes_media._wave_lock.acquire()
+    try:
+        tid = db.connect(settings.data_dir).execute("SELECT id FROM tracks LIMIT 1").fetchone()[0]
+        assert user_client.get(f"/api/tracks/{tid}/waveform").status_code == 503
+        assert user_client.get("/api/health").status_code == 200
+    finally:
+        routes_media._wave_lock.release()
+    # SEC-09 : signature d'une proposition à durée limitée, port autre que 443 refusé
+    sig = coversearch.sign("k" * 40, "https://a/b.jpg", now=1000)
+    assert coversearch.check("k" * 40, "https://a/b.jpg", sig, now=1500) and not coversearch.check("k" * 40, "https://a/b.jpg", sig, now=5000)
+    assert not coversearch.check("k" * 40, "https://a/c.jpg", sig, now=1500)
+    for bad in ("https://example.com:8443/a.jpg", "http://example.com/a.jpg", "https://127.0.0.1/a.jpg"):
+        try:
+            coversearch.fetch(bad)
+            raise AssertionError(bad)
+        except ValueError:
+            pass
+    # BUG-01 : « ² » n'est pas un numéro, ponctuation seule sans parcours complet
+    c = db.connect(settings.data_dir)
+    for i in range(3):
+        c.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, artist, title)"
+                  " VALUES (?,?,'','Compilations',0,0,1,0,0,'VA','Pure Trance ²')", (f"t{i}", f"t{i}"))
+    c.commit()
+    assert user_client.get("/api/groups", params={"by": "series"}).status_code == 200
+    assert user_client.get("/api/series", params={"name": "Pure Trance"}).status_code == 200
+    assert user_client.get("/api/tracks", params={"remixes": "!!!"}).json()["items"] == []
+    assert not artists.remixed("Crazy (!!! Remix)", "!!!") and not artists.collab("A_Feat_B", "...")

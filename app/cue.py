@@ -1,6 +1,9 @@
 """Chapitres d'un long mix, lus dans le fichier .cue qui l'accompagne."""
+import os
 import re
 from pathlib import Path
+
+from app.security import open_regular
 
 _LINE = re.compile(r'^\s*(FILE|TRACK|TITLE|PERFORMER|INDEX)\s+(.*?)\s*$', re.I)
 _QUOTED = re.compile(r'"(.*)"')
@@ -46,9 +49,16 @@ def for_tracks(folder: Path, tracks: list[tuple[int, str]]) -> dict[int, list[di
     sous-dossiers de disque. Seules les pistes découpées en au moins deux chapitres y figurent. Lève OSError si le
     dossier est illisible."""
     found = {}
-    cues = sorted(p for p in folder.rglob("*") if p.suffix.lower() == ".cue" and p.is_file() and p.stat().st_size < 512 * 1024)[:20]
-    for path in cues:
-        with open(path, "rb") as fh:  # lecture seule
+    # os.walk sans suivre les dossiers liés, et aucun fichier .cue qui soit un lien symbolique (hors de la bibliothèque)
+    cues = []
+    for dirpath, dirnames, filenames in os.walk(folder):
+        dirnames.sort()
+        for n in sorted(filenames):
+            p = Path(dirpath, n)
+            if p.suffix.lower() == ".cue" and not p.is_symlink() and p.is_file() and p.stat().st_size < 512 * 1024:
+                cues.append(p)
+    for path in cues[:20]:
+        with open_regular(path, folder) as fh:  # lecture seule
             for name, parts in parse(fh.read().decode("cp437")).items():
                 found.setdefault(name, parts)
     out = {}

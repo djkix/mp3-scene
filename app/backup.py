@@ -4,6 +4,7 @@ Ce qui est sauvegardé : la base SQLite (comptes, favoris, playlists, historique
 de la pile est monté, son fichier compose et son .env. Ni la musique (déjà sur le NAS), ni les vignettes, ni les pistes
 converties (reconstruites à la demande). Sans chiffrement."""
 import logging
+import os
 import shutil
 import sqlite3
 import threading
@@ -16,7 +17,9 @@ log = logging.getLogger(__name__)
 KEEP = 7
 STALE = 36 * 3600  # sans sauvegarde réussie depuis ce délai, l'administration alerte
 _lock = threading.Lock()  # une seule sauvegarde à la fois (planifiée ou à la main)
-_CONFIG = ("compose.yaml", "compose.yml", "docker-compose.yml", "docker-compose.yaml", ".env")
+_CONFIG = ("compose.yaml", "compose.yml", "docker-compose.yml", "docker-compose.yaml")
+# le .env (clé secrète, mots de passe, jeton) n'est copié que sur demande expresse : BACKUP_ENV=1
+_SECRETS = (".env",)
 
 
 def _copy(settings, tmp: Path) -> int:
@@ -38,10 +41,13 @@ def _copy(settings, tmp: Path) -> int:
     covers = settings.data_dir / "covers"  # pochettes déposées à la main : elles n'existent nulle part ailleurs
     if covers.is_dir():
         shutil.copytree(covers, tmp / "covers")
-    for name in _CONFIG:  # configuration de la pile, si son dossier est monté
+    for name in _CONFIG + (_SECRETS if os.environ.get("BACKUP_ENV") == "1" else ()):  # configuration de la pile, si montée
         if (settings.stack_dir / name).is_file():
             (tmp / "config").mkdir(exist_ok=True)
             shutil.copy2(settings.stack_dir / name, tmp / "config" / name)
+    # lisible par l'application seule (la base contient les empreintes des mots de passe et les jetons de partage)
+    for p in [tmp, *tmp.rglob("*")]:
+        os.chmod(p, 0o700 if p.is_dir() else 0o600)
     size = (tmp / "mp3scene.db").stat().st_size
     (tmp / "sauvegarde.txt").write_text(f"date : {time.strftime('%Y-%m-%d %H:%M:%S')}\nbase : {size} octets\n", encoding="utf-8")
     return size

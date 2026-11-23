@@ -17,7 +17,7 @@ from .routes_library import RELEASE_COLS, RELEASE_FROM, Dir, Sort, _all_series, 
 
 # libellé au journal d'activité de chaque action d'administration : (méthode, route) -> libellé
 _ACTIONS = {
-    ("POST", "/users"): "Compte créé", ("PATCH", "/users/{user_id}"): "Compte modifié", ("DELETE", "/users/{user_id}"): "Compte supprimé",
+    # comptes : inscrits par leurs routes, avec le nom du compte et ce qui a changé
     ("POST", "/scan"): "Scan lancé", ("PUT", "/scan/schedule"): "Scan quotidien réglé", ("POST", "/classify"): "Reclassement",
     ("PATCH", "/releases/{rid}"): "Correction", ("PATCH", "/releases"): "Correction en lot",
     ("PUT", "/releases/{rid}/cover"): "Pochette ajoutée", ("POST", "/releases/{rid}/cover/fetch"): "Pochette ajoutée", ("DELETE", "/releases/{rid}/cover"): "Pochette retirée",
@@ -26,6 +26,10 @@ _ACTIONS = {
     ("PUT", "/artists/aliases"): "Artiste rattaché", ("DELETE", "/artists/aliases"): "Artiste détaché",
     ("PUT", "/labels/aliases"): "Label rattaché", ("DELETE", "/labels/aliases"): "Label détaché",
     ("PUT", "/artists/separate"): "Artiste gardé à part", ("DELETE", "/artists/separate"): "Artiste fusionné à nouveau",
+    ("POST", "/scan/retag"): "Relecture des tags", ("DELETE", "/transcode"): "Cache de conversion vidé",
+    ("POST", "/photo"): "Photo choisie", ("DELETE", "/photo"): "Photo retirée",
+    ("PUT", "/series/rules"): "Règle de série", ("DELETE", "/series/rules"): "Règle de série retirée",
+    ("POST", "/genres/guess"): "Genres proposés appliqués", ("POST", "/sessions/revoke"): "Toutes les sessions fermées",
 }
 
 
@@ -88,9 +92,12 @@ def list_users(conn=Depends(get_conn)):
 
 
 @router.post("/users", status_code=201)
-def create_user(body: NewUser, conn=Depends(get_conn)):
+def create_user(body: NewUser, request: Request, conn=Depends(get_conn)):
     username = body.username.strip()
     _check(security.username_error(username))
+    # « Bob » et « bob » seraient deux comptes distincts : refusé (majuscule automatique des téléphones)
+    if conn.execute("SELECT 1 FROM users WHERE lower(username)=lower(?)", (username,)).fetchone():
+        raise HTTPException(409, "Ce nom d'utilisateur existe déjà.")
     _check(security.password_error(body.password))
     try:
         cur = conn.execute("INSERT INTO users(username, password_hash, role) VALUES (?,?,?)",
@@ -98,12 +105,15 @@ def create_user(body: NewUser, conn=Depends(get_conn)):
         conn.commit()
     except sqlite3.IntegrityError:
         raise HTTPException(409, "Ce nom d'utilisateur existe déjà.")
+    db.log(conn, request.state.user["username"], "Compte créé", f"{username} ({body.role})")
+    conn.commit()
     return {"id": cur.lastrowid, "username": username, "role": body.role}
 
 
 @router.patch("/users/{user_id}", status_code=204)
-def update_user(user_id: Id, body: UserPatch, conn=Depends(get_conn)):
+def update_user(user_id: Id, body: UserPatch, request: Request, conn=Depends(get_conn)):
     _get_user(conn, user_id)
+    target = conn.execute("SELECT username FROM users WHERE id=?", (user_id,)).fetchone()[0]
     pw_hash = None
     if body.password is not None:
         _check(security.password_error(body.password))
@@ -117,16 +127,29 @@ def update_user(user_id: Id, body: UserPatch, conn=Depends(get_conn)):
     if pw_hash is not None:
         conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (pw_hash, user_id))
         security.drop_sessions(conn, user_id)  # valide aussi la transaction
+    changes = [f"rôle {body.role}"] if body.role else []
+    db.log(conn, request.state.user["username"], "Compte modifié", ", ".join([target, *changes, *(["mot de passe"] if pw_hash else [])]))
     conn.commit()
 
 
 @router.delete("/users/{user_id}", status_code=204)
-def delete_user(user_id: Id, conn=Depends(get_conn)):
+def delete_user(user_id: Id, request: Request, conn=Depends(get_conn)):
     _get_user(conn, user_id)
+    target = conn.execute("SELECT username FROM users WHERE id=?", (user_id,)).fetchone()[0]
     cur = conn.execute(f"DELETE FROM users WHERE id = ? AND {NOT_LAST_ADMIN}", (user_id,))
-    conn.commit()
     if cur.rowcount == 0:
+        conn.commit()
         raise HTTPException(409, "Impossible de supprimer le dernier administrateur.")
+    db.log(conn, request.state.user["username"], "Compte supprimé", target)
+    conn.commit()
+
+
+@router.post("/sessions/revoke", status_code=204)
+def revoke_sessions(request: Request, conn=Depends(get_conn)):
+    """Ferme toutes les sessions ouvertes, de tous les comptes, sauf celle de l'administrateur qui le demande (en cas
+    de doute après une fuite : changer SECRET_KEY ne ferme pas les sessions)."""
+    conn.execute("DELETE FROM sessions WHERE token_hash != ?", (security._token_hash(request.cookies[security.COOKIE]),))
+    conn.commit()
 
 
 @router.post("/scan", status_code=202)
@@ -140,9 +163,12 @@ def start_scan(request: Request):
 def reread_tags(request: Request, conn=Depends(get_conn)):
     """Relit les tags de toutes les pistes (BPM et tonalité, indexés depuis la 1.61.0). Les valeurs déjà lues restent
     affichées jusqu'à leur relecture ; rien n'est écrit dans le dossier de musique."""
+    runner = request.app.state.runner
+    if runner._thread is not None and runner._thread.is_alive():  # avant d'effacer quoi que ce soit
+        raise HTTPException(409, "Un scan est déjà en cours : relancez la relecture quand il sera fini.")
     conn.execute("UPDATE tracks SET tags_read=0")
     conn.commit()
-    if not request.app.state.runner._launch(structure=False):
+    if not runner._launch(structure=False):
         raise HTTPException(409, "Un scan est déjà en cours : la relecture suivra au prochain scan.")
     return {"started": True}
 
@@ -480,7 +506,10 @@ def _release_path(conn, rid):
 async def upload_cover(rid: Id, request: Request):
     """Dépose une pochette pour cette release (corps de la requête : l'image, JPEG ou PNG). Elle est gardée dans les
     données de l'application, jamais dans le dossier de musique, et passe avant celle du dossier."""
-    if int(request.headers.get("content-length") or 0) > COVER_MAX:
+    declared = request.headers.get("content-length") or "0"
+    if not declared.isdigit():
+        raise HTTPException(400, "Longueur invalide.")
+    if int(declared) > COVER_MAX:
         raise HTTPException(413, "Image trop lourde (8 Mo au plus).")
     data = await request.body()
     if not data or len(data) > COVER_MAX:

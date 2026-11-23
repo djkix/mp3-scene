@@ -4,6 +4,8 @@ from pathlib import Path
 
 
 MIN_SECRET = 32
+# réseaux d'où X-Forwarded-For est cru par défaut : boucle locale et réseaux privés (pas le CGNAT 100.64.0.0/10)
+TRUSTED_DEFAULT = ("127.0.0.0/8", "::1/128", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7")
 
 
 @dataclass
@@ -17,7 +19,9 @@ class Settings:
     backup_dir: Path | None = None   # dossier des sauvegardes (NAS monté) ; None : sauvegarde désactivée
     backup_hour: int = 3             # heure du serveur à partir de laquelle la sauvegarde du jour est faite
     discogs_token: str | None = None  # jeton personnel Discogs (pochettes des singles et maxis) ; None : Deezer et iTunes seuls
-    stack_dir: Path = Path("/stack")  # dossier de la pile (compose, .env), monté en lecture seule s'il est à copier
+    stack_dir: Path = Path("/stack")
+    # réseaux d'où X-Forwarded-For est cru (le reverse proxy) ; par défaut la boucle locale et les réseaux privés
+    trusted_proxies: tuple = TRUSTED_DEFAULT  # dossier de la pile (compose, .env), monté en lecture seule s'il est à copier
 
 
 def load() -> Settings:
@@ -38,4 +42,6 @@ def load() -> Settings:
         backup_hour=min(23, max(0, int(os.environ.get("BACKUP_HOUR") or 3))),
         stack_dir=Path(os.environ.get("STACK_DIR", "/stack")),
         discogs_token=os.environ.get("DISCOGS_TOKEN") or None,
+        **({"trusted_proxies": tuple(x.strip() for x in os.environ["TRUSTED_PROXIES"].split(",") if x.strip())}
+           if os.environ.get("TRUSTED_PROXIES") else {}),
     )

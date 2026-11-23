@@ -96,6 +96,8 @@ def create_playlist(body: NewPlaylist, user=Depends(current_user), conn=Depends(
     rules = body.rules and body.rules.model_dump(exclude_none=True)
     if body.rules and not rules:
         raise HTTPException(400, "Choisissez au moins un filtre.")
+    if conn.execute("SELECT COUNT(*) FROM playlists WHERE user_id=?", (user["id"],)).fetchone()[0] >= 100:
+        raise HTTPException(400, "100 playlists au plus par compte.")
     pid = conn.execute("INSERT INTO playlists(user_id, name, created_at, rules) VALUES (?,?,?,?)",
                        (user["id"], name, time.time(), json.dumps(rules) if rules else None)).lastrowid
     conn.commit()
@@ -137,6 +139,7 @@ def add_tracks(pid: Id, body: Add, user=Depends(current_user), conn=Depends(get_
     if body.release_id is not None:
         ids += [r[0] for r in conn.execute("SELECT id FROM tracks WHERE release_id=? ORDER BY disc, relpath",
                                            (body.release_id,))]
+    conn.execute("BEGIN IMMEDIATE")  # deux ajouts simultanés n'obtiennent pas les mêmes positions
     pos = conn.execute("SELECT COALESCE(MAX(position), 0) FROM playlist_tracks WHERE playlist_id=?", (pid,)).fetchone()[0]
     # les identifiants inconnus sont écartés par la sous-requête (pas d'erreur de clé étrangère)
     conn.executemany("INSERT OR IGNORE INTO playlist_tracks(playlist_id, track_id, position)"
@@ -149,6 +152,7 @@ def add_tracks(pid: Id, body: Add, user=Depends(current_user), conn=Depends(get_
 def move_track(pid: Id, track_id: Id, dir: Literal["up", "down"], user=Depends(current_user), conn=Depends(get_conn)):
     """Échange la piste avec sa voisine du dessus ou du dessous ; sans effet en bout de liste."""
     _manual(conn, user["id"], pid)
+    conn.execute("BEGIN IMMEDIATE")
     me = conn.execute("SELECT position FROM playlist_tracks WHERE playlist_id=? AND track_id=?", (pid, track_id)).fetchone()
     if me is None:
         raise HTTPException(404, "Piste introuvable.")

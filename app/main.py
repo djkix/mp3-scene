@@ -1,6 +1,8 @@
 import logging
+import os
 import mimetypes
 import time
+import urllib.parse
 from pathlib import Path
 from contextlib import asynccontextmanager
 
@@ -68,6 +70,10 @@ def _setup_logging() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    url = urllib.parse.urlsplit(app.state.settings.public_url)
+    if url.scheme == "http" and url.hostname not in ("localhost", "127.0.0.1", "::1"):
+        # liens de cast et de partage en clair : refusé (le réglage attendu est l'adresse https du proxy)
+        raise RuntimeError("PUBLIC_URL doit être en https (seul un poste local peut rester en http).")
     if not app.state.settings.public_url.startswith(("http://", "https://")):
         log.warning("PUBLIC_URL est vide ou invalide (attendu : https://mp3.exemple.fr) : les URL envoyées au "
                     "Chromecast seraient relatives et le cast ne fonctionnera pas.")
@@ -86,6 +92,51 @@ def _with_conn(settings: Settings, fn, *args):
         conn.close()
 
 
+MAX_BODY = 1024 * 1024                 # corps de requête au plus (JSON) ; au-delà : 413
+MAX_BODY_COVER = 8 * 1024 * 1024 + 65536  # pochette déposée par un administrateur (8 Mo et l'enveloppe)
+
+
+class BodyLimit:
+    """Coupe tout corps de requête au-delà du plafond, annoncé (Content-Length) ou reçu par morceaux (chunked), avant
+    que l'application ne le lise en mémoire : même /api/login, sans compte, ne peut pas épuiser la mémoire."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        path = scope["path"]
+        cap = MAX_BODY_COVER if scope["method"] == "PUT" and path.startswith("/api/admin/releases/") and path.endswith("/cover") \
+            else MAX_BODY
+        declared = dict(scope["headers"]).get(b"content-length")
+        if declared is not None and (not declared.isdigit() or int(declared) > cap):
+            return await self._refuse(scope, receive, send, 413 if declared.isdigit() else 400)
+        seen = 0
+
+        async def limited():
+            nonlocal seen
+            msg = await receive()
+            if msg["type"] == "http.request":
+                seen += len(msg.get("body", b""))
+                if seen > cap:
+                    raise _TooLarge
+            return msg
+        try:
+            await self.app(scope, limited, send)
+        except _TooLarge:
+            await self._refuse(scope, receive, send, 413)
+
+    @staticmethod
+    async def _refuse(scope, receive, send, status):
+        await JSONResponse({"detail": "Corps de requête trop volumineux." if status == 413 else "Longueur invalide."},
+                           status_code=status)(scope, receive, send)
+
+
+class _TooLarge(Exception):
+    pass
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     _setup_logging()
     app = FastAPI(title="Mp3 Scene", lifespan=lifespan, dependencies=[Depends(csrf)],
@@ -93,6 +144,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings or config.load()
     app.state.runner = Runner(app.state.settings)
     app.state.limiter = security.LoginLimiter()
+    app.add_middleware(BodyLimit)
+    # fichiers créés par l'application (base, sauvegardes, vignettes) lisibles par elle seule
+    os.umask(0o077)
 
     @app.middleware("http")
     async def require_session(request: Request, call_next):
@@ -100,6 +154,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         path = request.scope["path"]
         if not path.startswith("/api/") or path in PUBLIC_API:
             return await call_next(request)
+        # une requête déclenchée par un autre site (lien, image, formulaire) : refusée même en GET, car certaines
+        # lectures écrivent (photos d'artistes) ; ni l'application ni les liens publics n'appellent /api/ ainsi
+        if request.headers.get("sec-fetch-site") == "cross-site":
+            return JSONResponse({"detail": "Requête d'un autre site refusée."}, status_code=403)
         settings = app.state.settings
         token = request.cookies.get(security.COOKIE)
         user = token and await run_in_threadpool(_with_conn, settings, security.session_user, token)
@@ -125,7 +183,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return response
 
     @app.get("/api/health")
-    def health():
+    async def health():  # sur la boucle d'événements : répond même si tous les threads sont occupés
         return {"ok": True}
 
     for module in (routes_auth, routes_admin, routes_library, routes_media, routes_playlists, routes_share):

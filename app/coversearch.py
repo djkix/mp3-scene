@@ -1,5 +1,8 @@
 """Pochettes proposées pour une release sans image : catalogues Deezer et iTunes (sans clé), et Discogs
 si un jeton est fourni (DISCOGS_TOKEN). Le serveur ne télécharge que les adresses qu'il a lui-même proposées."""
+import http.client
+import ssl
+import time
 import hashlib
 import hmac
 import ipaddress
@@ -116,7 +119,8 @@ def label_photos(name: str, token: str) -> list[dict]:
     except (OSError, ValueError):
         return []
     # Discogs : « Nom (2) » pour un homonyme ; sans image, un pixel « spacer.gif »
-    return [{"url": r["cover_image"], "thumb": r.get("thumb") or r["cover_image"], "source": "Discogs",
+    return [{"url": r["cover_image"], "thumb": r["thumb"] if str(r.get("thumb", "")).startswith("https://") else r["cover_image"],
+             "source": "Discogs",
              "title": re.sub(r"\s*\(\d+\)$", "", r.get("title") or "")}
             for r in data.get("results", []) if str(r.get("cover_image", "")).startswith("https://") and "spacer.gif" not in r["cover_image"]]
 
@@ -139,12 +143,21 @@ def exact(artist: str | None, title: str | None, found: str) -> bool:
     return _key(who) in _VARIOUS if _key(artist) in _VARIOUS | {""} else _key(who) == _key(artist)
 
 
-def sign(secret: str, url: str) -> str:
-    return hmac.new(secret.encode(), b"cover:" + url.encode(), hashlib.sha256).hexdigest()[:32]
+SIGN_TTL = 3600  # une proposition se valide dans l'heure
 
 
-def check(secret: str, url: str, sig: str) -> bool:
-    return hmac.compare_digest(sign(secret, url), sig or "")
+def sign(secret: str, url: str, now: float | None = None) -> str:
+    """« échéance.signature » d'une adresse proposée : valable une heure, préfixe « cover: » propre à cet usage."""
+    exp = int((now if now is not None else time.time()) + SIGN_TTL)
+    return f"{exp}." + hmac.new(secret.encode(), f"cover:{exp}:{url}".encode(), hashlib.sha256).hexdigest()[:32]
+
+
+def check(secret: str, url: str, sig: str, now: float | None = None) -> bool:
+    exp, _, mac = (sig or "").partition(".")
+    if not exp.isdigit() or int(exp) < (now if now is not None else time.time()):
+        return False
+    good = hmac.new(secret.encode(), f"cover:{exp}:{url}".encode(), hashlib.sha256).hexdigest()[:32]
+    return hmac.compare_digest(good, mac)
 
 
 def public_host(host: str) -> bool:
@@ -156,18 +169,50 @@ def public_host(host: str) -> bool:
     return bool(infos) and all(ipaddress.ip_address(i[4][0]).is_global for i in infos)
 
 
+class _Pinned(http.client.HTTPSConnection):
+    """Connexion HTTPS à une adresse IP déjà vérifiée, le nom servant au certificat (SNI) : pas de seconde résolution
+    DNS entre la vérification et la connexion (rebinding)."""
+
+    def __init__(self, host: str, ip: str):
+        super().__init__(host, 443, timeout=10, context=ssl.create_default_context())
+        self._ip = ip
+
+    def connect(self):
+        self.sock = self._context.wrap_socket(socket.create_connection((self._ip, 443), self.timeout), server_hostname=self.host)
+
+
+def _global(ip: str) -> bool:
+    addr = ipaddress.ip_address(ip)
+    return (getattr(addr, "ipv4_mapped", None) or addr).is_global
+
+
 def fetch(url: str) -> bytes:
-    """Télécharge l'image proposée : https seulement, hôte public, sans redirection, 8 Mo au plus. ValueError sinon."""
+    """Télécharge l'image proposée : https sur le port 443 seulement, hôte dont toutes les adresses sont publiques,
+    connexion à l'adresse vérifiée, sans redirection, 8 Mo au plus. ValueError sinon."""
     parts = urllib.parse.urlsplit(url)
-    # ponytail: le nom est résolu ici puis à nouveau par la requête ; l'adresse vient d'une proposition signée par le
-    # serveur et seul un administrateur peut la valider — épingler l'adresse IP si cela ne suffit plus
-    if parts.scheme != "https" or not parts.hostname or not public_host(parts.hostname):
+    try:
+        port = parts.port
+    except ValueError:
+        raise ValueError("adresse refusée") from None
+    if parts.scheme != "https" or not parts.hostname or port not in (None, 443):
         raise ValueError("adresse refusée")
     try:
-        with _opener.open(urllib.request.Request(url, headers=_UA), timeout=10) as r:
-            data = r.read(MAX + 1)
-    except (OSError, urllib.error.URLError) as e:
+        ips = [i[4][0] for i in socket.getaddrinfo(parts.hostname, 443, proto=socket.IPPROTO_TCP)]
+    except OSError as e:
         raise ValueError("image inaccessible") from e
+    if not ips or not all(_global(ip) for ip in ips):
+        raise ValueError("adresse refusée")
+    conn = _Pinned(parts.hostname, ips[0])
+    try:
+        conn.request("GET", (parts.path or "/") + (f"?{parts.query}" if parts.query else ""), headers={**_UA, "Host": parts.netloc})
+        r = conn.getresponse()
+        if r.status != 200:  # une redirection n'est jamais suivie
+            raise ValueError("image inaccessible")
+        data = r.read(MAX + 1)
+    except (OSError, http.client.HTTPException) as e:
+        raise ValueError("image inaccessible") from e
+    finally:
+        conn.close()
     if not data or len(data) > MAX:
         raise ValueError("image vide ou trop lourde")
     return data

@@ -72,7 +72,8 @@ async function route() {
   const { name, params } = parsed;
   dispose?.();
   dispose = null;
-  if (name === 'login') player.reset(); // déconnexion / session expirée : la file n'est pas transmise au suivant
+  // déconnexion / session expirée ou révoquée : ni la file ni la musique gardée hors ligne ne passent au suivant
+  if (name === 'login') { player.reset(); offline.clear().catch(() => {}); }
   if (name !== 'login' && !session.user) {
     try {
       session.user = await api('/me');

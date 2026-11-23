@@ -1,6 +1,7 @@
 """Scan de la bibliothèque (lecture seule) : phase structure (dossiers → releases et pistes), puis phase tags."""
 import bisect
 import errno
+import hashlib
 import logging
 import os
 import re
@@ -14,7 +15,7 @@ import mutagen
 from mutagen.easyid3 import EasyID3
 from mutagen.id3 import ID3
 
-from app import artists, backup, cue, db, genres, nfo
+from app import artists, backup, cue, db, genres, nfo, security
 from app.naming import parse_release_name, unwrap
 
 # sous-dossier de disque : « CD1 », « Disc 2 », ou un simple numéro (« 1 », « 02 »)
@@ -108,6 +109,17 @@ def scan_structure(conn, root: Path, now: float) -> dict:
     except BaseException:
         conn.rollback()
         raise
+
+
+def _follow_move(conn, old, new):
+    """Les corrections manuelles et la pochette déposée d'une release déplacée la suivent (clés : son chemin)."""
+    conn.execute("UPDATE OR REPLACE overrides SET path=? WHERE path=?", (new, old))
+    db_file = conn.execute("PRAGMA database_list").fetchone()[2]
+    if db_file:
+        covers = Path(db_file).parent / "covers"
+        src, dst = (covers / (hashlib.sha1(x.encode("utf-8")).hexdigest() + ".jpg") for x in (old, new))
+        if src.is_file():
+            os.replace(src, dst)
 
 
 def _scan_structure(conn, root, now):
@@ -272,6 +284,7 @@ def _scan_structure(conn, root, now):
             _drop(conn, dup, rid)
             conn.execute("UPDATE releases SET path=?, parent=?, category=? WHERE id=?",
                          (dest, dest.rpartition("/")[0], dest.split("/", 1)[0], rid))
+            _follow_move(conn, p, dest)
             moved += 1
         else:
             _drop(conn, rid)
@@ -341,7 +354,7 @@ def _read_tags(path):
     """(titre, artiste, genre, durée, débit, BPM, tonalité) du fichier, champs None s'il n'est pas lisible.
 
     Lève OSError si le fichier ne peut pas être lu (absent, NFS indisponible) : la piste reste à lire."""
-    with open(path, "rb") as raw:  # lecture seule : mutagen ne reçoit qu'un fichier ouvert en 'rb'
+    with security.open_regular(path) as raw:  # lecture seule, sans suivre de lien symbolique
         f = _Watched(raw)
         try:
             m = mutagen.File(f, easy=True)
@@ -424,12 +437,12 @@ def _scan_tags(conn, root, should_stop):
 def _nfo_info(root, path):
     """(date de sortie, label, catalogue) du premier NFO du dossier (le même que celui de la fiche) ; 0 et '' pour
     une date ou un label absents. Sans numéro dans le NFO, celui du nom : « Artist-Title-(CAT001)-WEB-2019-GRP »."""
-    names = sorted(n for n in os.listdir(Path(root, path)) if n.lower().endswith(".nfo"))
+    names = security.regular_names(Path(root, path), (".nfo",))  # liens symboliques ignorés
     in_name = re.search(r"-\(([^()]{2,30})\)-", _name(path))
     cat = in_name and in_name.group(1).replace("_", " ")
     if not names:
         return 0, "", cat
-    with open(Path(root, path, names[0]), "rb") as fh:  # lecture seule
+    with security.open_regular(Path(root, path, names[0]), root) as fh:  # lecture seule
         text = fh.read(1024 * 1024).decode("cp437")
     label, nfo_cat = nfo.label(text)
     return nfo.release_date(text) or 0, label or "", nfo_cat or cat
@@ -506,10 +519,10 @@ def _scan_nfo_text(conn, root, should_stop):
         done = []  # lot lu avant d'écrire, comme pour les tags
         for r in rows:
             try:
-                names = sorted(n for n in os.listdir(Path(root, r["path"])) if n.lower().endswith(".nfo"))
+                names = security.regular_names(Path(root, r["path"]), (".nfo",))  # liens symboliques ignorés
                 text = ""
                 if names:
-                    with open(Path(root, r["path"], names[0]), "rb") as fh:  # lecture seule
+                    with security.open_regular(Path(root, r["path"], names[0]), root) as fh:  # lecture seule
                         text = fh.read(200 * 1024).decode("cp437")
                 done.append((r["id"], text))
             except OSError as e:
@@ -551,11 +564,11 @@ def _scan_cues(conn, root, should_stop):
 
 def _has_cover(root, path, first):
     """Image dans le dossier de la release, sinon incluse dans les tags de sa première piste (comme la fiche)."""
-    if any(n.lower().endswith(IMAGES) for n in os.listdir(Path(root, path))):
+    if security.regular_names(Path(root, path), tuple(IMAGES)):
         return True
     if first is None:
         return False
-    with open(Path(root, path, first), "rb") as raw:  # lecture seule
+    with security.open_regular(Path(root, path, first), root) as raw:  # lecture seule
         f = _Watched(raw)
         try:
             found = bool(ID3(f).getall("APIC"))

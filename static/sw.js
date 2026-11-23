@@ -1,6 +1,6 @@
 // Service worker classique (non module). Ne met en cache que la coquille de l'interface :
 // jamais l'audio, jamais l'API, jamais le SDK Cast (autre origine).
-const VERSION = 'v101';
+const VERSION = 'v102';
 const CACHE = 'mp3-scene-' + VERSION;
 const PRECACHE = [
   '/',
@@ -68,7 +68,7 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== self.location.origin
-      || url.pathname.startsWith('/api/') || url.pathname.startsWith('/cast/')
+      || url.pathname.startsWith('/api/') || url.pathname.startsWith('/cast/') || url.pathname.startsWith('/s/')
       || req.headers.has('range')) return; // pas de respondWith : le navigateur traite la requête seul
   event.respondWith(
     fetch(req).then((res) => {

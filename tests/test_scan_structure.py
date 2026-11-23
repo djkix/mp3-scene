@@ -356,3 +356,19 @@ def test_releases_found_updated_at_each_batch(settings, conn, music, monkeypatch
     scan_structure(conn, music, now=1.0)
     other.close()
     assert counts == [0, 0, 0, 1, 2]
+
+
+def test_moved_release_keeps_its_corrections_and_custom_cover(conn, music):
+    """BUG-02 : les corrections et la pochette déposée sont rangées sous le chemin ; elles suivent le déplacement."""
+    import hashlib
+    from pathlib import Path
+    mk(music, "S/A/Art-Two-WEB-2015-GRP", ["01-a.mp3"]); scan_structure(conn, music, now=1.0)
+    conn.execute("INSERT INTO overrides(path, genre) VALUES ('S/A/Art-Two-WEB-2015-GRP', 'Disco')"); conn.commit()
+    covers = Path(conn.execute("PRAGMA database_list").fetchone()[2]).parent / "covers"
+    covers.mkdir(exist_ok=True)
+    name = lambda p: covers / (hashlib.sha1(p.encode()).hexdigest() + ".jpg")
+    name("S/A/Art-Two-WEB-2015-GRP").write_bytes(b"jpg")
+    (music / "T").mkdir(); (music / "S/A/Art-Two-WEB-2015-GRP").rename(music / "T/Art-Two-WEB-2015-GRP")
+    assert scan_structure(conn, music, now=2.0)["moved"] == 1
+    assert conn.execute("SELECT path, genre FROM overrides").fetchone()[:] == ("T/Art-Two-WEB-2015-GRP", "Disco")
+    assert name("T/Art-Two-WEB-2015-GRP").read_bytes() == b"jpg" and not name("S/A/Art-Two-WEB-2015-GRP").exists()

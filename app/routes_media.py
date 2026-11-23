@@ -22,7 +22,8 @@ from PIL import Image
 
 # images de la bibliothèque ou d'Internet, non fiables : au-delà de 40 Mpx, refusées (une « bombe » de 8 Mo peut faire
 # 170 Mpx et occuper 500 Mo de mémoire au décodage)
-Image.MAX_IMAGE_PIXELS = 40_000_000
+Image.MAX_IMAGE_PIXELS = 25_000_000
+DECODE = threading.BoundedSemaphore(2)  # deux décodages d'image à la fois au plus : la mémoire reste bornée
 warnings.simplefilter("error", Image.DecompressionBombWarning)
 IMAGE_ERRORS = (ValueError, OSError, Image.DecompressionBombError, Image.DecompressionBombWarning)
 from pydantic import BaseModel, Field
@@ -45,8 +46,19 @@ def _disposition(name: str) -> str:
     return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{quote(name, safe='')}"
 
 
+# processus externes sur des fichiers non fiables : sans les secrets de l'environnement (SECRET_KEY, mots de passe)
+SAFE_ENV = {"PATH": "/usr/local/bin:/usr/bin:/bin", "LC_ALL": "C.UTF-8"}
 TRANSCODE_MAX = 5 * 1024 ** 3  # taille du cache des pistes converties (data/transcode)
 _transcode_lock = threading.Lock()
+LOCK_WAIT = 3  # secondes d'attente au plus d'un calcul déjà en cours, au-delà : 503 (jamais tout le pool de threads bloqué)
+
+
+class Busy(Exception):
+    """Une conversion ou un calcul de forme d'onde occupe déjà le serveur."""
+
+
+def busy() -> HTTPException:
+    return HTTPException(503, "Un autre calcul est en cours, réessayez dans quelques secondes.", headers={"Retry-After": "5"})
 
 
 def transcoded(src, cache: Path, track_id: int, mtime: float):
@@ -62,15 +74,18 @@ def transcoded(src, cache: Path, track_id: int, mtime: float):
         return None
     # ponytail: une conversion à la fois pour tout le serveur, et la première écoute attend sa fin (quelques secondes
     # par piste) ; convertir à l'avance la piste suivante de la file si l'attente gêne
-    with _transcode_lock:
+    if not _transcode_lock.acquire(timeout=LOCK_WAIT):
+        raise Busy
+    try:
         if out.is_file():
             return out
         cache.mkdir(parents=True, exist_ok=True)
         tmp = out.with_suffix(".part")
         try:
-            subprocess.run([exe, "-v", "error", "-nostdin", "-y", "-i", str(src), "-vn", "-map_metadata", "0",
-                            "-codec:a", "libmp3lame", "-b:a", "320k", "-f", "mp3", str(tmp)],
-                           stdin=subprocess.DEVNULL, capture_output=True, timeout=600, check=True)
+            # -protocol_whitelist file : un fichier « .m4a » qui serait une playlist HLS ne fait sortir aucune requête
+            subprocess.run([exe, "-v", "error", "-nostdin", "-y", "-protocol_whitelist", "file", "-i", str(src), "-vn",
+                            "-map_metadata", "-1", "-codec:a", "libmp3lame", "-b:a", "320k", "-f", "mp3", str(tmp)],
+                           stdin=subprocess.DEVNULL, capture_output=True, timeout=600, check=True, env=SAFE_ENV)
             os.replace(tmp, out)
         except (subprocess.SubprocessError, OSError):
             tmp.unlink(missing_ok=True)
@@ -82,6 +97,8 @@ def transcoded(src, cache: Path, track_id: int, mtime: float):
                 break
             total -= old.stat().st_size
             old.unlink(missing_ok=True)
+    finally:
+        _transcode_lock.release()
     return out
 
 
@@ -113,7 +130,10 @@ def _track_file(request: Request, conn, track_id: int, download: bool = False, h
     if original and native:
         return FileResponse(path, media_type=native, stat_result=st, headers=headers)
     if not mp3:  # FLAC, WAV, WMA, M4A… : écoutés en MP3 320 kbit/s, que tout navigateur et tout Chromecast lit
-        path = transcoded(path, request.app.state.settings.data_dir / "transcode", track_id, st.st_mtime)
+        try:
+            path = transcoded(path, request.app.state.settings.data_dir / "transcode", track_id, st.st_mtime)
+        except Busy:
+            raise busy() from None
         if path is None:
             raise HTTPException(503, "Conversion impossible : ffmpeg est absent ou le fichier est illisible.")
         st = os.stat(path)
@@ -147,11 +167,11 @@ def save_cover(data_dir: Path, release_path: str, rid: int, data: bytes | None) 
     if data is None:
         target.unlink(missing_ok=True)
     else:
-        with Image.open(io.BytesIO(data)) as img:  # lève une erreur si ce n'est pas une image
+        with DECODE, Image.open(io.BytesIO(data)) as img:  # lève une erreur si ce n'est pas une image
             img = img.convert("RGB")
             img.thumbnail((1600, 1600))
             target.parent.mkdir(exist_ok=True)
-            tmp = target.with_suffix(".tmp")
+            tmp = target.with_name(f"{target.stem}.{threading.get_ident()}.tmp")
             img.save(tmp, "JPEG", quality=88)
         os.replace(tmp, target)
     (data_dir / "thumbs" / f"{rid}.jpg").unlink(missing_ok=True)
@@ -224,7 +244,7 @@ def thumb(rid: Id, request: Request, conn=Depends(get_conn)):
         tmp = folder / f"{rid}.{threading.get_ident()}.tmp"
         try:
             path, data, _ = _find_cover(request, conn, rid)
-            with Image.open(path or io.BytesIO(data)) as img:
+            with DECODE, Image.open(path or io.BytesIO(data)) as img:
                 img.draft("RGB", (THUMB_SIZE * 2, THUMB_SIZE * 2))  # JPEG : décodé directement en petit
                 img = img.convert("RGB")
                 img.thumbnail((THUMB_SIZE, THUMB_SIZE))
@@ -323,7 +343,7 @@ def _decode_cmd(path) -> list[str] | None:
     if str(path).lower().endswith(".mp3") and (exe := shutil.which("mpg123")):  # petit et rapide, MP3 seulement
         return [exe, "-q", "-s", "-m", "-r", str(WAVE_RATE), "-e", "s16", str(path)]
     if exe := shutil.which("ffmpeg"):
-        return [exe, "-v", "error", "-nostdin", "-i", str(path), "-vn", "-ac", "1", "-ar", str(WAVE_RATE),
+        return [exe, "-v", "error", "-nostdin", "-protocol_whitelist", "file", "-i", str(path), "-vn", "-ac", "1", "-ar", str(WAVE_RATE),
                 "-f", "s16le", "-"]
     return None
 
@@ -343,7 +363,7 @@ def compute_waveform(path) -> bytes | None:
     if cmd is None:
         return None
     peaks, deadline = [], time.monotonic() + WAVE_TIMEOUT
-    proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=SAFE_ENV)
     try:
         while chunk := proc.stdout.read(WAVE_WINDOW * 2):
             if time.monotonic() > deadline:
@@ -370,7 +390,9 @@ def waveform(track_id: Id, request: Request, conn=Depends(get_conn)):
     if row is None:
         raise HTTPException(404, "Piste introuvable.")
     path = safe_path(request.app.state.settings.music_root, row["path"], row["relpath"])
-    with _wave_lock:
+    if not _wave_lock.acquire(timeout=LOCK_WAIT):  # un calcul déjà en cours : le client redemandera plus tard
+        raise busy()
+    try:
         if hit := cached():  # calculée par une autre requête pendant l'attente
             return hit
         peaks = compute_waveform(path)  # aucune écriture SQLite pendant la lecture du fichier
@@ -378,6 +400,8 @@ def waveform(track_id: Id, request: Request, conn=Depends(get_conn)):
             raise HTTPException(404, "Forme d'onde indisponible.")
         conn.execute("INSERT OR REPLACE INTO waveforms(track_id, peaks) VALUES (?,?)", (track_id, peaks))
         conn.commit()
+    finally:
+        _wave_lock.release()
     return {"peaks": list(peaks)}
 
 
@@ -475,7 +499,7 @@ def cast(track_id: int, request: Request, exp: str = "", sig: str = ""):
         raise HTTPException(404, "Piste introuvable.")
     conn = db.connect(settings.data_dir)
     try:
-        return _track_file(request, conn, track_id, headers={
+        return _track_file(request, conn, track_id, original=True, headers={  # FLAC, M4A, OGG… lus par le Chromecast
             **CAST_CORS, "Access-Control-Expose-Headers": "Content-Range, Accept-Ranges, Content-Length"})
     finally:
         conn.close()

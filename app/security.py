@@ -1,5 +1,7 @@
 import hashlib
 import hmac
+import os
+import stat
 import re
 import secrets
 import threading
@@ -57,6 +59,9 @@ def create_session(conn, user_id: int, now: float) -> str:
     conn.execute("DELETE FROM sessions WHERE expires_at <= ?", (now,))
     conn.execute("INSERT INTO sessions(token_hash, user_id, expires_at) VALUES (?,?,?)",
                  (_token_hash(token), user_id, now + SESSION_TTL))
+    # au plus 20 sessions par compte : les plus anciennes (échéance la plus proche) sont fermées
+    conn.execute("DELETE FROM sessions WHERE user_id=? AND token_hash NOT IN (SELECT token_hash FROM sessions WHERE user_id=?"
+                 " ORDER BY expires_at DESC LIMIT 20)", (user_id, user_id))
     conn.commit()
     return token
 
@@ -101,6 +106,7 @@ class LoginLimiter:
     # ponytail: en mémoire, remis à zéro au redémarrage ; passer en table SQLite si plusieurs processus.
     MAX_TRIES = 5
     WINDOW = 15 * 60
+    MAX_KEYS = 10_000  # au-delà, les clés les plus anciennes sont oubliées (mémoire bornée)
 
     def __init__(self):
         self._tries: dict[str, list[float]] = {}
@@ -123,8 +129,10 @@ class LoginLimiter:
             self._until = {k: t for k, t in self._until.items() if t > now}
             if any(k in self._until for k, _ in keys):
                 return False
+            if len(self._tries) > self.MAX_KEYS:  # garde les plus récentes (dictionnaire ordonné par insertion)
+                self._tries = dict(list(self._tries.items())[-self.MAX_KEYS // 2:])
             for k, cap in keys:
-                tries = [t for t in self._tries.get(k, []) if t > now - self.WINDOW] + [now]
+                tries = [t for t in self._tries.pop(k, []) if t > now - self.WINDOW] + [now]
                 self._tries[k] = tries
                 if len(tries) >= cap:
                     self._until[k] = now + self.WINDOW
@@ -143,6 +151,28 @@ class LoginLimiter:
         with self._lock:
             self._tries.pop(key, None)
             self._until.pop(key, None)
+
+
+def open_regular(path, root: Path | None = None):
+    """Ouvre en lecture un fichier ordinaire de la bibliothèque, sans jamais suivre de lien symbolique : un lien
+    « 00.nfo » vers /proc/self/environ ou /data ne doit pas être lu par le scan. Avec `root`, vérifie aussi que le
+    chemin réel reste dessous. Lève OSError sinon (même traitement qu'un fichier illisible)."""
+    fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0))  # FIFO : pas d'attente
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise OSError(f"pas un fichier ordinaire : {path}")
+        if root is not None and not Path(os.path.realpath(path)).is_relative_to(Path(root).resolve()):
+            raise OSError(f"hors de la bibliothèque : {path}")
+        return os.fdopen(fd, "rb")
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def regular_names(folder, suffixes: tuple[str, ...]) -> list[str]:
+    """Noms triés des fichiers ordinaires du dossier finissant par l'un des suffixes ; liens symboliques ignorés."""
+    with os.scandir(folder) as it:
+        return sorted(e.name for e in it if e.name.lower().endswith(suffixes) and e.is_file(follow_symlinks=False))
 
 
 def safe_path(root: Path, *parts: str) -> Path:

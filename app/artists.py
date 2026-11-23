@@ -129,27 +129,28 @@ _GUEST = r"(?:feat|ft|featuring|vs|versus|and|with|&|\+)"
 
 @lru_cache(maxsize=64)
 def _collab_re(artist):
-    a = r"[\W_]+".join(map(re.escape, re.split(r"[\W_]+", artist.strip())))
+    a = r"[\W_]+".join(map(re.escape, [w for w in re.split(r"[\W_]+", artist.strip()) if w]))
     return re.compile(rf"(?<![^\W_]){_GUEST}[\W_]+{a}(?![^\W_])|(?<![^\W_]){a}[\W_]+{_GUEST}(?![^\W_])", re.I)
 
 
+_WORD = re.compile(r"[^\W_]")  # au moins une lettre ou un chiffre : sinon le motif ne contiendrait aucun nom
 _REMIX = r"(?:remix|rmx|mix|edit|dub|rework|re-?edit|bootleg|version|vip|refix|flip|cut|recut|extended)"
 
 
 @lru_cache(maxsize=64)
 def _remix_re(artist):
-    a = r"[\W_]+".join(map(re.escape, re.split(r"[\W_]+", artist.strip())))
+    a = r"[\W_]+".join(map(re.escape, [w for w in re.split(r"[\W_]+", artist.strip()) if w]))
     return re.compile(rf"[(\[][^()\[\]]*(?<![^\W_]){a}(?![^\W_])[^()\[\]]*\b{_REMIX}\b", re.I)
 
 
 def remixed(title: str | None, artist: str) -> bool:
     """Vrai si le titre de la piste crédite l'artiste d'une version : « Crazy (Axwell Remix) », « Crazy [Axwell & X
     Dub] ». Le nom doit être entre parenthèses ou crochets, suivi du mot qui dit la version."""
-    return bool(title and artist.strip()) and _remix_re(artist).search(title) is not None
+    return bool(title and _WORD.search(artist)) and _remix_re(artist).search(title) is not None
 
 
 def collab(name: str, artist: str) -> bool:
     """Vrai si le nom de la release associe l'artiste à un autre : « X_Feat_Artiste », « Artiste_Vs_Y », « Artiste_and_Y »."""
     # ponytail: cherche la graphie exacte de l'artiste dans le nom (« Tiesto » ne trouve pas « Tiësto ») ; garder le
     # crédit complet en base si cela manque
-    return bool(artist.strip()) and _collab_re(artist).search(name) is not None
+    return bool(_WORD.search(artist)) and _collab_re(artist).search(name) is not None

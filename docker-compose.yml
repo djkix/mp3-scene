@@ -3,6 +3,14 @@ services:
     image: ghcr.io/djkix/mp3-scene:latest   # ou une version précise : ghcr.io/djkix/mp3-scene:1.1.0
     container_name: mp3-scene
     restart: unless-stopped
+    # durcissement : système de fichiers en lecture seule (sauf /data et /tmp), aucune capacité Linux, mémoire bornée
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid,nodev
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 1g
+    pids_limit: 256
     environment:
       SECRET_KEY: ${SECRET_KEY:?renseignez SECRET_KEY dans .env}
       ADMIN_USER: ${ADMIN_USER:-admin}

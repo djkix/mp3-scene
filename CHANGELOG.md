@@ -4,6 +4,25 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.72.0](https://github.com/djkix/mp3-scene/compare/v1.71.0...v1.72.0) (2026-11-23)
+
+### Résumé
+
+**Corrections issues de l'audit de sécurité externe.**
+
+- **Fichiers** : tags, NFO, `.cue` et pochettes ne sont plus lus à travers un lien symbolique ; seuls les fichiers
+  ordinaires sous `/music` sont ouverts.
+- **Requêtes** : corps plafonné (1 Mio, 8 Mio pour une pochette) ; requêtes d'un autre site refusées sur `/api/` ;
+  conversions et formes d'onde répondent 503 quand le serveur est occupé ; ffmpeg limité aux fichiers locaux.
+- **Comptes** : proxys de confiance réglables (`TRUSTED_PROXIES`), IPv6 compté par /64, adresse habituelle jamais
+  bloquée, changement de mot de passe limité et journalisé, 20 sessions au plus et bouton « Fermer toutes les autres
+  sessions », identifiants en double selon la casse refusés, journal complet des actions d'administration.
+- **Données** : `.env` exclu des sauvegardes sauf `BACKUP_ENV=1`, base et sauvegardes en 0600 ; photos cherchées
+  seulement pour les noms en base ; téléchargement d'images sur l'adresse déjà vérifiée, signatures valables une
+  heure ; corrections et pochette suivent un album déplacé ; 100 playlists au plus.
+- **Hors ligne** : liens publics `/s/` exclus du cache, cache vidé à la déconnexion.
+- **Livraison** : tests et `pip-audit` avant la construction de l'image ; exemple de compose durci.
+
 ## [1.71.0](https://github.com/djkix/mp3-scene/compare/v1.70.0...v1.71.0) (2026-11-23)
 
 ### Résumé
