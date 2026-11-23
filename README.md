@@ -4,7 +4,7 @@
 
 **Collection de releases MP3 « scene » — bibliothèque · lecteur web · Chromecast · PWA**
 
-[![Version](https://img.shields.io/badge/version-1.72.2-purple?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.72.3-purple?style=for-the-badge)](CHANGELOG.md)
 [![Stack](https://img.shields.io/badge/stack-FastAPI_·_SQLite_·_JavaScript_pur-blue?style=for-the-badge)](#stack-technique)
 [![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
 
@@ -306,7 +306,7 @@ La coquille de l'interface est mise en cache pour démarrer vite ; la musique et
 - Uniquement dans **Chrome ou Edge** sur Android et ordinateur. Impossible depuis un iPhone (limite de la plateforme) : le bouton est masqué ailleurs.
 - Le Chromecast doit pouvoir joindre `PUBLIC_URL` en **HTTPS avec un certificat valide**, sans barrière d'accès au niveau du proxy.
 - Les liens envoyés au Chromecast sont valables **12 heures**.
-- La file est envoyée au Chromecast par fenêtres d'au plus 100 pistes. Au-delà, la fenêtre suivante n'est envoyée que tant que la page ou l'appli reste ouverte sur le téléphone.
+- La file est envoyée au Chromecast par fenêtres d'au plus 40 pistes (limite de 64 Ko des messages Cast). Au-delà, la fenêtre suivante n'est envoyée que tant que la page ou l'appli reste ouverte sur le téléphone.
 
 ## Sécurité
 

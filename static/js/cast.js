@@ -1,6 +1,6 @@
 // Chromecast (SDK Cast « CAF » côté émetteur, récepteur multimédia par défaut de Google).
 // La file est transmise au récepteur, qui l'enchaîne seul (téléphone verrouillé, onglet en veille), par
-// fenêtres de 100 pistes au plus : à la fin d'une fenêtre, l'émetteur (si la page vit encore) charge la suivante.
+// fenêtres de 40 pistes au plus : à la fin d'une fenêtre, l'émetteur (si la page vit encore) charge la suivante.
 // Le lecteur (player.js) ne connaît que l'objet `backend` ci-dessous : aucune référence au SDK hors de ce fichier.
 import { api } from './api.js';
 import { t as tr } from './i18n.js';

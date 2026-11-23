@@ -4,6 +4,14 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.72.3](https://github.com/djkix/mp3-scene/compare/v1.72.2...v1.72.3) (2026-11-23)
+
+### Résumé
+
+**Cast réparé avec une longue file d'écoute.** La file était envoyée au Chromecast par fenêtres de 100 pistes,
+soit environ 78 Ko, au-delà de la limite de 64 Ko des messages Cast : le message était abandonné sans erreur,
+le récepteur ne lançait rien. Fenêtres de 40 pistes désormais (environ 35 Ko), la suivante étant chargée à la fin.
+
 ## [1.72.2](https://github.com/djkix/mp3-scene/compare/v1.72.1...v1.72.2) (2026-11-23)
 
 ### Résumé

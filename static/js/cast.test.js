@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Queue } from './queue.js';
 import { castOrder, sameOrder, batches, repeatKey, itemMap, urlsStale, URL_MAX_AGE,
   castWindow, windowValid, receiverRepeat, isLastOfWindow, afterWindow, URL_REFRESH_AGE,
-  windowFinished } from './castqueue.js';
+  windowFinished, WINDOW } from './castqueue.js';
 
 const T = (n) => Array.from({ length: n }, (_, i) => ({ id: 100 + i }));
 
@@ -72,6 +72,11 @@ test('urlsStale : plus de 11 h', () => {
 });
 
 // --- Fenêtre de 100 pistes au plus (décision du contrôleur) ----------------------------------------
+
+test('WINDOW : la file envoyée tient dans un message Cast de 64 Ko', () => {
+  // mesuré avec le SDK : ~780 octets par piste ; 1 200 couvre les titres très longs (le média est envoyé deux fois)
+  assert.ok((WINDOW + 1) * 1200 < 64 * 1024);
+});
 
 const qi = (items) => items.map((x) => x.queueIndex);
 

@@ -27,11 +27,13 @@ export function itemMap(items, itemIds) {
 
 export const URL_MAX_AGE = 11 * 3600 * 1000; // URL signées valables 12 h : renouvelées après 11 h
 export const URL_REFRESH_AGE = 6 * 3600 * 1000; // rechargement complet : URL neuves au-delà de 6 h (le récepteur
-                                                // enchaîne seul une fenêtre de 100 pistes, soit plusieurs heures)
+                                                // enchaîne seul une fenêtre de 40 pistes, soit plusieurs heures)
 export const urlsStale = (fetchedAt, now, maxAge = URL_MAX_AGE) => fetchedAt == null || now - fetchedAt > maxAge;
 
 // --- Fenêtre : jamais plus de WINDOW éléments par chargement (limite de 64 Ko des messages Cast) ----
-export const WINDOW = 100;
+// ~780 octets par piste (URL signée, pochette, métadonnées, champs nuls du SDK) : 100 pistes faisaient 78 Ko,
+// message abandonné sans erreur par le SDK. 40 pistes ≈ 31 Ko, de la marge pour les titres très longs.
+export const WINDOW = 40;
 
 // File entière si elle tient (départ sur la courante, prev et répétition gérés par le récepteur), sinon
 // les WINDOW pistes de l'ordre effectif à partir de la courante (start = 0).
