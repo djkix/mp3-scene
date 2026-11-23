@@ -322,9 +322,12 @@ def artist_info(name: str = Query(min_length=1, max_length=200), user=Depends(cu
     pistes, et ses releases les plus écoutées par l'utilisateur."""
     mine = "COALESCE(r.tag_artist, r.artist)=? AND r.hidden=0"
     span = conn.execute(f"SELECT MIN(r.year) AS first, MAX(r.year) AS last FROM releases r WHERE {mine}", (name,)).fetchone()
-    labels = [dict(x) for x in conn.execute(
-        f"SELECT r.label AS name, COUNT(*) AS releases FROM releases r WHERE {mine} AND NULLIF(r.label, '') IS NOT NULL"
-        " GROUP BY 1 ORDER BY releases DESC, 1 COLLATE NOCASE LIMIT 6", (name,))]
+    # « Bits & Pieces » et « Bits And Pieces » : un seul label ici, sous la graphie la plus fréquente (qui porte le lien)
+    merged = {}
+    for x in conn.execute(f"SELECT r.label AS name, COUNT(*) AS releases FROM releases r WHERE {mine} AND NULLIF(r.label, '')"
+                          " IS NOT NULL GROUP BY 1 ORDER BY releases DESC, 1 COLLATE NOCASE", (name,)):
+        merged.setdefault(artists.fold(x["name"]), {"name": x["name"], "releases": 0})["releases"] += x["releases"]
+    labels = sorted(merged.values(), key=lambda l: -l["releases"])[:6]
     # crédits des pistes où il figure avec d'autres : « Bob Sinclar feat. Steve Edwards », « A & B »
     # ponytail: LIKE sur l'artiste de toutes les pistes (~0,1 s pour 500 000) ; table des crédits si trop lent
     me, others, spelling = artists.fold(name), {}, {}
@@ -337,7 +340,7 @@ def artist_info(name: str = Query(min_length=1, max_length=200), user=Depends(cu
                     others[k] = others.get(k, 0) + n
                     spelling.setdefault(k, x)
     top = [dict(x) for x in conn.execute(
-        f"SELECT r.id, r.name, COUNT(*) AS plays FROM plays p JOIN tracks t ON t.id=p.track_id JOIN releases r ON r.id=t.release_id"
+        f"SELECT r.id, r.name, r.title, COUNT(*) AS plays FROM plays p JOIN tracks t ON t.id=p.track_id JOIN releases r ON r.id=t.release_id"
         f" WHERE p.user_id=? AND {mine} GROUP BY r.id ORDER BY plays DESC, r.name COLLATE NOCASE LIMIT 5", (user["id"], name))]
     return {"first": span["first"], "last": span["last"], "labels": labels, "top": top,
             "with": [{"name": spelling[k], "tracks": n} for k, n in sorted(others.items(), key=lambda kv: (-kv[1], kv[0]))[:8]]}

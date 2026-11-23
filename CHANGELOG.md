@@ -4,6 +4,18 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.59.1](https://github.com/djkix/mp3-scene/compare/v1.59.0...v1.59.1) (2026-11-23)
+
+### Résumé
+
+**En-tête de la page d'un artiste en deux colonnes.**
+
+- À gauche, un tableau : releases, poids, une ligne par catégorie (un clic filtre la liste), années d'activité. À
+  droite, les labels, les artistes associés et les releases les plus écoutées, en pastilles cliquables. Sur mobile,
+  les deux colonnes passent l'une sous l'autre.
+- Les graphies d'un même label (« Bits & Pieces », « Bits And Pieces ») y sont réunies ; les releases les plus
+  écoutées sont montrées par leur titre.
+
 ## [1.59.0](https://github.com/djkix/mp3-scene/compare/v1.58.0...v1.59.0) (2026-11-23)
 
 ### Résumé

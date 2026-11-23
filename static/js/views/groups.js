@@ -28,11 +28,11 @@ function detail(container, kind, params) {
   const total = el('span', { class: 'muted' });
   const list = el('div');
   const years = el('div', { class: 'letters years' });
-  // artiste : le total puis le détail par catégorie, sur une ligne sous les onglets
-  const split = el('span');
-  const kinds = el('p', { class: 'grp-kinds muted' }, total, split);
-  // artiste : années d'activité, labels, artistes associés et releases les plus écoutées, une ligne chacun
-  const facts = el('div', { class: 'grp-facts muted' });
+  // artiste : deux colonnes sous les onglets. À gauche le résumé (releases, poids, une ligne par catégorie, années
+  // d'activité) ; à droite les labels, les artistes associés et les releases les plus écoutées, en pastilles.
+  const fact = (label, value) => el('div', { class: 'art-row' }, el('span', {}, label), el('span', {}, value));
+  const sum = el('div'), cats = el('div'), active = el('div'), chips = el('div', { class: 'art-chips' });
+  const head = el('div', { class: 'art-head' }, el('div', { class: 'art-sum' }, sum, cats, active), chips);
   // artiste : ses releases, celles dont le nom l'associe à un autre (feat, vs, &), ou celles des autres
   // (compilations) où il signe une piste
   const other = kind === 'artists' && { with: 'collab', appears: 'appears', mixes: 'mixes' }[params.in];
@@ -44,7 +44,7 @@ function detail(container, kind, params) {
     ...(kind === 'artists' ? [el('div', { class: 'tabs', role: 'tablist', 'aria-label': name },
       tabBtn(tr('Releases'), !other, base), tabBtn(tr('Avec'), other === 'collab', base + '?in=with'),
       tabBtn(tr('Apparitions'), other === 'appears', base + '?in=appears'), tabBtn(tr('Mixes'), other === 'mixes', base + '?in=mixes'))] : []),
-    ...(kind === 'artists' && !other ? [kinds, facts, years] : []), list);
+    ...(kind === 'artists' && !other ? [head, years] : []), list);
   // chronologie : une pastille par année avec son nombre de releases ; un clic filtre la liste sur cette année
   if (kind === 'artists' && !other) api('/groups?' + new URLSearchParams({ by: 'year', artist: name })).then((rows) => {
     if (rows.length < 2) return;
@@ -55,13 +55,13 @@ function detail(container, kind, params) {
     `${y.name} `, el('small', {}, String(y.releases)))));
   }).catch(() => {});
   if (kind === 'artists' && !other) api('/artist-info?' + new URLSearchParams({ name })).then((a) => {
-    const line = (label, items) => items.length && el('p', {}, el('b', {}, label), ' ', ...items.flatMap((x, i) => [i ? ' · ' : '', x]));
-    facts.replaceChildren(...[
-      a.first && line(tr('Actif'), [a.first === a.last ? String(a.first) : tr('de {0} à {1}', a.first, a.last)]),
-      line(tr('Labels'), a.labels.map((l) => el('span', {}, el('a', { href: `#/labels/${encodeURIComponent(l.name)}` }, l.name), ` (${l.releases})`))),
-      line(tr('Souvent avec'), a.with.map((w) => el('span', {}, el('a', { href: `#/artists/${encodeURIComponent(w.name)}` }, w.name), ` (${w.tracks})`))),
-      line(tr('Vos plus écoutées'), a.top.map((r) => el('span', {}, el('a', { href: relHref(r.name, r.id) }, relName(r.name)), ` (${r.plays})`))),
-    ].filter(Boolean));
+    if (a.first) active.replaceChildren(fact(tr('Actif'), a.first === a.last ? String(a.first) : tr('de {0} à {1}', a.first, a.last)));
+    const group = (label, items) => (items.length ? [el('p', {}, label), el('div', {}, items)] : []);
+    const chip = (href, text, n) => el('a', { class: 'chip', href }, text, n ? el('small', {}, String(n)) : null);
+    chips.replaceChildren(
+      ...group(tr('Labels'), a.labels.map((l) => chip(`#/labels/${encodeURIComponent(l.name)}`, l.name, l.releases))),
+      ...group(tr('Souvent avec'), a.with.map((w) => chip(`#/artists/${encodeURIComponent(w.name)}`, w.name, w.tracks))),
+      ...group(tr('Vos plus écoutées'), a.top.map((r) => chip(relHref(r.name, r.id), r.title || relName(r.name), r.plays))));
   }).catch(() => {}); // facultatif
   // longs mixes où un chapitre (fichier .cue) est de cet artiste : la lecture démarre à son morceau
   if (other === 'mixes') return trackList(list, { path: '/tracks?mixes=' + encodeURIComponent(name),
@@ -70,16 +70,19 @@ function detail(container, kind, params) {
   one.set('by', by);
   one.set('name', name);
   if (!appears) api('/groups?' + one)
-    .then(([g]) => { total.textContent = g ? `${count(g.releases)} · ${fmtSize(g.size)}` : ''; }).catch(() => {});
+    .then(([g]) => {
+      total.textContent = g ? `${count(g.releases)} · ${fmtSize(g.size)}` : '';
+      if (g) sum.replaceChildren(fact(tr('Releases'), String(g.releases)), fact(tr('Poids'), fmtSize(g.size)));
+    }).catch(() => {});
   // artiste : ses releases par catégorie (albums, singles, compilations…), avec le nombre et le poids de chacune ;
   // un clic filtre la liste sur cette catégorie
   if (kind === 'artists' && !other) {
-    const cats = releases.multiQuery({ genre: params.genre, year: params.year });
-    cats.set('by', 'category');
-    cats.set('artist', name);
-    api('/groups?' + cats).then((rows) => {
-      split.replaceChildren(...rows.flatMap((c, i) => [i ? ' · ' : ' : ',
-        el('a', { href: base + qs({ genre: params.genre, year: params.year, category: c.name }) }, `${c.releases} ${catLabel(c.name)}`), ` (${fmtSize(c.size)})`]));
+    const byCat = releases.multiQuery({ genre: params.genre, year: params.year });
+    byCat.set('by', 'category');
+    byCat.set('artist', name);
+    api('/groups?' + byCat).then((rows) => {
+      cats.replaceChildren(...rows.map((c) => fact(
+        el('a', { href: base + qs({ genre: params.genre, year: params.year, category: c.name }) }, catLabel(c.name)), `${c.releases} · ${fmtSize(c.size)}`)));
     }).catch(() => {}); // facultatif
   }
   return releases.render(list, { ...params, q: '', pin: appears ? { key: other, value: name, base, extra: { in: params.in } } : { key: pin, value: name, base } });
