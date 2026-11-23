@@ -13,6 +13,7 @@ from PIL import Image
 
 from . import artists, coversearch, nfo
 from .naming import complete_title
+from .routes_media import IMAGE_ERRORS
 from .deps import MAX_INT, Id, current_user, get_conn
 from .security import safe_path
 
@@ -585,7 +586,7 @@ def photo(request: Request, kind: PHOTO_KINDS, name: str = Query(min_length=1, m
             else:
                 path.parent.mkdir(exist_ok=True)
                 path.write_bytes(b"")
-        except (ValueError, OSError):
+        except IMAGE_ERRORS:
             pass
     if not path.is_file() or not path.stat().st_size:
         raise HTTPException(404, "Pas de photo.")

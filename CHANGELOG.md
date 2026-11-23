@@ -4,6 +4,22 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.71.0](https://github.com/djkix/mp3-scene/compare/v1.70.0...v1.71.0) (2026-11-23)
+
+### Résumé
+
+**Durcissements de sécurité, statistiques des enrichissements.**
+
+- **En-têtes** : politique de contenu (scripts de l'application et du SDK Cast seulement), interdiction d'affichage
+  dans le cadre d'un autre site, politique de référent `same-origin`.
+- **Connexion** : cinq essais ratés bloquent le couple identifiant + adresse et l'adresse, plus le compte lui-même ;
+  l'identifiant seul garde un plafond large (50 par quart d'heure). X-Forwarded-For n'est cru que d'une connexion
+  venue du réseau local (le proxy).
+- **Images** : une image de plus de 40 mégapixels est refusée au décodage (pochettes, vignettes, photos) ; les
+  vignettes JPEG sont décodées directement en petit.
+- **Statistiques** : une section « Enrichissements » — pistes avec BPM et tonalité, chapitres, titres à plusieurs
+  versions, séries et familles, photos et logos, rattachements, pistes par tempo, titres et séries les plus présents.
+
 ## [1.70.0](https://github.com/djkix/mp3-scene/compare/v1.69.1...v1.70.0) (2026-11-23)
 
 ### Résumé

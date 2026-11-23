@@ -553,6 +553,7 @@ dialog.compare { max-width: min(96vw, 1100px); }
   font: 600 11px var(--mono); } /* comme les pastilles d'années */
 .rel-head.trk button { padding: 4px 0; border: 0; background: none; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
 .rel-head.trk button:hover { color: var(--fg); background: none; }
+.st-sub { margin: 24px 0 8px; }
 .cap-pill small { color: var(--muted); font-weight: 400; }
 .rel[class*="kind-"] { border-left: 3px solid var(--kind); }
 .kind-0 { --kind: #22c55e; } .kind-1 { --kind: #3b82f6; } .kind-2 { --kind: #f59e0b; } .kind-3 { --kind: #a855f7; } .kind-4 { --kind: var(--line); }

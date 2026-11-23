@@ -12,8 +12,8 @@ from pydantic import BaseModel, Field
 from . import artists, backup, coversearch, db, genres, nfo, scanner, security
 from .deps import MAX_INT, Id, get_conn, require_admin
 from .naming import parse_release_name
-from .routes_media import COVER_MAX, save_cover
-from .routes_library import RELEASE_COLS, RELEASE_FROM, Dir, Sort, _order, _page, _release, photo_candidates, photo_path, store_photo
+from .routes_media import COVER_MAX, IMAGE_ERRORS, save_cover
+from .routes_library import RELEASE_COLS, RELEASE_FROM, Dir, Sort, _all_series, _families, _order, _page, _release, titles, photo_candidates, photo_path, store_photo
 
 # libellé au journal d'activité de chaque action d'administration : (méthode, route) -> libellé
 _ACTIONS = {
@@ -313,7 +313,7 @@ def save_photo(body: PhotoPick, request: Request):
         raise HTTPException(400, "Cette image n'a pas été proposée par la recherche.")
     try:
         store_photo(settings.data_dir, body.kind, body.name, body.url)
-    except (ValueError, OSError) as e:
+    except IMAGE_ERRORS as e:
         raise HTTPException(400, f"Photo refusée : {e}") from None
 
 
@@ -352,6 +352,36 @@ def suggestions(conn=Depends(get_conn)):
 @router.get("/scan")
 def scan_status(request: Request, conn=Depends(get_conn)):
     return request.app.state.runner.status(conn)
+
+
+@router.get("/library/extras")
+def library_extras(request: Request, conn=Depends(get_conn)):
+    """Statistiques des enrichissements : BPM et tonalité, chapitres, titres à plusieurs versions, séries et familles,
+    photos et logos, rattachements manuels. À part de /library : le regroupement des titres prend près d'une seconde."""
+    one = lambda sql: conn.execute(sql).fetchone()[0]
+    data = request.app.state.settings.data_dir
+    photos = lambda kind: sum(1 for p in (data / kind).glob("*.jpg") if p.stat().st_size) if (data / kind).is_dir() else 0
+    every = _all_series(conn)
+    fam = _families(every, dict(conn.execute("SELECT key, family FROM series_rules").fetchall()))
+    sizes = {}
+    for g in every:
+        f = fam.get(g["name"].casefold(), g["name"])
+        sizes[f] = sizes.get(f, 0) + g["releases"]
+    top_titles = titles(genre=None, year=None, decade=None, category=None, song=None, conn=conn)
+    return {
+        "tracks": one("SELECT COUNT(*) FROM tracks"), "bpm": one("SELECT COUNT(bpm) FROM tracks"), "key": one("SELECT COUNT(key) FROM tracks"),
+        "chaptered": one("SELECT COUNT(DISTINCT t.release_id) FROM chapters c JOIN tracks t ON t.id=c.track_id"),
+        "chapters": one("SELECT COUNT(*) FROM chapters"),
+        "titles": len(top_titles), "versions": sum(t["releases"] for t in top_titles),
+        "series": len(every), "families": len(set(fam.values())),
+        "artist_photos": photos("artists"), "label_logos": photos("labels"),
+        "artist_aliases": one("SELECT COUNT(*) FROM artist_aliases"), "label_aliases": one("SELECT COUNT(*) FROM label_aliases"),
+        "title_aliases": one("SELECT COUNT(*) FROM title_aliases"),
+        "top_titles": [{"name": t["name"], "n": t["releases"], "size": t["size"]} for t in top_titles[:15]],
+        "top_series": [{"name": k, "n": v} for k, v in sorted(sizes.items(), key=lambda kv: -kv[1])[:15]],
+        # tempo des pistes qui en ont un, par tranche de 10 BPM
+        "bpm_ranges": [dict(r) for r in conn.execute(
+            "SELECT CAST(bpm / 10 AS INTEGER) * 10 AS name, COUNT(*) AS n FROM tracks WHERE bpm IS NOT NULL GROUP BY 1 ORDER BY 1")]}
 
 
 @router.get("/library")

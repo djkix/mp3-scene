@@ -6,6 +6,7 @@ import shutil
 import stat
 import subprocess
 import threading
+import warnings
 import time
 import zipfile
 from array import array
@@ -18,6 +19,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import FileResponse, StreamingResponse
 from mutagen.id3 import ID3
 from PIL import Image
+
+# images de la bibliothèque ou d'Internet, non fiables : au-delà de 40 Mpx, refusées (une « bombe » de 8 Mo peut faire
+# 170 Mpx et occuper 500 Mo de mémoire au décodage)
+Image.MAX_IMAGE_PIXELS = 40_000_000
+warnings.simplefilter("error", Image.DecompressionBombWarning)
+IMAGE_ERRORS = (ValueError, OSError, Image.DecompressionBombError, Image.DecompressionBombWarning)
 from pydantic import BaseModel, Field
 
 from . import cue, db
@@ -218,6 +225,7 @@ def thumb(rid: Id, request: Request, conn=Depends(get_conn)):
         try:
             path, data, _ = _find_cover(request, conn, rid)
             with Image.open(path or io.BytesIO(data)) as img:
+                img.draft("RGB", (THUMB_SIZE * 2, THUMB_SIZE * 2))  # JPEG : décodé directement en petit
                 img = img.convert("RGB")
                 img.thumbnail((THUMB_SIZE, THUMB_SIZE))
                 img.save(tmp, "JPEG", quality=80)

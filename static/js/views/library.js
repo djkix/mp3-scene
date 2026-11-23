@@ -40,7 +40,10 @@ function stats(box, isDead) {
   const status = el('p', { class: 'status', role: 'status' });
   const tiles = el('div', { class: 'ad-metrics st-tiles' }), top = el('div', { class: 'st-row st-wide' }), parts = el('div', { class: 'st-row' }),
     time = el('div', { class: 'st-row' }), ranks = el('div', { class: 'stats' });
-  box.replaceChildren(el('div', { class: 'filters' }, sel), status, tiles, top, parts, time, ranks);
+  // enrichissements : BPM, chapitres, titres, séries, photos, rattachements (chargés à part, plus lents)
+  const extraTiles = el('div', { class: 'ad-metrics st-tiles' }), extraRow = el('div', { class: 'st-row' }), extraRanks = el('div', { class: 'stats' });
+  box.replaceChildren(el('div', { class: 'filters' }, sel), status, tiles, top, parts, time, ranks,
+    el('h2', { class: 'st-sub' }, tr('Enrichissements')), extraTiles, extraRow, extraRanks);
   const d = {};
   const n = (x) => Number(x).toLocaleString();
   function paint() {
@@ -73,10 +76,25 @@ function stats(box, isDead) {
       block(tr('Pistes les plus écoutées'), u.tracks, undefined, t, false), block(tr('Par utilisateur'), u.users, undefined, t)] : []),
     ...(s ? [block(tr('Par genre'), s.genres), block(tr('Par groupe'), s.groups)] : []));
   }
+  const pct = (a, b) => (b ? ` (${Math.round(100 * a / b)} %)` : '');
+  function paintExtras(x) {
+    if (isDead()) return;
+    extraTiles.replaceChildren(tile(tr('Pistes avec BPM'), n(x.bpm) + pct(x.bpm, x.tracks)), tile(tr('Pistes avec tonalité'), n(x.key) + pct(x.key, x.tracks)),
+      tile(tr('Releases à chapitres'), n(x.chaptered)), tile(tr('Chapitres'), n(x.chapters)),
+      tile(tr('Titres à plusieurs versions'), n(x.titles)), tile(tr('Séries · familles'), `${n(x.series)} · ${n(x.families)}`),
+      tile(tr('Photos · logos'), `${n(x.artist_photos)} · ${n(x.label_logos)}`),
+      tile(tr('Rattachements'), `${n(x.artist_aliases)} · ${n(x.label_aliases)} · ${n(x.title_aliases)}`));
+    extraRow.replaceChildren(panel(tr('Pistes par tempo'), x.bpm_ranges.length
+      ? columns(tr('Pistes par tempo'), x.bpm_ranges.map((r) => r.n), 1, x.bpm_ranges.map((r) => `${r.name}–${r.name + 9} BPM : ${n(r.n)}`)) : el('p', {}, tr('Aucun BPM lu.')),
+    x.bpm_ranges.length ? el('p', { class: 'axis' }, el('span', {}, `${x.bpm_ranges[0].name} BPM`), el('span', {}, `${x.bpm_ranges.at(-1).name} BPM`)) : null));
+    extraRanks.replaceChildren(block(tr('Titres les plus présents'), x.top_titles, undefined, (r) => fmtSize(r.size), false),
+      block(tr('Séries les plus fournies'), x.top_series, undefined, () => ''));
+  }
   const fail = (err) => { if (!isDead()) status.textContent = err.message; };
   const loadUsage = () => api(`/admin/usage?days=${sel.value}`).then((u) => { d.u = u; paint(); }).catch(fail);
   paint();
   api('/admin/library').then((s) => { d.s = s; paint(); }).catch(fail);
+  api('/admin/library/extras').then(paintExtras).catch(() => {}); // facultatif
   loadUsage();
 }
 

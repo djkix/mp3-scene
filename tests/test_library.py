@@ -1297,3 +1297,12 @@ def test_tracks_of_a_title_are_grouped_by_artist_and_sortable(user_client, libra
     got = lambda **p: [t["artist"] for t in user_client.get("/api/tracks", params={"song": "Glue", **p}).json()["items"]]
     assert got()[:2] == ["Axwell /\\ Ingrosso", "Axwell and Ingrosso"] or got()[:2] == ["Axwell and Ingrosso", "Axwell /\\ Ingrosso"]
     assert got()[-1] == "Zed" and got(sort="bitrate", dir="desc")[0] == "Axwell and Ingrosso"
+
+
+def test_library_extras_counts_enrichments(admin_client, library, settings):
+    conn = db.connect(settings.data_dir)
+    conn.execute("UPDATE tracks SET bpm=124 WHERE title='Glue'")
+    conn.commit()
+    x = admin_client.get("/api/admin/library/extras").json()
+    assert x["bpm"] == 1 and x["tracks"] >= 3 and x["bpm_ranges"] == [{"name": 120, "n": 1}]
+    assert {"titles", "series", "families", "artist_photos", "label_logos", "top_titles", "top_series"} <= set(x)

@@ -112,19 +112,21 @@ class LoginLimiter:
             return self._until.get(key, 0.0) > now
 
     def attempt(self, keys, now: float) -> bool:
-        """Réserve un essai pour toutes les clés, AVANT la vérification du mot de passe (atomique).
+        """Réserve un essai pour toutes les clés, AVANT la vérification du mot de passe (atomique). Une clé est un nom,
+        ou (nom, plafond) pour un plafond autre que MAX_TRIES.
 
         False si l'une est bloquée : rien n'est alors compté ni prolongé."""
+        keys = [k if isinstance(k, tuple) else (k, self.MAX_TRIES) for k in keys]
         with self._lock:
             # ponytail: purge O(n) à chaque essai ; n est borné par le nombre d'essais sur 15 min
             self._tries = {k: v for k, v in self._tries.items() if v and v[-1] > now - self.WINDOW}
             self._until = {k: t for k, t in self._until.items() if t > now}
-            if any(k in self._until for k in keys):
+            if any(k in self._until for k, _ in keys):
                 return False
-            for k in keys:
+            for k, cap in keys:
                 tries = [t for t in self._tries.get(k, []) if t > now - self.WINDOW] + [now]
                 self._tries[k] = tries
-                if len(tries) >= self.MAX_TRIES:
+                if len(tries) >= cap:
                     self._until[k] = now + self.WINDOW
             return True
 

@@ -1,3 +1,4 @@
+import ipaddress
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -21,18 +22,28 @@ class PasswordChange(BaseModel):
 
 def client_ip(request: Request) -> str:
     # un seul proxy de confiance, qui ajoute l'adresse réelle en DERNIER ; les entrées précédentes viennent du client
-    # plusieurs lignes possibles : un proxy qui ajoute sa propre ligne laisse celle du client en premier
+    # plusieurs lignes possibles : un proxy qui ajoute sa propre ligne laisse celle du client en premier.
+    # L'en-tête n'est cru que si la connexion vient du réseau local (le proxy, dans Docker) : un client d'Internet
+    # qui joindrait directement le port de l'application ne peut pas choisir son adresse.
+    peer = request.client.host if request.client else ""
+    try:
+        direct = ipaddress.ip_address(peer).is_global
+    except ValueError:
+        direct = False  # nom (client de test) : pas une adresse d'Internet
     parts = [p.strip() for p in ",".join(request.headers.getlist("x-forwarded-for")).split(",") if p.strip()]
-    if parts:
+    if parts and not direct:
         return parts[-1]
-    return request.client.host if request.client else ""
+    return peer
 
 
 @router.post("/login")
 def login(body: Login, request: Request, response: Response, conn=Depends(get_conn)):
     limiter = request.app.state.limiter
     username = body.username.strip()
-    keys = (f"u:{username}", f"ip:{client_ip(request)}")
+    ip = client_ip(request)
+    # le blocage à 5 essais vise le couple identifiant + adresse, et l'adresse seule : un inconnu ne peut pas bloquer
+    # un compte depuis chez lui. L'identifiant seul a un plafond large, contre une attaque répartie sur beaucoup d'adresses
+    keys = ((f"u:{username}|{ip}", 5), (f"u:{username}", 50), (f"ip:{ip}", 5))
     now = time.time()
     if not limiter.attempt(keys, now):
         raise HTTPException(429, "Trop de tentatives échouées, réessayez dans 15 minutes.")
@@ -42,9 +53,10 @@ def login(body: Login, request: Request, response: Response, conn=Depends(get_co
         db.log(conn, username[:60] or "—", "Connexion refusée", client_ip(request))
         conn.commit()
         raise HTTPException(401, "Identifiant ou mot de passe incorrect.")
-    limiter.reset(keys[0])
+    limiter.reset(keys[0][0])
+    limiter.reset(keys[1][0])
     # IP : on retire seulement l'essai de cette requête ; ses échecs passés comptent toujours
-    limiter.forgive(keys[1])
+    limiter.forgive(keys[2][0])
     old = request.cookies.get(security.COOKIE)
     if old:
         security.drop_session(conn, old)

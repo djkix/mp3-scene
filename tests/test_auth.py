@@ -347,3 +347,41 @@ def test_password_hashed_outside_write_transaction(admin_client, settings, monke
     assert admin_client.post("/api/me/password", json={"current": "adminpass", "new": "nouveaumdp"}).status_code == 204
     other.close()
     assert errors == []
+
+
+def test_failures_from_one_address_do_not_lock_the_account_elsewhere(client):
+    h = {"X-Forwarded-For": "198.51.100.20", "X-CSRF": "1"}
+    for _ in range(5):
+        assert _login(client, "admin", "bad", headers=h).status_code == 401
+    assert _login(client, "admin", "adminpass", headers=h).status_code == 429          # cette adresse est bloquée
+    other = {"X-Forwarded-For": "198.51.100.21", "X-CSRF": "1"}
+    assert _login(client, "admin", "adminpass", headers=other).status_code == 200      # le compte ne l'est pas
+
+
+def test_forwarded_for_is_ignored_from_an_internet_peer():
+    from starlette.requests import Request
+    from app.routes_auth import client_ip
+    req = lambda peer: Request({"type": "http", "headers": [(b"x-forwarded-for", b"10.0.0.9")], "client": (peer, 1)})
+    assert client_ip(req("172.18.0.2")) == "10.0.0.9"      # le proxy, dans le réseau Docker
+    assert client_ip(req("203.0.114.5")) == "203.0.114.5"  # connexion directe depuis Internet : l'en-tête est ignoré
+
+
+def test_security_headers(client):
+    r = client.get("/api/health")
+    assert "frame-ancestors 'none'" in r.headers["content-security-policy"] and r.headers["x-frame-options"] == "DENY"
+    assert r.headers["referrer-policy"] == "same-origin"
+
+
+def test_huge_image_is_refused():
+    import io
+    from PIL import Image
+    from app.routes_media import IMAGE_ERRORS
+    buf = io.BytesIO()
+    Image.new("1", (9000, 9000)).save(buf, "PNG")  # 81 Mpx, quelques Ko
+    try:
+        with Image.open(io.BytesIO(buf.getvalue())) as img:
+            img.convert("RGB")
+        refused = False
+    except IMAGE_ERRORS:
+        refused = True
+    assert refused

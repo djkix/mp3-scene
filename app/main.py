@@ -28,6 +28,14 @@ class NoCacheStatic(StaticFiles):
         return response
 
 
+# style 'unsafe-inline' : attributs style posés par l'interface (largeur des barres, couleurs des graphiques) ;
+# aucun script en ligne n'est servi. « www.gstatic.com » sans schéma : celui de la page (https en production), le SDK
+# Cast chargeant ses fichiers par des adresses sans schéma
+CSP = ("default-src 'self'; script-src 'self' www.gstatic.com; style-src 'self' 'unsafe-inline'; "
+       "img-src 'self' https: data: blob:; media-src 'self' blob:; connect-src 'self' https://api.github.com; "
+       "frame-src 'self' www.gstatic.com; font-src 'self'; object-src 'none'; base-uri 'self'; "
+       "form-action 'self'; frame-ancestors 'none'")
+
 def _bootstrap_admin(settings: Settings) -> None:
     conn = db.connect(settings.data_dir)
     try:
@@ -109,6 +117,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def nosniff(request: Request, call_next):
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
+        # pas d'affichage dans le cadre d'un autre site (clic forcé d'un administrateur connecté) ; scripts de
+        # l'application et du SDK Cast seulement ; images distantes pour les pochettes proposées (Deezer, iTunes, Discogs)
+        response.headers["Content-Security-Policy"] = CSP
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers.setdefault("Referrer-Policy", "same-origin")  # la page d'un partage garde son no-referrer
         return response
 
     @app.get("/api/health")
