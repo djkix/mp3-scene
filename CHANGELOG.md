@@ -4,6 +4,15 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.60.1](https://github.com/djkix/mp3-scene/compare/v1.60.0...v1.60.1) (2026-11-23)
+
+### Résumé
+
+**Fréquence d'échantillonnage sur la fiche d'une release.**
+
+- La fiche affiche de nouveau la fréquence (« 44,1 kHz »), après le débit : sur une release sans source ni label,
+  les deux colonnes du bloc ont le même nombre de lignes. Elle est lue dans le fichier de la première piste.
+
 ## [1.60.0](https://github.com/djkix/mp3-scene/compare/v1.59.1...v1.60.0) (2026-11-23)
 
 ### Résumé

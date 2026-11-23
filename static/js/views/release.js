@@ -82,15 +82,19 @@ function header(rel) {
   const play = () => player.playTracks(rel.tracks, 0);
   const fav = favButton(rel);
   fav.classList.remove('icon'); // dans la barre d'actions : un bloc comme les autres, même cœur que sur les pistes
+  // format (MP3, FLAC…) : l'extension de la première piste ; fréquence : lue dans son fichier, donc ajoutée ensuite
+  // ponytail: la première piste vaut pour la release ; les lire toutes si des releases mélangent les formats
+  const shown = { ...rel, format: /\.\w+$/.test(rel.tracks[0]?.filename || '') ? rel.tracks[0].filename.split('.').pop().toUpperCase() : null };
+  const info = el('dl', { class: 'detail-info' }, infoRows(shown, el));
+  if (rel.tracks[0]) api(`/tracks/${rel.tracks[0].id}/tech`)
+    .then((d) => info.replaceChildren(...infoRows({ ...shown, sample_rate: d.sample_rate }, el))).catch(() => {}); // facultatif
   return el('header', { class: 'detail-head' },
     el('h1', { class: 'detail-name' }, relName(rel.name)),
     el('div', { class: 'detail-top' },
       // pochette facultative : sans image (404), le lien disparaît
       el('a', { class: 'cover', href: `/api/releases/${rel.id}/cover`, target: '_blank', rel: 'noopener' },
         el('img', { src: `/api/releases/${rel.id}/cover`, alt: t('Pochette'), onerror: (e) => e.target.parentNode.remove() })),
-      // format (MP3, FLAC…) : l'extension de la première piste
-      // ponytail: la première piste vaut pour la release ; les lire toutes si des releases mélangent les formats
-      el('dl', { class: 'detail-info' }, infoRows({ ...rel, format: /\.\w+$/.test(rel.tracks[0]?.filename || '') ? rel.tracks[0].filename.split('.').pop().toUpperCase() : null }, el))),
+      info),
     session.user?.role === 'admin' ? coverTools(rel) : null,
     el('div', { class: 'detail-actions' },
       el('button', { type: 'button', class: 'primary', 'data-ico': 'play', disabled: !rel.tracks.length, onclick: play }, t('Lire')),
