@@ -4,6 +4,13 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.72.1](https://github.com/djkix/mp3-scene/compare/v1.72.0...v1.72.1) (2026-11-23)
+
+### Résumé
+
+**Tests JavaScript de la CI lancés par motif de fichiers** (Node 22 n'accepte pas un dossier) ; l'image 1.72.0
+n'avait pas été construite.
+
 ## [1.72.0](https://github.com/djkix/mp3-scene/compare/v1.71.0...v1.72.0) (2026-11-23)
 
 ### Résumé

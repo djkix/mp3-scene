@@ -20,7 +20,7 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg mpg123
       - run: pip install -r requirements-dev.txt pip-audit
       - run: python -m pytest -q
-      - run: node --test static/js
+      - run: node --test 'static/js/**/*.test.js'
       - run: pip-audit -r requirements.txt
 
   publish:
