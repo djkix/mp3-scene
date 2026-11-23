@@ -30,13 +30,13 @@ function detail(container, kind, params) {
   const years = el('div', { class: 'letters years' });
   // artiste : ses releases, celles dont le nom l'associe à un autre (feat, vs, &), celles des autres (compilations)
   // où il signe une piste, ou les longs mixes dont un chapitre est de lui
-  const other = kind === 'artists' && { with: 'collab', appears: 'appears', mixes: 'mixes' }[params.in];
+  const other = kind === 'artists' && { with: 'collab', appears: 'appears', mixes: 'mixes', remixes: 'remixes' }[params.in];
   const appears = !!other;
   // en-tête d'un artiste, deux colonnes. À gauche le tableau des quatre listes (nombre, poids) : il tient lieu
   // d'onglets, la ligne ouverte est marquée. À droite les labels, les artistes associés et les releases les plus
   // écoutées, en pastilles.
   const LISTS = [['releases', 'Releases', '', false], ['with', 'Avec', '?in=with', 'collab'], ['appears', 'Apparitions', '?in=appears', 'appears'],
-    ['mixes', 'Mixes', '?in=mixes', 'mixes']];
+    ['mixes', 'Mixes', '?in=mixes', 'mixes'], ['remixes', 'Remixes', '?in=remixes', 'remixes']];
   const cells = {};
   const table = el('table', { class: 'art-sum' },
     el('thead', {}, el('tr', {}, el('th'), el('th', { scope: 'col' }, tr('Nombre')), el('th', { scope: 'col' }, tr('Poids')))),
@@ -70,6 +70,9 @@ function detail(container, kind, params) {
       ...group(tr('Vos plus écoutées'), a.top.map((r) => chip(relHref(r.name, r.id), r.title || relName(r.name), r.plays))));
   }).catch(() => {}); // facultatif
   // longs mixes où un chapitre (fichier .cue) est de cet artiste : la lecture démarre à son morceau
+  // pistes dont le titre le crédite d'une version (« … (Axwell Remix) »), où qu'elles soient
+  if (other === 'remixes') return trackList(list, { path: '/tracks?remixes=' + encodeURIComponent(name),
+    empty: tr('Aucune piste remixée par cet artiste.') });
   if (other === 'mixes') return trackList(list, { path: '/tracks?mixes=' + encodeURIComponent(name),
     empty: tr('Aucun mix où cet artiste figure dans un chapitre.') });
   const one = releases.multiQuery({ genre: params.genre, year: params.year });

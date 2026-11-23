@@ -123,7 +123,31 @@ export function render(container, params) {
       } catch (err) { player.flash(err.message); }
     };
     const covers = kind === 'no_cover' && el('button', { type: 'button', class: 'primary', onclick: () => review() }, tr('Chercher les pochettes'));
-    body.replaceChildren(el('p', { class: 'filters' }, covers, fix, all), list);
+    // pochettes automatiques : pour chaque release sans pochette, la première proposition au même artiste et au même
+    // titre est validée sans rien demander ; les autres releases restent dans la liste, à voir à la main
+    let running = false;
+    const auto = kind === 'no_cover' && el('button', { type: 'button', onclick: async () => {
+      if (running) { running = false; return; }
+      running = true;
+      auto.textContent = tr('Arrêter');
+      let skip = 0, added = 0;
+      try {
+        while (running && !dead) {
+          const [rel] = (await api(`/admin/quality?kind=no_cover&offset=${skip}&limit=1`)).items;
+          if (!rel) break;
+          const hit = (await api(`/admin/releases/${rel.id}/cover/search`)).items.find((x) => x.exact);
+          const saved = hit && await api(`/admin/releases/${rel.id}/cover/fetch`, { method: 'POST', body: { url: hit.url, sig: hit.sig } }).then(() => true, () => false);
+          if (saved) added++; else skip++;
+          autoMsg.textContent = tr('{0} pochettes ajoutées, {1} releases à voir à la main…', added, skip);
+        }
+      } catch (err) { player.flash(err.message); }
+      running = false;
+      if (dead) return;
+      player.flash(tr('{0} pochettes ajoutées, {1} releases à voir à la main.', added, skip));
+      refresh();
+    } }, tr('Pochettes automatiques'));
+    const autoMsg = el('span', { class: 'hint', role: 'status' });
+    body.replaceChildren(el('p', { class: 'filters' }, covers, auto, fix, all, autoMsg), list);
     dispose = releaseList(list, (offset, tri) => api(`/admin/quality?kind=${kind}&offset=${offset}&limit=50${tri}`),
       { empty: tr('Aucune release concernée.'), sort: ['name', 'asc'], pick: picked, onPick });
   }

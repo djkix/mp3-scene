@@ -6,6 +6,7 @@ import ipaddress
 import json
 import re
 import socket
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -84,6 +85,23 @@ def candidates(artist: str | None, title: str | None, discogs_token: str | None,
         except (OSError, ValueError, KeyError, TypeError):  # réseau, JSON, réponse inattendue
             pass
     return [x for x in out if x["url"].startswith("https://") and x["thumb"].startswith("https://")]
+
+
+_VARIOUS = {"va", "various", "variousartists"}
+
+
+def _key(s: str | None) -> str:
+    return "".join(c for c in unicodedata.normalize("NFKD", s or "").casefold() if c.isalnum())
+
+
+def exact(artist: str | None, title: str | None, found: str) -> bool:
+    """Vrai si la proposition (« Artiste - Titre ») désigne sans doute la release : même artiste et même titre, à la
+    casse, aux accents et à la ponctuation près. Une compilation n'accepte qu'un « Various »."""
+    who, sep, what = found.partition(" - ")
+    who = re.sub(r"\s*\(\d+\)$|\*$", "", who.strip())  # Discogs : « Artiste (2) », « Artiste* »
+    if not sep or not _key(title) or _key(what) != _key(title):
+        return False
+    return _key(who) in _VARIOUS if _key(artist) in _VARIOUS | {""} else _key(who) == _key(artist)
 
 
 def sign(secret: str, url: str) -> str:

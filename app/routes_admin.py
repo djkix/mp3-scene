@@ -414,7 +414,9 @@ def search_cover(rid: Id, request: Request, conn=Depends(get_conn)):
     settings = request.app.state.settings
     items = coversearch.candidates(r["artist"], r["title"], settings.discogs_token, r["name"])
     return {"web": bool(settings.discogs_token),
-            "items": [{**x, "sig": coversearch.sign(settings.secret_key, x["url"])} for x in items]}
+            # exact : la proposition porte le même artiste et le même titre (pochettes automatiques)
+            "items": [{**x, "sig": coversearch.sign(settings.secret_key, x["url"]),
+                       "exact": coversearch.exact(r["artist"], r["title"], x["title"])} for x in items]}
 
 
 class CoverPick(BaseModel):

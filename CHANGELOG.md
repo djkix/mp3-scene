@@ -4,6 +4,17 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.62.0](https://github.com/djkix/mp3-scene/compare/v1.61.0...v1.62.0) (2026-11-23)
+
+### Résumé
+
+**Remixes d'un artiste, pochettes automatiques.**
+
+- **Remixes** : la page d'un artiste gagne une ligne « Remixes », les pistes dont le titre le crédite d'une version
+  (« Crazy (Axwell Remix) », « … [Axwell & X Dub] »), où qu'elles soient dans la bibliothèque.
+- **Pochettes automatiques** (contrôle qualité « Sans pochette ») : pour chaque release, la première proposition au
+  même artiste et au même titre est validée sans rien demander ; les autres releases restent à voir à la main.
+
 ## [1.61.0](https://github.com/djkix/mp3-scene/compare/v1.60.1...v1.61.0) (2026-11-23)
 
 ### Résumé

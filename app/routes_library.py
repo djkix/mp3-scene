@@ -238,9 +238,18 @@ def groups(by: Literal["grp", "artist", "genre", "label", "category", "year", "s
         + " GROUP BY 1 ORDER BY releases DESC, 1 COLLATE NOCASE", params)]
 
 
+def _remix_conds(artist: str):
+    """Condition SQL des pistes remixées par cet artiste. Le LIKE sur son mot le plus long écarte presque tout avant
+    la fonction Python remixed()."""
+    # ponytail: LIKE sans index sur toutes les pistes (~0,1 s pour 500 000)
+    word = max(_WORDS.split(artist), key=len)
+    return "t.title LIKE ? AND remixed(t.title, ?)", [f"%{word}%", artist]
+
+
 @router.get("/api/tracks")
 def search_tracks(q: str = Query("", max_length=200), category: Many = None, genre: Many = None, year: Years = None,
                   decade: Years = None, source: Many = None, mixes: str | None = Query(None, min_length=1, max_length=200),
+                  remixes: str | None = Query(None, min_length=1, max_length=200),
                   offset: int = Query(0, ge=0, le=MAX_INT), summary: bool = False,
                   bpm_min: float | None = Query(None, ge=0, le=999), bpm_max: float | None = Query(None, ge=0, le=999),
                   limit: int = Query(50, ge=1, le=MAX_INT), user=Depends(current_user), conn=Depends(get_conn)):
@@ -248,7 +257,7 @@ def search_tracks(q: str = Query("", max_length=200), category: Many = None, gen
     ceux des listes de releases, appliqués à la release de la piste. `summary` : au lieu des pistes, leur nombre
     et leur poids par catégorie (la ligne de synthèse de l'onglet Pistes)."""
     words = [w for w in _WORDS.split(q) if w][:8]
-    if not words and not mixes:
+    if not words and not mixes and not remixes:
         return [] if summary else {"items": [], "has_more": False}
     # ponytail: LIKE parcourt toutes les pistes (~0,1 s pour 500 000) ; index FTS sur les pistes si trop lent
     # un titre ou un artiste de 30 caractères est peut-être coupé (ID3v1) : sa suite est dans le nom du fichier
@@ -264,6 +273,9 @@ def search_tracks(q: str = Query("", max_length=200), category: Many = None, gen
         # ponytail: égalité à la casse près sur l'artiste du chapitre ; « X feat. Y » n'est pas une apparition de X
         in_chapter, likes = "c.artist=? COLLATE NOCASE", [mixes]
         conds, params = f"t.id IN (SELECT c.track_id FROM chapters c WHERE {in_chapter})", [mixes]
+    if remixes:  # page d'un artiste : les pistes dont le titre le crédite d'une version (« Axwell Remix »)
+        in_chapter, likes = "0", []
+        conds, params = _remix_conds(remixes)
     more, extra = _release_conds(category, genre, year, source=source, decade=decade)
     conds, params = " AND ".join([conds, *more]), params + extra
     for op, v in ((">=", bpm_min), ("<=", bpm_max)):  # tempo du tag ; une piste sans BPM sort dès qu'une borne est posée
@@ -325,7 +337,11 @@ def artist_info(name: str = Query(min_length=1, max_length=200), user=Depends(cu
         return {"n": n, "size": size}
     n, size = conn.execute("SELECT COUNT(*), COALESCE(SUM(t.size), 0) FROM tracks t JOIN releases r ON r.id=t.release_id WHERE r.hidden=0"
                            " AND t.id IN (SELECT c.track_id FROM chapters c WHERE c.artist=? COLLATE NOCASE)", (name,)).fetchone()
-    lists = {"releases": total(artist=name), "with": total(collab=name), "appears": total(appears=name), "mixes": {"n": n, "size": size}}
+    cond, args = _remix_conds(name)
+    rn, rsize = conn.execute("SELECT COUNT(*), COALESCE(SUM(t.size), 0) FROM tracks t JOIN releases r ON r.id=t.release_id"
+                             f" WHERE r.hidden=0 AND {cond}", args).fetchone()
+    lists = {"releases": total(artist=name), "with": total(collab=name), "appears": total(appears=name),
+             "mixes": {"n": n, "size": size}, "remixes": {"n": rn, "size": rsize}}
     # « Bits & Pieces » et « Bits And Pieces » : un seul label ici, sous la graphie la plus fréquente (qui porte le lien)
     merged = {}
     for x in conn.execute(f"SELECT r.label AS name, COUNT(*) AS releases FROM releases r WHERE {mine} AND NULLIF(r.label, '')"

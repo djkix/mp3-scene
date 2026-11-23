@@ -1007,7 +1007,7 @@ def test_artist_info_gives_years_labels_partners_and_top(user_client, library, s
     conn.commit()
     info = user_client.get("/api/artist-info", params={"name": "A-Trak"}).json()
     assert info["lists"]["releases"]["n"] == 1 and info["lists"]["releases"]["size"] > 0 and info["lists"]["mixes"] == {"n": 0, "size": 0}
-    assert set(info["lists"]) == {"releases", "with", "appears", "mixes"} and info["labels"] == [{"name": "Fool's Gold", "releases": 1}]
+    assert set(info["lists"]) == {"releases", "with", "appears", "mixes", "remixes"} and info["labels"] == [{"name": "Fool's Gold", "releases": 1}]
     assert info["with"] == [{"name": "Andrew Wyatt", "tracks": 1}] and [(x["id"], x["plays"]) for x in info["top"]] == [(rid, 1)]
 
 
@@ -1049,3 +1049,18 @@ def test_admin_suggests_merges_and_clears_transcode_cache(admin_client, settings
     (cache / "1-1.mp3").write_bytes(b"x" * 10)
     assert admin_client.get("/api/admin/overview").json()["transcode_size"] == 10
     assert admin_client.delete("/api/admin/transcode", headers={"X-CSRF": "1"}).status_code == 204 and not list(cache.iterdir())
+
+
+def test_remixes_of_an_artist_and_exact_cover_match(user_client, library, settings):
+    from app import artists, coversearch
+    assert artists.remixed("Crazy (Axwell Remix)", "Axwell") and artists.remixed("Crazy [Axwell & Ingrosso Dub]", "Axwell")
+    assert not artists.remixed("Axwell Mix", "Axwell") and not artists.remixed("Crazy (Maxwell Remix)", "Axwell")
+    conn = db.connect(settings.data_dir)
+    rel = conn.execute("SELECT release_id FROM tracks WHERE title='Glue'").fetchone()[0]
+    conn.execute("INSERT INTO tracks(release_id, relpath, size, title, artist) VALUES (?, 'r.mp3', 7, 'Glue (A-Trak Remix)', 'Bicep')", (rel,))
+    conn.commit()
+    assert [t["title"] for t in user_client.get("/api/tracks", params={"remixes": "A-Trak"}).json()["items"]] == ["Glue (A-Trak Remix)"]
+    assert user_client.get("/api/artist-info", params={"name": "A-Trak"}).json()["lists"]["remixes"] == {"n": 1, "size": 7}
+    assert coversearch.exact("Bob Sinclar", "Love Generation", "Bob Sinclar (2) - Love Génération!")
+    assert coversearch.exact("VA", "Big Mix", "Various - Big Mix") and not coversearch.exact("VA", "Big Mix", "Someone - Big Mix")
+    assert not coversearch.exact("Bob Sinclar", "Love Generation", "Bob Sinclar - Love Generation (Remixes)")
