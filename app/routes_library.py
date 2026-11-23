@@ -1,3 +1,4 @@
+import hashlib
 import re
 import time
 from collections import Counter
@@ -5,6 +6,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi.responses import FileResponse
 
 from . import artists
 from .naming import complete_title
@@ -37,8 +39,13 @@ TRACK_FROM = ("tracks t JOIN releases r ON r.id=t.release_id "
 # tri des listes : colonnes autorisées (jamais de texte du client dans le SQL)
 SORTS = {"name": "r.name COLLATE NOCASE", "genre": "r.genre COLLATE NOCASE", "date": DATE, "added": "r.added_at",
          "tracks": "r.track_count", "size": "r.size", "category": "r.category COLLATE NOCASE",
-         "bitrate": BITRATE}
-Sort = Literal["name", "genre", "date", "added", "tracks", "size", "category", "bitrate"]
+         "bitrate": BITRATE,
+         # ponytail: écoutes de tous les comptes, sous-requête par ligne ; colonne releases.plays si le tri devient lent
+         "plays": "(SELECT COUNT(*) FROM plays p JOIN tracks t ON t.id=p.track_id WHERE t.release_id=r.id)"}
+# page d'un artiste : ses albums d'abord, puis ses singles, ses compilations, ses lives, chacun par nom
+SORTS["kind"] = ("CASE WHEN r.category LIKE '%album%' THEN 0 WHEN r.category LIKE '%single%' THEN 1 WHEN r.category LIKE '%compil%'"
+                 " THEN 2 WHEN r.category LIKE '%live%' OR r.category LIKE '%radio%' THEN 3 ELSE 4 END, r.name COLLATE NOCASE")
+Sort = Literal["name", "genre", "date", "added", "tracks", "size", "category", "bitrate", "plays", "kind"]
 Dir = Literal["asc", "desc"]
 
 
@@ -152,7 +159,7 @@ def list_releases(q: str = "", category: Many = None, genre: Many = None, grp: s
                   decade: Years = None, collab: str | None = Query(None, max_length=200),
                   year: Years = None, favorites: int = Query(0, ge=0, le=1),
                   label: str | None = Query(None, max_length=200), sort: Sort | None = None, dir: Dir = "asc",
-                  letter: str | None = Query(None, pattern="^([A-Z]|#)$"),
+                  letter: str | None = Query(None, pattern="^([A-Z]|#)$"), nfo: bool = False,
                   offset: int = Query(0, ge=0, le=MAX_INT), limit: int = Query(50, ge=1, le=MAX_INT),
                   user=Depends(current_user), conn=Depends(get_conn)):
     conds, params = _release_conds(category, genre, year, grp, artist, source, decade, appears, collab, label)
@@ -164,7 +171,7 @@ def list_releases(q: str = "", category: Many = None, genre: Many = None, grp: s
     if favorites:  # un favori reste visible même masqué
         conds.remove("r.hidden=0")
     if match := _fts_query(q):
-        conds.append("r.id IN (SELECT rowid FROM releases_fts WHERE releases_fts MATCH ?)")
+        conds.append(_FTS[nfo])
         params.append(match)
     if favorites:
         conds.append("f.item_id IS NOT NULL")
@@ -173,14 +180,19 @@ def list_releases(q: str = "", category: Many = None, genre: Many = None, grp: s
                  user["id"], offset, limit, _release)
 
 
+# recherche : dans le nom des releases, ou (nfo=1) dans le texte de leur NFO
+_FTS = {False: "r.id IN (SELECT rowid FROM releases_fts WHERE releases_fts MATCH ?)",
+        True: "r.id IN (SELECT rowid FROM nfo_fts WHERE nfo_fts MATCH ?)"}
+
+
 @router.get("/api/release-summary")
 def release_summary(q: str = "", category: Many = None, genre: Many = None, source: Many = None, decade: Years = None,
-                    year: Years = None, conn=Depends(get_conn)):
+                    year: Years = None, nfo: bool = False, conn=Depends(get_conn)):
     """Releases d'une recherche comptées par catégorie, avec leur poids : la ligne de synthèse au-dessus des résultats.
     Mêmes filtres que la liste."""
     conds, params = _release_conds(category, genre, year, None, None, source, decade)
     if match := _fts_query(q):
-        conds.append("r.id IN (SELECT rowid FROM releases_fts WHERE releases_fts MATCH ?)")
+        conds.append(_FTS[nfo])
         params.append(match)
     return [dict(x) for x in conn.execute(
         "SELECT r.category AS name, COUNT(*) AS releases, COALESCE(SUM(r.size), 0) AS size FROM releases r WHERE "
@@ -233,7 +245,7 @@ def groups(by: Literal["grp", "artist", "genre", "label", "category", "year", "s
         conds.append("(" + " OR ".join(when) + ")")
     if by == "series":  # une ligne par famille : « Hed Kandi » réunit « Hed Kandi Beach House », « Hed Kandi Nu Cool »…
         every = _all_series(conn, conds, params)
-        fam, out = _families(every), {}
+        fam, out = _families(every, _series_rules(conn)), {}
         for g in every:
             f = fam.get(g["name"].casefold(), g["name"])
             row = out.setdefault(f.casefold(), {"name": f, "releases": 0, "size": 0, "series": 0})
@@ -242,9 +254,32 @@ def groups(by: Literal["grp", "artist", "genre", "label", "category", "year", "s
             row["series"] += 1
         return sorted(out.values(), key=lambda g: (-g["releases"], g["name"].casefold()))
     # ponytail: liste entière sans pagination (l'interface n'affiche que les 1000 premières lignes) ; paginer si lourd
-    return [dict(r) for r in conn.execute(
+    rows = [dict(r) for r in conn.execute(
         f"SELECT {col} AS name, COUNT(*) AS releases, SUM(size) AS size FROM releases WHERE " + " AND ".join(conds)
         + " GROUP BY 1 ORDER BY releases DESC, 1 COLLATE NOCASE", params)]
+    if by == "genre" and name is None:  # une ligne par famille : « House » réunit « Deep House », « Tech House »…
+        fam, out = _genre_families(conn), {}
+        for g in rows:
+            f = fam.get(g["name"], g["name"])
+            row = out.setdefault(f, {"name": f, "releases": 0, "size": 0, "genres": 0})
+            row["releases"] += g["releases"]
+            row["size"] += g["size"] or 0
+            row["genres"] += 1
+        rows = sorted(out.values(), key=lambda g: (-g["releases"], g["name"].casefold()))
+    return rows
+
+
+def _genre_families(conn) -> dict:
+    """{genre: famille} : un genre dont le dernier mot est lui-même un genre de la bibliothèque le rejoint
+    (« Deep House », « Euro-House », « Dance & House » -> House ; « Hard Rock » -> Rock)."""
+    known = [r[0] for r in conn.execute("SELECT DISTINCT genre FROM releases WHERE genre IS NOT NULL")]
+    single = {g.casefold(): g for g in known if not re.search(r"[\s-]", g)}
+    out = {}
+    for g in known:
+        last = re.split(r"[\s-]+", g)[-1].casefold()
+        if last in single and single[last] != g and "&" not in g:  # « Drum & Bass » : un genre à part entière, pas de la « Bass »
+            out[g] = single[last]
+    return out
 
 
 def _remix_conds(artist: str):
@@ -376,20 +411,45 @@ def artist_info(name: str = Query(min_length=1, max_length=200), user=Depends(cu
 
 
 @router.get("/api/group-info")
-def group_info(by: Literal["label", "grp"], name: str = Query(min_length=1, max_length=200), conn=Depends(get_conn)):
-    """En-tête de la page d'un label ou d'un groupe : nombre, poids, années couvertes, et ce qu'on y trouve le plus
-    (artistes, genres, puis les groupes d'un label ou les labels d'un groupe)."""
-    mine = f"r.hidden=0 AND r.{by}=?"
+def group_info(by: Literal["label", "grp", "genre"], name: str = Query(min_length=1, max_length=200),
+               sub: str | None = Query(None, max_length=200), conn=Depends(get_conn)):
+    """En-tête de la page d'un label, d'un groupe ou d'un genre : nombre, poids, années couvertes, et ce qu'on y
+    trouve le plus (artistes, genres, puis les groupes d'un label ou les labels d'un groupe ou d'un genre).
+    Un genre réunit sa famille (`members`) ; `sub` limite les chiffres à l'un de ses genres."""
+    names, members = [name], []
+    if by == "genre":
+        fam = _genre_families(conn)
+        names = [name, *sorted(g for g, f in fam.items() if f == name)]
+        members = [dict(x) for x in conn.execute(
+            f"SELECT genre AS name, COUNT(*) AS releases FROM releases WHERE hidden=0 AND genre IN ({','.join('?' * len(names))})"
+            " GROUP BY 1 ORDER BY releases DESC, 1 COLLATE NOCASE", names)]
+        if sub in names:
+            names = [sub]
+    mine = f"r.hidden=0 AND r.{by} IN ({','.join('?' * len(names))})"
     total = dict(conn.execute(f"SELECT COUNT(*) AS n, COALESCE(SUM(r.size), 0) AS size, MIN(r.year) AS first, MAX(r.year) AS last"
-                              f" FROM releases r WHERE {mine}", (name,)).fetchone())
+                              f" FROM releases r WHERE {mine}", names).fetchone())
 
     def top(col, extra="1"):
         return [dict(x) for x in conn.execute(
             f"SELECT {col} AS name, COUNT(*) AS releases FROM releases r WHERE {mine} AND {col} IS NOT NULL AND {extra}"
-            " GROUP BY 1 ORDER BY releases DESC, 1 COLLATE NOCASE LIMIT 8", (name,))]
+            " GROUP BY 1 ORDER BY releases DESC, 1 COLLATE NOCASE LIMIT 8", names)]
     art = "COALESCE(r.tag_artist, r.artist)"
-    return {**total, "artists": top(art, f"lower({art}) NOT IN ('va', 'various', 'various artists')"), "genres": top("r.genre"),
+    return {**total, "artists": top(art, f"lower({art}) NOT IN ('va', 'various', 'various artists')"),
+            "genres": [] if by == "genre" else top("r.genre"), "members": members if len(members) > 1 else [],
             "others": top("r.grp" if by == "label" else "NULLIF(r.label, '')")}
+
+
+def artist_photo_path(data_dir, name: str):
+    """Fichier de la photo d'un artiste, dans les données de l'application (jamais dans le dossier de musique)."""
+    return data_dir / "artists" / (hashlib.sha1(artists.fold(name).encode()).hexdigest()[:20] + ".jpg")
+
+
+@router.get("/api/artist-photo")
+def artist_photo(request: Request, name: str = Query(min_length=1, max_length=200)):
+    path = artist_photo_path(request.app.state.settings.data_dir, name)
+    if not path.is_file():
+        raise HTTPException(404, "Pas de photo.")
+    return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=3600"})
 
 
 @router.get("/api/folders")
@@ -429,6 +489,9 @@ def release_by_name(name: str = Query(max_length=1024), user=Depends(current_use
 def release_detail(rid: Id, user=Depends(current_user), conn=Depends(get_conn)):
     d = _release(_release_row(conn, user["id"], rid))
     d["series"] = _series(d["title"])  # la fiche demande les autres volumes à /api/series
+    seen = conn.execute("SELECT COUNT(*), MAX(p.played_at) FROM plays p JOIN tracks t ON t.id=p.track_id"
+                        " WHERE t.release_id=? AND p.user_id=?", (rid, user["id"])).fetchone()
+    d["plays"], d["last_played"] = seen[0], seen[1]  # écoutes de l'utilisateur : pistes lancées, dernière fois
     d["custom_cover"] = conn.execute("SELECT 1 FROM overrides WHERE path=? AND cover=1", (d["path"],)).fetchone() is not None
     d["tracks"] = [_track(r) for r in conn.execute(
         f"SELECT {TRACK_COLS} FROM {TRACK_FROM} WHERE t.release_id=? ORDER BY t.disc, t.relpath",
@@ -489,7 +552,11 @@ def _all_series(conn, conds=("hidden=0",), params=()):
     return sorted((g for g in found.values() if g["releases"] >= 3), key=lambda g: (-g["releases"], g["name"].casefold()))
 
 
-def _families(every) -> dict:
+def _series_rules(conn) -> dict:
+    return dict(conn.execute("SELECT key, family FROM series_rules").fetchall())
+
+
+def _families(every, rules=None) -> dict:
     """{série en minuscules: nom de sa famille} pour les séries qui partagent leurs deux premiers mots : la famille
     porte leur début commun (« Hed Kandi », « Ministry of Sound »). Une série seule, ou un début commun de moins de
     huit caractères (« Live at »), reste hors famille."""
@@ -512,6 +579,14 @@ def _families(every) -> dict:
         # « The Best », « House Of », « Only for » : un début qui finit par un mot creux ne nomme pas une famille
         if len(members) > 1 and len(name) >= 8 and members[0][n - 1].casefold() not in _HOLLOW:
             out.update({" ".join(w).casefold(): name for w in members})
+    # règles manuelles : une famille défaite (règle vide à son nom), une série gardée à part ou rattachée ailleurs
+    rules = rules or {}
+    out = {k: f for k, f in out.items() if rules.get(f.casefold()) != ""}
+    for g in every:
+        if (family := rules.get(g["name"].casefold())) is not None:
+            out.pop(g["name"].casefold(), None)
+            if family:
+                out[g["name"].casefold()] = family
     return out
 
 
@@ -561,9 +636,9 @@ def series(name: str = Query(min_length=1, max_length=200), exact: bool = False,
     items = [_release(x) for x in conn.execute(
         f"SELECT {RELEASE_COLS} FROM {RELEASE_FROM} WHERE r.hidden=0 AND r.title LIKE ? ESCAPE '!'", (user["id"], like))]
     every = [] if exact else _all_series(conn)
-    fam = _families(every)
+    fam = _families(every, _series_rules(conn))
     subs = {g["name"].casefold(): g for g in every if fam.get(g["name"].casefold(), "").casefold() == name.casefold()}
-    if len(subs) > 1:
+    if len(subs) > 1 or (subs and name.casefold() not in subs):  # famille, ou série seule rattachée à la main
         items = [x for x in items if (_series(x["title"]) or "").casefold() in subs]
         for x in items:
             x["series"] = subs[_series(x["title"]).casefold()]["name"]

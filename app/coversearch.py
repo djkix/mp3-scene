@@ -87,6 +87,18 @@ def candidates(artist: str | None, title: str | None, discogs_token: str | None,
     return [x for x in out if x["url"].startswith("https://") and x["thumb"].startswith("https://")]
 
 
+def artist_photos(name: str) -> list[dict]:
+    """Photos proposées pour un artiste, d'après le catalogue Deezer ; une panne ou un silence donne une liste vide."""
+    try:
+        data = _json("https://api.deezer.com/search/artist?" + urllib.parse.urlencode({"q": name, "limit": 6}))
+    except (OSError, ValueError):
+        return []
+    # sans photo, Deezer renvoie une image générique dont l'adresse contient « /artist// »
+    return [{"url": a["picture_xl"], "thumb": a["picture_medium"], "source": "Deezer", "title": a.get("name", "")}
+            for a in data.get("data", []) if str(a.get("picture_xl", "")).startswith("https://")
+            and str(a.get("picture_medium", "")).startswith("https://") and "/artist//" not in a["picture_xl"]]
+
+
 _VARIOUS = {"va", "various", "variousartists"}
 
 

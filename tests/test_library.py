@@ -1104,3 +1104,42 @@ def test_series_sharing_their_first_words_form_a_family(user_client, settings):
     assert fam["subs"] == [{"name": "Hed Kandi Beach House", "releases": 3, "missing": [3]}, {"name": "Hed Kandi Nu Cool", "releases": 3, "missing": []}]
     one = user_client.get("/api/series", params={"name": "Hed Kandi Beach House"}).json()
     assert len(one["items"]) == 3 and one["missing"] == [3] and one["subs"] == []
+
+
+def test_series_rules_genre_families_plays_and_nfo_search(admin_client, library, settings):
+    from app import scanner
+    conn = db.connect(settings.data_dir)
+    titles = [f"Hed Kandi Beach House {i}" for i in (1, 2, 3)] + [f"Hed Kandi Nu Cool {i}" for i in (1, 2, 3)] + [f"Serious Beats {i}" for i in (1, 2, 3)]
+    for i, t in enumerate(titles):
+        conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, artist, title, genre)"
+                     " VALUES (?,?,'','Compilations',0,0,10,0,0,'VA',?,?)", (f"r{i}", f"VA-r{i}", t, "Deep House" if i % 2 else "House"))
+    conn.commit()
+    series = lambda: {g["name"]: g["series"] for g in admin_client.get("/api/groups", params={"by": "series"}).json()}
+    put = lambda name, family: admin_client.put("/api/admin/series/rules", json={"name": name, "family": family}, headers={"X-CSRF": "1"}).status_code
+    assert series() == {"Hed Kandi": 2, "Serious Beats": 1}
+    assert put("Serious Beats", "Hed Kandi") == 204 and series() == {"Hed Kandi": 3}          # rattachée
+    assert put("Hed Kandi Nu Cool", "") == 204 and series() == {"Hed Kandi": 2, "Hed Kandi Nu Cool": 1}  # gardée à part
+    assert put("Hed Kandi", "") == 204 and len(series()) == 3 and put("X", "x") == 400         # famille défaite
+    assert admin_client.delete("/api/admin/series/rules", params={"name": "Hed Kandi"}, headers={"X-CSRF": "1"}).status_code == 204
+    # genres : « Deep House » rejoint « House », la page du genre donne les deux
+    genres = {g["name"]: g for g in admin_client.get("/api/groups", params={"by": "genre"}).json()}
+    assert genres["House"]["genres"] == 2 and "Deep House" not in genres
+    info = admin_client.get("/api/group-info", params={"by": "genre", "name": "House"}).json()
+    assert [m["name"] for m in info["members"]] == ["House", "Deep House"] and info["n"] == sum(m["releases"] for m in info["members"])
+    assert admin_client.get("/api/group-info", params={"by": "genre", "name": "House", "sub": "Deep House"}).json()["n"] == 4
+    # écoutes : compteur de la fiche, tri par écoutes, tri d'un artiste par catégorie
+    rid, tid = conn.execute("SELECT release_id, id FROM tracks WHERE title='Glue'").fetchone()
+    conn.execute("INSERT INTO plays(user_id, track_id, played_at) SELECT id, ?, 50 FROM users", (tid,))
+    conn.commit()
+    d = admin_client.get(f"/api/releases/{rid}").json()
+    assert (d["plays"], d["last_played"]) == (1, 50)
+    assert admin_client.get("/api/releases", params={"sort": "plays", "dir": "desc"}).json()["items"][0]["id"] == rid
+    kinds = [x["category"] for x in admin_client.get("/api/releases", params={"sort": "kind", "limit": 100}).json()["items"]]
+    assert kinds == sorted(kinds, key=lambda c: ("album" not in c.lower(), "single" not in c.lower(), "compil" not in c.lower()))
+    # NFO : le texte est indexé au scan, la recherche nfo=1 le trouve, la recherche par nom non
+    nfo_rid = conn.execute("SELECT id FROM releases WHERE has_nfo=1").fetchone()[0]
+    scanner._scan_nfo_text(conn, settings.music_root, lambda: False)
+    assert [x["id"] for x in admin_client.get("/api/releases", params={"q": "ascii", "nfo": 1}).json()["items"]] == [nfo_rid]
+    assert admin_client.get("/api/releases", params={"q": "ascii"}).json()["items"] == []
+    assert admin_client.get("/api/release-summary", params={"q": "ascii", "nfo": 1}).json()[0]["releases"] == 1
+    assert admin_client.get("/api/artist-photo", params={"name": "Personne"}).status_code == 404

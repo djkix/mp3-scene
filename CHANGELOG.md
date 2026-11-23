@@ -4,6 +4,24 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.65.0](https://github.com/djkix/mp3-scene/compare/v1.64.0...v1.65.0) (2026-11-23)
+
+### Résumé
+
+**Familles de genres, recherche dans les NFO, photo d'artiste, compteur d'écoutes, règles de familles de séries.**
+
+- **Genres** : un genre dont le dernier mot est lui-même un genre le rejoint (« Deep House », « Tech House » dans
+  House). La page d'un genre montre un bloc par genre de sa famille et le même en-tête que celle d'un label.
+- **Recherche dans les NFO** : un onglet « NFO » de la recherche trouve les releases par le texte de leur NFO, indexé
+  au scan (et au premier démarrage de cette version).
+- **Photo d'artiste** : un administrateur peut en choisir une parmi celles proposées (Deezer) ; elle s'affiche sur la
+  page de l'artiste.
+- **Écoutes** : la fiche d'une release indique combien de fois elle a été écoutée et quand pour la dernière fois ;
+  les listes se trient par nombre d'écoutes.
+- **Familles de séries** (Administration › Règles) : rattacher une série à une famille, la garder à part, ou défaire
+  une famille.
+- **Page d'un artiste** : ses releases s'ouvrent groupées par catégorie — albums, singles, compilations, live.
+
 ## [1.64.0](https://github.com/djkix/mp3-scene/compare/v1.63.0...v1.64.0) (2026-11-23)
 
 ### Résumé

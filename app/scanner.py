@@ -88,6 +88,7 @@ def _name(rel):
 
 def _drop(conn, loser, survivor=None):
     """Supprime la release `loser` ; ses favoris passent à `survivor` (pistes appariées par relpath)."""
+    conn.execute("DELETE FROM nfo_fts WHERE rowid=?", (loser,))
     if survivor is not None:
         conn.execute("UPDATE OR IGNORE favorites SET item_id=? WHERE kind='release' AND item_id=?", (survivor, loser))
         pairs = conn.execute("SELECT s.id, l.id FROM tracks l JOIN tracks s ON s.relpath=l.relpath AND s.release_id=?"
@@ -416,6 +417,7 @@ def _scan_tags(conn, root, should_stop):
     _scan_covers(conn, root, should_stop)
     _scan_dates(conn, root, should_stop)
     _scan_cues(conn, root, should_stop)
+    _scan_nfo_text(conn, root, should_stop)
     return read
 
 
@@ -452,6 +454,33 @@ def _scan_dates(conn, root, should_stop):
         conn.executemany("UPDATE releases SET released_at=?, label=?, catalog=? WHERE id=?", done)
         db.year_from_nfo(conn)
         db.merge_labels(conn)
+        conn.commit()
+
+
+def _scan_nfo_text(conn, root, should_stop):
+    """Indexe le texte du NFO des releases qui ne l'ont pas encore été (recherche dans les NFO)."""
+    last = 0
+    while not should_stop():
+        rows = conn.execute("SELECT id, path FROM releases WHERE has_nfo=1 AND nfo_indexed IS NULL AND id>? ORDER BY id LIMIT ?",
+                            (last, TAG_BATCH)).fetchall()
+        if not rows:
+            break
+        last = rows[-1]["id"]
+        done = []  # lot lu avant d'écrire, comme pour les tags
+        for r in rows:
+            try:
+                names = sorted(n for n in os.listdir(Path(root, r["path"])) if n.lower().endswith(".nfo"))
+                text = ""
+                if names:
+                    with open(Path(root, r["path"], names[0]), "rb") as fh:  # lecture seule
+                        text = fh.read(200 * 1024).decode("cp437")
+                done.append((r["id"], text))
+            except OSError as e:
+                log.warning("NFO illisible, indexé au prochain scan : %s (%s)", r["path"], e)
+        for rid, text in done:
+            conn.execute("DELETE FROM nfo_fts WHERE rowid=?", (rid,))
+            conn.execute("INSERT INTO nfo_fts(rowid, text) VALUES (?, ?)", (rid, text))
+        conn.executemany("UPDATE releases SET nfo_indexed=1 WHERE id=?", [(rid,) for rid, _ in done])
         conn.commit()
 
 
@@ -541,6 +570,7 @@ class Runner:
             conn.execute("UPDATE scan_state SET status='idle' WHERE status='tags'")
             conn.commit()
             pending = (conn.execute("SELECT 1 FROM tracks WHERE tags_read=0 LIMIT 1").fetchone()
+                       or conn.execute("SELECT 1 FROM releases WHERE has_nfo=1 AND nfo_indexed IS NULL LIMIT 1").fetchone()
                        or conn.execute("SELECT 1 FROM releases WHERE has_cover IS NULL LIMIT 1").fetchone()
                        or conn.execute("SELECT 1 FROM releases WHERE has_nfo=1 AND (released_at IS NULL OR label IS NULL) LIMIT 1").fetchone())
         finally:

@@ -1,7 +1,7 @@
 // Explorer : releases regroupées par groupe (#/groups), artiste (#/artists) ou genre (#/genres), avec le nombre de
 // releases et le poids. #/groups/<nom>, #/artists/<nom>, #/labels/<nom> et #/genres/<nom> ouvrent les
 // releases correspondantes. Les filtres Genre et Année sont dans l'adresse et suivent d'une page à l'autre.
-import { api, fmtSize } from '../api.js';
+import { api, fmtSize, session } from '../api.js';
 import { el, relName, relHref } from '../dom.js';
 import { t as tr, catLabel } from '../i18n.js';
 import * as releases from './releases.js';
@@ -44,11 +44,27 @@ function detail(container, kind, params) {
       el('th', { scope: 'row' }, el('a', { href: base + query }, tr(label))),
       ...(cells[key] = [el('td', {}, '…'), el('td')])))));
   const chips = el('div', { class: 'art-chips' });
-  const head = el('div', { class: 'art-head' }, table, chips);
+  // photo de l'artiste, si une a été validée ; un administrateur peut en chercher une (Deezer) ou la retirer
+  const photo = el('img', { class: 'art-photo', alt: '', src: '/api/artist-photo?' + new URLSearchParams({ name }), onerror: (e) => e.target.remove() });
+  const photoBtn = kind === 'artists' && session.user?.role === 'admin'
+    && el('button', { type: 'button', class: 'chip keep', onclick: () => findPhoto(name).catch(() => {}) }, tr('Chercher une photo'));
+  const head = el('div', { class: 'art-head' }, el('div', {}, photo, table, photoBtn), chips);
   // label ou groupe : le même bloc en deux colonnes, résumé à gauche, ce qu'on y trouve le plus à droite
   const facts = el('table', { class: 'art-sum' }), found = el('div', { class: 'art-chips' });
-  const info = (kind === 'labels' || kind === 'groups') && el('div', { class: 'art-head' }, facts, found);
-  if (info) api('/group-info?' + new URLSearchParams({ by, name })).then((g) => {
+  const info = (kind === 'labels' || kind === 'groups' || kind === 'genres') && el('div', { class: 'art-head' }, facts, found);
+  // genre : sa famille (« House » réunit « Deep House », « Tech House »…), un bloc par genre comme pour les séries ;
+  // un clic s'y limite, un second revient à l'ensemble. La liste attend de connaître la famille.
+  const sub = kind === 'genres' ? params.sub || '' : '';
+  const blocks = el('div', { class: 'tabs cats subs', role: 'tablist', 'aria-label': tr('Genres') });
+  let dead = false, disposeList = null;
+  if (info) api('/group-info?' + new URLSearchParams({ by, name, ...(sub && { sub }) })).then((g) => {
+    if (dead) return;
+    if (kind === 'genres') {
+      blocks.replaceChildren(...g.members.map((m) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(m.name === sub),
+        onclick: () => { location.hash = base + qs({ year: params.year, sub: m.name === sub ? '' : m.name }); } }, m.name, el('small', {}, ` ${m.releases}`))));
+      disposeList = releases.render(list, { ...params, q: '', genre: '',
+        pin: { key: 'genre', value: sub || (g.members.length ? g.members.map((m) => m.name) : name), base, extra: { sub } } });
+    }
     const line = (label, value) => el('tr', {}, el('th', { scope: 'row' }, label), el('td', {}, value));
     facts.replaceChildren(el('tbody', {}, line(tr('Releases'), String(g.n)), line(tr('Poids'), fmtSize(g.size)),
       g.first ? line(tr('Années'), g.first === g.last ? String(g.first) : `${g.first} – ${g.last}`) : null));
@@ -59,7 +75,7 @@ function detail(container, kind, params) {
   }).catch(() => {}); // facultatif
   container.replaceChildren(
     el('h1', { class: 'grp-title' }, el('a', { href: `#/${kind}` + qs({ genre: params.genre, year: params.year }) }, tr(tab)), ' › ', name, ' ', kind === 'artists' || info ? null : total),
-    ...(kind === 'artists' ? [head] : []), ...(info ? [info] : []), ...(kind === 'artists' && !other ? [years] : []), list);
+    ...(kind === 'genres' ? [blocks] : []), ...(kind === 'artists' ? [head] : []), ...(info ? [info] : []), ...(kind === 'artists' && !other ? [years] : []), list);
   // chronologie : une pastille par année avec son nombre de releases ; un clic filtre la liste sur cette année
   if (kind === 'artists' && !other) api('/groups?' + new URLSearchParams({ by: 'year', artist: name })).then((rows) => {
     if (rows.length < 2) return;
@@ -92,7 +108,33 @@ function detail(container, kind, params) {
   one.set('name', name);
   if (kind !== 'artists') api('/groups?' + one)
     .then(([g]) => { total.textContent = g ? `${count(g.releases)} · ${fmtSize(g.size)}` : ''; }).catch(() => {});
+  if (kind === 'genres') return () => { dead = true; disposeList?.(); };
   return releases.render(list, { ...params, q: '', pin: appears ? { key: other, value: name, base, extra: { in: params.in } } : { key: pin, value: name, base } });
+}
+
+// Administrateur : photos proposées pour un artiste ; un clic en valide une, gardée dans les données de l'application.
+let dlg = null;
+async function findPhoto(name) {
+  dlg ??= document.body.appendChild(el('dialog'));
+  dlg.className = 'pl-add cover-dlg';
+  const msg = el('p', { class: 'status', role: 'status' }, tr('Recherche…'));
+  const grid = el('div', { class: 'cover-grid' });
+  const reload = () => { dlg.close(); dispatchEvent(new HashChangeEvent('hashchange')); };
+  dlg.replaceChildren(el('h2', {}, tr('Chercher une photo')), el('p', { class: 'cover-rel' }, name), grid, msg,
+    el('div', { class: 'inline-form' },
+      el('button', { type: 'button', onclick: async () => {
+        try { await api('/admin/artists/photo?' + new URLSearchParams({ name }), { method: 'DELETE' }); reload(); } catch (err) { msg.textContent = err.message; }
+      } }, tr('Retirer la photo')),
+      el('button', { type: 'button', onclick: () => dlg.close() }, tr('Fermer'))));
+  dlg.showModal();
+  try {
+    const r = await api('/admin/artists/photo/search?' + new URLSearchParams({ name }));
+    msg.textContent = r.items.length ? tr('Cliquez sur une image pour la valider.') : tr('Aucune photo trouvée.');
+    grid.replaceChildren(...r.items.map((x) => el('button', { type: 'button', class: 'cover-pick', title: x.title, onclick: async () => {
+      msg.textContent = tr('Chargement…');
+      try { await api('/admin/artists/photo', { method: 'POST', body: { name, url: x.url, sig: x.sig } }); reload(); } catch (err) { msg.textContent = err.message; }
+    } }, el('img', { src: x.thumb, alt: x.title, loading: 'lazy', referrerPolicy: 'no-referrer' }), el('small', {}, x.title))));
+  } catch (err) { msg.textContent = err.message; }
 }
 
 // Catégories : un bloc par catégorie, centré sous les onglets et au-dessus des filtres ; les releases dessous.
@@ -239,7 +281,8 @@ export function render(container, params) {
     const shown = rows.filter((g) => g.name.toLowerCase().includes(needle) && (!letter || initial(g.name) === letter))
       .sort((a, b) => dir * (key === 'name' ? a.name.localeCompare(b.name) : a[key] - b[key]) || a.name.localeCompare(b.name));
     body.replaceChildren(...shown.slice(0, MAX_ROWS).map((g) => el('tr', {},
-      el('td', {}, el('a', { href: href(g.name) }, g.name), g.series > 1 ? el('small', { class: 'muted' }, ' ' + tr('{0} séries', g.series)) : null),
+      el('td', {}, el('a', { href: href(g.name) }, g.name), g.series > 1 ? el('small', { class: 'muted' }, ' ' + tr('{0} séries', g.series)) : null,
+        g.genres > 1 ? el('small', { class: 'muted' }, ' ' + tr('{0} genres', g.genres)) : null),
       el('td', { class: 'num' }, String(g.releases)), el('td', { class: 'num' }, fmtSize(g.size)))));
     status.textContent = !shown.length ? tr('Aucun résultat')
       : tr('{0} lignes · {1} · {2}', shown.length, count(shown.reduce((n, g) => n + g.releases, 0)), fmtSize(shown.reduce((n, g) => n + g.size, 0)))

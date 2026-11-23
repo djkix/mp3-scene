@@ -34,7 +34,8 @@ def init(data_dir: Path) -> None:
                                  ("releases", "label", "TEXT"), ("releases", "catalog", "TEXT"),
                                  ("releases", "hidden", "INTEGER NOT NULL DEFAULT 0"), ("playlists", "rules", "TEXT"),
                                  ("releases", "cue_done", "INTEGER"),  # NULL : fichiers .cue pas encore lus
-                                 ("tracks", "bpm", "REAL"), ("tracks", "key", "TEXT")):  # ajoutées en 1.61.0
+                                 ("tracks", "bpm", "REAL"), ("tracks", "key", "TEXT"),  # ajoutées en 1.61.0
+                                 ("releases", "nfo_indexed", "INTEGER")):  # NULL : texte du NFO pas encore indexé (1.65.0)
             if col not in {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {kind}")
         classify(conn)  # données rangées par une version antérieure : mêmes règles que le scanner d'aujourd'hui

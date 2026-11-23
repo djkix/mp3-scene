@@ -25,7 +25,9 @@ export function since() {
 }
 // [libellé, clé de tri côté serveur, sens au premier clic]
 const HEAD = [[tr('Nom'), 'name', 'asc'], [tr('Genre'), 'genre', 'asc'], [tr('Date'), 'date', 'desc'], [tr('Pistes'), 'tracks', 'desc'],
-  [tr('Débit'), 'bitrate', 'desc'],  [tr('Poids'), 'size', 'desc'], [tr('Catégorie'), 'category', 'asc']];
+  [tr('Débit'), 'bitrate', 'desc'],  [tr('Poids'), 'size', 'desc'], [tr('Catégorie'), 'category', 'asc'],
+  // sans colonne dans les lignes : l'en-tête au-dessus des actions trie par nombre d'écoutes
+  [tr('Écoutes'), 'plays', 'desc']];
 
 export function favButton(rel, kind = 'release') {
   const btn = el('button', { type: 'button', class: 'icon fav' });
@@ -108,7 +110,7 @@ export function releaseList(container, fetchPage, { empty = tr('Aucun résultat'
     });
   }
   paintHead();
-  const head = el('div', { class: 'rel-head' }, el('span'), heads, el('span'));
+  const head = el('div', { class: 'rel-head' }, el('span'), heads);
   container.replaceChildren(head, list, status, sentinel);
 
   const observer = new IntersectionObserver((entries) => {
@@ -196,13 +198,15 @@ export function render(container, params) {
   const bar = el('div', { class: 'filters' });
   const list = el('div');
   const inTracks = q && params.in === 'tracks';
+  const inNfo = q && params.in === 'nfo'; // recherche dans le texte des NFO plutôt que dans le nom des releases
   const tab = (label, on, hash) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(on),
     onclick: () => { location.hash = hash; } }, label);
   // les deux onglets de la recherche partagent les mêmes filtres, qui suivent quand on passe de l'un à l'autre
   const kept = Object.entries({ category, genre, year, source }).filter(([, v]) => v).map(([k, v]) => `&${k}=${encodeURIComponent(v)}`).join('');
   const tabs = q && el('div', { class: 'tabs', role: 'tablist', 'aria-label': tr('Rechercher') },
-    tab(tr('Releases'), !inTracks, `#/search?q=${encodeURIComponent(q)}${kept}`),
-    tab(tr('Pistes'), inTracks, `#/search?q=${encodeURIComponent(q)}&in=tracks${kept}`));
+    tab(tr('Releases'), !inTracks && !inNfo, `#/search?q=${encodeURIComponent(q)}${kept}`),
+    tab(tr('Pistes'), inTracks, `#/search?q=${encodeURIComponent(q)}&in=tracks${kept}`),
+    tab('NFO', inNfo, `#/search?q=${encodeURIComponent(q)}&in=nfo${kept}`));
   // initiales, comme sur les listes d'artistes : « # » réunit ce qui ne commence pas par une lettre
   const letters = params.letters && el('div', { class: 'letters', role: 'group', 'aria-label': tr('Initiale') },
     ['', '#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'].map((l) => el('button', { type: 'button', 'aria-pressed': String(l === letter),
@@ -225,7 +229,7 @@ export function render(container, params) {
   }).catch(() => {}); // facultatif
 
   function setFilter(name, value) {
-    const next = { q, in: inTracks ? 'tracks' : '', category, genre, year, source, letter, bpm_min: params.bpm_min, bpm_max: params.bpm_max, ...pin?.extra, ...(name ? { [name]: value } : { category: '', genre: '', year: '', source: '' }) };
+    const next = { q, in: inTracks ? 'tracks' : inNfo ? 'nfo' : '', category, genre, year, source, letter, bpm_min: params.bpm_min, bpm_max: params.bpm_max, ...pin?.extra, ...(name ? { [name]: value } : { category: '', genre: '', year: '', source: '' }) };
     const qs = Object.entries(next).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
     location.hash = (pin ? pin.base : params.base || (q ? '#/search' : '#/')) + (qs ? '?' + qs : ''); // nouvelle entrée d'historique, pagination remise à zéro
   }
@@ -248,7 +252,7 @@ export function render(container, params) {
   const many = (v) => (v ? v.split('|') : []);
   const years = many(year);
   const filters = { category: many(category), genre: many(genre), year: years.filter((y) => !/s$/.test(y)),
-    decade: years.filter((y) => /s$/.test(y)).map((y) => parseInt(y, 10)), source: many(source), letter: many(letter), ...(pin && { [pin.key]: [pin.value] }) };
+    decade: years.filter((y) => /s$/.test(y)).map((y) => parseInt(y, 10)), source: many(source), letter: many(letter), ...(pin && { [pin.key]: [].concat(pin.value) }) };
   const toQuery = (extra = {}) => {
     const p = new URLSearchParams();
     for (const [k, vs] of Object.entries({ ...extra, ...filters })) for (const v of [].concat(vs)) if (v !== '') p.append(k, v);
@@ -256,7 +260,7 @@ export function render(container, params) {
   };
   // même ligne sur les deux onglets : des releases d'un côté, des pistes de l'autre
   const unit = inTracks ? 'tracks' : 'releases';
-  if (found) api((inTracks ? '/tracks?summary=1&' : '/release-summary?') + toQuery({ q })).then((rows) => {
+  if (found) api((inTracks ? '/tracks?summary=1&' : '/release-summary?') + toQuery({ q, ...(inNfo && { nfo: 1 }) })).then((rows) => {
     if (dead || !rows.length) return;
     const n = rows.reduce((s, c) => s + c[unit], 0);
     found.replaceChildren(`${n} ${inTracks ? (n > 1 ? tr('pistes') : tr('piste')) : n > 1 ? tr('releases') : tr('release')} · ${fmtSize(rows.reduce((s, c) => s + c.size, 0))}`,
@@ -284,7 +288,7 @@ export function render(container, params) {
     }).catch(() => {});
   }
 
-  const query = toQuery({ q });
+  const query = toQuery({ q, ...(inNfo && { nfo: 1 }) });
   if (inTracks) for (const k of ['bpm_min', 'bpm_max']) if (Number(params[k]) > 0) query.set(k, Number(params[k]));
   // onglet Pistes de la recherche : mêmes filtres, appliqués à la release de chaque piste
   const dispose = inTracks ? trackList(list, { path: `/tracks?${query}`, empty: tr('Aucun résultat') }) : releaseList(list, (offset, tri) => {
@@ -292,7 +296,8 @@ export function render(container, params) {
     query.set('limit', PAGE);
     return api('/releases?' + query + tri);
   // derniers ajouts (accueil sans filtre) par date d'ajout, même si la colonne Date montre celle du NFO ; recherche, filtre, groupe ou artiste par ordre alphabétique
-  }, { empty: tr('Aucun résultat'), sort: q || pin || category || genre || year || source ? ['name', 'asc'] : ['added', 'desc'],
+  }, { empty: tr('Aucun résultat'), // un artiste : ses albums d'abord, puis ses singles, ses compilations et ses lives, chaque groupe par nom
+    sort: pin?.key === 'artist' ? ['kind', 'asc'] : q || pin || category || genre || year || source ? ['name', 'asc'] : ['added', 'desc'],
     pick: sel?.pick, onPick: sel?.onPick });
   return () => { dead = true; dispose(); };
 }

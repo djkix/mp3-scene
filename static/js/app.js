@@ -130,7 +130,8 @@ $('search').addEventListener('input', (e) => {
   clearTimeout(timer);
   timer = setTimeout(() => {
     const q = e.target.value.trim();
-    const tracks = parseHash()?.params.in === 'tracks' ? '&in=tracks' : ''; // on reste sur l'onglet Pistes
+    const on = parseHash()?.params.in;
+    const tracks = on === 'tracks' || on === 'nfo' ? '&in=' + on : ''; // on reste sur l'onglet Pistes ou NFO
     location.replace(q ? '#/search?q=' + encodeURIComponent(q) + tracks : '#/'); // remplace l'entrée : pas d'historique à chaque frappe
   }, 250);
 });

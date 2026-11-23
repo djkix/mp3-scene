@@ -1,3 +1,4 @@
+import io
 import os
 import re
 import sqlite3
@@ -5,13 +6,14 @@ import time
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from PIL import Image
 from pydantic import BaseModel, Field
 
 from . import artists, backup, coversearch, db, genres, nfo, scanner, security
 from .deps import MAX_INT, Id, get_conn, require_admin
 from .naming import parse_release_name
 from .routes_media import COVER_MAX, save_cover
-from .routes_library import RELEASE_COLS, RELEASE_FROM, Dir, Sort, _order, _page, _release
+from .routes_library import RELEASE_COLS, RELEASE_FROM, Dir, Sort, _order, _page, _release, artist_photo_path
 
 # libellé au journal d'activité de chaque action d'administration : (méthode, route) -> libellé
 _ACTIONS = {
@@ -256,6 +258,71 @@ def clear_transcode(request: Request):
 
 
 _LABEL_WORDS = re.compile(r"(?<=...)(?:productions?|recordings?|records?|recs?|music|digital|limited|ltd|inc)$")
+
+
+class SeriesRule(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    family: str = Field(default="", max_length=200)
+
+
+@router.get("/series/rules")
+def series_rules(conn=Depends(get_conn)):
+    """Familles de séries réglées à la main : série (ou famille) -> famille ; vide : jamais regroupée."""
+    return [dict(r) for r in conn.execute("SELECT name, family FROM series_rules ORDER BY name COLLATE NOCASE")]
+
+
+@router.put("/series/rules", status_code=204)
+def set_series_rule(body: SeriesRule, conn=Depends(get_conn)):
+    """Rattache une série à une famille, ou (famille vide) la garde à part ; au nom d'une famille, vide la défait."""
+    name, family = body.name.strip(), body.family.strip()
+    if not name or name.casefold() == family.casefold():
+        raise HTTPException(400, "Choisissez une autre famille que la série elle-même.")
+    conn.execute("INSERT OR REPLACE INTO series_rules(key, name, family) VALUES (?,?,?)", (name.casefold(), name, family))
+    conn.commit()
+
+
+@router.delete("/series/rules", status_code=204)
+def drop_series_rule(name: str = Query(max_length=200), conn=Depends(get_conn)):
+    if conn.execute("DELETE FROM series_rules WHERE key=?", (name.strip().casefold(),)).rowcount == 0:
+        raise HTTPException(404, "Règle introuvable.")
+    conn.commit()
+
+
+class PhotoPick(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    url: str = Field(max_length=2000)
+    sig: str = Field(max_length=64)
+
+
+@router.get("/artists/photo/search")
+def search_artist_photo(request: Request, name: str = Query(min_length=1, max_length=200)):
+    """Photos proposées pour cet artiste (Deezer). Chaque adresse est signée : seule une image proposée ici peut être validée."""
+    key = request.app.state.settings.secret_key
+    return {"items": [{**x, "sig": coversearch.sign(key, x["url"])} for x in coversearch.artist_photos(name)]}
+
+
+@router.post("/artists/photo", status_code=204)
+def save_artist_photo(body: PhotoPick, request: Request):
+    """Télécharge la photo choisie et la garde dans les données de l'application."""
+    settings = request.app.state.settings
+    if not coversearch.check(settings.secret_key, body.url, body.sig):
+        raise HTTPException(400, "Cette image n'a pas été proposée par la recherche.")
+    try:
+        data = coversearch.fetch(body.url)
+        with Image.open(io.BytesIO(data)) as img:
+            img = img.convert("RGB")
+            img.thumbnail((600, 600))
+            target = artist_photo_path(settings.data_dir, body.name)
+            target.parent.mkdir(exist_ok=True)
+            img.save(target.with_suffix(".tmp"), "JPEG", quality=88)
+        os.replace(target.with_suffix(".tmp"), target)
+    except (ValueError, OSError) as e:
+        raise HTTPException(400, f"Photo refusée : {e}") from None
+
+
+@router.delete("/artists/photo", status_code=204)
+def drop_artist_photo(request: Request, name: str = Query(min_length=1, max_length=200)):
+    artist_photo_path(request.app.state.settings.data_dir, name).unlink(missing_ok=True)
 
 
 @router.get("/suggestions")

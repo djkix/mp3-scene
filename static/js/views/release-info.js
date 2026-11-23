@@ -20,6 +20,7 @@ export function infoRows(rel, el) {
     [t('Durée'), rel.duration == null ? null : fmtDuration(rel.duration), null, 'num'],
     [t('Format'), rel.format, null, 'num'],
     [t('Débit'), rel.bitrate ? `${Math.round(rel.bitrate / 1000)} kbit/s` : null, null, 'num'],
+    [t('Écoutes'), rel.plays ? `${rel.plays} · ${fmtDate(rel.last_played)}` : null, null, 'num'],
     [t('Fréquence'), rel.sample_rate ? `${(rel.sample_rate / 1000).toLocaleString()} kHz` : null, null, 'num']]
     .filter(([, v]) => v != null && v !== '')
     // à plat : el() n'aplatit qu'un niveau

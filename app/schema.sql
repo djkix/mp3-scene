@@ -92,6 +92,10 @@ CREATE INDEX IF NOT EXISTS idx_tracks_release ON tracks(release_id);
 CREATE INDEX IF NOT EXISTS idx_tracks_tags_read ON tracks(tags_read);
 CREATE INDEX IF NOT EXISTS idx_folders_parent ON folders(parent);
 
+-- familles de séries réglées à la main : série (ou famille) -> famille ; vide : jamais regroupée
+CREATE TABLE IF NOT EXISTS series_rules(key TEXT PRIMARY KEY, name TEXT NOT NULL, family TEXT NOT NULL DEFAULT '');
+-- texte des NFO, pour la recherche (rowid : identifiant de la release) ; sans contenu : seul l'index est gardé
+CREATE VIRTUAL TABLE IF NOT EXISTS nfo_fts USING fts5(text, content='', contentless_delete=1, tokenize='unicode61');
 CREATE VIRTUAL TABLE IF NOT EXISTS releases_fts USING fts5(
   name, content='releases', content_rowid='id', tokenize='unicode61');
 CREATE TRIGGER IF NOT EXISTS releases_ai AFTER INSERT ON releases BEGIN

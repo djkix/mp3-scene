@@ -279,6 +279,29 @@ export function render(container, params = {}) {
     }).catch((err) => { if (!dead) sepMsg.textContent = err.message; });
     const sepForm = el('form', { class: 'inline-form', onsubmit: (e) => { e.preventDefault(); sepCall('PUT', sepName.value).then(() => { sepName.value = ''; }); } },
       sepName, el('button', { type: 'submit' }, t('Garder à part')));
+    // familles de séries réglées à la main
+    const fams = el('tbody'), famMsg = el('p', { class: 'status', role: 'status' });
+    const famName = el('input', { required: true, maxLength: 200, placeholder: t('Série'), 'aria-label': t('Série') });
+    const famTo = el('input', { maxLength: 200, placeholder: t('Famille (vide : à part)'), 'aria-label': t('Famille') });
+    const loadFams = () => api('/admin/series/rules').then((list) => {
+      if (dead) return;
+      famMsg.textContent = list.length ? '' : t('Aucune famille réglée à la main.');
+      fams.replaceChildren(...list.map((r) => el('tr', {}, el('th', { scope: 'row' }, r.name), el('td', {}, r.family || t('À part')),
+        el('td', {}, el('button', { type: 'button', onclick: async (e) => {
+          e.target.disabled = true;
+          try { await api('/admin/series/rules?name=' + encodeURIComponent(r.name), { method: 'DELETE' }); } catch (err) { famMsg.textContent = err.message; }
+          loadFams();
+        } }, t('Retirer'))))));
+    }).catch((err) => { if (!dead) famMsg.textContent = err.message; });
+    const famForm = el('form', { class: 'inline-form', onsubmit: async (e) => {
+      e.preventDefault();
+      try {
+        await api('/admin/series/rules', { method: 'PUT', body: { name: famName.value, family: famTo.value } });
+        famName.value = famTo.value = '';
+      } catch (err) { famMsg.textContent = err.message; }
+      loadFams();
+    } }, famName, famTo, el('button', { type: 'submit' }, t('Enregistrer')));
+    loadFams();
     body.replaceChildren(el('h1', {}, t('Règles de classement')),
       el('p', { class: 'hint' }, t('Appliquées à chaque scan et à chaque démarrage. Les corrections manuelles l’emportent toujours.')),
       ...RULES.map(([title, key, text]) => el('section', { class: 'ad-card' }, el('h3', {}, t(title), counts[key]), el('p', {}, t(text)))),
@@ -288,6 +311,10 @@ export function render(container, params = {}) {
       el('h2', {}, t('Labels rattachés')),
       el('p', { class: 'hint' }, t('Détacher rend son label d’origine à chaque release au prochain scan.')),
       ...aliasTable('/admin/labels/aliases', t('Label'), t('Aucun label rattaché à la main.'), 'labels'),
+      el('h2', {}, t('Familles de séries')),
+      el('p', { class: 'hint' }, t('Les séries qui partagent leur début sont réunies en famille. Ici : rattacher une série à une famille, la garder à part (famille vide), ou défaire une famille entière (son nom, famille vide).')),
+      famForm, el('div', { class: 'table-wrap' }, el('table', { class: 'users' },
+        el('thead', {}, el('tr', {}, th(t('Série')), th(t('Famille')), th(t('Actions')))), fams)), famMsg,
       el('h2', {}, t('Artistes à ne jamais fusionner')),
       el('p', { class: 'hint' }, t('Une graphie listée ici garde ses releases au lieu de rejoindre un artiste au nom proche, à ce scan et aux suivants.')),
       sepForm,
