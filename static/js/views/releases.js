@@ -324,10 +324,10 @@ export function render(container, params) {
     // pas : sans nombre plutôt qu'un nombre faux)
     counts: category || source ? null : q ? api('/release-summary?' + toQuery({ q, ...(inNfo && { nfo: 1 }) }))
       .then((rows) => Object.fromEntries(rows.map((c) => [c.name, c.releases]))).catch(() => ({}))
-      : ['artist', 'label', 'grp', 'genre'].includes(pin?.key) ? (() => {
-        const p = multiQuery({ genre: pin.key === 'genre' ? [].concat(pin.value).join('|') : genre, year });
+      : ['artist', 'label', 'grp', 'genre', 'year'].includes(pin?.key) ? (() => {
+        const p = multiQuery({ genre: pin.key === 'genre' ? [].concat(pin.value).join('|') : genre, year: pin.key === 'year' ? pin.value : year });
         p.set('by', 'category');
-        if (pin.key !== 'genre') p.set(pin.key, pin.value);
+        if (!['genre', 'year'].includes(pin.key)) p.set(pin.key, pin.value);
         return api('/groups?' + p).then((rows) => Object.fromEntries(rows.map((c) => [c.name, c.releases])));
       })() : null });
   return () => { dead = true; dispose(); };

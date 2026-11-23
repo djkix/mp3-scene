@@ -135,9 +135,20 @@ def mix(category: Many = None, genre: Many = None, year: Years = None,
         grp: str | None = None, artist: str | None = None, source: Many = None,
         decade: Years = None, appears: str | None = None,
         collab: str | None = Query(None, max_length=200), label: str | None = Query(None, max_length=200),
+        release: Annotated[list[Id] | None, Query(max_length=2000)] = None, song: str | None = Query(None, max_length=300),
         limit: int = Query(50, ge=1, le=MAX_LIMIT), user=Depends(current_user), conn=Depends(get_conn)):
-    """Pistes tirées au hasard parmi les releases qui passent les filtres."""
+    """Pistes tirées au hasard parmi les releases qui passent les filtres (`release` : celles d'une série ; `song` :
+    les versions d'un titre ; `appears` : les pistes de l'artiste dans les releases des autres)."""
     conds, params = _release_conds(category, genre, year, grp, artist, source, decade, appears, collab, label)
+    if release:
+        conds.append(f"r.id IN ({','.join('?' * len(release))})")
+        params += release
+    if song:
+        conds.append(f"{SONG}=lower(?)")
+        params.append(song.strip())
+    if appears is not None:  # seulement ses pistes, pas toute la compilation
+        conds.append("t.artist=? COLLATE NOCASE")
+        params.append(appears)
     where = "WHERE " + " AND ".join(conds) if conds else ""
     # ponytail: ORDER BY RANDOM() trie tous les identifiants candidats (rapide jusqu'au million de pistes)
     rows = conn.execute(
@@ -232,9 +243,13 @@ def filters(conn=Depends(get_conn)):
 GROUP_BY = {"series": "title", "grp": "grp", "artist": "COALESCE(tag_artist, artist)", "genre": "genre", "label": "NULLIF(label, '')", "category": "category", "year": "year"}
 
 
-# titre d'un morceau sans sa version : « Crazy (Club Mix) », « Crazy [Dub] » -> « crazy » (onglet Titres d'Explorer)
-SONG = """lower(trim(CASE WHEN instr(t.title, '(') > 1 THEN substr(t.title, 1, instr(t.title, '(') - 1)
-  WHEN instr(t.title, '[') > 1 THEN substr(t.title, 1, instr(t.title, '[') - 1) ELSE t.title END))"""
+# titre d'un morceau sans sa version : « Crazy (Club Mix) », « Crazy [Dub] », « Crazy - Club Mix » -> « crazy »
+_T = """replace(ltrim(t.title, '_.-*~#>| '), '_', ' ')"""  # « _All_These_Things », « ....On The Radio » : dès la première lettre
+SONG_RAW = f"""trim(CASE WHEN instr({_T}, '(') > 1 THEN substr({_T}, 1, instr({_T}, '(') - 1)
+  WHEN instr({_T}, '[') > 1 THEN substr({_T}, 1, instr({_T}, '[') - 1)
+  WHEN instr({_T}, ' - ') > 1 THEN substr({_T}, 1, instr({_T}, ' - ') - 1) ELSE {_T} END)"""
+# titres fusionnés à la main (Administration › Règles) : la clé d'un titre rattaché devient celle de sa cible
+SONG = f"COALESCE((SELECT lower(ta.target) FROM title_aliases ta WHERE ta.key=lower({SONG_RAW})), lower({SONG_RAW}))"
 
 
 @router.get("/api/titles")
@@ -254,7 +269,8 @@ def titles(genre: Many = None, year: Years = None, decade: Years = None, categor
     pretty = lambda t: t if not (t.isupper() or t.islower()) else artists.capitalize(t.lower())
     return [{"name": pretty(r[1]), "releases": r[2], "size": r[3]} for r in conn.execute(
         # nom affiché : le titre sans sa version, dans la graphie qui vient en premier (capitales avant minuscules)
-        f"SELECT {SONG} AS k, MIN({SONG[6:-1]}) AS shown, COUNT(*), COALESCE(SUM(t.size), 0)"
+        f"SELECT {SONG} AS k, COALESCE((SELECT ta.target FROM title_aliases ta WHERE lower(ta.target)={SONG} LIMIT 1), MIN({SONG_RAW}))"
+        " AS shown, COUNT(*), COALESCE(SUM(t.size), 0)"
         " FROM tracks t JOIN releases r ON r.id=t.release_id WHERE " + " AND ".join(conds)
         + f" GROUP BY k HAVING {having} ORDER BY COUNT(*) DESC, k", params)]
 

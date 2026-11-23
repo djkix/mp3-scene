@@ -4,6 +4,22 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.69.0](https://github.com/djkix/mp3-scene/compare/v1.68.0...v1.69.0) (2026-11-23)
+
+### Résumé
+
+**Lecture aléatoire d'une page, onglet Années, titres mieux réunis, titres des pistes lus dans le NFO.**
+
+- **Lecture aléatoire** : un bouton sur la page d'un artiste, d'un label, d'un groupe, d'un genre, d'une année, d'une
+  série ou d'un titre lance jusqu'à 100 de ses pistes au hasard.
+- **Années** : nouvel onglet d'Explorer, une ligne par année (la plus récente d'abord), filtres genre et catégorie ;
+  une année ouvre ses releases, groupées par catégorie.
+- **Titres** : les versions notées après un tiret (« Show Me Love - Club Mix ») rejoignent leur titre, les signes en
+  tête (« _ », « .... ») sont ignorés, et un titre se fusionne à un autre à la main (Administration › Règles).
+  « Détail des pistes » montre chaque piste au lieu des regroupements.
+- **Pistes sans tags** : elles prennent l'artiste et le titre de la tracklist du NFO quand celle-ci compte exactement
+  autant de morceaux (lu au scan, et au premier démarrage de cette version).
+
 ## [1.68.0](https://github.com/djkix/mp3-scene/compare/v1.67.0...v1.68.0) (2026-11-23)
 
 ### Résumé

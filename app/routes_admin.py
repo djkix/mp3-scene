@@ -21,6 +21,7 @@ _ACTIONS = {
     ("POST", "/scan"): "Scan lancé", ("PUT", "/scan/schedule"): "Scan quotidien réglé", ("POST", "/classify"): "Reclassement",
     ("PATCH", "/releases/{rid}"): "Correction", ("PATCH", "/releases"): "Correction en lot",
     ("PUT", "/releases/{rid}/cover"): "Pochette ajoutée", ("POST", "/releases/{rid}/cover/fetch"): "Pochette ajoutée", ("DELETE", "/releases/{rid}/cover"): "Pochette retirée",
+    ("PUT", "/titles/aliases"): "Titres fusionnés", ("DELETE", "/titles/aliases"): "Titres séparés",
     ("PUT", "/releases/{rid}/keep"): "Version gardée", ("DELETE", "/releases/{rid}/keep"): "Versions réaffichées",
     ("PUT", "/artists/aliases"): "Artiste rattaché", ("DELETE", "/artists/aliases"): "Artiste détaché",
     ("PUT", "/labels/aliases"): "Label rattaché", ("DELETE", "/labels/aliases"): "Label détaché",
@@ -574,6 +575,35 @@ def detach_artist(alias: str = Query(max_length=200), conn=Depends(get_conn)):
         artists.reset(conn, shown[0])
     artists.apply(conn)
     db.categorize(conn)
+    conn.commit()
+
+
+def _title_key(t: str) -> str:
+    """Clé d'un titre, comme dans l'onglet Titres : minuscules, sans la version entre parenthèses ou après un tiret."""
+    t = t.lstrip("_.-*~#>| ").replace("_", " ")
+    return re.split(r"\s*[(\[]|\s+-\s+", t.strip(), maxsplit=1)[0].strip().lower()
+
+
+@router.get("/titles/aliases")
+def title_aliases(conn=Depends(get_conn)):
+    """Titres fusionnés à la main."""
+    return [dict(r) for r in conn.execute("SELECT alias, target FROM title_aliases ORDER BY alias COLLATE NOCASE")]
+
+
+@router.put("/titles/aliases", status_code=204)
+def attach_title(body: Alias, conn=Depends(get_conn)):
+    """Réunit un titre à un autre (« Show Me Love 2009 » à « Show Me Love ») dans l'onglet Titres."""
+    alias, target = body.alias.strip(), body.target.strip()
+    if not target or _title_key(alias) == _title_key(target):
+        raise HTTPException(400, "Ces deux titres sont déjà réunis.")
+    conn.execute("INSERT OR REPLACE INTO title_aliases(key, alias, target) VALUES (?,?,?)", (_title_key(alias), alias, target))
+    conn.commit()
+
+
+@router.delete("/titles/aliases", status_code=204)
+def detach_title(alias: str = Query(max_length=300), conn=Depends(get_conn)):
+    if conn.execute("DELETE FROM title_aliases WHERE key=?", (_title_key(alias),)).rowcount == 0:
+        raise HTTPException(404, "Rattachement introuvable.")
     conn.commit()
 
 

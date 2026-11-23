@@ -1251,3 +1251,35 @@ def test_titles_gather_every_version_of_a_song(user_client, library, settings):
     assert user_client.get("/api/titles", params={"song": "glue"}).json()[0]["releases"] == 2
     assert sorted(t["title"] for t in user_client.get("/api/tracks", params={"song": "Glue"}).json()["items"]) == ["Glue", "Glue (Dub)"]
     assert user_client.get("/api/titles", params={"category": "Albums"}).json() == []
+
+
+def test_titles_join_after_a_dash_strip_leading_signs_merge_by_hand_and_shuffle(admin_client, library, settings):
+    conn = db.connect(settings.data_dir)
+    rel = conn.execute("SELECT release_id FROM tracks WHERE title='Glue'").fetchone()[0]
+    for t in ("Glue - Club Mix", "_Glue", "....Glue (Dub)", "Glue 2009", "Glue 2009"):
+        conn.execute("INSERT INTO tracks(release_id, relpath, size, title, artist) VALUES (?, 'x.mp3', 1, ?, 'Bicep')", (rel, t))
+    conn.commit()
+    rows = {r["name"]: r["releases"] for r in admin_client.get("/api/titles").json()}
+    assert rows["Glue"] == 4 and rows["Glue 2009"] == 2
+    assert admin_client.put("/api/admin/titles/aliases", json={"alias": "Glue 2009", "target": "Glue"}, headers={"X-CSRF": "1"}).status_code == 204
+    rows = {r["name"]: r["releases"] for r in admin_client.get("/api/titles").json()}
+    assert rows == {**{k: v for k, v in rows.items() if k != "Glue"}, "Glue": 6} and "Glue 2009" not in rows
+    assert len(admin_client.get("/api/tracks", params={"song": "Glue"}).json()["items"]) == 6
+    assert {t["title"] for t in admin_client.get("/api/mix", params={"song": "glue", "limit": 50}).json()["items"]} >= {"Glue", "Glue 2009"}
+    assert admin_client.delete("/api/admin/titles/aliases", params={"alias": "Glue 2009"}, headers={"X-CSRF": "1"}).status_code == 204
+    ids = [rel]
+    assert {t["release_id"] for t in admin_client.get("/api/mix", params={"release": ids}).json()["items"]} == {rel}
+
+
+def test_nfo_tracklist_names_tracks_without_tags(app, settings):
+    from app import nfo, scanner
+    text = "01. Alpha - One\n02. Beta - Two\n    (Club Mix)\n05. Stray - Line\n"
+    assert nfo.track_names(text) == [{"artist": "Alpha", "title": "One"}, {"artist": "Beta", "title": "Two (Club Mix)"}]
+    conn = db.connect(settings.data_dir)
+    rid = conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo)"
+                       " VALUES ('n', 'n', '', 'Singles', 0, 0, 1, 2, 1)").lastrowid
+    for i in (1, 2):
+        conn.execute("INSERT INTO tracks(release_id, relpath, size) VALUES (?, ?, 1)", (rid, f"0{i}.mp3"))
+    scanner._nfo_titles(conn, rid, text)
+    assert [tuple(r) for r in conn.execute("SELECT artist, title FROM tracks WHERE release_id=? ORDER BY relpath", (rid,))] == \
+        [("Alpha", "One"), ("Beta", "Two (Club Mix)")]

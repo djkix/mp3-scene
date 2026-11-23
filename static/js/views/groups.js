@@ -6,19 +6,27 @@ import { el, relName, relHref } from '../dom.js';
 import { t as tr, catLabel, artistLabel } from '../i18n.js';
 import * as releases from './releases.js';
 import { trackList } from './tracklist.js';
+import { player } from '../player.js';
 
 const MAX_ROWS = 1000; // au-delà, on demande d'affiner (des dizaines de milliers d'artistes figeraient la page)
 // route -> [onglet, en-tête de colonne, valeur de `by` côté serveur, paramètre de /releases qui épingle la liste]
 const KINDS = { groups: ['Groupes', 'Groupe', 'grp', 'grp'], artists: ['Artistes', 'Artiste', 'artist', 'artist'],
   labels: ['Labels', 'Label', 'label', 'label'], genres: ['Genres', 'Genre', 'genre', 'genre'],
   series: ['Séries', 'Série', 'series', null],
-  titles: ['Titres', 'Titre', 'title', null] }; // un titre (toutes ses versions) ouvre une liste de pistes // une série ouvre sa propre page (volumes dans l'ordre), pas une liste épinglée
+  titles: ['Titres', 'Titre', 'title', null], years: ['Années', 'Année', 'year', 'year'] }; // un titre (toutes ses versions) ouvre une liste de pistes // une série ouvre sa propre page (volumes dans l'ordre), pas une liste épinglée
 // Onglets d'Explorer, dans l'ordre affiché.
-const TABS = [['artists', 'Artistes'], ['titles', 'Titres'], ['genres', 'Genres'], ['categories', 'Catégories'], ['series', 'Séries'], ['labels', 'Labels'], ['groups', 'Groupes']];
+const TABS = [['artists', 'Artistes'], ['titles', 'Titres'], ['genres', 'Genres'], ['years', 'Années'], ['categories', 'Catégories'], ['series', 'Séries'], ['labels', 'Labels'], ['groups', 'Groupes']];
 export const tabs = (current, genre = '', year = '') => el('div', { class: 'tabs', role: 'tablist', 'aria-label': tr('Explorer') },
   TABS.map(([k, label]) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(k === current),
     onclick: () => { location.hash = `#/${k}` + qs({ genre: k === 'genres' ? '' : genre, year }); } }, tr(label))));
 
+// Lecture aléatoire : jusqu'à 100 pistes tirées au hasard parmi celles de la page (paramètres de /api/mix)
+const shuffleBtn = (query) => el('button', { type: 'button', class: 'chip keep shuffle', onclick: async () => {
+  try {
+    const { items } = await api('/mix?' + new URLSearchParams([...new URLSearchParams(typeof query === 'function' ? query() : query), ['limit', 100]]));
+    if (items.length) player.playTracks(items); else player.flash(tr('Aucune piste à lire.'));
+  } catch (err) { player.flash(err.message); }
+} }, '⇄ ' + tr('Lecture aléatoire'));
 const qs = (o) => { const s = String(new URLSearchParams(Object.entries(o).filter(([, v]) => v))); return s ? '?' + s : ''; };
 const count = (n) => `${n} ${n > 1 ? tr('releases') : tr('release')}`;
 
@@ -60,10 +68,11 @@ function detail(container, kind, params) {
   // un clic s'y limite, un second revient à l'ensemble. La liste attend de connaître la famille.
   const sub = kind === 'genres' ? params.sub || '' : '';
   const blocks = el('div', { class: 'tabs cats subs', role: 'tablist', 'aria-label': tr('Genres') });
-  let dead = false, disposeList = null;
+  let dead = false, disposeList = null, genreNames = [];
   if (info) api('/group-info?' + new URLSearchParams({ by, name, ...(sub && { sub }) })).then((g) => {
     if (dead) return;
     if (kind === 'genres') {
+      genreNames = g.members.map((m) => m.name);
       blocks.replaceChildren(...g.members.map((m) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(m.name === sub),
         onclick: () => { location.hash = base + qs({ year: params.year, sub: m.name === sub ? '' : m.name }); } }, m.name, el('small', {}, ` ${m.releases}`))));
       disposeList = releases.render(list, { ...params, q: '', genre: '',
@@ -78,7 +87,15 @@ function detail(container, kind, params) {
       ...(kind === 'labels' ? group(tr('Groupes'), 'groups', g.others) : group(tr('Labels'), 'labels', g.others)));
   }).catch(() => {}); // facultatif
   container.replaceChildren(
-    el('h1', { class: 'grp-title' }, el('a', { href: `#/${kind}` + qs({ genre: params.genre, year: params.year }) }, tr(tab)), ' › ', kind === 'artists' ? artistLabel(name) : name, ' ', kind === 'artists' || info ? null : total),
+    el('h1', { class: 'grp-title' }, el('a', { href: `#/${kind}` + qs({ genre: params.genre, year: params.year }) }, tr(tab)), ' › ', kind === 'artists' ? artistLabel(name) : name, ' ', kind === 'artists' || info ? null : total,
+      // les pistes de la liste ouverte, au hasard (un genre : toute sa famille ; les mixes n'en ont pas)
+      other === 'mixes' ? null : shuffleBtn(() => {
+        const p = releases.multiQuery({ genre: params.genre, year: params.year });
+        if (kind === 'genres') { p.delete('genre'); (genreNames.length ? genreNames : [name]).forEach((x) => p.append('genre', x)); }
+        else p.set({ artists: { collab: 'collab', appears: 'appears', remixes: 'artist' }[other] || 'artist', labels: 'label', groups: 'grp', years: 'year' }[kind], name);
+        if (sub) { p.delete('genre'); p.append('genre', sub); }
+        return p;
+      })),
     ...(kind === 'genres' ? [blocks] : []), ...(kind === 'artists' ? [head] : []), ...(info ? [info] : []), ...(kind === 'artists' && !other ? [years] : []), list);
   // chronologie : une pastille par année avec son nombre de releases ; un clic filtre la liste sur cette année
   if (kind === 'artists' && !other) api('/groups?' + new URLSearchParams({ by: 'year', artist: name })).then((rows) => {
@@ -149,7 +166,8 @@ function title(container, params) {
   const name = params.rest, { genre = '', year = '', category = '' } = params;
   const total = el('span', { class: 'muted' }), list = el('div');
   container.replaceChildren(tabs('titles', genre, year),
-    el('h1', { class: 'grp-title' }, el('a', { href: '#/titles' + qs({ genre, year, category }) }, tr('Titres')), ' › ', name, ' ', total), list);
+    el('h1', { class: 'grp-title' }, el('a', { href: '#/titles' + qs({ genre, year, category }) }, tr('Titres')), ' › ', name, ' ', total, ' ',
+      shuffleBtn(() => { const q = releases.multiQuery({ genre, year, category }); q.set('song', name); return q; })), list);
   const p = releases.multiQuery({ genre, year, category });
   p.set('song', name);
   api('/titles?' + p).then(([t]) => { total.textContent = t ? `${tr('{0} pistes', t.releases)} · ${fmtSize(t.size)}` : ''; }).catch(() => {});
@@ -190,15 +208,16 @@ function series(container, params) {
   // sur le même bloc revient à l'ensemble. Les chiffres de l'en-tête portent sur ce qui est affiché.
   const subsBar = el('div', { class: 'tabs cats subs', role: 'tablist', 'aria-label': tr('Séries') });
   container.replaceChildren(tabs('series', genre, year),
-    el('h1', { class: 'grp-title' }, el('a', { href: '#/series' + qs({ genre, year }) }, tr('Séries')), ' › ', name),
+    el('h1', { class: 'grp-title' }, el('a', { href: '#/series' + qs({ genre, year }) }, tr('Séries')), ' › ', name, ' ',
+      shuffleBtn(() => new URLSearchParams(shownNow.slice(0, 2000).map((x) => ['release', x.id])))),
     subsBar, el('div', { class: 'art-head' }, facts, found), bar, status, list);
-  let dead = false, all = [], missing = [], subs = [];
+  let dead = false, all = [], missing = [], subs = [], shownNow = [];
   const genres = genre ? genre.split('|') : [], years = year ? year.split('|') : [];
   // une année cochée, ou sa décennie (« 1990s »), comme dans les autres listes
   const inYears = (y) => !years.length || years.some((v) => (/s$/.test(v) ? y >= parseInt(v, 10) && y <= parseInt(v, 10) + 9 : String(y) === v));
   function paint() {
     const needle = find.value.trim().toLowerCase();
-    const shown = all.filter((x) => (!sub || x.series === sub) && (!genres.length || genres.includes(x.genre)) && inYears(x.year)
+    const shown = shownNow = all.filter((x) => (!sub || x.series === sub) && (!genres.length || genres.includes(x.genre)) && inYears(x.year)
       && relName(x.name).toLowerCase().includes(needle));
     const tally = (key) => Object.entries(shown.reduce((m, x) => { if (x[key]) (m[x[key]] ??= { n: 0, size: 0 }, m[x[key]].n++, m[x[key]].size += x.size); return m; }, {}))
       .sort((p, q) => q[1].n - p[1].n);
@@ -269,39 +288,65 @@ export function render(container, params) {
   const [, label, by, pin] = KINDS[kind];
   if (params.rest && pin) return detail(container, kind, params);
   const { genre = '', year = '' } = params;
-  const category = kind === 'titles' ? params.category || '' : ''; // titres : filtre Catégories en plus
+  const category = kind === 'titles' || kind === 'years' ? params.category || '' : ''; // titres, années : filtre Catégories en plus
   const setFilter = (name, value) => { location.hash = `#/${kind}` + qs({ genre, year, category, [name]: value }); };
   // [libellé, clé, sens au premier clic] ; un titre compte des pistes (ses versions), les autres des releases
   const HEAD = [[tr(label), 'name', 1], [kind === 'titles' ? tr('Pistes') : tr('Releases'), 'releases', -1], [tr('Poids'), 'size', -1]];
-  let rows = [], key = 'name', dir = 1, dead = false;
+  let rows = [], key = 'name', dir = kind === 'years' ? -1 : 1, dead = false; // années : la plus récente d'abord
   // Lettres sous les filtres : « # » réunit ce qui ne commence pas par une lettre. La lettre choisie est dans
   // l'adresse (sans recharger la liste) pour la retrouver au retour d'une fiche.
   let letter = /^([A-Z]|#)$/.test(params.letter || '') ? params.letter : '';
-  const initial = (name) => { const c = (name.normalize('NFD')[0] || '').toUpperCase(); return c >= 'A' && c <= 'Z' ? c : '#'; };
+  const initial = (name) => { const c = (String(name).normalize('NFD')[0] || '').toUpperCase(); return c >= 'A' && c <= 'Z' ? c : '#'; };
   const letters = el('div', { class: 'letters', role: 'group', 'aria-label': tr('Initiale') },
     ['', '#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'].map((l) => el('button', { type: 'button', 'aria-pressed': String(l === letter),
       onclick: () => {
         letter = l;
         [...letters.children].forEach((b) => b.setAttribute('aria-pressed', String(b.textContent === (l || tr('Tous')))));
-        history.replaceState(null, '', `#/${kind}` + qs({ genre, year, category, letter }));
+        history.replaceState(null, '', `#/${kind}` + qs({ genre, year, category, letter, detail: flat ? 1 : '' }));
         paint();
       } }, l || tr('Tous'))));
-  const find = el('input', { type: 'search', placeholder: tr('Filtrer la liste…'), 'aria-label': tr('Filtrer la liste…'), oninput: paint });
-  const bar = el('div', { class: 'filters' }, find, kind === 'series' ? el('a', { class: 'btn', href: '#/series?missing=1' }, tr('Volumes à compléter')) : null);
+  const find = el('input', { type: 'search', placeholder: tr('Filtrer la liste…'), 'aria-label': tr('Filtrer la liste…'), oninput: () => (flat ? showTracks() : paint()) });
+  // titres : regroupés par morceau, ou le détail des pistes (chacune sur sa ligne) pour les mots du filtre
+  let flat = kind === 'titles' && params.detail === '1', disposeTracks = null, typing = null;
+  const tracksBox = el('div');
+  const detailBtn = kind === 'titles' && el('button', { type: 'button', 'aria-pressed': String(flat), onclick: () => {
+    flat = !flat;
+    detailBtn.setAttribute('aria-pressed', String(flat));
+    history.replaceState(null, '', `#/${kind}` + qs({ genre, year, category, letter, detail: flat ? 1 : '' }));
+    layout();
+  } }, tr('Détail des pistes'));
+  const bar = el('div', { class: 'filters' }, find, detailBtn || null, kind === 'series' ? el('a', { class: 'btn', href: '#/series?missing=1' }, tr('Volumes à compléter')) : null);
   const body = el('tbody');
   const status = el('p', { class: 'status', role: 'status' }, tr('Chargement…'));
   const heads = HEAD.map(([text, k, first], i) => el('th', { scope: 'col', class: i ? 'num' : '' },
     el('button', { type: 'button', onclick: () => { dir = key === k ? -dir : first; key = k; paint(); } }, text)));
-  container.replaceChildren(
-    tabs(kind, genre, year),
-    bar, letters, el('div', { class: 'table-wrap' }, el('table', { class: 'groups' }, el('thead', {}, el('tr', {}, heads)), body)), status);
+  const table = el('div', { class: 'table-wrap' }, el('table', { class: 'groups' }, el('thead', {}, el('tr', {}, heads)), body));
+  container.replaceChildren(tabs(kind, genre, year), bar, letters, table, status, tracksBox);
+  // détail des pistes : la recherche dans les tags (mêmes filtres), relancée à la frappe
+  function showTracks() {
+    clearTimeout(typing);
+    typing = setTimeout(() => {
+      disposeTracks?.();
+      const words = find.value.trim();
+      if (!words) { disposeTracks = null; tracksBox.replaceChildren(el('p', { class: 'status' }, tr('Tapez un mot du titre pour voir les pistes.'))); return; }
+      const p = releases.multiQuery({ genre, year, category });
+      p.set('q', words);
+      disposeTracks = trackList(tracksBox, { path: '/tracks?' + p, empty: tr('Aucun résultat') });
+    }, 250);
+  }
+  function layout() {
+    table.hidden = letters.hidden = status.hidden = flat;
+    tracksBox.hidden = !flat;
+    if (flat) showTracks(); else { disposeTracks?.(); disposeTracks = null; tracksBox.replaceChildren(); paint(); }
+  }
 
   const href = (name) => `#/${kind}/${encodeURIComponent(name)}` + qs({ genre: kind === 'genres' ? '' : genre, year, category });
   function paint() {
     HEAD.forEach(([text, k], i) => { heads[i].firstChild.textContent = k === key ? `${text} ${dir > 0 ? '▲' : '▼'}` : text; });
     const needle = find.value.trim().toLowerCase();
-    const shown = rows.filter((g) => g.name.toLowerCase().includes(needle) && (!letter || initial(g.name) === letter))
-      .sort((a, b) => dir * (key === 'name' ? a.name.localeCompare(b.name) : a[key] - b[key]) || a.name.localeCompare(b.name));
+    const shown = rows.filter((g) => String(g.name).toLowerCase().includes(needle) && (!letter || initial(g.name) === letter))
+      .sort((a, b) => dir * (key === 'name' ? String(a.name).localeCompare(String(b.name), undefined, { numeric: true }) : a[key] - b[key])
+        || String(a.name).localeCompare(String(b.name)));
     body.replaceChildren(...shown.slice(0, MAX_ROWS).map((g) => el('tr', {},
       el('td', {}, el('a', { href: href(g.name) }, kind === 'artists' ? artistLabel(g.name) : g.name), g.series > 1 ? el('small', { class: 'muted' }, ' ' + tr('{0} séries', g.series)) : null,
         g.genres > 1 ? el('small', { class: 'muted' }, ' ' + tr('{0} genres', g.genres)) : null),
@@ -316,13 +361,14 @@ export function render(container, params) {
     if (dead) return;
     // mêmes filtres à choix multiples que dans les listes de releases
     if (kind !== 'genres') bar.append(releases.multi(tr('Genre'), tr('Genres'), 'genre', f.genres, genre, setFilter));
-    bar.append(releases.yearSelect(f, year, setFilter, releases.multi));
-    if (kind === 'titles') bar.append(releases.multi(tr('Catégorie'), tr('Catégories'), 'category', f.categories, category, setFilter));
+    if (kind !== 'years') bar.append(releases.yearSelect(f, year, setFilter, releases.multi));
+    if (kind === 'titles' || kind === 'years') bar.append(releases.multi(tr('Catégorie'), tr('Catégories'), 'category', f.categories, category, setFilter));
     if (genre || year || category) bar.append(el('button', { type: 'button', class: 'reset', onclick: () => { location.hash = `#/${kind}`; } }, tr('Réinitialiser')));
   }).catch(() => {});
   const all = releases.multiQuery({ genre: kind === 'genres' ? '' : genre, year, category });
   if (kind !== 'titles') all.set('by', by);
   api((kind === 'titles' ? '/titles?' : '/groups?') + all).then((g) => { if (!dead) { rows = g; paint(); } })
     .catch((err) => { if (!dead) status.textContent = err.message; });
-  return () => { dead = true; };
+  if (flat) layout();
+  return () => { dead = true; clearTimeout(typing); disposeTracks?.(); };
 }

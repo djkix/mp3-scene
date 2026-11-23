@@ -225,7 +225,7 @@ export function render(container, params = {}) {
       const hints = el('div', { class: 'ad-hints' });
       const suggest = () => api('/admin/suggestions').then((s) => {
         if (dead) return;
-        const list = s[kind];
+        const list = s[kind] || []; // pas de rapprochement proposé pour les titres
         hints.replaceChildren(...(list.length ? [el('p', { class: 'hint' }, t('Rapprochements suggérés :')),
           ...list.map((x) => el('p', {}, `${x.alias} (${x.releases}) → ${x.target} (${x.target_releases}) `,
             el('button', { type: 'button', onclick: async (e) => {
@@ -254,7 +254,7 @@ export function render(container, params = {}) {
       const suggestNames = (e) => {
         clearTimeout(typing);
         typing = setTimeout(() => api('/suggest?' + new URLSearchParams({ q: e.target.value })).then((s) => {
-          names.replaceChildren(...s[kind].map((x) => el('option', { value: x.name }, `${x.releases} releases`)));
+          names.replaceChildren(...(s[kind] || []).map((x) => el('option', { value: x.name }, `${x.releases} releases`)));
         }).catch(() => {}), 200);
       };
       const from = el('input', { required: true, maxLength: 200, placeholder: first, 'aria-label': first, list: names.id, oninput: suggestNames });
@@ -318,6 +318,9 @@ export function render(container, params = {}) {
       el('h2', {}, t('Fusionner des artistes')),
       el('p', { class: 'hint' }, t('Le premier artiste rejoint le second : ses releases passent sous son nom, à ce scan et aux suivants. Détacher annule la fusion.')),
       ...aliasTable('/admin/artists/aliases', t('Artiste'), t('Aucun artiste rattaché à la main.'), 'artists'),
+      el('h2', {}, t('Fusionner des titres')),
+      el('p', { class: 'hint' }, t('Dans l’onglet Titres, le premier titre rejoint le second (« Show Me Love 2009 » dans « Show Me Love »). Les versions entre parenthèses ou après un tiret sont déjà réunies.')),
+      ...aliasTable('/admin/titles/aliases', t('Titre'), t('Aucun titre fusionné à la main.'), 'titles'),
       el('h2', {}, t('Labels rattachés')),
       el('p', { class: 'hint' }, t('Détacher rend son label d’origine à chaque release au prochain scan.')),
       ...aliasTable('/admin/labels/aliases', t('Label'), t('Aucun label rattaché à la main.'), 'labels'),

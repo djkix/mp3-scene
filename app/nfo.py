@@ -154,3 +154,28 @@ def tracklist(text: str) -> list[list[dict]]:
         out.append([{"artist": p["artist"], "title": p["title"], "start": t, "length": None if starts else p["t"]}
                     for p, t in zip(parts, times)])
     return out
+
+
+_NUMBERED = re.compile(r"^\s*(\d{1,3})\s*[.)\-]\s+(.+?)(?:\s+\[?\(?(?:\d{1,2}:)?\d{1,3}:\d{2}\)?\]?)?\s*$")
+
+
+def track_names(text: str) -> list[dict]:
+    """Morceaux numérotés de la tracklist du NFO, dans l'ordre, minutés ou non : [{artist, title}]. La numérotation
+    doit repartir de 1 à chaque disque et se suivre ; une ligne qui ne commence que par une parenthèse prolonge le
+    titre précédent."""
+    out, expect = [], 1
+    for line in text.splitlines():
+        m = _NUMBERED.match(line)
+        if m:
+            n = int(m[1])
+            if n == 1 and out:
+                expect = 1  # disque suivant
+            if n != expect:
+                continue
+            expect += 1
+            parts = re.split(r"\s+[-\u2013]\s+", m[2].strip(), maxsplit=1)
+            artist, title = (parts[0], parts[1]) if len(parts) == 2 else ("", parts[0])
+            out.append({"artist": artist.strip()[:200], "title": title.strip()[:300]})
+        elif out and line.strip().startswith("("):
+            out[-1]["title"] = (out[-1]["title"] + " " + line.strip())[:300]
+    return out

@@ -479,11 +479,26 @@ def _nfo_chapters(conn, rid, text):
     conn.executemany("INSERT INTO chapters(track_id, pos, start, artist, title) VALUES (?,?,?,?,?)", rows)
 
 
+def _nfo_titles(conn, rid, text):
+    """Titre et artiste des pistes sans tags, lus dans la tracklist du NFO : seulement si toutes les pistes de la release
+    en manquent et que la tracklist en compte exactement autant (sinon l'appariement serait au hasard)."""
+    # ponytail: une relecture des tags (fichier modifié, « Relire tous les tags ») rend la valeur du fichier, vide ici ;
+    # le titre du NFO revient au scan suivant seulement si le NFO est relu
+    tracks = conn.execute("SELECT id, title FROM tracks WHERE release_id=? ORDER BY disc, relpath", (rid,)).fetchall()
+    if not tracks or any(t["title"] for t in tracks):
+        return
+    names = nfo.track_names(text)
+    if len(names) != len(tracks):
+        return
+    conn.executemany("UPDATE tracks SET title=?, artist=COALESCE(artist, NULLIF(?, '')) WHERE id=?",
+                     [(n["title"], n["artist"], t["id"]) for t, n in zip(tracks, names)])
+
+
 def _scan_nfo_text(conn, root, should_stop):
     """Indexe le texte du NFO des releases qui ne l'ont pas encore été (recherche dans les NFO)."""
     last = 0
     while not should_stop():
-        rows = conn.execute("SELECT id, path FROM releases WHERE has_nfo=1 AND COALESCE(nfo_indexed, 0)<2 AND id>? ORDER BY id LIMIT ?",
+        rows = conn.execute("SELECT id, path FROM releases WHERE has_nfo=1 AND COALESCE(nfo_indexed, 0)<3 AND id>? ORDER BY id LIMIT ?",
                             (last, TAG_BATCH)).fetchall()
         if not rows:
             break
@@ -503,8 +518,9 @@ def _scan_nfo_text(conn, root, should_stop):
             conn.execute("DELETE FROM nfo_fts WHERE rowid=?", (rid,))
             conn.execute("INSERT INTO nfo_fts(rowid, text) VALUES (?, ?)", (rid, text))
             _nfo_chapters(conn, rid, text)
-        # 2 : texte indexé et tracklist lue (1 : texte seul, avant la 1.66.0)
-        conn.executemany("UPDATE releases SET nfo_indexed=2 WHERE id=?", [(rid,) for rid, _ in done])
+            _nfo_titles(conn, rid, text)
+        # 3 : texte indexé, chapitres et titres lus (2 : sans les titres, avant la 1.69.0 ; 1 : texte seul)
+        conn.executemany("UPDATE releases SET nfo_indexed=3 WHERE id=?", [(rid,) for rid, _ in done])
         conn.commit()
 
 
@@ -594,7 +610,7 @@ class Runner:
             conn.execute("UPDATE scan_state SET status='idle' WHERE status='tags'")
             conn.commit()
             pending = (conn.execute("SELECT 1 FROM tracks WHERE tags_read=0 LIMIT 1").fetchone()
-                       or conn.execute("SELECT 1 FROM releases WHERE has_nfo=1 AND COALESCE(nfo_indexed, 0)<2 LIMIT 1").fetchone()
+                       or conn.execute("SELECT 1 FROM releases WHERE has_nfo=1 AND COALESCE(nfo_indexed, 0)<3 LIMIT 1").fetchone()
                        or conn.execute("SELECT 1 FROM releases WHERE has_cover IS NULL LIMIT 1").fetchone()
                        or conn.execute("SELECT 1 FROM releases WHERE has_nfo=1 AND (released_at IS NULL OR label IS NULL) LIMIT 1").fetchone())
         finally:

@@ -546,6 +546,7 @@ dialog.compare { max-width: min(96vw, 1100px); }
 .subs { flex-wrap: wrap; padding: 8px 12px 0; }
 .subs small { opacity: .65; }
 .art-photo { display: block; width: 96px; height: 96px; margin: 0 0 8px; border-radius: 50%; object-fit: cover; }
+.grp-title .shuffle { margin-left: 8px; font-size: 12px; vertical-align: middle; }
 .art-photo.logo { border-radius: 6px; object-fit: contain; background: #fff; }
 .art-head .chip.keep { margin-top: 8px; }
 .rel-cap { padding: 5px 12px; background: var(--hover); border-bottom: 1px solid var(--line); border-left: 3px solid var(--kind); }

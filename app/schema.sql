@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS overrides(path TEXT PRIMARY KEY, artist TEXT, categor
   cover INTEGER);  -- 1 : pochette déposée à la main (data/covers)
 -- labels rattachés à la main : `key` est la clé de rapprochement (nfo.label_key) du label rattaché
 CREATE TABLE IF NOT EXISTS label_aliases(key TEXT PRIMARY KEY, alias TEXT NOT NULL, target TEXT NOT NULL);
+-- titres fusionnés à la main (onglet Titres) : clé = titre réduit (minuscules, sans version), cible = titre affiché
+CREATE TABLE IF NOT EXISTS title_aliases(key TEXT PRIMARY KEY, alias TEXT NOT NULL, target TEXT NOT NULL);
 -- tentatives de sauvegarde (app/backup.py), lues par l'administration
 CREATE TABLE IF NOT EXISTS backup_runs(
   started_at REAL NOT NULL, finished_at REAL NOT NULL, ok INTEGER NOT NULL, message TEXT NOT NULL DEFAULT '',
