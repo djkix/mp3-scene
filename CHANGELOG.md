@@ -4,6 +4,13 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.72.2](https://github.com/djkix/mp3-scene/compare/v1.72.1...v1.72.2) (2026-11-23)
+
+### Résumé
+
+**Cast : message quand le récepteur ne peut pas lire la piste** (adresse injoignable, certificat refusé, format
+non lu) ; jusqu'ici rien ne se passait, sans explication.
+
 ## [1.72.1](https://github.com/djkix/mp3-scene/compare/v1.72.0...v1.72.1) (2026-11-23)
 
 ### Résumé

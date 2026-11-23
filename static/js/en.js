@@ -2,6 +2,7 @@
 export const EN = {
   // Lecteur
   'Diffusion impossible.': 'Casting failed.',
+  'Le récepteur ne peut pas lire la piste.': 'The receiver cannot play the track.',
   'Diffuser sur un appareil': 'Cast to a device',
   'Lecture bloquée par le navigateur : appuyez sur lecture.': 'Playback blocked by the browser: press play.',
   'Lecture impossible.': 'Playback failed.',

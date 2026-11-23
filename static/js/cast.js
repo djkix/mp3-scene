@@ -174,6 +174,8 @@ function setup(player) {
         if (next != null) { player.queue.index = next; lastTime = 0; reload({ play: true, pos: 0 }); }
         return player.refresh();
       }
+      // le récepteur n'a pas pu charger l'URL (réseau, certificat, format) : sans ce message, rien ne se passe
+      if (m.idleReason === M.IdleReason.ERROR) player.flash(tr('Le récepteur ne peut pas lire la piste.'));
       if (!alive) { media = null; return player.refresh(); }
       if (loaded && !loaded.map) loaded.map = itemMap(loaded.items, m.items?.map((x) => x.itemId));
       const i = remoteIndex();
