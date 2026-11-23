@@ -318,10 +318,18 @@ _CREDIT = re.compile(r"\s*(?:\b(?:feat|ft|featuring|vs|versus|with|and|pres|pres
 
 @router.get("/api/artist-info")
 def artist_info(name: str = Query(min_length=1, max_length=200), user=Depends(current_user), conn=Depends(get_conn)):
-    """Fiche d'un artiste : années d'activité dans la bibliothèque, labels, artistes avec qui il signe le plus de
-    pistes, et ses releases les plus écoutées par l'utilisateur."""
+    """Fiche d'un artiste : nombre et poids de ses quatre listes (ses releases, celles où le nom l'associe à un
+    autre, celles des autres où il signe une piste, les longs mixes dont un chapitre est de lui), ses labels, les
+    artistes avec qui il signe le plus de pistes, et ses releases les plus écoutées par l'utilisateur."""
     mine = "COALESCE(r.tag_artist, r.artist)=? AND r.hidden=0"
-    span = conn.execute(f"SELECT MIN(r.year) AS first, MAX(r.year) AS last FROM releases r WHERE {mine}", (name,)).fetchone()
+
+    def total(**cond):  # mêmes conditions que les listes affichées sous l'en-tête
+        conds, params = _release_conds(**cond)
+        n, size = conn.execute("SELECT COUNT(*), COALESCE(SUM(r.size), 0) FROM releases r WHERE " + " AND ".join(conds), params).fetchone()
+        return {"n": n, "size": size}
+    n, size = conn.execute("SELECT COUNT(*), COALESCE(SUM(t.size), 0) FROM tracks t JOIN releases r ON r.id=t.release_id WHERE r.hidden=0"
+                           " AND t.id IN (SELECT c.track_id FROM chapters c WHERE c.artist=? COLLATE NOCASE)", (name,)).fetchone()
+    lists = {"releases": total(artist=name), "with": total(collab=name), "appears": total(appears=name), "mixes": {"n": n, "size": size}}
     # « Bits & Pieces » et « Bits And Pieces » : un seul label ici, sous la graphie la plus fréquente (qui porte le lien)
     merged = {}
     for x in conn.execute(f"SELECT r.label AS name, COUNT(*) AS releases FROM releases r WHERE {mine} AND NULLIF(r.label, '')"
@@ -342,7 +350,7 @@ def artist_info(name: str = Query(min_length=1, max_length=200), user=Depends(cu
     top = [dict(x) for x in conn.execute(
         f"SELECT r.id, r.name, r.title, COUNT(*) AS plays FROM plays p JOIN tracks t ON t.id=p.track_id JOIN releases r ON r.id=t.release_id"
         f" WHERE p.user_id=? AND {mine} GROUP BY r.id ORDER BY plays DESC, r.name COLLATE NOCASE LIMIT 5", (user["id"], name))]
-    return {"first": span["first"], "last": span["last"], "labels": labels, "top": top,
+    return {"lists": lists, "labels": labels, "top": top,
             "with": [{"name": spelling[k], "tracks": n} for k, n in sorted(others.items(), key=lambda kv: (-kv[1], kv[0]))[:8]]}
 
 

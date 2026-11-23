@@ -4,6 +4,18 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.60.0](https://github.com/djkix/mp3-scene/compare/v1.59.1...v1.60.0) (2026-11-23)
+
+### Résumé
+
+**Page d'un artiste : un tableau des quatre listes à la place des onglets.**
+
+- Le bloc de gauche devient un tableau : Releases, Avec, Apparitions et Mixes, chacune avec son nombre et son
+  poids. Un clic sur une ligne ouvre sa liste, la ligne ouverte est marquée ; les quatre onglets disparaissent.
+- L'en-tête (tableau, labels, artistes associés, releases les plus écoutées) reste affiché sur les quatre listes.
+- Les lignes par catégorie et les années d'activité quittent le bloc : le filtre Catégories et les pastilles
+  d'années les donnent toujours.
+
 ## [1.59.1](https://github.com/djkix/mp3-scene/compare/v1.59.0...v1.59.1) (2026-11-23)
 
 ### Résumé

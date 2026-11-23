@@ -1006,5 +1006,6 @@ def test_artist_info_gives_years_labels_partners_and_top(user_client, library, s
     conn.execute("INSERT INTO plays(user_id, track_id, played_at) SELECT id, ?, 1 FROM users WHERE username='user'", (tid,))
     conn.commit()
     info = user_client.get("/api/artist-info", params={"name": "A-Trak"}).json()
-    assert (info["first"], info["last"]) == (2015, 2015) and info["labels"] == [{"name": "Fool's Gold", "releases": 1}]
+    assert info["lists"]["releases"]["n"] == 1 and info["lists"]["releases"]["size"] > 0 and info["lists"]["mixes"] == {"n": 0, "size": 0}
+    assert set(info["lists"]) == {"releases", "with", "appears", "mixes"} and info["labels"] == [{"name": "Fool's Gold", "releases": 1}]
     assert info["with"] == [{"name": "Andrew Wyatt", "tracks": 1}] and [(x["id"], x["plays"]) for x in info["top"]] == [(rid, 1)]
