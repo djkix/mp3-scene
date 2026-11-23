@@ -4,6 +4,22 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.59.0](https://github.com/djkix/mp3-scene/compare/v1.58.0...v1.59.0) (2026-11-23)
+
+### Résumé
+
+**Onglet Séries, autres versions d'un morceau, fiche d'artiste enrichie, pas de fondu dans une même release.**
+
+- **Séries** : nouvel onglet d'Explorer, qui liste les séries d'au moins trois volumes (« Kontor Top Of The Clubs »,
+  « Serious Beats »…) avec leur nombre de releases et leur poids ; un clic ouvre la page de la série, ses volumes
+  dans l'ordre et les numéros absents.
+- **Autres versions** : dans le menu d'une piste, la liste des pistes du même artiste et du même titre (remixes,
+  edits, la même piste sur une autre release), le meilleur débit d'abord ; un clic lit la version choisie.
+- **Artiste** : sa page indique ses années d'activité dans la bibliothèque, ses labels, les artistes avec qui il
+  signe le plus de pistes et ses releases les plus écoutées.
+- **Fondu enchaîné** : deux pistes d'une même release s'enchaînent sans fondu, pour ne pas abîmer un album ou une
+  compilation mixée.
+
 ## [1.58.0](https://github.com/djkix/mp3-scene/compare/v1.57.1...v1.58.0) (2026-11-23)
 
 ### Résumé

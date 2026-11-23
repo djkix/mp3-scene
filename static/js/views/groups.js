@@ -2,7 +2,7 @@
 // releases et le poids. #/groups/<nom>, #/artists/<nom>, #/labels/<nom> et #/genres/<nom> ouvrent les
 // releases correspondantes. Les filtres Genre et Année sont dans l'adresse et suivent d'une page à l'autre.
 import { api, fmtSize } from '../api.js';
-import { el } from '../dom.js';
+import { el, relName, relHref } from '../dom.js';
 import { t as tr, catLabel } from '../i18n.js';
 import * as releases from './releases.js';
 import { trackList } from './tracklist.js';
@@ -10,9 +10,10 @@ import { trackList } from './tracklist.js';
 const MAX_ROWS = 1000; // au-delà, on demande d'affiner (des dizaines de milliers d'artistes figeraient la page)
 // route -> [onglet, en-tête de colonne, valeur de `by` côté serveur, paramètre de /releases qui épingle la liste]
 const KINDS = { groups: ['Groupes', 'Groupe', 'grp', 'grp'], artists: ['Artistes', 'Artiste', 'artist', 'artist'],
-  labels: ['Labels', 'Label', 'label', 'label'], genres: ['Genres', 'Genre', 'genre', 'genre'] };
+  labels: ['Labels', 'Label', 'label', 'label'], genres: ['Genres', 'Genre', 'genre', 'genre'],
+  series: ['Séries', 'Série', 'series', null] }; // une série ouvre sa propre page (volumes dans l'ordre), pas une liste épinglée
 // Onglets d'Explorer, dans l'ordre affiché.
-const TABS = [['artists', 'Artistes'], ['genres', 'Genres'], ['categories', 'Catégories'], ['labels', 'Labels'], ['groups', 'Groupes']];
+const TABS = [['artists', 'Artistes'], ['genres', 'Genres'], ['categories', 'Catégories'], ['series', 'Séries'], ['labels', 'Labels'], ['groups', 'Groupes']];
 export const tabs = (current, genre = '', year = '') => el('div', { class: 'tabs', role: 'tablist', 'aria-label': tr('Explorer') },
   TABS.map(([k, label]) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(k === current),
     onclick: () => { location.hash = `#/${k}` + qs({ genre: k === 'genres' ? '' : genre, year }); } }, tr(label))));
@@ -30,6 +31,8 @@ function detail(container, kind, params) {
   // artiste : le total puis le détail par catégorie, sur une ligne sous les onglets
   const split = el('span');
   const kinds = el('p', { class: 'grp-kinds muted' }, total, split);
+  // artiste : années d'activité, labels, artistes associés et releases les plus écoutées, une ligne chacun
+  const facts = el('div', { class: 'grp-facts muted' });
   // artiste : ses releases, celles dont le nom l'associe à un autre (feat, vs, &), ou celles des autres
   // (compilations) où il signe une piste
   const other = kind === 'artists' && { with: 'collab', appears: 'appears', mixes: 'mixes' }[params.in];
@@ -41,7 +44,7 @@ function detail(container, kind, params) {
     ...(kind === 'artists' ? [el('div', { class: 'tabs', role: 'tablist', 'aria-label': name },
       tabBtn(tr('Releases'), !other, base), tabBtn(tr('Avec'), other === 'collab', base + '?in=with'),
       tabBtn(tr('Apparitions'), other === 'appears', base + '?in=appears'), tabBtn(tr('Mixes'), other === 'mixes', base + '?in=mixes'))] : []),
-    ...(kind === 'artists' && !other ? [kinds, years] : []), list);
+    ...(kind === 'artists' && !other ? [kinds, facts, years] : []), list);
   // chronologie : une pastille par année avec son nombre de releases ; un clic filtre la liste sur cette année
   if (kind === 'artists' && !other) api('/groups?' + new URLSearchParams({ by: 'year', artist: name })).then((rows) => {
     if (rows.length < 2) return;
@@ -51,6 +54,15 @@ function detail(container, kind, params) {
       onclick: () => { location.hash = base + qs({ genre: params.genre, year: picked.includes(String(y.name)) ? '' : y.name }); } },
     `${y.name} `, el('small', {}, String(y.releases)))));
   }).catch(() => {});
+  if (kind === 'artists' && !other) api('/artist-info?' + new URLSearchParams({ name })).then((a) => {
+    const line = (label, items) => items.length && el('p', {}, el('b', {}, label), ' ', ...items.flatMap((x, i) => [i ? ' · ' : '', x]));
+    facts.replaceChildren(...[
+      a.first && line(tr('Actif'), [a.first === a.last ? String(a.first) : tr('de {0} à {1}', a.first, a.last)]),
+      line(tr('Labels'), a.labels.map((l) => el('span', {}, el('a', { href: `#/labels/${encodeURIComponent(l.name)}` }, l.name), ` (${l.releases})`))),
+      line(tr('Souvent avec'), a.with.map((w) => el('span', {}, el('a', { href: `#/artists/${encodeURIComponent(w.name)}` }, w.name), ` (${w.tracks})`))),
+      line(tr('Vos plus écoutées'), a.top.map((r) => el('span', {}, el('a', { href: relHref(r.name, r.id) }, relName(r.name)), ` (${r.plays})`))),
+    ].filter(Boolean));
+  }).catch(() => {}); // facultatif
   // longs mixes où un chapitre (fichier .cue) est de cet artiste : la lecture démarre à son morceau
   if (other === 'mixes') return trackList(list, { path: '/tracks?mixes=' + encodeURIComponent(name),
     empty: tr('Aucun mix où cet artiste figure dans un chapitre.') });
@@ -95,7 +107,7 @@ function series(container, params) {
   const name = params.rest;
   const total = el('span', { class: 'muted' }), miss = el('p', { class: 'status', role: 'status' }, tr('Chargement…'));
   const list = el('ul', { class: 'rel-list' });
-  container.replaceChildren(el('h1', { class: 'grp-title' }, tr('Série'), ' › ', name, ' ', total), miss, list);
+  container.replaceChildren(el('h1', { class: 'grp-title' }, el('a', { href: '#/series' }, tr('Séries')), ' › ', name, ' ', total), miss, list);
   let dead = false;
   api('/series?' + new URLSearchParams({ name })).then((s) => {
     if (dead) return;
@@ -107,7 +119,7 @@ function series(container, params) {
 }
 
 export function render(container, params) {
-  if (params.kind === 'series') return series(container, params);
+  if (params.kind === 'series' && params.rest) return series(container, params);
   if (params.kind === 'categories') return categories(container, params);
   const kind = KINDS[params.kind] ? params.kind : 'groups';
   const [, label, by, pin] = KINDS[kind];

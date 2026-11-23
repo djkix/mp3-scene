@@ -1,6 +1,6 @@
 // Bouton « ajouter à une playlist » et sa boîte de dialogue (une seule, réutilisée).
 import { api } from './api.js';
-import { el } from './dom.js';
+import { el, relName } from './dom.js';
 import { t as tr } from './i18n.js';
 import { player } from './player.js';
 
@@ -18,6 +18,21 @@ async function techDialog(track) {
     .filter(([, v]) => v);
   dlg.replaceChildren(el('h2', {}, tr('Détails techniques')),
     el('dl', { class: 'tech' }, rows.flatMap(([k, v]) => [el('dt', {}, k), el('dd', {}, String(v))])),
+    el('div', { class: 'fx-foot' }, el('span'), el('button', { type: 'button', class: 'primary', onclick: () => dlg.close() }, tr('Fermer'))));
+  dlg.showModal();
+}
+
+// Autres versions d'un morceau dans la bibliothèque (remixes, edits, autres releases), le meilleur débit d'abord ;
+// un clic lit la version choisie.
+async function versionsDialog(track) {
+  dlg ??= document.body.appendChild(el('dialog', { class: 'pl-add' }));
+  const { items } = await api(`/tracks/${track.id}/versions`);
+  dlg.replaceChildren(el('h2', {}, tr('Autres versions')),
+    items.length ? el('div', { class: 'pl-add-list versions' }, items.map((t, i) => el('button', { type: 'button',
+      onclick: () => { player.playTracks(items.slice(), i); dlg.close(); } },
+    el('b', {}, t.artist ? `${t.artist} - ${t.title}` : t.title),
+    el('small', {}, [relName(t.release_name), t.bitrate && `${Math.round(t.bitrate / 1000)} kbit/s`].filter(Boolean).join(' · ')))))
+      : el('p', { class: 'status' }, tr('Aucune autre version dans la bibliothèque.')),
     el('div', { class: 'fx-foot' }, el('span'), el('button', { type: 'button', class: 'primary', onclick: () => dlg.close() }, tr('Fermer'))));
   dlg.showModal();
 }
@@ -49,6 +64,7 @@ export async function openMenu(btn, payload, tracks = null) {
       item('queue', tr('Ajouter à la file'), () => player.enqueue(tracks, false)),
       tracks.length === 1 && tracks[0].release_id != null ? item('radio', tr('Radio'), () => player.radio(tracks[0].release_id, tracks),
         tr('Lire cette piste, puis sans fin des pistes proches')) : null,
+      tracks.length === 1 && tracks[0].title ? item('disc', tr('Autres versions'), () => versionsDialog(tracks[0])) : null,
       tracks.length === 1 ? item('info', tr('Détails techniques'), () => techDialog(tracks[0])) : null,
       el('hr')] : []),
     el('p', { class: 'menu-cap' }, tr('Ajouter à une playlist')), lists);

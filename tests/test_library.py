@@ -1,4 +1,5 @@
 import pytest
+from app import db
 from fastapi import HTTPException
 
 from app.security import safe_path
@@ -974,3 +975,36 @@ def test_classify_rereads_titles_left_by_the_old_parser(tmp_path):
                      " VALUES (?,?,'','Compilations',0,0,1,0,0,'VA',?)", (path, name, title))
     db.classify(conn)
     assert [r[0] for r in conn.execute("SELECT title FROM releases ORDER BY path")] == ["La Rocca - Ballroom Tunes 6", "Corrigé à la main"]
+
+
+def test_series_are_listed_from_three_volumes(user_client, settings):
+    conn = db.connect(settings.data_dir)
+    for i, t in enumerate(["Kontor Top Of The Clubs Vol 1", "Kontor Top Of The Clubs 2", "Kontor Top Of The Clubs Vol. 4",
+                           "Other Series 1", "Other Series 2", "Seul"]):
+        conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, artist, title)"
+                     " VALUES (?,?,'','Compilations',0,0,10,0,0,'VA',?)", (f"s{i}", f"VA-{i}", t))
+    conn.commit()
+    assert user_client.get("/api/groups", params={"by": "series"}).json() == [{"name": "Kontor Top Of The Clubs", "releases": 3, "size": 30}]
+
+
+def test_track_versions_share_artist_and_song(user_client, library, settings):
+    conn = db.connect(settings.data_dir)
+    one = conn.execute("SELECT id FROM tracks WHERE title='Ibanez'").fetchone()[0]
+    rel = conn.execute("SELECT release_id FROM tracks WHERE title='Glue'").fetchone()[0]
+    for title, artist in (("Ibanez (Club Mix)", "A-Trak feat. Someone"), ("Ibanez (Cover)", "Bicep"), ("Ibanezzz", "A-Trak")):
+        conn.execute("INSERT INTO tracks(release_id, relpath, size, title, artist) VALUES (?,?,1,?,?)", (rel, title + ".mp3", title, artist))
+    conn.commit()
+    assert [t["title"] for t in user_client.get(f"/api/tracks/{one}/versions").json()["items"]] == ["Ibanez (Club Mix)"]
+    assert user_client.get("/api/tracks/999999/versions").status_code == 404
+
+
+def test_artist_info_gives_years_labels_partners_and_top(user_client, library, settings):
+    conn = db.connect(settings.data_dir)
+    rid, tid = conn.execute("SELECT release_id, id FROM tracks WHERE title='Ibanez'").fetchone()
+    conn.execute("UPDATE releases SET label='Fool''s Gold' WHERE id=?", (rid,))
+    conn.execute("INSERT INTO tracks(release_id, relpath, size, title, artist) VALUES (?,'x.mp3',1,'X','A-Trak feat. Andrew Wyatt')", (rid,))
+    conn.execute("INSERT INTO plays(user_id, track_id, played_at) SELECT id, ?, 1 FROM users WHERE username='user'", (tid,))
+    conn.commit()
+    info = user_client.get("/api/artist-info", params={"name": "A-Trak"}).json()
+    assert (info["first"], info["last"]) == (2015, 2015) and info["labels"] == [{"name": "Fool's Gold", "releases": 1}]
+    assert info["with"] == [{"name": "Andrew Wyatt", "tracks": 1}] and [(x["id"], x["plays"]) for x in info["top"]] == [(rid, 1)]

@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 from pydantic import Field
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
+from . import artists
 from .naming import complete_title
 from .deps import MAX_INT, Id, current_user, get_conn
 from .security import safe_path
@@ -204,11 +205,11 @@ def filters(conn=Depends(get_conn)):
 
 
 # regroupements de la page Explorer : colonnes autorisées (jamais de texte du client dans le SQL)
-GROUP_BY = {"grp": "grp", "artist": "COALESCE(tag_artist, artist)", "genre": "genre", "label": "NULLIF(label, '')", "category": "category", "year": "year"}
+GROUP_BY = {"series": "title", "grp": "grp", "artist": "COALESCE(tag_artist, artist)", "genre": "genre", "label": "NULLIF(label, '')", "category": "category", "year": "year"}
 
 
 @router.get("/api/groups")
-def groups(by: Literal["grp", "artist", "genre", "label", "category", "year"] = "grp", name: str | None = None, genre: Many = None,
+def groups(by: Literal["grp", "artist", "genre", "label", "category", "year", "series"] = "grp", name: str | None = None, genre: Many = None,
            year: Years = None, decade: Years = None, artist: str | None = Query(None, max_length=200), conn=Depends(get_conn)):
     """Releases regroupées par groupe, artiste, genre ou label : nombre et poids total, restreints au genre / à l'année."""
     col = GROUP_BY[by]
@@ -229,6 +230,16 @@ def groups(by: Literal["grp", "artist", "genre", "label", "category", "year"] = 
         params += [d, d + 9]
     if when:
         conds.append("(" + " OR ".join(when) + ")")
+    if by == "series":  # début de titre commun (voir _series) : calculé ici, pas en SQL ; trois volumes au moins
+        # ponytail: tous les titres relus à chaque appel (~0,1 s pour 45 000) ; colonne releases.series si trop lent
+        found = {}
+        for title, size in conn.execute("SELECT title, size FROM releases WHERE " + " AND ".join(conds), params):
+            # « Live at Electric Zoo (New York » : coupé dans une parenthèse, ce n'est pas un nom de série
+            if (name := _series(title)) and name.count("(") == name.count(")"):
+                g = found.setdefault(name.casefold(), {"name": name, "releases": 0, "size": 0})
+                g["releases"] += 1
+                g["size"] += size or 0
+        return sorted((g for g in found.values() if g["releases"] >= 3), key=lambda g: (-g["releases"], g["name"].casefold()))
     # ponytail: liste entière sans pagination (l'interface n'affiche que les 1000 premières lignes) ; paginer si lourd
     return [dict(r) for r in conn.execute(
         f"SELECT {col} AS name, COUNT(*) AS releases, SUM(size) AS size FROM releases WHERE " + " AND ".join(conds)
@@ -275,6 +286,61 @@ def search_tracks(q: str = Query("", max_length=200), category: Many = None, gen
         if c:
             item["chapter"] = dict(c)
     return page
+
+
+def _song(title: str | None) -> str:
+    """Morceau sans sa version : « Crazy (Club Mix) », « Crazy feat. X [Dub] » -> « crazy »."""
+    return re.sub(r"\s+(feat|ft|featuring)\b\.?\s.*$", "", re.sub(r"\s*[(\[].*$", "", title or ""), flags=re.I).strip().casefold()
+
+
+@router.get("/api/tracks/{tid}/versions")
+def track_versions(tid: Id, user=Depends(current_user), conn=Depends(get_conn)):
+    """Autres versions d'un morceau dans la bibliothèque : même artiste principal, même titre avant la parenthèse
+    (remixes, edits, la même piste sur une autre release). Le meilleur débit d'abord."""
+    t = conn.execute("SELECT title, artist FROM tracks WHERE id=?", (tid,)).fetchone()
+    if t is None:
+        raise HTTPException(404, "Piste introuvable.")
+    song, who = _song(t["title"]), t["artist"] and artists.fold(artists.main(t["artist"]))
+    if len(song) < 2 or not who:
+        return {"items": []}
+    # ponytail: LIKE sur le début du titre, sans index (~0,1 s pour 500 000 pistes) ; « Crazy - Club Mix » (version
+    # après un tiret) n'est pas rapproché
+    rows = conn.execute(
+        f"SELECT {TRACK_COLS} FROM {TRACK_FROM} WHERE r.hidden=0 AND t.id!=? AND t.title LIKE ? ESCAPE '!'"
+        " ORDER BY t.bitrate DESC, t.id LIMIT 2000", (user["id"], tid, re.sub(r"([!%_])", r"!\1", song) + "%"))
+    items = [_track(x) for x in rows if _song(x["title"]) == song and x["artist"]
+             and artists.fold(artists.main(x["artist"])) == who]
+    return {"items": items[:100]}
+
+
+_CREDIT = re.compile(r"\s*(?:\b(?:feat|ft|featuring|vs|versus|with|and|pres|presents)\b\.?|[&+,;/])\s*", re.I)
+
+
+@router.get("/api/artist-info")
+def artist_info(name: str = Query(min_length=1, max_length=200), user=Depends(current_user), conn=Depends(get_conn)):
+    """Fiche d'un artiste : années d'activité dans la bibliothèque, labels, artistes avec qui il signe le plus de
+    pistes, et ses releases les plus écoutées par l'utilisateur."""
+    mine = "COALESCE(r.tag_artist, r.artist)=? AND r.hidden=0"
+    span = conn.execute(f"SELECT MIN(r.year) AS first, MAX(r.year) AS last FROM releases r WHERE {mine}", (name,)).fetchone()
+    labels = [dict(x) for x in conn.execute(
+        f"SELECT r.label AS name, COUNT(*) AS releases FROM releases r WHERE {mine} AND NULLIF(r.label, '') IS NOT NULL"
+        " GROUP BY 1 ORDER BY releases DESC, 1 COLLATE NOCASE LIMIT 6", (name,))]
+    # crédits des pistes où il figure avec d'autres : « Bob Sinclar feat. Steve Edwards », « A & B »
+    # ponytail: LIKE sur l'artiste de toutes les pistes (~0,1 s pour 500 000) ; table des crédits si trop lent
+    me, others, spelling = artists.fold(name), {}, {}
+    for credit, n in conn.execute("SELECT artist, COUNT(*) FROM tracks WHERE artist LIKE ? ESCAPE '!' AND artist!=? GROUP BY 1",
+                                  ("%" + re.sub(r"([!%_])", r"!\1", name) + "%", name)):
+        parts = {artists.fold(x): x.strip(" ()[]") for x in _CREDIT.split(credit) if x.strip(" ()[]")}
+        if me in parts:
+            for k, x in parts.items():
+                if k != me and k:
+                    others[k] = others.get(k, 0) + n
+                    spelling.setdefault(k, x)
+    top = [dict(x) for x in conn.execute(
+        f"SELECT r.id, r.name, COUNT(*) AS plays FROM plays p JOIN tracks t ON t.id=p.track_id JOIN releases r ON r.id=t.release_id"
+        f" WHERE p.user_id=? AND {mine} GROUP BY r.id ORDER BY plays DESC, r.name COLLATE NOCASE LIMIT 5", (user["id"], name))]
+    return {"first": span["first"], "last": span["last"], "labels": labels, "top": top,
+            "with": [{"name": spelling[k], "tracks": n} for k, n in sorted(others.items(), key=lambda kv: (-kv[1], kv[0]))[:8]]}
 
 
 @router.get("/api/folders")

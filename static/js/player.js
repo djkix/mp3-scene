@@ -269,7 +269,8 @@ function prime() {
     o.load();
     primedId = t.id;
   }
-  const x = canFade ? prefs.fade : 0;
+  // deux pistes d'une même release (album, compilation mixée) s'enchaînent telles quelles, sans fondu
+  const x = canFade && t.release_id !== player.queue.current()?.release_id ? prefs.fade : 0;
   if (x > 0 && left <= x && d > 3 * x) { // fondu : la suivante démarre avant la fin de la courante
     player.queue.next({ auto: true });
     swap(x);
@@ -362,7 +363,7 @@ function openAudioPrefs() {
     return [btn, note];
   };
   const [eqHelp, eqNote] = help(tr("Sur iPhone, l'égaliseur et le nivellement peuvent couper le son écran verrouillé : remettez-les à zéro puis rechargez la page."));
-  const [fadeHelp, fadeNote] = help(canFade ? tr("Les pistes s'enchaînent sans blanc ; le fondu les fait se chevaucher.")
+  const [fadeHelp, fadeNote] = help(canFade ? tr("Les pistes s'enchaînent sans blanc ; le fondu les fait se chevaucher, sauf entre deux pistes d'une même release.")
     : tr("Les pistes s'enchaînent sans blanc. Le fondu n'est pas possible sur cet appareil."));
   const [origHelp, origNote] = help(tr('Sans ce réglage, ces fichiers sont écoutés convertis en MP3 320 kbit/s, plus légers. Il s’applique à partir de la piste suivante.'));
   fxDlg.replaceChildren(el('h2', {}, tr('Réglages audio')),
