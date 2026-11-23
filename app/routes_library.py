@@ -144,7 +144,7 @@ def mix(category: Many = None, genre: Many = None, year: Years = None,
         conds.append(f"r.id IN ({','.join('?' * len(release))})")
         params += release
     if song:
-        conds.append(f"{SONG}=lower(?)")
+        conds.append(f"{song_key(conn)}=lower(?)")
         params.append(song.strip())
     if appears is not None:  # seulement ses pistes, pas toute la compilation
         conds.append("t.artist=? COLLATE NOCASE")
@@ -245,11 +245,27 @@ GROUP_BY = {"series": "title", "grp": "grp", "artist": "COALESCE(tag_artist, art
 
 # titre d'un morceau sans sa version : « Crazy (Club Mix) », « Crazy [Dub] », « Crazy - Club Mix » -> « crazy »
 _T = """replace(ltrim(t.title, '_.-*~#>| '), '_', ' ')"""  # « _All_These_Things », « ....On The Radio » : dès la première lettre
-SONG_RAW = f"""trim(CASE WHEN instr({_T}, '(') > 1 THEN substr({_T}, 1, instr({_T}, '(') - 1)
-  WHEN instr({_T}, '[') > 1 THEN substr({_T}, 1, instr({_T}, '[') - 1)
-  WHEN instr({_T}, ' - ') > 1 THEN substr({_T}, 1, instr({_T}, ' - ') - 1) ELSE {_T} END)"""
-# titres fusionnés à la main (Administration › Règles) : la clé d'un titre rattaché devient celle de sa cible
-SONG = f"COALESCE((SELECT lower(ta.target) FROM title_aliases ta WHERE ta.key=lower({SONG_RAW})), lower({SONG_RAW}))"
+
+
+def _raw(c: str) -> str:
+    """Titre `c` sans sa version : « Crazy (Club Mix) », « Crazy [Dub] », « Crazy - Club Mix » -> « Crazy »."""
+    return (f"trim(CASE WHEN instr({c}, '(') > 1 THEN substr({c}, 1, instr({c}, '(') - 1)"
+            f" WHEN instr({c}, '[') > 1 THEN substr({c}, 1, instr({c}, '[') - 1)"
+            f" WHEN instr({c}, ' - ') > 1 THEN substr({c}, 1, instr({c}, ' - ') - 1) ELSE {c} END)")
+
+
+SONG_RAW = _raw(_T)
+
+
+def _key(raw: str, aliases: bool) -> str:
+    """Clé d'un titre ; avec des fusions manuelles, celle de la cible pour un titre rattaché."""
+    return f"COALESCE((SELECT lower(ta.target) FROM title_aliases ta WHERE ta.key=lower({raw})), lower({raw}))" if aliases else f"lower({raw})"
+
+
+def song_key(conn) -> str:
+    """Expression SQL de la clé d'un titre (filtres d'un seul titre : pistes, lecture aléatoire). Sans fusion manuelle,
+    la sous-requête par piste est évitée."""
+    return _key(SONG_RAW, conn.execute("SELECT 1 FROM title_aliases LIMIT 1").fetchone() is not None)
 
 
 @router.get("/api/titles")
@@ -259,20 +275,24 @@ def titles(genre: Many = None, year: Years = None, decade: Years = None, categor
     et leur poids. Seuls les titres présents au moins deux fois sont listés ; `song` donne le seul titre demandé."""
     conds, params = _release_conds(category, genre, year, decade=decade)
     conds.append("t.title IS NOT NULL")
+    aliases = conn.execute("SELECT 1 FROM title_aliases LIMIT 1").fetchone() is not None
     having = "COUNT(*) >= 2"
     if song is not None:
-        conds.append(f"{SONG}=lower(?)")
+        conds.append(f"{_key(SONG_RAW, aliases)}=lower(?)")
         params.append(song.strip())
         having = "1"
     # ponytail: toutes les pistes regroupées à chaque appel (~0,5 s pour 340 000) ; table des titres si trop lent
     # tout en capitales ou tout en minuscules (« GET UP ») : une capitale par mot (« Get Up »)
     pretty = lambda t: t if not (t.isupper() or t.islower()) else artists.capitalize(t.lower())
+    # trois niveaux : le titre nettoyé puis sans sa version ne sont calculés qu'une fois par piste
+    inner = (f"SELECT {SONG_RAW} AS rr, t.size AS sz FROM tracks t JOIN releases r ON r.id=t.release_id WHERE " + " AND ".join(conds))
+    # MATERIALIZED : sans lui, SQLite recopie l'expression du titre à chaque usage (quatre fois plus lent)
     return [{"name": pretty(r[1]), "releases": r[2], "size": r[3]} for r in conn.execute(
-        # nom affiché : le titre sans sa version, dans la graphie qui vient en premier (capitales avant minuscules)
-        f"SELECT {SONG} AS k, COALESCE((SELECT ta.target FROM title_aliases ta WHERE lower(ta.target)={SONG} LIMIT 1), MIN({SONG_RAW}))"
-        " AS shown, COUNT(*), COALESCE(SUM(t.size), 0)"
-        " FROM tracks t JOIN releases r ON r.id=t.release_id WHERE " + " AND ".join(conds)
-        + f" GROUP BY k HAVING {having} ORDER BY COUNT(*) DESC, k", params)]
+        f"WITH s AS MATERIALIZED ({inner}), g AS MATERIALIZED (SELECT {_key('rr', aliases)} AS k, MIN(rr) AS shown, COUNT(*) AS n,"
+        f" COALESCE(SUM(sz), 0) AS size FROM s GROUP BY k HAVING k != '' AND {having})"
+        # un titre fusionné à la main s'affiche sous le nom de sa cible ; sinon la graphie qui vient en premier
+        " SELECT k, COALESCE((SELECT ta.target FROM title_aliases ta WHERE lower(ta.target)=k LIMIT 1), shown), n, size FROM g"
+        " ORDER BY n DESC, k", params)]
 
 
 @router.get("/api/groups")
@@ -379,7 +399,7 @@ def search_tracks(q: str = Query("", max_length=200), category: Many = None, gen
         conds, params = f"t.id IN (SELECT c.track_id FROM chapters c WHERE {in_chapter})", [mixes]
     if song:  # page d'un titre (Explorer › Titres) : toutes ses versions
         in_chapter, likes = "0", []
-        conds, params = f"{SONG}=lower(?)", [song.strip()]
+        conds, params = f"{song_key(conn)}=lower(?)", [song.strip()]
     if remixes:  # page d'un artiste : les pistes dont le titre le crédite d'une version (« Axwell Remix »)
         in_chapter, likes = "0", []
         conds, params = _remix_conds(remixes)

@@ -4,6 +4,15 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.69.1](https://github.com/djkix/mp3-scene/compare/v1.69.0...v1.69.1) (2026-11-23)
+
+### Résumé
+
+**Onglet Titres plus rapide, sans titre vide.**
+
+- La liste des titres se calcule trois fois plus vite (le titre nettoyé n'est plus recalculé à chaque usage), et un
+  titre fait seulement de signes n'apparaît plus vide.
+
 ## [1.69.0](https://github.com/djkix/mp3-scene/compare/v1.68.0...v1.69.0) (2026-11-23)
 
 ### Résumé
