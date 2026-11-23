@@ -4,6 +4,19 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.64.0](https://github.com/djkix/mp3-scene/compare/v1.63.0...v1.64.0) (2026-11-23)
+
+### Résumé
+
+**Séries regroupées par famille, page d'une série avec filtres et en-tête.**
+
+- **Familles** : les séries qui partagent leur début (« Hed Kandi Beach House », « Hed Kandi Nu Cool »…) ne font
+  plus qu'une ligne dans l'onglet Séries, avec leur nombre. Sur la page de la famille, un bloc par série, comme pour
+  les catégories : un clic s'y limite, un second revient à l'ensemble.
+- **Page d'une série** : mêmes onglets et mêmes filtres (Genre, Années, texte) que la liste des séries, et un en-tête
+  en deux colonnes — séries, releases, poids, détail par catégorie et années à gauche ; genres, labels et volumes
+  absents à droite. Les chiffres portent sur ce qui est affiché.
+
 ## [1.63.0](https://github.com/djkix/mp3-scene/compare/v1.62.0...v1.63.0) (2026-11-23)
 
 ### Résumé

@@ -984,7 +984,7 @@ def test_series_are_listed_from_three_volumes(user_client, settings):
         conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, artist, title)"
                      " VALUES (?,?,'','Compilations',0,0,10,0,0,'VA',?)", (f"s{i}", f"VA-{i}", t))
     conn.commit()
-    assert user_client.get("/api/groups", params={"by": "series"}).json() == [{"name": "Kontor Top Of The Clubs", "releases": 3, "size": 30}]
+    assert user_client.get("/api/groups", params={"by": "series"}).json() == [{"name": "Kontor Top Of The Clubs", "releases": 3, "size": 30, "series": 1}]
 
 
 def test_track_versions_share_artist_and_song(user_client, library, settings):
@@ -1086,3 +1086,21 @@ def test_genre_guess_group_info_and_track_artist_case(admin_client, settings):
     assert info["others"] == [{"name": "GRP", "releases": 3}, {"name": "XYZ", "releases": 1}]
     db.merge_track_artists(conn)
     assert [r[0] for r in conn.execute("SELECT DISTINCT artist FROM tracks WHERE artist LIKE 'axwell'")] == ["AXWELL"]  # la plus fréquente
+
+
+def test_series_sharing_their_first_words_form_a_family(user_client, settings):
+    conn = db.connect(settings.data_dir)
+    titles = [f"Hed Kandi Beach House {i}" for i in (1, 2, 4)] + [f"Hed Kandi Nu Cool {i}" for i in (1, 2, 3)] + [f"Serious Beats {i}" for i in (1, 2, 3)]
+    for i, t in enumerate(titles):
+        conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, artist, title)"
+                     " VALUES (?,?,'','Compilations',0,0,10,0,0,'VA',?)", (f"f{i}", f"VA-f{i}", t))
+    conn.commit()
+    rows = {g["name"]: g for g in user_client.get("/api/groups", params={"by": "series"}).json()}
+    assert rows == {"Hed Kandi": {"name": "Hed Kandi", "releases": 6, "size": 60, "series": 2},
+                    "Serious Beats": {"name": "Serious Beats", "releases": 3, "size": 30, "series": 1}}
+    fam = user_client.get("/api/series", params={"name": "Hed Kandi"}).json()
+    assert [(x["series"], x["volume"]) for x in fam["items"]] == [("Hed Kandi Beach House", 1), ("Hed Kandi Beach House", 2),
+        ("Hed Kandi Beach House", 4), ("Hed Kandi Nu Cool", 1), ("Hed Kandi Nu Cool", 2), ("Hed Kandi Nu Cool", 3)]
+    assert fam["subs"] == [{"name": "Hed Kandi Beach House", "releases": 3, "missing": [3]}, {"name": "Hed Kandi Nu Cool", "releases": 3, "missing": []}]
+    one = user_client.get("/api/series", params={"name": "Hed Kandi Beach House"}).json()
+    assert len(one["items"]) == 3 and one["missing"] == [3] and one["subs"] == []

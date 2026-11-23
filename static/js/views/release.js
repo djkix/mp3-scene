@@ -24,7 +24,7 @@ export function render(container, params) {
     const nfo = el('div'), sim = el('div'), vers = el('div'), chap = el('div'), ser = el('div');
     container.replaceChildren(el('div', { class: 'detail' }, header(rel), ser, trackTable(rel), chap, vers, nfo, sim));
     // série (« Global Underground 47 ») : volume précédent, page de la série, volume suivant
-    if (rel.series) api('/series?' + new URLSearchParams({ name: rel.series })).then((s) => {
+    if (rel.series) api('/series?' + new URLSearchParams({ name: rel.series, exact: 1 })).then((s) => {
       if (dead || s.items.length < 2) return;
       const i = s.items.findIndex((x) => x.id === rel.id);
       const step = (x, text) => x && el('a', { class: 'btn', href: relHref(x.name, x.id), title: relName(x.name) }, text);

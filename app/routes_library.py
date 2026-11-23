@@ -1,5 +1,6 @@
 import re
 import time
+from collections import Counter
 from typing import Annotated, Literal
 
 from pydantic import Field
@@ -230,8 +231,16 @@ def groups(by: Literal["grp", "artist", "genre", "label", "category", "year", "s
         params += [d, d + 9]
     if when:
         conds.append("(" + " OR ".join(when) + ")")
-    if by == "series":
-        return [{k: g[k] for k in ("name", "releases", "size")} for g in _all_series(conn, conds, params)]
+    if by == "series":  # une ligne par famille : « Hed Kandi » réunit « Hed Kandi Beach House », « Hed Kandi Nu Cool »…
+        every = _all_series(conn, conds, params)
+        fam, out = _families(every), {}
+        for g in every:
+            f = fam.get(g["name"].casefold(), g["name"])
+            row = out.setdefault(f.casefold(), {"name": f, "releases": 0, "size": 0, "series": 0})
+            row["releases"] += g["releases"]
+            row["size"] += g["size"]
+            row["series"] += 1
+        return sorted(out.values(), key=lambda g: (-g["releases"], g["name"].casefold()))
     # ponytail: liste entière sans pagination (l'interface n'affiche que les 1000 premières lignes) ; paginer si lourd
     return [dict(r) for r in conn.execute(
         f"SELECT {col} AS name, COUNT(*) AS releases, SUM(size) AS size FROM releases WHERE " + " AND ".join(conds)
@@ -480,6 +489,35 @@ def _all_series(conn, conds=("hidden=0",), params=()):
     return sorted((g for g in found.values() if g["releases"] >= 3), key=lambda g: (-g["releases"], g["name"].casefold()))
 
 
+def _families(every) -> dict:
+    """{série en minuscules: nom de sa famille} pour les séries qui partagent leurs deux premiers mots : la famille
+    porte leur début commun (« Hed Kandi », « Ministry of Sound »). Une série seule, ou un début commun de moins de
+    huit caractères (« Live at »), reste hors famille."""
+    clusters = {}
+    for g in every:  # les plus fournies d'abord : la graphie de la famille est celle de sa plus grande série
+        words = g["name"].split()
+        clusters.setdefault(tuple(w.casefold() for w in words[:2]), []).append(words)
+    out = {}
+    for members in clusters.values():
+        # le début s'allonge tant qu'un même mot suivant réunit au moins quatre séries sur cinq ; celles qui ne le
+        # portent pas quittent la famille (« Ministry Of House » parmi les « Ministry of Sound … »)
+        n = 2
+        while len(members) > 1:
+            nxt = Counter(w[n].casefold() for w in members if len(w) > n).most_common(1)
+            if not nxt or nxt[0][1] < max(2, 0.8 * len(members)):
+                break
+            members = [w for w in members if len(w) > n and w[n].casefold() == nxt[0][0]]
+            n += 1
+        name = " ".join(members[0][:n])
+        # « The Best », « House Of », « Only for » : un début qui finit par un mot creux ne nomme pas une famille
+        if len(members) > 1 and len(name) >= 8 and members[0][n - 1].casefold() not in _HOLLOW:
+            out.update({" ".join(w).casefold(): name for w in members})
+    return out
+
+
+_HOLLOW = {"of", "the", "for", "a", "an", "and", "to", "in", "at", "up", "on", "by", "best", "very", "top", "de", "la", "le"}
+
+
 def _missing(vols) -> list:
     """Numéros absents entre le plus petit et le plus grand volume présents."""
     vols = {v for v in vols if v < 1000}  # une année (« Hed Kandi 2005 ») n'est pas un numéro de volume
@@ -514,17 +552,32 @@ def suggest(q: str = Query("", max_length=200), conn=Depends(get_conn)):
 
 
 @router.get("/api/series")
-def series(name: str = Query(min_length=1, max_length=200), user=Depends(current_user), conn=Depends(get_conn)):
-    """Volumes d'une série, dans l'ordre de leur numéro, et les numéros absents de la bibliothèque."""
+def series(name: str = Query(min_length=1, max_length=200), exact: bool = False, user=Depends(current_user),
+           conn=Depends(get_conn)):
+    """Volumes d'une série, dans l'ordre de leur numéro, et les numéros absents de la bibliothèque. Si le nom est
+    celui d'une famille (« Hed Kandi »), les volumes de toutes ses séries, chacun avec la sienne (`series`), et le
+    détail par série (`subs`) ; `exact` s'en tient à la série de ce nom (volume précédent et suivant d'une fiche)."""
     like = re.sub(r"([!%_])", r"!\1", name) + " %"
     items = [_release(x) for x in conn.execute(
         f"SELECT {RELEASE_COLS} FROM {RELEASE_FROM} WHERE r.hidden=0 AND r.title LIKE ? ESCAPE '!'", (user["id"], like))]
+    every = [] if exact else _all_series(conn)
+    fam = _families(every)
+    subs = {g["name"].casefold(): g for g in every if fam.get(g["name"].casefold(), "").casefold() == name.casefold()}
+    if len(subs) > 1:
+        items = [x for x in items if (_series(x["title"]) or "").casefold() in subs]
+        for x in items:
+            x["series"] = subs[_series(x["title"]).casefold()]["name"]
+            x["volume"] = int(re.search(r"\d+", x["title"][len(x["series"]):])[0])
+        items.sort(key=lambda x: (x["series"].casefold(), x["volume"], x["year"] or 0, x["name"].lower()))
+        return {"name": name, "items": items, "missing": [],
+                "subs": [{"name": g["name"], "releases": g["releases"], "missing": _missing(g["volumes"])}
+                         for g in sorted(subs.values(), key=lambda g: g["name"].casefold())]}
     # « Global Underground Nubreed 8 » commence comme « Global Underground » : c'est une autre série
     items = [x for x in items if (_series(x["title"]) or "").casefold() == name.casefold()] if _series(name + " 1") else []
     for x in items:
         x["volume"] = int(re.search(r"\d+", x["title"][len(name):])[0])
     items.sort(key=lambda x: (x["volume"], x["year"] or 0, x["name"].lower()))
-    return {"name": name, "items": items, "missing": _missing({x["volume"] for x in items}) if items else []}
+    return {"name": name, "items": items, "missing": _missing({x["volume"] for x in items}) if items else [], "subs": []}
 
 
 _LIVE = re.compile(r"[^-]+-(.+?)_Live(?:_\(|-|$)")

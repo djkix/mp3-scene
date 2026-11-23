@@ -113,18 +113,63 @@ function categories(container, params) {
 }
 
 // Série (#/series/<nom>) : ses volumes dans l'ordre de leur numéro, et les numéros absents de la bibliothèque.
+// Mêmes onglets et mêmes filtres (Genre, Années, texte) que la liste des séries, qui suivent depuis celle-ci ; en-tête
+// en deux colonnes comme sur la page d'un artiste : releases, poids, années et catégories à gauche, genres, labels
+// et volumes absents à droite.
 function series(container, params) {
-  const name = params.rest;
-  const total = el('span', { class: 'muted' }), miss = el('p', { class: 'status', role: 'status' }, tr('Chargement…'));
+  const name = params.rest, { genre = '', year = '', sub = '' } = params;
+  const base = `#/series/${encodeURIComponent(name)}`;
+  const setFilter = (key, value) => { location.hash = base + qs({ genre, year, sub, [key]: value }); };
+  const facts = el('table', { class: 'art-sum' }), found = el('div', { class: 'art-chips' });
+  const status = el('p', { class: 'status', role: 'status' }, tr('Chargement…'));
   const list = el('ul', { class: 'rel-list' });
-  container.replaceChildren(el('h1', { class: 'grp-title' }, el('a', { href: '#/series' }, tr('Séries')), ' › ', name, ' ', total), miss, list);
-  let dead = false;
+  const find = el('input', { type: 'search', placeholder: tr('Filtrer la liste…'), 'aria-label': tr('Filtrer la liste…'), oninput: () => paint() });
+  const bar = el('div', { class: 'filters' }, find);
+  // famille (« Hed Kandi ») : un bloc par série qu'elle réunit, comme les catégories ; un clic s'y limite, un second
+  // sur le même bloc revient à l'ensemble. Les chiffres de l'en-tête portent sur ce qui est affiché.
+  const subsBar = el('div', { class: 'tabs cats subs', role: 'tablist', 'aria-label': tr('Séries') });
+  container.replaceChildren(tabs('series', genre, year),
+    el('h1', { class: 'grp-title' }, el('a', { href: '#/series' + qs({ genre, year }) }, tr('Séries')), ' › ', name),
+    subsBar, el('div', { class: 'art-head' }, facts, found), bar, status, list);
+  let dead = false, all = [], missing = [], subs = [];
+  const genres = genre ? genre.split('|') : [], years = year ? year.split('|') : [];
+  // une année cochée, ou sa décennie (« 1990s »), comme dans les autres listes
+  const inYears = (y) => !years.length || years.some((v) => (/s$/.test(v) ? y >= parseInt(v, 10) && y <= parseInt(v, 10) + 9 : String(y) === v));
+  function paint() {
+    const needle = find.value.trim().toLowerCase();
+    const shown = all.filter((x) => (!sub || x.series === sub) && (!genres.length || genres.includes(x.genre)) && inYears(x.year)
+      && relName(x.name).toLowerCase().includes(needle));
+    const tally = (key) => Object.entries(shown.reduce((m, x) => { if (x[key]) (m[x[key]] ??= { n: 0, size: 0 }, m[x[key]].n++, m[x[key]].size += x.size); return m; }, {}))
+      .sort((p, q) => q[1].n - p[1].n);
+    const line = (label, value) => el('tr', {}, el('th', { scope: 'row' }, label), el('td', {}, value));
+    const ys = shown.map((x) => x.year).filter(Boolean);
+    facts.replaceChildren(el('tbody', {}, subs.length && !sub ? line(tr('Séries'), String(new Set(shown.map((x) => x.series)).size)) : null,
+      line(tr('Releases'), String(shown.length)), line(tr('Poids'), fmtSize(shown.reduce((n, x) => n + x.size, 0))),
+      ...tally('category').map(([c, v]) => line(catLabel(c), `${v.n} · ${fmtSize(v.size)}`)),
+      ys.length ? line(tr('Années'), Math.min(...ys) === Math.max(...ys) ? String(ys[0]) : `${Math.min(...ys)} – ${Math.max(...ys)}`) : null));
+    const group = (label, items) => (items.length ? [el('p', {}, label), el('div', {}, items)] : []);
+    const chip = (route, [k, v]) => el('a', { class: 'chip', href: `#/${route}/${encodeURIComponent(k)}` }, k, el('small', {}, String(v.n)));
+    found.replaceChildren(...group(tr('Genres'), tally('genre').slice(0, 8).map((g) => chip('genres', g))),
+      ...group(tr('Labels'), tally('label').slice(0, 8).map((l) => chip('labels', l))),
+      ...group(tr('Volumes absents'), missing.map((v) => el('span', { class: 'chip' }, String(v)))));
+    list.replaceChildren(...shown.map((x) => releases.row(x)));
+    status.textContent = shown.length ? '' : tr('Aucun résultat');
+  }
+  releases.loadFilters().then((f) => {
+    if (dead) return;
+    bar.append(releases.multi(tr('Genre'), tr('Genres'), 'genre', f.genres, genre, setFilter), releases.yearSelect(f, year, setFilter, releases.multi));
+    if (genre || year) bar.append(el('button', { type: 'button', class: 'reset', onclick: () => { location.hash = base; } }, tr('Réinitialiser')));
+  }).catch(() => {});
   api('/series?' + new URLSearchParams({ name })).then((s) => {
     if (dead) return;
-    total.textContent = count(s.items.length);
-    miss.textContent = !s.items.length ? tr('Aucun résultat') : s.missing.length ? tr('Volumes absents : {0}', s.missing.join(', ')) : '';
-    list.replaceChildren(...s.items.map((x) => releases.row(x)));
-  }).catch((err) => { if (!dead) miss.textContent = err.message; });
+    all = s.items;
+    subs = s.subs;
+    missing = sub ? subs.find((x) => x.name === sub)?.missing || [] : s.missing;
+    // le nom du bloc : ce qui suit celui de la famille (« Beach House ») ; la série qui porte le nom seul le garde
+    subsBar.replaceChildren(...subs.map((x) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(x.name === sub),
+      onclick: () => setFilter('sub', x.name === sub ? '' : x.name) }, x.name.slice(s.name.length).trim() || x.name, el('small', {}, ` ${x.releases}`))));
+    paint();
+  }).catch((err) => { if (!dead) status.textContent = err.message; });
   return () => { dead = true; };
 }
 
@@ -194,7 +239,7 @@ export function render(container, params) {
     const shown = rows.filter((g) => g.name.toLowerCase().includes(needle) && (!letter || initial(g.name) === letter))
       .sort((a, b) => dir * (key === 'name' ? a.name.localeCompare(b.name) : a[key] - b[key]) || a.name.localeCompare(b.name));
     body.replaceChildren(...shown.slice(0, MAX_ROWS).map((g) => el('tr', {},
-      el('td', {}, el('a', { href: href(g.name) }, g.name)),
+      el('td', {}, el('a', { href: href(g.name) }, g.name), g.series > 1 ? el('small', { class: 'muted' }, ' ' + tr('{0} séries', g.series)) : null),
       el('td', { class: 'num' }, String(g.releases)), el('td', { class: 'num' }, fmtSize(g.size)))));
     status.textContent = !shown.length ? tr('Aucun résultat')
       : tr('{0} lignes · {1} · {2}', shown.length, count(shown.reduce((n, g) => n + g.releases, 0)), fmtSize(shown.reduce((n, g) => n + g.size, 0)))
