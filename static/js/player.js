@@ -368,7 +368,7 @@ function applyPrefs() {
 // Deux pictos du lecteur : en plein écran (téléphone), les paroles ou le spectre prennent la place de la pochette ;
 // sur ordinateur, ils s'ouvrent dans un panneau au-dessus de la barre. Paroles : LRCLIB, par le serveur ; elles
 // suivent la musique quand la version minutée a la même durée (à 8 s près : un remix décale tout), sinon en texte.
-// Visualiseur (VU-mètre à segments) : le son passe alors par Web Audio (circuit créé à la première ouverture, jamais avant).
+// Visualiseur (anneau autour de la pochette) : le son passe alors par Web Audio (circuit créé à la première ouverture, jamais avant).
 let stage = null; // 'lyrics' | 'viz' | null
 let vizOn = false, raf = 0;
 let lyr = { id: null };
@@ -440,29 +440,37 @@ function startViz() {
   if (!fx) { ui.stage.replaceChildren(stageMsg(tr('Visualiseur indisponible sur ce navigateur.'))); return; }
   const c = el('canvas', { class: 'pl-viz', 'aria-hidden': 'true' });
   ui.stage.replaceChildren(c, backend ? stageMsg(tr('Pas de spectre pendant une diffusion : le son est joué ailleurs.')) : '');
-  // VU-mètre à segments : colonnes de diodes (accent du thème, puis jaune, rouge en haut), éteintes en couleur de
-  // trait ; un pic par colonne retombe doucement
+  // anneau : la pochette ronde au centre, le spectre rayonne autour en traits arrondis (couleur d'accent du thème),
+  // symétrique gauche-droite : les basses en haut, les aigus en bas
   const g = c.getContext('2d'), data = new Uint8Array(fx.an.frequencyBinCount);
-  const css = getComputedStyle(ui.footer);
-  const lit = [css.getPropertyValue('--accent').trim() || '#3a3', '#EF9F27', '#E24B4A'];
-  const off = css.getPropertyValue('--line').trim() || '#262624';
-  const COLS = 16, ROWS = 14, peaks = new Array(COLS).fill(0);
+  const color = getComputedStyle(ui.footer).getPropertyValue('--accent').trim() || '#3a3';
+  const RAYS = 72;
+  const art = ui.cover; // la pochette du lecteur : déjà chargée, ou celle par défaut s'il n'y en a pas
   const draw = () => {
     if (stage !== 'viz') return;
     const w = Math.round(c.clientWidth * devicePixelRatio), h = Math.round(c.clientHeight * devicePixelRatio);
     if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
     fx.an.getByteFrequencyData(data);
     g.clearRect(0, 0, w, h);
-    const cw = w / COLS, rh = h / ROWS;
-    for (let i = 0; i < COLS; i++) { // échelle logarithmique : les basses ne prennent pas toute la largeur
-      const v = data[Math.min(data.length - 1, Math.floor((data.length * 0.75) ** (i / COLS)))] / 255;
-      const on = Math.round(v * ROWS);
-      peaks[i] = Math.max(peaks[i] - 0.15, on);
-      const pk = Math.min(ROWS - 1, Math.floor(peaks[i]));
-      for (let j = 0; j < ROWS; j++) {
-        g.fillStyle = j < on || (j === pk && pk > 0) ? lit[j >= ROWS - 2 ? 2 : j >= ROWS - 5 ? 1 : 0] : off;
-        g.fillRect(i * cw + cw * 0.15, h - (j + 1) * rh + rh * 0.2, cw * 0.7, rh * 0.6);
-      }
+    const cx = w / 2, cy = h / 2, r0 = Math.min(w, h) * 0.24, room = Math.min(w, h) * 0.22;
+    g.save();
+    g.beginPath();
+    g.arc(cx, cy, r0 * 0.92, 0, Math.PI * 2);
+    g.clip();
+    if (art.complete && art.naturalWidth) g.drawImage(art, cx - r0 * 0.92, cy - r0 * 0.92, r0 * 1.84, r0 * 1.84);
+    else { g.fillStyle = color; g.globalAlpha = 0.35; g.fill(); }
+    g.restore();
+    g.strokeStyle = color;
+    g.lineWidth = Math.max(2, r0 * 0.045);
+    g.lineCap = 'round';
+    for (let i = 0; i < RAYS; i++) {
+      const half = i < RAYS / 2 ? i : RAYS - i; // même fréquence à gauche et à droite
+      const v = data[Math.min(data.length - 1, Math.floor((data.length * 0.75) ** (half / (RAYS / 2))))] / 255;
+      const a = (i / RAYS) * Math.PI * 2 - Math.PI / 2, len = 4 * devicePixelRatio + v * room;
+      g.beginPath();
+      g.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+      g.lineTo(cx + Math.cos(a) * (r0 + len), cy + Math.sin(a) * (r0 + len));
+      g.stroke();
     }
     raf = requestAnimationFrame(draw);
   };

@@ -4,6 +4,13 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.76.3](https://github.com/djkix/mp3-scene/compare/v1.76.2...v1.76.3) (2026-11-24)
+
+### Résumé
+
+- Visualiseur en anneau : la pochette ronde au centre, le spectre rayonne tout autour en traits arrondis (basses en
+  haut, aigus en bas, symétrique), à la place du VU-mètre.
+
 ## [1.76.2](https://github.com/djkix/mp3-scene/compare/v1.76.1...v1.76.2) (2026-11-24)
 
 ### Résumé
