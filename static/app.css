@@ -615,6 +615,9 @@ dialog.pl-add { width: min(360px, calc(100vw - 24px)); padding: 16px; border: 1p
 .switch:checked::after { transform: translateX(16px); }
 @media (prefers-reduced-motion: reduce) { .switch, .switch::after { transition: none; } }
 dialog.cover-dlg { width: min(620px, calc(100vw - 24px)); }
+/* photo à soi : zone de dépôt (clic, glisser-déposer, coller) au-dessus des propositions */
+.photo-drop { border: 2px dashed var(--line); border-radius: 8px; padding: 14px; margin: 0 0 10px; text-align: center; color: var(--muted); cursor: pointer; }
+.photo-drop:hover, .photo-drop:focus-visible, .photo-drop.over { border-color: var(--accent); color: inherit; }
 .cover-rel { margin: 0 0 10px; font: 12px var(--mono); color: var(--muted); overflow-wrap: anywhere; }
 .cover-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; max-height: 60vh; overflow-y: auto; }
 .cover-pick { display: flex; flex-direction: column; gap: 4px; min-height: 0; padding: 4px; }

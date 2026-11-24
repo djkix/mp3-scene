@@ -27,7 +27,7 @@ _ACTIONS = {
     ("PUT", "/labels/aliases"): "Label rattaché", ("DELETE", "/labels/aliases"): "Label détaché",
     ("PUT", "/artists/separate"): "Artiste gardé à part", ("DELETE", "/artists/separate"): "Artiste fusionné à nouveau",
     ("POST", "/scan/retag"): "Relecture des tags", ("DELETE", "/transcode"): "Cache de conversion vidé",
-    ("POST", "/photo"): "Photo choisie", ("DELETE", "/photo"): "Photo retirée",
+    ("POST", "/photo"): "Photo choisie", ("POST", "/photo/url"): "Photo choisie", ("PUT", "/photo"): "Photo déposée", ("DELETE", "/photo"): "Photo retirée",
     ("PUT", "/series/rules"): "Règle de série", ("DELETE", "/series/rules"): "Règle de série retirée",
     ("POST", "/genres/guess"): "Genres proposés appliqués", ("POST", "/sessions/revoke"): "Toutes les sessions fermées",
 }
@@ -341,6 +341,38 @@ def save_photo(body: PhotoPick, request: Request):
         store_photo(settings.data_dir, body.kind, body.name, body.url)
     except IMAGE_ERRORS as e:
         raise HTTPException(400, f"Photo refusée : {e}") from None
+
+
+class PhotoUrl(BaseModel):
+    kind: Literal["artist", "label", "event"] = "artist"
+    name: str = Field(min_length=1, max_length=200)
+    url: str = Field(max_length=2000)
+
+
+@router.post("/photo/url", status_code=204)
+def save_photo_url(body: PhotoUrl, request: Request):
+    """Photo prise à une adresse donnée par l'administrateur (image glissée depuis un autre onglet, adresse collée) :
+    mêmes garde-fous que pour les propositions (https, hôte public, sans redirection, 8 Mo au plus)."""
+    try:
+        store_photo(request.app.state.settings.data_dir, body.kind, body.name, body.url)
+    except IMAGE_ERRORS as e:
+        raise HTTPException(400, f"Photo refusée : {e}") from None
+
+
+@router.put("/photo", status_code=204)
+async def upload_photo(request: Request, kind: Literal["artist", "label", "event"], name: str = Query(min_length=1, max_length=200)):
+    """Photo déposée par l'administrateur (corps de la requête : l'image, JPEG, PNG, WebP ou GIF), réduite et gardée
+    dans les données de l'application."""
+    declared = request.headers.get("content-length") or "0"
+    if not declared.isdigit() or int(declared) > COVER_MAX:
+        raise HTTPException(413, "Image trop lourde (8 Mo au plus).")
+    data = await request.body()
+    if not data or len(data) > COVER_MAX:
+        raise HTTPException(413 if data else 400, "Image trop lourde (8 Mo au plus)." if data else "Image manquante.")
+    try:
+        store_photo(request.app.state.settings.data_dir, kind, name, data=data)
+    except IMAGE_ERRORS:
+        raise HTTPException(400, "Ce fichier n'est pas une image lisible.") from None
 
 
 @router.delete("/photo", status_code=204)

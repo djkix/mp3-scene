@@ -1408,3 +1408,24 @@ def test_live_sets_split_into_festivals_radio_shows_and_artists(user_client, set
     assert photo("Ultra Music Festival") == 404 and got == []  # absent de la bibliothèque : rien n'est cherché
     assert photo("A State of Trance") == 200 and got == ["https://x/a.jpg"]
     assert user_client.get("/api/festivals", params={"type": "radio"}).json()[0]["photo"] is True
+
+
+
+def test_admin_sets_own_photo_by_upload_or_address(admin_client, user_client, monkeypatch):
+    import io
+    from PIL import Image
+    from app import coversearch
+    buf = io.BytesIO()
+    Image.new("RGB", (900, 500), "blue").save(buf, "PNG")
+    q = {"kind": "event", "name": "The Essential Selection"}
+    h = {"X-CSRF": "1"}
+    assert admin_client.put("/api/admin/photo", params=q, content=b"pas une image", headers=h).status_code == 400
+    assert user_client.put("/api/admin/photo", params=q, content=buf.getvalue(), headers=h).status_code == 403
+    assert admin_client.put("/api/admin/photo", params=q, content=buf.getvalue(), headers=h).status_code == 204
+    got = admin_client.get("/api/photo", params=q)
+    assert got.status_code == 200 and Image.open(io.BytesIO(got.content)).size == (600, 333)  # réduite, en JPEG
+    # image glissée depuis une page web : téléchargée par le serveur, avec ses garde-fous
+    seen = []
+    monkeypatch.setattr(coversearch, "fetch", lambda url: seen.append(url) or buf.getvalue())
+    body = {**q, "url": "https://encrypted-tbn0.gstatic.com/images?q=x"}
+    assert admin_client.post("/api/admin/photo/url", json=body, headers=h).status_code == 204 and seen == [body["url"]]

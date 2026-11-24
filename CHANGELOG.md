@@ -4,6 +4,19 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.75.0](https://github.com/djkix/mp3-scene/compare/v1.74.1...v1.75.0) (2026-11-24)
+
+### Résumé
+
+**Vos propres photos.**
+
+- La fenêtre « Chercher une photo » (artistes, labels, festivals, émissions) accepte une image à soi : déposée,
+  choisie sur l'appareil, collée (⌘V / Ctrl+V) ou glissée depuis une page web (téléchargée par le serveur, mêmes
+  garde-fous que les propositions). Réduite à 600 px, gardée dans les données de l'application.
+- Bouton « Chercher sur le web » : Google Images s'ouvre dans un nouvel onglet, le nom déjà saisi.
+- Live & Radio : un nom écrit en minuscules dans les fichiers s'affiche avec ses majuscules quand une autre
+  graphie en a.
+
 ## [1.74.1](https://github.com/djkix/mp3-scene/compare/v1.74.0...v1.74.1) (2026-11-24)
 
 ### Résumé

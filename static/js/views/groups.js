@@ -126,13 +126,48 @@ async function findPhoto(kind, name) {
   dlg.className = 'pl-add cover-dlg';
   const msg = el('p', { class: 'status', role: 'status' }, tr('Recherche…'));
   const grid = el('div', { class: 'cover-grid' });
-  const reload = () => { dlg.close(); dispatchEvent(new HashChangeEvent('hashchange')); };
-  dlg.replaceChildren(el('h2', {}, tr('Chercher une photo')), el('p', { class: 'cover-rel' }, name), grid, msg,
+  // la photo est en cache dans le navigateur : rechargement complet pour voir la nouvelle
+  const reload = () => { dlg.close(); location.reload(); };
+  const fail = (err) => { msg.textContent = err.message; };
+  // image à soi : fichier choisi ou déposé, image collée (copiée depuis un autre onglet), ou image glissée depuis
+  // une page web (le serveur la télécharge)
+  const upload = async (blob) => {
+    msg.textContent = tr('Chargement…');
+    const res = await fetch('/api/admin/photo?' + new URLSearchParams({ kind, name }), { method: 'PUT', body: blob, credentials: 'same-origin',
+      headers: { 'X-CSRF': '1', 'Content-Type': blob.type || 'application/octet-stream' } });
+    if (!res.ok) throw new Error(tr((await res.json().catch(() => ({}))).detail || tr('Erreur {0}', res.status)));
+    reload();
+  };
+  const fromData = async (dt) => {
+    const file = [...(dt.files || [])].find((f) => f.type.startsWith('image/'));
+    if (file) return upload(file);
+    const img = /<img[^>]+src="([^"]+)"/i.exec(dt.getData('text/html') || '');
+    const url = [img?.[1]?.replace(/&amp;/g, '&'), ...(dt.getData('text/uri-list') || dt.getData('text/plain') || '').split(/\s+/)]
+      .find((u) => /^(https:\/\/|data:image\/)/.test(u || ''));
+    if (!url) throw new Error(tr('Aucune image reconnue.'));
+    if (url.startsWith('data:')) { // vignette en ligne (Google Images) : décodée ici
+      const [head, b64] = url.split(',');
+      return upload(new Blob([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))], { type: head.slice(5).split(';')[0] }));
+    }
+    msg.textContent = tr('Chargement…');
+    await api('/admin/photo/url', { method: 'POST', body: { kind, name, url } });
+    reload();
+  };
+  const file = el('input', { type: 'file', accept: 'image/*', hidden: true, onchange: () => file.files[0] && upload(file.files[0]).catch(fail) });
+  const drop = el('div', { class: 'photo-drop', tabIndex: 0, role: 'button', 'aria-label': tr('Choisir une image sur cet appareil'),
+    onclick: () => file.click(), onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); file.click(); } },
+    ondragover: (e) => { e.preventDefault(); drop.classList.add('over'); }, ondragleave: () => drop.classList.remove('over'),
+    ondrop: (e) => { e.preventDefault(); drop.classList.remove('over'); fromData(e.dataTransfer).catch(fail); } },
+  tr('Déposez une image ici, collez-la (Ctrl+V / ⌘V) ou cliquez pour en choisir une.'));
+  dlg.onpaste = (e) => { e.preventDefault(); fromData(e.clipboardData).catch(fail); };
+  const web = el('a', { class: 'btn', target: '_blank', rel: 'noopener noreferrer',
+    href: 'https://www.google.com/search?' + new URLSearchParams({ tbm: 'isch', q: name }) }, tr('Chercher sur le web'));
+  dlg.replaceChildren(el('h2', {}, tr('Chercher une photo')), el('p', { class: 'cover-rel' }, name), file, drop, grid, msg,
     el('div', { class: 'inline-form' },
       el('button', { type: 'button', onclick: async () => {
         try { await api('/admin/photo?' + new URLSearchParams({ kind, name }), { method: 'DELETE' }); reload(); } catch (err) { msg.textContent = err.message; }
       } }, tr('Retirer la photo')),
-      el('button', { type: 'button', onclick: () => dlg.close() }, tr('Fermer'))));
+      web, el('button', { type: 'button', onclick: () => dlg.close() }, tr('Fermer'))));
   dlg.showModal();
   try {
     const r = await api('/admin/photo/search?' + new URLSearchParams({ kind, name }));

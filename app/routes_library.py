@@ -550,10 +550,10 @@ def photo_path(data_dir, kind: str, name: str):
     return data_dir / (kind + "s") / (hashlib.sha1(artists.fold(name).encode()).hexdigest()[:20] + ".jpg")
 
 
-def store_photo(data_dir, kind: str, name: str, url: str) -> None:
-    """Télécharge la photo (adresse proposée par la recherche) et la garde, réduite, dans les données de l'application.
-    Lève ValueError ou OSError si l'image est refusée ou illisible."""
-    data = coversearch.fetch(url)
+def store_photo(data_dir, kind: str, name: str, url: str | None = None, data: bytes | None = None) -> None:
+    """Garde la photo, réduite, dans les données de l'application : téléchargée depuis `url`, ou `data` déposée par un
+    administrateur. Lève ValueError ou OSError si l'image est refusée ou illisible."""
+    data = coversearch.fetch(url) if data is None else data
     target = photo_path(data_dir, kind, name)
     with DECODE, Image.open(io.BytesIO(data)) as img:
         img = img.convert("RGB")
@@ -857,8 +857,9 @@ def _live_sets(conn, kind: str) -> dict:
 
 
 def _live_name(g) -> str:
-    """Graphie la plus fréquente, la plus longue à égalité (« Ultra Music Festival » plutôt que « Ultra Festival »)."""
-    return max(g["names"].items(), key=lambda kv: (kv[1], len(kv[0])))[0]
+    """Graphie avec des majuscules d'abord (« The Essential Selection » plutôt que « the essential selection »), puis
+    la plus fréquente, la plus longue à égalité (« Ultra Music Festival » plutôt que « Ultra Festival »)."""
+    return max(g["names"].items(), key=lambda kv: (not kv[0].islower(), kv[1], len(kv[0])))[0]
 
 
 @router.get("/api/festivals")
