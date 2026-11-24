@@ -4,6 +4,13 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.74.1](https://github.com/djkix/mp3-scene/compare/v1.74.0...v1.74.1) (2026-11-24)
+
+### Résumé
+
+- Live & Radio : la rangée Festivals · Radio · Clubs et autres garde le même écart vertical que les rangées
+  d'onglets au-dessus (20 px).
+
 ## [1.74.0](https://github.com/djkix/mp3-scene/compare/v1.73.0...v1.74.0) (2026-11-24)
 
 ### Résumé

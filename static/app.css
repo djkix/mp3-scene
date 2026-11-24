@@ -837,7 +837,7 @@ tr.playing td:first-child::before { content: "▶"; font-size: 11px; color: var(
 .fest-name { font-weight: 600; overflow-wrap: anywhere; }
 .fest-meta, .fest-facts { color: var(--muted); font-size: 13px; }
 .fest-facts { margin: 4px 0 8px; }
-.fest-kinds { justify-content: center; padding-top: 0; } /* Festivals · Radio · Clubs et autres, sous les catégories */
+.fest-kinds { justify-content: center; padding: 20px 12px 8px; } /* sous les catégories, même écart qu’entre les deux premières rangées */
 .fest-head { display: flex; gap: 12px; align-items: center; margin: 4px 12px 0; }
 .fest-head .art-photo { margin: 0; border-radius: 8px; }
 .fest-bar input { flex: 1 1 220px; min-width: 0; }
