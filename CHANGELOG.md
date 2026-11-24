@@ -4,6 +4,13 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.75.1](https://github.com/djkix/mp3-scene/compare/v1.75.0...v1.75.1) (2026-11-24)
+
+### Résumé
+
+- « Chercher sur le web » cherche le logo d'un festival, d'une émission ou d'un label (« … logo ») ; la photo pour
+  un artiste.
+
 ## [1.75.0](https://github.com/djkix/mp3-scene/compare/v1.74.1...v1.75.0) (2026-11-24)
 
 ### Résumé

@@ -161,7 +161,7 @@ async function findPhoto(kind, name) {
   tr('Déposez une image ici, collez-la (Ctrl+V / ⌘V) ou cliquez pour en choisir une.'));
   dlg.onpaste = (e) => { e.preventDefault(); fromData(e.clipboardData).catch(fail); };
   const web = el('a', { class: 'btn', target: '_blank', rel: 'noopener noreferrer',
-    href: 'https://www.google.com/search?' + new URLSearchParams({ tbm: 'isch', q: name }) }, tr('Chercher sur le web'));
+    href: 'https://www.google.com/search?' + new URLSearchParams({ tbm: 'isch', q: kind === 'artist' ? name : `${name} logo` }) }, tr('Chercher sur le web')); // festival, émission, label : leur logo
   dlg.replaceChildren(el('h2', {}, tr('Chercher une photo')), el('p', { class: 'cover-rel' }, name), file, drop, grid, msg,
     el('div', { class: 'inline-form' },
       el('button', { type: 'button', onclick: async () => {
