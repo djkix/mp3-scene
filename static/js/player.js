@@ -368,7 +368,7 @@ function applyPrefs() {
 // Deux pictos du lecteur : en plein écran (téléphone), les paroles ou le spectre prennent la place de la pochette ;
 // sur ordinateur, ils s'ouvrent dans un panneau au-dessus de la barre. Paroles : LRCLIB, par le serveur ; elles
 // suivent la musique quand la version minutée a la même durée (à 8 s près : un remix décale tout), sinon en texte.
-// Visualiseur : le son passe alors par Web Audio (circuit créé à la première ouverture, jamais avant).
+// Visualiseur (VU-mètre à segments) : le son passe alors par Web Audio (circuit créé à la première ouverture, jamais avant).
 let stage = null; // 'lyrics' | 'viz' | null
 let vizOn = false, raf = 0;
 let lyr = { id: null };
@@ -440,20 +440,29 @@ function startViz() {
   if (!fx) { ui.stage.replaceChildren(stageMsg(tr('Visualiseur indisponible sur ce navigateur.'))); return; }
   const c = el('canvas', { class: 'pl-viz', 'aria-hidden': 'true' });
   ui.stage.replaceChildren(c, backend ? stageMsg(tr('Pas de spectre pendant une diffusion : le son est joué ailleurs.')) : '');
+  // VU-mètre à segments : colonnes de diodes (accent du thème, puis jaune, rouge en haut), éteintes en couleur de
+  // trait ; un pic par colonne retombe doucement
   const g = c.getContext('2d'), data = new Uint8Array(fx.an.frequencyBinCount);
-  const color = getComputedStyle(ui.footer).getPropertyValue('--accent').trim() || '#3a3';
-  const BARS = 48;
+  const css = getComputedStyle(ui.footer);
+  const lit = [css.getPropertyValue('--accent').trim() || '#3a3', '#EF9F27', '#E24B4A'];
+  const off = css.getPropertyValue('--line').trim() || '#262624';
+  const COLS = 16, ROWS = 14, peaks = new Array(COLS).fill(0);
   const draw = () => {
     if (stage !== 'viz') return;
     const w = Math.round(c.clientWidth * devicePixelRatio), h = Math.round(c.clientHeight * devicePixelRatio);
     if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
     fx.an.getByteFrequencyData(data);
     g.clearRect(0, 0, w, h);
-    g.fillStyle = color;
-    const bw = w / BARS;
-    for (let i = 0; i < BARS; i++) { // échelle logarithmique : les basses ne prennent pas toute la largeur
-      const v = data[Math.min(data.length - 1, Math.floor((data.length * 0.75) ** (i / BARS)))] / 255;
-      g.fillRect(i * bw + 1, h - v * h, Math.max(1, bw - 2), v * h);
+    const cw = w / COLS, rh = h / ROWS;
+    for (let i = 0; i < COLS; i++) { // échelle logarithmique : les basses ne prennent pas toute la largeur
+      const v = data[Math.min(data.length - 1, Math.floor((data.length * 0.75) ** (i / COLS)))] / 255;
+      const on = Math.round(v * ROWS);
+      peaks[i] = Math.max(peaks[i] - 0.15, on);
+      const pk = Math.min(ROWS - 1, Math.floor(peaks[i]));
+      for (let j = 0; j < ROWS; j++) {
+        g.fillStyle = j < on || (j === pk && pk > 0) ? lit[j >= ROWS - 2 ? 2 : j >= ROWS - 5 ? 1 : 0] : off;
+        g.fillRect(i * cw + cw * 0.15, h - (j + 1) * rh + rh * 0.2, cw * 0.7, rh * 0.6);
+      }
     }
     raf = requestAnimationFrame(draw);
   };

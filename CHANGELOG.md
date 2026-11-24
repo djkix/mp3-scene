@@ -4,6 +4,13 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.76.2](https://github.com/djkix/mp3-scene/compare/v1.76.1...v1.76.2) (2026-11-24)
+
+### Résumé
+
+- Visualiseur en VU-mètre à segments : colonnes de diodes (couleur d'accent, puis jaune, rouge en haut), avec un
+  pic qui retombe, à la place des barres pleines.
+
 ## [1.76.1](https://github.com/djkix/mp3-scene/compare/v1.76.0...v1.76.1) (2026-11-24)
 
 ### Résumé
