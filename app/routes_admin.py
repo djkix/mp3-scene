@@ -317,14 +317,14 @@ def drop_series_rule(name: str = Query(max_length=200), conn=Depends(get_conn)):
 
 
 class PhotoPick(BaseModel):
-    kind: Literal["artist", "label"] = "artist"
+    kind: Literal["artist", "label", "event"] = "artist"
     name: str = Field(min_length=1, max_length=200)
     url: str = Field(max_length=2000)
     sig: str = Field(max_length=64)
 
 
 @router.get("/photo/search")
-def search_photo(request: Request, kind: Literal["artist", "label"], name: str = Query(min_length=1, max_length=200)):
+def search_photo(request: Request, kind: Literal["artist", "label", "event"], name: str = Query(min_length=1, max_length=200)):
     """Photos proposées pour un artiste (Deezer) ou un label (Discogs). Chaque adresse est signée : seule une image
     proposée ici peut être validée."""
     settings = request.app.state.settings
@@ -344,7 +344,7 @@ def save_photo(body: PhotoPick, request: Request):
 
 
 @router.delete("/photo", status_code=204)
-def drop_photo(request: Request, kind: Literal["artist", "label"], name: str = Query(min_length=1, max_length=200)):
+def drop_photo(request: Request, kind: Literal["artist", "label", "event"], name: str = Query(min_length=1, max_length=200)):
     """Retire la photo ; un fichier vide empêche la recherche automatique de la remettre."""
     path = photo_path(request.app.state.settings.data_dir, kind, name)
     path.parent.mkdir(exist_ok=True)

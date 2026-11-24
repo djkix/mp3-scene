@@ -111,6 +111,18 @@ def artist_photos(name: str) -> list[dict]:
             and str(a.get("picture_medium", "")).startswith("https://") and "/artist//" not in a["picture_xl"]]
 
 
+def event_photos(name: str) -> list[dict]:
+    """Pochettes d'albums proposées pour un festival ou une émission (Deezer, iTunes) ; titre = celui de l'album."""
+    out = []
+    for search in (_deezer, _itunes):
+        try:
+            out += [{**x, "title": x["title"].split(" - ", 1)[-1]} for x in search(name)]
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+    out.sort(key=lambda x: not re.search(r"\b(19|20)\d\d\b", x["title"]))  # « Tomorrowland 2019 » avant le film « Tomorrowland »
+    return [x for x in out if x["url"].startswith("https://") and x["thumb"].startswith("https://")]
+
+
 def label_photos(name: str, token: str) -> list[dict]:
     """Logos proposés pour un label, d'après Discogs ; une panne ou un silence donne une liste vide."""
     try:

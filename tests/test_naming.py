@@ -53,6 +53,21 @@ def test_source_word_inside_a_long_title_stays_in_the_title():
     assert p("Artist-Title-Promo_CDM-2007-GRP")["title"] == "Title"  # segment court : toujours retiré
 
 
+def test_radio_show_read_from_set_names():
+    from app.naming import radio
+    cases = {
+        "Armin_van_Buuren-A_State_of_Trance_1100-SAT-01-12-2022-GRP": ("A State of Trance", 2022, True),
+        "Pete_Tong-Radio_1s_Essential_Mix-SAT-03-05-2019-X": ("Essential Mix", 2019, True),
+        "Tiesto-Clublife_600-SAT-2018-X": ("Club Life", 2018, True),
+        "Paul_van_Dyk-Vonyc_Sessions_512-SAT-06-14-2016-X": ("Vonyc Sessions", 2016, True),
+        "Laurent_Garnier-It_Is_What_It_Is_Episode_12-SAT-2017-X": ("It Is What It Is", 2017, False),  # source radio seule : titre sans numéro, pas sûr
+        "Dubfire-Podcast_045_(Deep_Mix)-WEB-2012-X": ("Dubfire Podcast", 2012, True),
+        "Carl_Cox-Live_at_Space_Ibiza-SAT-07-23-2008-X": None,  # set de club, même diffusé
+        "Sven_Vath-Cocoon_Heroes-WEB-2015-X": None,
+    }
+    assert {n: radio(n) for n in cases} == cases
+
+
 def test_festival_and_year_read_from_set_names():
     from app.naming import festival, festival_key
     cases = {

@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse
 from PIL import Image
 
 from . import artists, coversearch, nfo
-from .naming import complete_title, festival, festival_key
+from .naming import complete_title, festival, festival_key, radio as radio_show
 from .routes_media import DECODE, IMAGE_ERRORS
 from .deps import MAX_INT, Id, current_user, get_conn
 from .security import safe_path
@@ -541,7 +541,7 @@ def group_info(by: Literal["label", "grp", "genre"], name: str = Query(min_lengt
             "others": top("r.grp" if by == "label" else "NULLIF(r.label, '')")}
 
 
-PHOTO_KINDS = Literal["artist", "label"]
+PHOTO_KINDS = Literal["artist", "label", "event"]  # event : festival ou émission de radio
 
 
 def photo_path(data_dir, kind: str, name: str):
@@ -565,7 +565,10 @@ def store_photo(data_dir, kind: str, name: str, url: str) -> None:
 
 
 def photo_candidates(settings, kind: str, name: str) -> list[dict]:
-    """Photos proposées : Deezer pour un artiste, Discogs pour un label (avec un jeton DISCOGS_TOKEN)."""
+    """Photos proposées : Deezer pour un artiste, Discogs pour un label (avec un jeton DISCOGS_TOKEN), pochettes
+    d'albums Deezer et iTunes pour un festival ou une émission."""
+    if kind == "event":
+        return coversearch.event_photos(name)
     if kind == "label":
         return coversearch.label_photos(name, settings.discogs_token) if settings.discogs_token else []
     return coversearch.artist_photos(name)
@@ -578,13 +581,16 @@ def photo(request: Request, kind: PHOTO_KINDS, name: str = Query(min_length=1, m
     recherche."""
     settings = request.app.state.settings
     path = photo_path(settings.data_dir, kind, name)
-    same = (lambda a, b: nfo.label_key(a) == nfo.label_key(b)) if kind == "label" else (lambda a, b: artists.fold(a) == artists.fold(b))
+    same = (lambda a, b: nfo.label_key(a) == nfo.label_key(b)) if kind == "label" \
+        else (lambda a, b: (festival_key(a) + " ").startswith(festival_key(b) + " ")) if kind == "event" \
+        else (lambda a, b: artists.fold(a) == artists.fold(b))  # event : « Ultra Music Festival 2023 » pour « Ultra Music Festival »
     # un label sans jeton Discogs n'est pas cherché, et rien n'est retenu : il le sera une fois le jeton posé
-    searchable = kind == "artist" or settings.discogs_token
+    searchable = kind != "label" or settings.discogs_token
     if not path.exists():
         # un nom absent de la bibliothèque : ni recherche ni fichier (sinon tout compte remplirait /data et le quota)
         known = conn.execute("SELECT 1 FROM releases WHERE COALESCE(tag_artist, artist)=? COLLATE NOCASE LIMIT 1", (name,)).fetchone() \
             or conn.execute("SELECT 1 FROM tracks WHERE artist=? LIMIT 1", (name,)).fetchone() if kind == "artist" \
+            else any(festival_key(name) in _live_sets(conn, t) for t in ("festival", "radio")) if kind == "event" \
             else conn.execute("SELECT 1 FROM releases WHERE label=? COLLATE NOCASE LIMIT 1", (name,)).fetchone()
         if not known:
             raise HTTPException(404, "Pas de photo.")
@@ -815,51 +821,76 @@ def series(name: str = Query(min_length=1, max_length=200), exact: bool = False,
     return {"name": name, "items": items, "missing": _missing({x["volume"] for x in items}) if items else [], "subs": []}
 
 
-# --- Festivals : les sets de Live & Radio réunis par festival (nom lu dans celui de la release), puis par année ---
+# --- Live & Radio : sets réunis par festival, émission de radio ou, à défaut, artiste (club ou autre), puis par année
 _LIVE_CAT = "(r.category LIKE '%live%' OR r.category LIKE '%radio%')"
+LiveType = Literal["festival", "radio", "artist"]
 
 
-def _festival_sets(conn) -> dict:
-    """{clé: {"names": Counter des graphies, "sets": [(id, année, poids)]}} ; année du nom, sinon celle de la release."""
+def _live_sets(conn, kind: str) -> dict:
+    """{clé: {"names": Counter des graphies, "sets": [(id, année, poids, pochette)]}} pour un type de live. Un set va
+    au festival qu'il cite, sinon à l'émission de radio, sinon à son artiste ; année du nom, sinon celle de la release.
+    Une émission tirée de la seule source (SAT, FM…) doit compter au moins deux épisodes : un set diffusé une fois
+    reste à son artiste."""
     # ponytail: relu à chaque appel (quelques milliers de noms, quelques ms) ; mettre en cache si la liste grossit
-    out = {}
-    for r in conn.execute(f"SELECT r.id, r.name, r.year, r.size FROM releases r WHERE r.hidden=0 AND {_LIVE_CAT}"):
+    rows = []
+    for r in conn.execute(f"SELECT r.id, r.name, r.year, r.size, r.has_cover, COALESCE(r.tag_artist, r.artist) AS who "
+                          f"FROM releases r WHERE r.hidden=0 AND {_LIVE_CAT}"):
         f = festival(r["name"])
-        if f:
-            g = out.setdefault(festival_key(f[0]), {"names": Counter(), "sets": []})
-            g["names"][f[0]] += 1
-            g["sets"].append((r["id"], f[1] or r["year"], r["size"] or 0))
+        g = None if f else radio_show(r["name"])
+        rows.append((r, "festival" if f else "radio" if g else "artist", f or g))
+    episodes = Counter(festival_key(x[0]) for _, t, x in rows if t == "radio")
+    out = {}
+    for r, t, x in rows:
+        if t == "radio" and not x[2] and episodes[festival_key(x[0])] < 2:
+            t = "artist"
+        if t != kind:
+            continue
+        if t == "artist":
+            name, year = r["who"] or r["name"].split("-")[0].replace("_", " ").strip(), None
+            key = artists.fold(name)
+        else:
+            name, year, key = x[0], x[1], festival_key(x[0])
+        grp = out.setdefault(key, {"names": Counter(), "sets": []})
+        grp["names"][name] += 1
+        grp["sets"].append((r["id"], year or r["year"], r["size"] or 0, bool(r["has_cover"])))
     return out
 
 
-def _festival_name(g) -> str:
+def _live_name(g) -> str:
     """Graphie la plus fréquente, la plus longue à égalité (« Ultra Music Festival » plutôt que « Ultra Festival »)."""
     return max(g["names"].items(), key=lambda kv: (kv[1], len(kv[0])))[0]
 
 
 @router.get("/api/festivals")
-def festivals(conn=Depends(get_conn)):
-    """Festivals de Live & Radio : nombre de sets, poids, première et dernière année, pochette du set le plus récent."""
-    rows = []
-    for g in _festival_sets(conn).values():
-        ys = sorted({y for _, y, _ in g["sets"] if y})
-        rows.append({"name": _festival_name(g), "sets": len(g["sets"]), "size": sum(x[2] for x in g["sets"]),
+def festivals(request: Request, type: LiveType = "festival", conn=Depends(get_conn)):
+    """Festivals, émissions ou artistes de Live & Radio : nombre de sets, poids, première et dernière année,
+    pochette du set le plus récent qui en a une, et `photo` si une photo est déjà gardée."""
+    rows, kind = [], "artist" if type == "artist" else "event"
+    for g in _live_sets(conn, type).values():
+        ys = sorted({y for _, y, _, _ in g["sets"] if y})
+        covered = [x for x in g["sets"] if x[3]]
+        name = _live_name(g)
+        path = photo_path(request.app.state.settings.data_dir, kind, name)
+        rows.append({"name": name, "sets": len(g["sets"]), "size": sum(x[2] for x in g["sets"]),
                      "first": ys[0] if ys else None, "last": ys[-1] if ys else None, "years": len(ys),
-                     "cover": max(g["sets"], key=lambda x: (x[1] or 0, x[0]))[0]})
+                     "cover": max(covered, key=lambda x: (x[1] or 0, x[0]))[0] if covered else None,
+                     "photo": path.is_file() and path.stat().st_size > 0})
     return sorted(rows, key=lambda x: (-x["sets"], x["name"].casefold()))
 
 
 @router.get("/api/festival")
-def festival_page(name: str = Query(min_length=1, max_length=200), user=Depends(current_user), conn=Depends(get_conn)):
-    """Sets d'un festival, du plus récent au plus ancien ; `fyear` est l'année du festival (celle du nom du set)."""
-    g = _festival_sets(conn).get(festival_key(name))
+def festival_page(name: str = Query(min_length=1, max_length=200), type: LiveType = "festival",
+                  user=Depends(current_user), conn=Depends(get_conn)):
+    """Sets d'un festival, d'une émission ou d'un artiste, du plus récent au plus ancien ; `fyear` est l'année du set
+    (celle de son nom)."""
+    g = _live_sets(conn, type).get(artists.fold(name) if type == "artist" else festival_key(name))
     if g is None:
-        raise HTTPException(404, "Festival introuvable.")
-    year = {i: y for i, y, _ in g["sets"]}
+        raise HTTPException(404, "Introuvable.")
+    year = {i: y for i, y, _, _ in g["sets"]}
     items = [{**_release(x), "fyear": year[x["id"]]} for x in conn.execute(
         f"SELECT {RELEASE_COLS} FROM {RELEASE_FROM} WHERE r.id IN ({','.join('?' * len(year))})", (user["id"], *year))]
     items.sort(key=lambda x: (x["fyear"] or 0, x["date"] or 0, x["name"].lower()), reverse=True)
-    return {"name": _festival_name(g), "items": items}
+    return {"name": _live_name(g), "items": items}
 
 
 _LIVE = re.compile(r"[^-]+-(.+?)_Live(?:_\(|-|$)")

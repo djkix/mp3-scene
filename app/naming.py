@@ -243,3 +243,49 @@ def festival_key(name: str) -> str:
     s = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().casefold()
     words = [w for w in re.findall(r"[a-z0-9]+", s) if w not in _FEST_NOISE]
     return " ".join(words) or s
+
+
+# --- Émissions de radio (Live & Radio) ----------------------------------------------------------------------------
+# Émissions connues (abréviation -> nom affiché) ; une release de source radio (SAT, FM…) sans émission connue prend
+# le titre lu dans son nom, sans numéro d'épisode ni date.
+_SHOWS = {"essential mix": "Essential Mix", "a state of trance": "A State of Trance", "asot": "A State of Trance",
+          "global dj broadcast": "Global DJ Broadcast", "group therapy": "Group Therapy", "club ?life": "Club Life",
+          "hardwell on air": "Hardwell On Air", "corsten'?s countdown": "Corsten's Countdown",
+          "trance around the world": "Trance Around The World", "tatw": "Trance Around The World",
+          "future sound of egypt": "Future Sound of Egypt", "fsoe": "Future Sound of Egypt",
+          "anjunabeats worldwide": "Anjunabeats Worldwide", "anjunadeep edition": "Anjunadeep Edition",
+          "protocol radio": "Protocol Radio", "revealed radio": "Revealed Radio", "heldeep radio": "Heldeep Radio",
+          "spinnin'? sessions": "Spinnin' Sessions", "musical freedom radio": "Musical Freedom Radio",
+          "drumcode radio": "Drumcode Radio", "vonyc sessions": "Vonyc Sessions", "tranceition": "Tranceition",
+          "fun radio": "Fun Radio", "radio fg": "Radio FG", "kiss fm": "Kiss FM", "bbc radio ?1": "BBC Radio 1"}
+_SHOW = re.compile(r"\b(" + "|".join(_SHOWS) + r")\b", re.I)
+_RADIO_SRC = re.compile(r"^(SAT|CABLE|DVB[CST]?|FM|DAB|RADIO|STREAM)$", re.I)
+_RADIO_WORDS = re.compile(r"\b(radio ?show|podcast|broadcast|radio)\b", re.I)
+_EPISODE = re.compile(r"(\s*\((?:[^)]*)\)|\s+(?:episode|ep|#|vol\.?|part)?\s*\d[\d.\s-]*$)", re.I)
+
+
+def radio(name: str) -> tuple[str, int | None, bool] | None:
+    """(émission, année) d'une release de radio : émission connue citée dans le nom (« Armin_van_Buuren-A_State_of_
+    Trance_1100-SAT-… »), sinon titre d'une release de source radio ou qui se dit « radio show », « podcast »…
+    None sinon (set de club ou autre). Le booléen dit si l'émission est sûre (connue, ou « radio show »…) ; sinon elle
+    n'est tirée que de la source et ne vaut qu'avec plusieurs épisodes."""
+    segs = [re.sub(r"\s+", " ", s.replace("_", " ")).strip() for s in name.split("-")]
+    segs = [s for s in segs if s]
+    y = _FEST_YEAR.search(name.replace("_", " "))
+    year = int(y[1]) if y else None
+    m = _SHOW.search(name.replace("_", " "))
+    if m:
+        key = next(k for k in _SHOWS if re.fullmatch(k, m[1], re.I))
+        return _SHOWS[key], year, True
+    radio_src = any(_RADIO_SRC.match(s) for s in segs[1:])
+    for s in segs[1:2] if len(segs) > 1 else segs[:1]:
+        if radio_src or _RADIO_WORDS.search(s):
+            show, sure = s, bool(_RADIO_WORDS.search(s))
+            while (t := _EPISODE.sub("", show).strip()) != show:
+                show = t
+            show = re.sub(r"\s+(?:\d{1,2}[.\s]\d{1,2}[.\s]\d{2,4}|live)$", "", show, flags=re.I).strip()
+            if _RADIO_WORDS.fullmatch(show) and len(segs) > 1:  # « Podcast 045 » seul : « Dubfire Podcast »
+                show = f"{segs[0]} {show}"
+            if re.search(r"[^\W\d_]", show) and not _LIVE_AT.match(show + " "):
+                return show, year, sure
+    return None

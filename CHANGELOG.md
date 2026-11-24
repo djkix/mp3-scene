@@ -4,6 +4,21 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.74.0](https://github.com/djkix/mp3-scene/compare/v1.73.0...v1.74.0) (2026-11-24)
+
+### Résumé
+
+**Live & Radio : festivals, radio, clubs et autres, avec photos.**
+
+- Trois onglets sous Live & Radio : Festivals, Radio et Clubs et autres, chacun avec son mur et la même page rangée
+  par année.
+- Radio : sets réunis par émission (Essential Mix, A State of Trance, Club Life, Group Therapy…) ; une release de
+  source radio (SAT, FM, CABLE…) prend son titre sans numéro d'épisode, à partir de deux épisodes.
+- Clubs et autres : le reste des lives, par artiste.
+- Photos prises d'office : photo de l'artiste ; pour un festival ou une émission, pochette d'un de ses sets, sinon
+  pochette d'album Deezer ou iTunes dont le titre commence par son nom (les éditions datées d'abord). Un
+  administrateur peut en choisir une autre ou la retirer depuis la page.
+
 ## [1.73.0](https://github.com/djkix/mp3-scene/compare/v1.72.3...v1.73.0) (2026-11-24)
 
 ### Résumé

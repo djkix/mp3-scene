@@ -1376,3 +1376,35 @@ def test_festivals_group_live_sets_by_festival_then_year(user_client, settings):
     page = user_client.get("/api/festival", params={"name": "inox electronic festival"}).json()
     assert [x["fyear"] for x in page["items"]] == [2009, 2007]  # année de la release quand le nom n'en donne pas
     assert user_client.get("/api/festival", params={"name": "Inconnu"}).status_code == 404
+
+
+def test_live_sets_split_into_festivals_radio_shows_and_artists(user_client, settings, monkeypatch):
+    import io
+    from PIL import Image
+    from app import coversearch
+    conn = db.connect(settings.data_dir)
+    sets = [("Tomorrowland_2013-Armin-SAT-2013-G", 2013, None, 0), ("Armin-A_State_of_Trance_1100-SAT-2022-G", 2022, "Armin", 0),
+            ("Ferry-ASOT_900-SAT-2019-G", 2019, "Ferry", 1), ("Paul_van_Dyk-Vonyc_Sessions_512-SAT-06-14-2016-G", 2016, None, 0),
+            ("Carl_Cox-Live_at_Space_Ibiza-SBD-07-23-2008-G", 2008, "Carl Cox", 0), ("Carl_Cox-Live_at_Fabric-LINE-2010-G", 2010, "CARL COX", 0),
+            ("Carl_Cox-Kites-SAT-2012-G", 2012, "Carl Cox", 0)]  # source radio, un seul épisode : reste à l'artiste
+    for i, (name, year, artist, cover) in enumerate(sets):
+        conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, year, artist, has_cover)"
+                     " VALUES (?,?,'','Live And Radio',0,0,10,0,0,?,?,?)", (f"f{i}", name, year, artist, cover))
+    conn.commit()
+    get = lambda t: {f["name"]: (f["sets"], f["cover"]) for f in user_client.get("/api/festivals", params={"type": t}).json()}
+    assert get("festival") == {"Tomorrowland": (1, None)}
+    assert get("radio") == {"A State of Trance": (2, 3), "Vonyc Sessions": (1, None)}  # pochette : le set qui en a une
+    assert get("artist") == {"Carl Cox": (3, None)}  # club ou autre : par artiste, casse confondue
+    page = user_client.get("/api/festival", params={"name": "carl cox", "type": "artist"}).json()
+    assert [x["fyear"] for x in page["items"]] == [2012, 2010, 2008]
+    # photo d'un festival ou d'une émission : première pochette d'album dont le titre commence par son nom
+    buf = io.BytesIO()
+    Image.new("RGB", (40, 40), "red").save(buf, "JPEG")
+    monkeypatch.setattr(coversearch, "event_photos", lambda name: [{"url": "https://x/film.jpg", "thumb": "t", "title": "Tomorrowland (Soundtrack) by Film"},
+                                                                    {"url": "https://x/a.jpg", "thumb": "t", "title": "A State of Trance 2022"}])
+    got = []
+    monkeypatch.setattr(coversearch, "fetch", lambda url: got.append(url) or buf.getvalue())
+    photo = lambda name: user_client.get("/api/photo", params={"kind": "event", "name": name}).status_code
+    assert photo("Ultra Music Festival") == 404 and got == []  # absent de la bibliothèque : rien n'est cherché
+    assert photo("A State of Trance") == 200 and got == ["https://x/a.jpg"]
+    assert user_client.get("/api/festivals", params={"type": "radio"}).json()[0]["photo"] is True

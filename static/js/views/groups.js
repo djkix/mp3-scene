@@ -186,7 +186,7 @@ function categories(container, params) {
   }
   const dispose = releases.render(list, { ...params, q: '', base: '#/categories', noCategory: true, letters: true });
   if (/live|radio/i.test(category)) list.prepend(el('div', { class: 'filters' },
-    el('a', { class: 'btn', href: '#/categories' + qs({ category, genre, year, source }) }, tr('Par festival'))));
+    el('a', { class: 'btn', href: '#/categories' + qs({ category, genre, year, source }) }, tr('Par festival, radio ou artiste'))));
   return () => { dead = true; dispose(); };
 }
 
@@ -196,45 +196,65 @@ const initials = (name) => name.split(/\s+/).filter((w) => /^[\p{L}\d]/u.test(w)
   .slice(0, 2).map((w) => w[0].toUpperCase()).join('');
 const sets = (n) => tr(n > 1 ? '{0} sets' : '{0} set', n);
 
-// Mur des festivals de Live & Radio : une vignette par festival (pochette du set le plus récent, nombre de sets,
-// période), du plus fourni au moins fourni, filtrable. Une liste de liens : le nom et les chiffres sont lus ensemble.
+// Live & Radio : trois murs, festivals, émissions de radio et le reste (clubs…) par artiste ; même page ensuite.
+const LIVE = { festival: ['Festivals', 'Filtrer les festivals…', 'Aucun festival reconnu dans les noms des releases.'],
+  radio: ['Radio', 'Filtrer les émissions…', 'Aucune émission de radio reconnue dans les noms des releases.'],
+  artist: ['Clubs et autres', 'Filtrer les artistes…', 'Aucun autre live.'] };
+const liveType = (t) => (LIVE[t] ? t : 'festival');
+const photoKind = (type) => (type === 'artist' ? 'artist' : 'event');
+// image d'une vignette : photo gardée, sinon pochette d'un set, sinon photo cherchée d'office ; sans rien, initiales
+function liveImg(f, type) {
+  const photo = '/api/photo?' + new URLSearchParams({ kind: photoKind(type), name: f.name });
+  const srcs = f.photo ? [photo] : [f.cover && `/api/releases/${f.cover}/thumb`, photo].filter(Boolean);
+  return el('img', { src: srcs.shift(), alt: '', loading: 'lazy', onerror: (e) => { if (srcs.length) e.target.src = srcs.shift(); else e.target.remove(); } });
+}
+
+// Mur de Live & Radio : une vignette par festival, émission ou artiste (photo, nombre de sets, période), du plus
+// fourni au moins fourni, filtrable. Une liste de liens : le nom et les chiffres sont lus ensemble.
 // Sur mobile, chaque vignette devient une ligne (pochette à gauche, cible tactile pleine largeur).
 function festivalWall(box, params) {
-  const { category = '' } = params;
+  const { category = '' } = params, type = liveType(params.type);
+  const [, hint, none] = LIVE[type];
   let rows = [], dead = false;
-  const find = el('input', { type: 'search', placeholder: tr('Filtrer les festivals…'), 'aria-label': tr('Filtrer les festivals…'), oninput: () => paint() });
+  const find = el('input', { type: 'search', placeholder: tr(hint), 'aria-label': tr(hint), oninput: () => paint() });
   const status = el('p', { class: 'status', role: 'status' }, tr('Chargement…'));
-  const wall = el('ul', { class: 'fest-wall', 'aria-label': tr('Festivals') });
-  box.replaceChildren(el('div', { class: 'filters fest-bar' }, find,
+  const wall = el('ul', { class: 'fest-wall', 'aria-label': tr(LIVE[type][0]) });
+  const kinds = el('div', { class: 'tabs fest-kinds', role: 'tablist', 'aria-label': tr('Type de live') },
+    Object.entries(LIVE).map(([k, [label]]) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(k === type),
+      onclick: () => { location.hash = '#/categories' + qs({ category, type: k === 'festival' ? '' : k }); } }, tr(label))));
+  box.replaceChildren(kinds, el('div', { class: 'filters fest-bar' }, find,
     el('a', { class: 'btn', href: '#/categories' + qs({ category, all: 1 }) }, tr('Toutes les releases'))), status, wall);
-  const tile = (f) => el('li', {}, el('a', { class: 'fest', href: `#/festivals/${encodeURIComponent(f.name)}` + qs({ category }) },
-    el('span', { class: 'fest-cover', 'aria-hidden': 'true' }, initials(f.name),
-      el('img', { src: `/api/releases/${f.cover}/thumb`, alt: '', loading: 'lazy', onerror: (e) => e.target.remove() })),
+  const tile = (f) => el('li', {}, el('a', { class: 'fest', href: `#/festivals/${encodeURIComponent(f.name)}` + qs({ category, type: type === 'festival' ? '' : type }) },
+    el('span', { class: 'fest-cover', 'aria-hidden': 'true' }, initials(f.name), liveImg(f, type)),
     el('span', { class: 'fest-text' }, el('span', { class: 'fest-name' }, f.name),
       el('span', { class: 'fest-meta' }, [sets(f.sets), yearSpan(f.first, f.last)].filter(Boolean).join(' · ')))));
   function paint() {
     const needle = find.value.trim().toLowerCase();
     const shown = rows.filter((f) => f.name.toLowerCase().includes(needle));
     wall.replaceChildren(...shown.map(tile));
-    status.textContent = shown.length ? '' : rows.length ? tr('Aucun résultat') : tr('Aucun festival reconnu dans les noms des releases.');
+    status.textContent = shown.length ? '' : rows.length ? tr('Aucun résultat') : tr(none);
   }
-  api('/festivals').then((r) => { if (!dead) { rows = r; paint(); } }).catch((err) => { if (!dead) status.textContent = err.message; });
+  api('/festivals?' + new URLSearchParams({ type })).then((r) => { if (!dead) { rows = r; paint(); } }).catch((err) => { if (!dead) status.textContent = err.message; });
   return () => { dead = true; };
 }
 
-// Festival (#/festivals/<nom>) : ses sets, du plus récent au plus ancien, sous un intertitre par année (pastille
+// Festival, émission ou artiste (#/festivals/<nom>?type=…) : ses sets, du plus récent au plus ancien, sous un intertitre par année (pastille
 // et liseré, comme les catégories d'un artiste). La rangée d'années mène à chacune et y place le focus.
 function festivalPage(container, params) {
-  const name = params.rest, { category = '' } = params;
+  const name = params.rest, { category = '' } = params, type = liveType(params.type);
   const status = el('p', { class: 'status', role: 'status' }, tr('Chargement…'));
   const facts = el('p', { class: 'fest-facts' });
+  const back = '#/categories' + qs({ category, type: type === 'festival' ? '' : type });
+  const photo = el('img', { class: 'art-photo', alt: '', src: '/api/photo?' + new URLSearchParams({ kind: photoKind(type), name }), onerror: (e) => e.target.remove() });
+  const photoBtn = session.user?.role === 'admin'
+    && el('button', { type: 'button', class: 'chip keep', onclick: () => findPhoto(photoKind(type), name).catch(() => {}) }, tr('Chercher une photo'));
   const jump = el('nav', { class: 'letters fest-years', 'aria-label': tr('Années') });
   const body = el('div');
   container.replaceChildren(tabs('categories'),
-    el('h1', { class: 'grp-title' }, el('a', { href: '#/categories' + qs({ category }) }, category ? catLabel(category) : tr('Catégories')), ' › ', name),
-    facts, jump, status, body);
+    el('h1', { class: 'grp-title' }, el('a', { href: back }, category ? catLabel(category) : tr('Catégories')), ' › ', name),
+    el('div', { class: 'fest-head' }, photo, el('div', {}, facts, photoBtn || '')), jump, status, body);
   let dead = false;
-  api('/festival?' + new URLSearchParams({ name })).then((f) => {
+  api('/festival?' + new URLSearchParams({ name, type })).then((f) => {
     if (dead) return;
     const years = new Map();
     for (const x of f.items) (years.get(x.fyear) ?? years.set(x.fyear, []).get(x.fyear)).push(x);
