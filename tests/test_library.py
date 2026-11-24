@@ -1356,3 +1356,23 @@ def test_audit_fixes_body_limit_cross_site_busy_superscript_and_signatures(admin
     assert user_client.get("/api/series", params={"name": "Pure Trance"}).status_code == 200
     assert user_client.get("/api/tracks", params={"remixes": "!!!"}).json()["items"] == []
     assert not artists.remixed("Crazy (!!! Remix)", "!!!") and not artists.collab("A_Feat_B", "...")
+
+
+def test_festivals_group_live_sets_by_festival_then_year(user_client, settings):
+    conn = db.connect(settings.data_dir)
+    sets = [("Tomorrowland_2013-Armin-SAT-2013-G", 2013, "Live And Radio"), ("Hardwell-Live_at_Tomorrowland_2014-STREAM-2014-G", 2014, "Live And Radio"),
+            ("Afrojack-Live_at_Ultra_Music_Festival_2015_(Miami)-STREAM-2015-G", 2015, "Live And Radio"),
+            ("Bob-Live_at_INOX_Electronique_Festival_(Fun_Radio)-FM-2007-G", 2007, "Live And Radio"),
+            ("Guetta-Live_at_INOX_Electronic_Festival_(Toulouse)-FM-2009-G", 2009, "Live And Radio"),
+            ("Armin-A_State_of_Trance_1100-SAT-2022-G", 2022, "Live And Radio"),
+            ("VA-Tomorrowland_2013-2CD-2013-G", 2013, "Compilations")]  # hors Live & Radio : ignorée
+    for i, (name, year, cat) in enumerate(sets):
+        conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, year)"
+                     " VALUES (?,?,'',?,0,0,10,0,0,?)", (f"f{i}", name, cat, year))
+    conn.commit()
+    got = {f["name"]: (f["sets"], f["first"], f["last"]) for f in user_client.get("/api/festivals").json()}
+    assert got == {"Tomorrowland": (2, 2013, 2014), "Ultra Music Festival": (1, 2015, 2015),
+                   "INOX Electronique Festival": (2, 2007, 2009)}  # à égalité, la graphie la plus longue
+    page = user_client.get("/api/festival", params={"name": "inox electronic festival"}).json()
+    assert [x["fyear"] for x in page["items"]] == [2009, 2007]  # année de la release quand le nom n'en donne pas
+    assert user_client.get("/api/festival", params={"name": "Inconnu"}).status_code == 404

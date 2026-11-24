@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse
 from PIL import Image
 
 from . import artists, coversearch, nfo
-from .naming import complete_title
+from .naming import complete_title, festival, festival_key
 from .routes_media import DECODE, IMAGE_ERRORS
 from .deps import MAX_INT, Id, current_user, get_conn
 from .security import safe_path
@@ -813,6 +813,53 @@ def series(name: str = Query(min_length=1, max_length=200), exact: bool = False,
         x["volume"] = int(re.search(r"[0-9]+", x["title"][len(name):])[0])
     items.sort(key=lambda x: (x["volume"], x["year"] or 0, x["name"].lower()))
     return {"name": name, "items": items, "missing": _missing({x["volume"] for x in items}) if items else [], "subs": []}
+
+
+# --- Festivals : les sets de Live & Radio réunis par festival (nom lu dans celui de la release), puis par année ---
+_LIVE_CAT = "(r.category LIKE '%live%' OR r.category LIKE '%radio%')"
+
+
+def _festival_sets(conn) -> dict:
+    """{clé: {"names": Counter des graphies, "sets": [(id, année, poids)]}} ; année du nom, sinon celle de la release."""
+    # ponytail: relu à chaque appel (quelques milliers de noms, quelques ms) ; mettre en cache si la liste grossit
+    out = {}
+    for r in conn.execute(f"SELECT r.id, r.name, r.year, r.size FROM releases r WHERE r.hidden=0 AND {_LIVE_CAT}"):
+        f = festival(r["name"])
+        if f:
+            g = out.setdefault(festival_key(f[0]), {"names": Counter(), "sets": []})
+            g["names"][f[0]] += 1
+            g["sets"].append((r["id"], f[1] or r["year"], r["size"] or 0))
+    return out
+
+
+def _festival_name(g) -> str:
+    """Graphie la plus fréquente, la plus longue à égalité (« Ultra Music Festival » plutôt que « Ultra Festival »)."""
+    return max(g["names"].items(), key=lambda kv: (kv[1], len(kv[0])))[0]
+
+
+@router.get("/api/festivals")
+def festivals(conn=Depends(get_conn)):
+    """Festivals de Live & Radio : nombre de sets, poids, première et dernière année, pochette du set le plus récent."""
+    rows = []
+    for g in _festival_sets(conn).values():
+        ys = sorted({y for _, y, _ in g["sets"] if y})
+        rows.append({"name": _festival_name(g), "sets": len(g["sets"]), "size": sum(x[2] for x in g["sets"]),
+                     "first": ys[0] if ys else None, "last": ys[-1] if ys else None, "years": len(ys),
+                     "cover": max(g["sets"], key=lambda x: (x[1] or 0, x[0]))[0]})
+    return sorted(rows, key=lambda x: (-x["sets"], x["name"].casefold()))
+
+
+@router.get("/api/festival")
+def festival_page(name: str = Query(min_length=1, max_length=200), user=Depends(current_user), conn=Depends(get_conn)):
+    """Sets d'un festival, du plus récent au plus ancien ; `fyear` est l'année du festival (celle du nom du set)."""
+    g = _festival_sets(conn).get(festival_key(name))
+    if g is None:
+        raise HTTPException(404, "Festival introuvable.")
+    year = {i: y for i, y, _ in g["sets"]}
+    items = [{**_release(x), "fyear": year[x["id"]]} for x in conn.execute(
+        f"SELECT {RELEASE_COLS} FROM {RELEASE_FROM} WHERE r.id IN ({','.join('?' * len(year))})", (user["id"], *year))]
+    items.sort(key=lambda x: (x["fyear"] or 0, x["date"] or 0, x["name"].lower()), reverse=True)
+    return {"name": _festival_name(g), "items": items}
 
 
 _LIVE = re.compile(r"[^-]+-(.+?)_Live(?:_\(|-|$)")

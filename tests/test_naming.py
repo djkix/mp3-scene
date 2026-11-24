@@ -51,3 +51,24 @@ def test_source_word_inside_a_long_title_stays_in_the_title():
     assert p(n)["title"] == "Live Royal Summer Party at Contact Fm-08-18-Radio" and p(n)["source"] == "FM"
     assert p(n, legacy=True)["title"] == "08-18-Radio"  # ancienne lecture : relue au démarrage
     assert p("Artist-Title-Promo_CDM-2007-GRP")["title"] == "Title"  # segment court : toujours retiré
+
+
+def test_festival_and_year_read_from_set_names():
+    from app.naming import festival, festival_key
+    cases = {
+        "Tomorrowland_2013-Dimitri_Vegas_And_Like_Mike-SAT-28-07-2013-GRP": ("Tomorrowland", 2013),
+        "Hardwell-Live_at_Tomorrowland_2014-STREAM-07-26-2014-EDC_INT": ("Tomorrowland", 2014),
+        "Afrojack-Live_at_Ultra_Music_Festival_2015_(Miami)-STREAM-03-28-2015-EDC_INT": ("Ultra Music Festival", 2015),
+        "Ultra_Music_Festival_2016_-_Fedde_Le_Grand_Live-SAT-03-20-2016-TALiON": ("Ultra Music Festival", 2016),
+        "Bob_Sinclar-Live_at_INOX_Electronique_Festival_(Fun_Radio)-FM-05-12-2007-OMA": ("INOX Electronique Festival", None),
+        "Sunrise_Festival_2014-DVBC-26-07-2014-AFO": ("Sunrise Festival", 2014),
+        "Indochine-Festival_Des_Vieilles_Charrues-DVBS-2009-JUST": ("Festival Des Vieilles Charrues", None),
+        "Moby-Live_Au_Caprices_Festival_(Crans-Montana)-DVBS-2008-JUST": ("Caprices Festival", None),
+    }
+    for name, expected in cases.items():
+        assert festival(name) == expected, name
+    for name in ("Artist-Festival_Mix-WEB-2020-GRP", "Artist-Best_Festival_Anthems-WEB-2020-GRP",
+                 "Armin_van_Buuren-A_State_of_Trance_1100-SAT-01-12-2022-GRP"):
+        assert festival(name) is None, name
+    assert festival_key("INOX Electronique Festival") == festival_key("INOX Electronic Festival") == "inox"
+    assert festival_key("Ultra Music Festival") == festival_key("Ultra Festival")

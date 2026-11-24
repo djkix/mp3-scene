@@ -823,3 +823,31 @@ tr.playing td:first-child::before { content: "▶"; font-size: 11px; color: var(
 @media (hover: hover) {
   tbody tr:not(.disc):hover, .pl-queue li:hover, .chapters li:hover { background: var(--hover); }
 }
+
+/* Festivals (Live & Radio) : grille de vignettes ; sur mobile une ligne par festival, cible tactile pleine largeur */
+.fest-wall { list-style: none; margin: 12px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+.fest { display: flex; flex-direction: column; gap: 6px; height: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--panel); color: var(--fg); text-decoration: none; }
+.fest:hover { background: var(--hover); }
+.fest:focus-visible { outline-offset: 2px; }
+.fest-cover { position: relative; display: grid; place-items: center; aspect-ratio: 1; border-radius: 6px; overflow: hidden;
+  background: var(--ed-tint); color: var(--ed); font: 600 22px var(--mono); }
+.fest-cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.fest-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fest-name { font-weight: 600; overflow-wrap: anywhere; }
+.fest-meta, .fest-facts { color: var(--muted); font-size: 13px; }
+.fest-facts { margin: 4px 12px 0; }
+.fest-bar input { flex: 1 1 220px; min-width: 0; }
+.fest-years { margin: 8px 12px; }
+.fest-cap { margin: 0; font-size: inherit; font-weight: inherit; scroll-margin-top: 80px; } /* sous la barre du haut, collante */
+.fest-cap:focus-visible { outline-offset: -2px; }
+@media (max-width: 699px) {
+  .fest-wall { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .fest { flex-direction: row; align-items: center; gap: 12px; min-height: 64px; padding: 8px 12px; }
+  .fest::after { content: "›"; margin-left: auto; padding-left: 8px; color: var(--muted); font-size: 20px; }
+  .fest-cover { flex: none; width: 52px; font-size: 16px; }
+  /* années : une seule rangée qui défile au doigt plutôt que plusieurs lignes de boutons */
+  .fest-years { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; padding-bottom: 4px; scroll-snap-type: x proximity; }
+  .fest-years button { flex: none; min-height: 40px; min-width: 56px; scroll-snap-align: start; }
+}
+@media (pointer: coarse) { .fest-years button { min-height: 44px; } }

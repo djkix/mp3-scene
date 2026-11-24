@@ -206,3 +206,40 @@ def complete_title(title: str | None, filename: str, artist: bool = False) -> st
     # ponytail: la suite garde la casse du nom du fichier (souvent en minuscules) ; relire un tag ID3v2 si elle existe
     # sans lettre dans la suite, le titre faisait 30 caractères sans être coupé
     return re.sub(r" {2,}", " ", title + tail).strip() if any(c.isalnum() for c in tail) else title
+
+
+# --- Festivals (Live & Radio) -------------------------------------------------------------------------------------
+# Grands rendez-vous dont le nom ne contient pas « Festival » ; les autres sont reconnus à ce mot.
+_BRANDS = re.compile(r"^(tomorrowland|mysteryland|defqon\.?1|qlimax|awakenings|mayday|nature one|time warp|creamfields"
+                     r"|electric daisy carnival|sensation|dance valley|global gathering|untold|parookaville|extrema outdoor"
+                     r"|electric love|world club dome|airbeat one|medusa|dreambeach|love parade|street parade|coachella"
+                     r"|glastonbury|lollapalooza)\b", re.I)
+_LIVE_AT = re.compile(r"^(?:.*?\b)?(?:live|set|dj set)\s+(?:at|au|@|from|a|à)\s+", re.I)
+_FEST_YEAR = re.compile(r"\b(19[89]\d|20\d\d)\b")
+# mots qui ne distinguent pas deux festivals : « INOX Electronique Festival » = « INOX Electronic Festival »
+_FEST_NOISE = {"music", "festival", "electronic", "electronique", "electronica", "open", "air", "the", "de", "des", "du"}
+
+
+def festival(name: str) -> tuple[str, int | None] | None:
+    """(festival, année) d'un set : « Tomorrowland_2013-… », « Artiste-Live_at_Ultra_Music_Festival_2015_(Miami)-… »,
+    « Festival_Des_Vieilles_Charrues-DVBS-2009 ». Année lue après le nom du festival, sinon None (celle de la release
+    sert alors). None si le nom ne cite aucun festival."""
+    for seg in re.split(r"-", name):
+        s = re.sub(r"\s+", " ", seg.replace("_", " ")).strip()
+        s = _LIVE_AT.sub("", s)
+        s = re.sub(r"^live\s+", "", s, flags=re.I)
+        if re.match(r"festival (?!mix|edit|version|anthem)", s, re.I):  # « Festival Des Vieilles Charrues (…) 2009 »
+            m = re.match(r"^(festival [^\d(]+?)(?= *[\d(]|$)", s, re.I)
+        else:
+            m = _BRANDS.match(s) or re.match(r"^((?:\S+ ){1,4}?festival)\b(?! (?:mix|edit|version|anthem))", s, re.I)
+        if m:
+            y = _FEST_YEAR.search(s[m.end():])
+            return m[1].strip(), int(y[1]) if y else None
+    return None
+
+
+def festival_key(name: str) -> str:
+    """Clé de regroupement : sans accents, casse ni mots génériques (« Ultra Music Festival » = « Ultra Festival »)."""
+    s = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().casefold()
+    words = [w for w in re.findall(r"[a-z0-9]+", s) if w not in _FEST_NOISE]
+    return " ".join(words) or s

@@ -4,6 +4,21 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.73.0](https://github.com/djkix/mp3-scene/compare/v1.72.3...v1.73.0) (2026-11-24)
+
+### Résumé
+
+**Live & Radio par festival.**
+
+- La catégorie Live & Radio s'ouvre sur un mur des festivals (Tomorrowland, Ultra Music Festival, INOX…) : pochette
+  du set le plus récent, nombre de sets, période ; filtre, et « Toutes les releases » pour la liste habituelle.
+- Le festival et son année sont lus dans le nom de la release (« Live at », « Festival … ») ; les graphies d'un même
+  festival sont réunies (« INOX Electronique » et « INOX Electronic »).
+- Page d'un festival : ses sets du plus récent au plus ancien, un intertitre en pastille par année, et une rangée
+  d'années qui mène à chacune.
+- Mobile : une ligne pleine largeur par festival, années sur une rangée qui défile au doigt, cibles tactiles de
+  44 px ; liste de liens lisible au lecteur d'écran, focus placé sur l'année choisie.
+
 ## [1.72.3](https://github.com/djkix/mp3-scene/compare/v1.72.2...v1.72.3) (2026-11-23)
 
 ### Résumé

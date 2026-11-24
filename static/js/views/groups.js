@@ -179,8 +179,82 @@ function categories(container, params) {
     cats.replaceChildren(...f.categories.map((c) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(c === category),
       onclick: () => { location.hash = '#/categories' + qs({ category: c === category ? '' : c, genre, year, source }); } }, catLabel(c))));
   }).catch(() => {});
+  // Live & Radio : d'abord le mur des festivals ; « Toutes les releases » (all=1) rend la liste habituelle
+  if (/live|radio/i.test(category) && params.all !== '1') {
+    const off = festivalWall(list, params);
+    return () => { dead = true; off(); };
+  }
   const dispose = releases.render(list, { ...params, q: '', base: '#/categories', noCategory: true, letters: true });
+  if (/live|radio/i.test(category)) list.prepend(el('div', { class: 'filters' },
+    el('a', { class: 'btn', href: '#/categories' + qs({ category, genre, year, source }) }, tr('Par festival'))));
   return () => { dead = true; dispose(); };
+}
+
+const yearSpan = (a, b) => (!a ? '' : a === b ? String(a) : `${a} – ${b}`);
+// sans pochette, les initiales du festival restent visibles sous l'image (qui se retire si elle manque)
+const initials = (name) => name.split(/\s+/).filter((w) => /^[\p{L}\d]/u.test(w) && !/^(festival|music|electroni\w*|des?|du|la|le|les|the)$/i.test(w))
+  .slice(0, 2).map((w) => w[0].toUpperCase()).join('');
+const sets = (n) => tr(n > 1 ? '{0} sets' : '{0} set', n);
+
+// Mur des festivals de Live & Radio : une vignette par festival (pochette du set le plus récent, nombre de sets,
+// période), du plus fourni au moins fourni, filtrable. Une liste de liens : le nom et les chiffres sont lus ensemble.
+// Sur mobile, chaque vignette devient une ligne (pochette à gauche, cible tactile pleine largeur).
+function festivalWall(box, params) {
+  const { category = '' } = params;
+  let rows = [], dead = false;
+  const find = el('input', { type: 'search', placeholder: tr('Filtrer les festivals…'), 'aria-label': tr('Filtrer les festivals…'), oninput: () => paint() });
+  const status = el('p', { class: 'status', role: 'status' }, tr('Chargement…'));
+  const wall = el('ul', { class: 'fest-wall', 'aria-label': tr('Festivals') });
+  box.replaceChildren(el('div', { class: 'filters fest-bar' }, find,
+    el('a', { class: 'btn', href: '#/categories' + qs({ category, all: 1 }) }, tr('Toutes les releases'))), status, wall);
+  const tile = (f) => el('li', {}, el('a', { class: 'fest', href: `#/festivals/${encodeURIComponent(f.name)}` + qs({ category }) },
+    el('span', { class: 'fest-cover', 'aria-hidden': 'true' }, initials(f.name),
+      el('img', { src: `/api/releases/${f.cover}/thumb`, alt: '', loading: 'lazy', onerror: (e) => e.target.remove() })),
+    el('span', { class: 'fest-text' }, el('span', { class: 'fest-name' }, f.name),
+      el('span', { class: 'fest-meta' }, [sets(f.sets), yearSpan(f.first, f.last)].filter(Boolean).join(' · ')))));
+  function paint() {
+    const needle = find.value.trim().toLowerCase();
+    const shown = rows.filter((f) => f.name.toLowerCase().includes(needle));
+    wall.replaceChildren(...shown.map(tile));
+    status.textContent = shown.length ? '' : rows.length ? tr('Aucun résultat') : tr('Aucun festival reconnu dans les noms des releases.');
+  }
+  api('/festivals').then((r) => { if (!dead) { rows = r; paint(); } }).catch((err) => { if (!dead) status.textContent = err.message; });
+  return () => { dead = true; };
+}
+
+// Festival (#/festivals/<nom>) : ses sets, du plus récent au plus ancien, sous un intertitre par année (pastille
+// et liseré, comme les catégories d'un artiste). La rangée d'années mène à chacune et y place le focus.
+function festivalPage(container, params) {
+  const name = params.rest, { category = '' } = params;
+  const status = el('p', { class: 'status', role: 'status' }, tr('Chargement…'));
+  const facts = el('p', { class: 'fest-facts' });
+  const jump = el('nav', { class: 'letters fest-years', 'aria-label': tr('Années') });
+  const body = el('div');
+  container.replaceChildren(tabs('categories'),
+    el('h1', { class: 'grp-title' }, el('a', { href: '#/categories' + qs({ category }) }, category ? catLabel(category) : tr('Catégories')), ' › ', name),
+    facts, jump, status, body);
+  let dead = false;
+  api('/festival?' + new URLSearchParams({ name })).then((f) => {
+    if (dead) return;
+    const years = new Map();
+    for (const x of f.items) (years.get(x.fyear) ?? years.set(x.fyear, []).get(x.fyear)).push(x);
+    const ys = [...years.keys()].filter(Boolean);
+    facts.textContent = [sets(f.items.length), ys.length > 1 ? tr('{0} années', ys.length) : yearSpan(ys[0], ys[0]),
+      fmtSize(f.items.reduce((n, x) => n + (x.size || 0), 0))].filter(Boolean).join(' · ');
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const sections = [...years].map(([y, items]) => {
+      const head = el('h2', { class: 'fest-cap rel-cap kind-3', tabIndex: -1 },
+        el('span', { class: 'cap-pill' }, y ? String(y) : tr('Sans année'), el('small', {}, ` ${items.length}`)));
+      return [y, items.length, head, el('section', {}, head, el('ul', { class: 'rel-list' }, items.map((x) => releases.row(x))))];
+    });
+    if (sections.length > 1) jump.replaceChildren(...sections.map(([y, n, head]) => el('button', { type: 'button',
+      'aria-label': `${y || tr('Sans année')} : ${sets(n)}`,
+      onclick: () => { head.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' }); head.focus({ preventScroll: true }); } },
+    `${y || '—'} `, el('small', {}, String(n)))));
+    body.replaceChildren(...sections.map((x) => x[3]));
+    status.textContent = '';
+  }).catch((err) => { if (!dead) status.textContent = err.message; });
+  return () => { dead = true; };
 }
 
 // Série (#/series/<nom>) : ses volumes dans l'ordre de leur numéro, et les numéros absents de la bibliothèque.
@@ -273,6 +347,7 @@ function seriesMissing(container) {
 export function render(container, params) {
   if (params.kind === 'series' && params.rest) return series(container, params);
   if (params.kind === 'series' && params.missing) return seriesMissing(container);
+  if (params.kind === 'festivals') return festivalPage(container, params);
   if (params.kind === 'categories') return categories(container, params);
   if (params.kind === 'titles' && params.rest) return title(container, params);
   const kind = KINDS[params.kind] ? params.kind : 'groups';
