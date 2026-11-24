@@ -391,6 +391,8 @@ def test_owner_address_is_never_locked_by_a_spread_attack(client):
 def test_security_headers(client):
     r = client.get("/api/health")
     assert "frame-ancestors 'none'" in r.headers["content-security-policy"] and r.headers["x-frame-options"] == "DENY"
+    # le son silencieux (data:) qui autorise le second élément audio sur mobile n'est pas bloqué
+    assert "media-src 'self' blob: data:" in r.headers["content-security-policy"]
     assert r.headers["referrer-policy"] == "same-origin"
 
 

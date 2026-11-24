@@ -58,17 +58,19 @@ function detail(container, kind, params) {
     kind === 'labels' ? el('div', {}, photo, facts, photoBtn) : facts, found);
   // genre : sa famille (« House » réunit « Deep House », « Tech House »…), un bloc par genre comme pour les séries ;
   // un clic s'y limite, un second revient à l'ensemble. La liste attend de connaître la famille.
-  const sub = kind === 'genres' ? params.sub || '' : '';
-  const blocks = el('div', { class: 'tabs cats subs', role: 'tablist', 'aria-label': tr('Genres') });
+  // label : sa famille de la même façon (« Toolroom » réunit « Toolroom Records », « Toolroom Trax »…)
+  const family = kind === 'genres' || kind === 'labels';
+  const sub = family ? params.sub || '' : '';
+  const blocks = el('div', { class: 'tabs cats subs', role: 'tablist', 'aria-label': tr(kind === 'labels' ? 'Labels' : 'Genres') });
   let dead = false, disposeList = null, genreNames = [];
   if (info) api('/group-info?' + new URLSearchParams({ by, name, ...(sub && { sub }) })).then((g) => {
     if (dead) return;
-    if (kind === 'genres') {
+    if (family) {
       genreNames = g.members.map((m) => m.name);
       blocks.replaceChildren(...g.members.map((m) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(m.name === sub),
         onclick: () => { location.hash = base + qs({ year: params.year, sub: m.name === sub ? '' : m.name }); } }, m.name, el('small', {}, ` ${m.releases}`))));
-      disposeList = releases.render(list, { ...params, q: '', genre: '',
-        pin: { key: 'genre', value: sub || (g.members.length ? g.members.map((m) => m.name) : name), base, extra: { sub } } });
+      disposeList = releases.render(list, { ...params, q: '', ...(kind === 'genres' && { genre: '' }),
+        pin: { key: kind === 'genres' ? 'genre' : 'label', value: sub || (g.members.length ? g.members.map((m) => m.name) : name), base, extra: { sub } } });
     }
     const line = (label, value) => el('tr', {}, el('th', { scope: 'row' }, label), el('td', {}, value));
     facts.replaceChildren(el('tbody', {}, line(tr('Releases'), String(g.n)), line(tr('Poids'), fmtSize(g.size)),
@@ -80,7 +82,7 @@ function detail(container, kind, params) {
   }).catch(() => {}); // facultatif
   container.replaceChildren(
     el('h1', { class: 'grp-title' }, el('a', { href: `#/${kind}` + qs({ genre: params.genre, year: params.year }) }, tr(tab)), ' › ', kind === 'artists' ? artistLabel(name) : name, ' ', kind === 'artists' || info ? null : total),
-    ...(kind === 'genres' ? [blocks] : []), ...(kind === 'artists' ? [head] : []), ...(info ? [info] : []), ...(kind === 'artists' && !other ? [years] : []), list);
+    ...(family ? [blocks] : []), ...(kind === 'artists' ? [head] : []), ...(info ? [info] : []), ...(kind === 'artists' && !other ? [years] : []), list);
   // chronologie : une pastille par année avec son nombre de releases ; un clic filtre la liste sur cette année
   if (kind === 'artists' && !other) api('/groups?' + new URLSearchParams({ by: 'year', artist: name })).then((rows) => {
     if (rows.length < 2) return;
@@ -102,6 +104,9 @@ function detail(container, kind, params) {
     chips.replaceChildren(
       ...group(tr('Labels'), a.labels.map((l) => chip(`#/labels/${encodeURIComponent(l.name)}`, l.name, l.releases))),
       ...group(tr('Souvent avec'), a.with.map((w) => chip(`#/artists/${encodeURIComponent(w.name)}`, w.name, w.tracks))),
+      // festivals, émissions et lives de club où il joue ; chacun mène à sa page de Live & Radio
+      ...group(tr('Lives'), (a.lives || []).map((l) => chip(`#/festivals/${encodeURIComponent(l.name)}` + qs({ type: l.type === 'festival' ? '' : l.type }),
+        l.type === 'artist' ? tr('Clubs et autres') : l.name, l.sets))),
       ...group(tr('Vos plus écoutées'), a.top.map((r) => chip(relHref(r.name, r.id), r.title || relName(r.name), r.plays))));
   }).catch(() => {}); // facultatif
   // longs mixes où un chapitre (fichier .cue) est de cet artiste : la lecture démarre à son morceau
@@ -115,7 +120,7 @@ function detail(container, kind, params) {
   one.set('name', name);
   if (kind !== 'artists') api('/groups?' + one)
     .then(([g]) => { total.textContent = g ? `${count(g.releases)} · ${fmtSize(g.size)}` : ''; }).catch(() => {});
-  if (kind === 'genres') return () => { dead = true; disposeList?.(); };
+  if (family) return () => { dead = true; disposeList?.(); };
   return releases.render(list, { ...params, q: '', pin: appears ? { key: other, value: name, base, extra: { in: params.in } } : { key: pin, value: name, base } });
 }
 
@@ -470,7 +475,8 @@ export function render(container, params) {
         || String(a.name).localeCompare(String(b.name)));
     body.replaceChildren(...shown.slice(0, MAX_ROWS).map((g) => el('tr', {},
       el('td', {}, el('a', { href: href(g.name) }, kind === 'artists' ? artistLabel(g.name) : g.name), g.series > 1 ? el('small', { class: 'muted' }, ' ' + tr('{0} séries', g.series)) : null,
-        g.genres > 1 ? el('small', { class: 'muted' }, ' ' + tr('{0} genres', g.genres)) : null),
+        g.genres > 1 ? el('small', { class: 'muted' }, ' ' + tr('{0} genres', g.genres)) : null,
+        g.labels > 1 ? el('small', { class: 'muted' }, ' ' + tr('{0} labels', g.labels)) : null),
       el('td', { class: 'num' }, String(g.releases)), el('td', { class: 'num' }, fmtSize(g.size)))));
     status.textContent = !shown.length ? tr('Aucun résultat')
       : tr('{0} lignes · {1} · {2}', shown.length, kind === 'titles' ? tr('{0} pistes', shown.reduce((n, g) => n + g.releases, 0))

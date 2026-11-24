@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
 from PIL import Image
 
-from . import artists, coversearch, nfo
+from . import artists, coversearch, lyrics, nfo
 from .naming import complete_title, festival, festival_key, radio as radio_show
 from .routes_media import DECODE, IMAGE_ERRORS
 from .deps import MAX_INT, Id, current_user, get_conn
@@ -136,7 +136,7 @@ def _release_conds(category=None, genre=None, year=None, grp=None, artist=None, 
 def mix(category: Many = None, genre: Many = None, year: Years = None,
         grp: str | None = None, artist: str | None = None, source: Many = None,
         decade: Years = None, appears: str | None = None,
-        collab: str | None = Query(None, max_length=200), label: str | None = Query(None, max_length=200),
+        collab: str | None = Query(None, max_length=200), label: Many = None,
         release: Annotated[list[Id] | None, Query(max_length=2000)] = None, song: str | None = Query(None, max_length=300),
         limit: int = Query(50, ge=1, le=MAX_LIMIT), user=Depends(current_user), conn=Depends(get_conn)):
     """Pistes tirées au hasard parmi les releases qui passent les filtres (`release` : celles d'une série ; `song` :
@@ -175,7 +175,7 @@ def list_releases(q: str = "", category: Many = None, genre: Many = None, grp: s
                   artist: str | None = None, source: Many = None, appears: str | None = None,
                   decade: Years = None, collab: str | None = Query(None, max_length=200),
                   year: Years = None, favorites: int = Query(0, ge=0, le=1),
-                  label: str | None = Query(None, max_length=200), sort: Sort | None = None, dir: Dir = "asc",
+                  label: Many = None, sort: Sort | None = None, dir: Dir = "asc",
                   letter: str | None = Query(None, pattern="^([A-Z]|#)$"), nfo: bool = False,
                   offset: int = Query(0, ge=0, le=MAX_INT), limit: int = Query(50, ge=1, le=MAX_INT),
                   user=Depends(current_user), conn=Depends(get_conn)):
@@ -300,7 +300,7 @@ def titles(genre: Many = None, year: Years = None, decade: Years = None, categor
 @router.get("/api/groups")
 def groups(by: Literal["grp", "artist", "genre", "label", "category", "year", "series"] = "grp", name: str | None = None, genre: Many = None,
            year: Years = None, decade: Years = None, artist: str | None = Query(None, max_length=200),
-           label: str | None = Query(None, max_length=200), grp: str | None = Query(None, max_length=200), conn=Depends(get_conn)):
+           label: Many = None, grp: str | None = Query(None, max_length=200), conn=Depends(get_conn)):
     """Releases regroupées par groupe, artiste, genre ou label : nombre et poids total, restreints au genre / à l'année."""
     col = GROUP_BY[by]
     conds, params = [f"{col} IS NOT NULL", "hidden=0"], []
@@ -310,10 +310,12 @@ def groups(by: Literal["grp", "artist", "genre", "label", "category", "year", "s
     if artist is not None:  # chronologie d'un artiste : ses releases par année (by=year)
         conds.append("COALESCE(tag_artist, artist)=? COLLATE NOCASE")
         params.append(artist)
-    for col_, val in (("label", label), ("grp", grp)):  # catégories d'un label ou d'un groupe (intertitres de sa liste)
-        if val is not None:
-            conds.append(f"{col_}=?")
-            params.append(val)
+    if label:  # catégories d'un label ou d'une famille de labels (intertitres de sa liste)
+        conds.append(f"label IN ({','.join('?' * len(label))})")
+        params += label
+    if grp is not None:  # catégories d'un groupe
+        conds.append("grp=?")
+        params.append(grp)
     if genre:  # plusieurs genres, années ou décennies : l'un ou l'autre, comme dans les listes
         conds.append(f"genre IN ({','.join('?' * len(genre))})")
         params += genre
@@ -338,6 +340,15 @@ def groups(by: Literal["grp", "artist", "genre", "label", "category", "year", "s
     rows = [dict(r) for r in conn.execute(
         f"SELECT {col} AS name, COUNT(*) AS releases, SUM(size) AS size FROM releases WHERE " + " AND ".join(conds)
         + " GROUP BY 1 ORDER BY releases DESC, 1 COLLATE NOCASE", params)]
+    if by == "label" and name is None:  # une ligne par famille : « Toolroom » réunit « Toolroom Records », « Toolroom Trax »…
+        fam, out = _label_families(conn), {}
+        for g in rows:
+            f = fam.get(g["name"], g["name"])
+            row = out.setdefault(f, {"name": f, "releases": 0, "size": 0, "labels": 0})
+            row["releases"] += g["releases"]
+            row["size"] += g["size"] or 0
+            row["labels"] += 1
+        rows = sorted(out.values(), key=lambda g: (-g["releases"], g["name"].casefold()))
     if by == "genre" and name is None:  # une ligne par famille : « House » réunit « Deep House », « Tech House »…
         fam, out = _genre_families(conn), {}
         for g in rows:
@@ -348,6 +359,64 @@ def groups(by: Literal["grp", "artist", "genre", "label", "category", "year", "s
             row["genres"] += 1
         rows = sorted(out.values(), key=lambda g: (-g["releases"], g["name"].casefold()))
     return rows
+
+
+# fin de nom qui ne distingue pas un label de sa maison mère : « Toolroom Records [UK] », « Toolroom Productions Ltd »
+_LABEL_TAIL = re.compile(r"(?:[\s,.-]+(?:productions?|recordings?|records?|recs?|music|digital|limited|ltd|inc|label|\[[^\]]*\]|\([^)]*\)))+$", re.I)
+
+
+def label_base(label: str) -> str:
+    """Nom d'un label sans « Records », « Productions », « Ltd » ni pays entre crochets : « Toolroom Records [UK] » -> « Toolroom »."""
+    return _LABEL_TAIL.sub("", label).strip() or label.strip()
+
+
+def _label_rules(conn) -> dict:
+    return dict(conn.execute("SELECT key, family FROM label_rules").fetchall())
+
+
+def _label_families(conn) -> dict:
+    """{label: famille} : un label qui commence par le nom d'un autre (sans « Records »…), ou qui le porte après une
+    barre (« Leaders of the New School/Toolroom »), rejoint sa maison mère : « Toolroom Records », « Toolroom Trax »,
+    « Toolroom Longplayer » -> Toolroom. Il faut un label au nom de la mère (« Toolroom Records ») et au moins deux
+    labels dans la famille. Règles manuelles comme pour les séries (label_rules)."""
+    counts = dict(conn.execute("SELECT label, COUNT(*) FROM releases WHERE NULLIF(label, '') IS NOT NULL AND hidden=0 GROUP BY 1").fetchall())
+    spell = {}  # nom de mère en minuscules -> {graphie: releases}
+    for lab, n in counts.items():
+        b = label_base(lab)
+        if len(b) >= 4 and b.casefold() not in _HOLLOW:
+            spell.setdefault(b.casefold(), Counter())[b] += n
+    out = {}
+    for lab in counts:
+        cands = []
+        for part in [lab, *(re.split(r"\s*/\s*", lab) if "/" in lab else [])]:
+            words = part.split()
+            cands += [" ".join(words[:i]).casefold() for i in range(1, len(words) + 1)]
+            cands.append(label_base(part).casefold())
+        hits = [c for c in cands if c in spell]
+        if hits:
+            out[lab] = min(hits, key=len)  # la mère la plus courte : pas de famille dans une famille
+    members = Counter(out.values())
+    out = {lab: spell[f].most_common(1)[0][0] for lab, f in out.items() if members[f] >= 2}
+    # règles manuelles : une famille défaite (règle vide à son nom), un label gardé à part ou rattaché ailleurs ; une
+    # règle « Nom -> Nom » réunit tous les labels qui commencent par ce nom
+    rules = _label_rules(conn)
+    out = {lab: f for lab, f in out.items() if rules.get(f.casefold()) != ""}
+    for k, f in rules.items():
+        if f and k == f.casefold():
+            out.update({lab: f for lab in counts if lab.casefold() == k or lab.casefold().startswith(k + " ")})
+    for lab in counts:
+        if (f := rules.get(lab.casefold())) is not None and lab.casefold() != (f or "").casefold():
+            out.pop(lab, None)
+            if f:
+                out[lab] = f
+    return out
+
+
+def label_members(conn, name: str) -> list[str]:
+    """Labels d'une famille (elle-même comprise si c'est un label) ; [name] pour un label hors famille."""
+    fam = _label_families(conn)
+    names = sorted({lab for lab, f in fam.items() if f.casefold() == name.casefold()}, key=str.casefold)
+    return names or [name]
 
 
 def _genre_families(conn) -> dict:
@@ -438,6 +507,34 @@ def _song(title: str | None) -> str:
     return re.sub(r"\s+(feat|ft|featuring)\b\.?\s.*$", "", re.sub(r"\s*[(\[].*$", "", title or ""), flags=re.I).strip().casefold()
 
 
+LYRICS_RETRY = 30 * 86400  # sans paroles : nouvel essai après 30 jours
+
+
+@router.get("/api/tracks/{tid}/lyrics")
+def track_lyrics(tid: Id, conn=Depends(get_conn)):
+    """Paroles du morceau (LRCLIB) : `synced` au format LRC, `plain` en texte, `duration` de la version minutée.
+    Gardées en base par artiste et titre ; rien pour un long mix (plus de 15 minutes) ni sans artiste ou titre."""
+    t = conn.execute("SELECT t.title, COALESCE(NULLIF(t.artist, ''), r.tag_artist, r.artist) AS artist, t.duration"
+                     " FROM tracks t JOIN releases r ON r.id=t.release_id WHERE t.id=?", (tid,)).fetchone()
+    if t is None:
+        raise HTTPException(404, "Piste introuvable.")
+    empty = {"synced": None, "plain": None, "duration": None, "instrumental": False}
+    if not t["title"] or not t["artist"] or artists.fold(t["artist"]) in artists._VA or (t["duration"] or 0) > 900:
+        return empty
+    key = artists.fold(artists.main(t["artist"])) + "|" + artists.fold(lyrics.clean_title(t["title"]))
+    row = conn.execute("SELECT * FROM lyrics WHERE key=?", (key,)).fetchone()
+    if row is None or (not row["synced"] and not row["plain"] and time.time() - row["fetched_at"] > LYRICS_RETRY):
+        try:
+            found = lyrics.find(artists.main(t["artist"]), t["title"])
+        except (OSError, ValueError):
+            return empty  # panne : rien n'est retenu, nouvel essai à la prochaine demande
+        conn.execute("INSERT OR REPLACE INTO lyrics(key, synced, plain, duration, instrumental, fetched_at) VALUES (?,?,?,?,?,?)",
+                     (key, found["synced"], found["plain"], found["duration"], int(found["instrumental"]), time.time()))
+        conn.commit()
+        return found
+    return {"synced": row["synced"], "plain": row["plain"], "duration": row["duration"], "instrumental": bool(row["instrumental"])}
+
+
 @router.get("/api/tracks/{tid}/versions")
 def track_versions(tid: Id, user=Depends(current_user), conn=Depends(get_conn)):
     """Autres versions d'un morceau dans la bibliothèque : même artiste principal, même titre avant la parenthèse
@@ -509,7 +606,25 @@ def artist_info(name: str = Query(min_length=1, max_length=200), user=Depends(cu
         return r[0] if r else artists.capitalize(n)
     partners = [{"name": shown(spelling[k]), "tracks": n} for k, n in sorted(others.items(), key=lambda kv: (-kv[1], kv[0]))[:8]]
     return {"name": canon[0] if canon else artists.capitalize(name), "lists": lists, "labels": labels, "top": top,
-            "with": partners}
+            "with": partners, "lives": _artist_lives(conn, name)}
+
+
+def _artist_lives(conn, name: str) -> list[dict]:
+    """Festivals, émissions et lives de club où l'artiste joue : son nom est l'artiste de la release ou l'un des
+    morceaux du nom (« Tomorrowland_2013-Dimitri_Vegas_And_Like_Mike-SAT-… », « Ultra_…_2016_-_Fedde_Le_Grand_Live »)."""
+    me = artists.fold(name)
+    # ponytail: relit les noms de Live & Radio à chaque page d'artiste (quelques ms) ; mettre en cache si besoin
+    mine = {r["id"] for r in conn.execute(f"SELECT r.id, r.name, COALESCE(r.tag_artist, r.artist) AS who FROM releases r"
+                                         f" WHERE r.hidden=0 AND {_LIVE_CAT}")
+            if me and (artists.fold(r["who"] or "") == me
+                       or any(artists.fold(re.sub(r"(?i)[_ ]live$", "", seg.strip("_ "))) == me for seg in r["name"].split("-")))}
+    out = []
+    for t in ("festival", "radio", "artist"):
+        for g in _live_sets(conn, t).values():
+            n = sum(1 for x in g["sets"] if x[0] in mine)
+            if n:
+                out.append({"type": t, "name": _live_name(g), "sets": n})
+    return sorted(out, key=lambda x: (-x["sets"], x["name"].casefold()))
 
 
 @router.get("/api/group-info")
@@ -517,13 +632,20 @@ def group_info(by: Literal["label", "grp", "genre"], name: str = Query(min_lengt
                sub: str | None = Query(None, max_length=200), conn=Depends(get_conn)):
     """En-tête de la page d'un label, d'un groupe ou d'un genre : nombre, poids, années couvertes, et ce qu'on y
     trouve le plus (artistes, genres, puis les groupes d'un label ou les labels d'un groupe ou d'un genre).
-    Un genre réunit sa famille (`members`) ; `sub` limite les chiffres à l'un de ses genres."""
+    Un genre ou un label réunit sa famille (`members`) ; `sub` limite les chiffres à l'un de ses membres."""
     names, members = [name], []
     if by == "genre":
         fam = _genre_families(conn)
         names = [name, *sorted(g for g, f in fam.items() if f == name)]
         members = [dict(x) for x in conn.execute(
             f"SELECT genre AS name, COUNT(*) AS releases FROM releases WHERE hidden=0 AND genre IN ({','.join('?' * len(names))})"
+            " GROUP BY 1 ORDER BY releases DESC, 1 COLLATE NOCASE", names)]
+        if sub in names:
+            names = [sub]
+    elif by == "label" and len(fam := label_members(conn, name)) > 1:  # famille de labels : un bloc par label
+        names = fam
+        members = [dict(x) for x in conn.execute(
+            f"SELECT label AS name, COUNT(*) AS releases FROM releases WHERE hidden=0 AND label IN ({','.join('?' * len(names))})"
             " GROUP BY 1 ORDER BY releases DESC, 1 COLLATE NOCASE", names)]
         if sub in names:
             names = [sub]
@@ -591,7 +713,8 @@ def photo(request: Request, kind: PHOTO_KINDS, name: str = Query(min_length=1, m
         known = conn.execute("SELECT 1 FROM releases WHERE COALESCE(tag_artist, artist)=? COLLATE NOCASE LIMIT 1", (name,)).fetchone() \
             or conn.execute("SELECT 1 FROM tracks WHERE artist=? LIMIT 1", (name,)).fetchone() if kind == "artist" \
             else any(festival_key(name) in _live_sets(conn, t) for t in ("festival", "radio")) if kind == "event" \
-            else conn.execute("SELECT 1 FROM releases WHERE label=? COLLATE NOCASE LIMIT 1", (name,)).fetchone()
+            else conn.execute("SELECT 1 FROM releases WHERE label=? COLLATE NOCASE LIMIT 1", (name,)).fetchone() \
+            or len(label_members(conn, name)) > 1
         if not known:
             raise HTTPException(404, "Pas de photo.")
     if searchable and not path.exists() and artists.fold(name) not in artists._VA | {""}:

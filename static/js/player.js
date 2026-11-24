@@ -340,7 +340,7 @@ function applyPrefs() {
   try { localStorage.setItem(PREFS, JSON.stringify(prefs)); } catch { /* navigation privée */ }
   keepAwake();
   const AC = globalThis.AudioContext || globalThis.webkitAudioContext;
-  if (!ctx && AC && (prefs.level || prefs.eq.some(Boolean))) {
+  if (!ctx && AC && (prefs.level || prefs.eq.some(Boolean) || vizOn)) {
     ctx = new AC();
     const bands = [['lowshelf', 200], ['peaking', 1000], ['highshelf', 4000]].map(([type, freq]) => {
       const f = ctx.createBiquadFilter();
@@ -352,13 +352,112 @@ function applyPrefs() {
     for (const a of els) ctx.createMediaElementSource(a).connect(bands[0]);
     bands[0].connect(bands[1]); bands[1].connect(bands[2]);
     comp.connect(ctx.destination);
-    fx = { bands, comp };
+    const an = ctx.createAnalyser(); // visualiseur : branché en dérivation, il ne change pas le son
+    an.fftSize = 512; an.smoothingTimeConstant = 0.8;
+    fx = { bands, comp, an };
     if (!audio.paused) ctx.resume();
   }
   if (!fx) return;
   fx.bands.forEach((f, i) => { f.gain.value = Number(prefs.eq[i]) || 0; });
   fx.bands[2].disconnect();
   fx.bands[2].connect(prefs.level ? fx.comp : ctx.destination);
+  fx.bands[2].connect(fx.an);
+}
+
+// --- Paroles et visualiseur ----------------------------------------------------------------------
+// Deux pictos du lecteur : en plein écran (téléphone), les paroles ou le spectre prennent la place de la pochette ;
+// sur ordinateur, ils s'ouvrent dans un panneau au-dessus de la barre. Paroles : LRCLIB, par le serveur ; elles
+// suivent la musique quand la version minutée a la même durée (à 8 s près : un remix décale tout), sinon en texte.
+// Visualiseur : le son passe alors par Web Audio (circuit créé à la première ouverture, jamais avant).
+let stage = null; // 'lyrics' | 'viz' | null
+let vizOn = false, raf = 0;
+let lyr = { id: null };
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const parseLrc = (s) => s.split('\n').map((l) => /^\[(\d+):(\d+(?:\.\d+)?)\](.*)$/.exec(l.trim())).filter(Boolean)
+  .map((m) => ({ t: +m[1] * 60 + +m[2], text: m[3].trim() }));
+const stageMsg = (text) => el('p', { class: 'pl-st-msg' }, text);
+
+function setStage(mode) {
+  stage = stage === mode ? null : mode;
+  ui.lyrbtn.setAttribute('aria-pressed', String(stage === 'lyrics'));
+  ui.vizbtn.setAttribute('aria-pressed', String(stage === 'viz'));
+  ui.stage.hidden = !stage;
+  ui.footer.classList.toggle('staged', !!stage);
+  cancelAnimationFrame(raf);
+  lyr = { id: null };
+  if (stage === 'viz') startViz();
+  else paintStage();
+}
+
+function paintStage() {
+  if (stage !== 'lyrics') return;
+  const t = player.queue.current();
+  if (!t) { lyr = { id: null }; ui.stage.replaceChildren(stageMsg(tr('Rien en lecture.'))); return; }
+  if (lyr.id === t.id) { if (lyr.lines) highlight(); return; }
+  lyr = { id: t.id, at: -1 };
+  ui.stage.replaceChildren(stageMsg(tr('Chargement…')));
+  api(`/tracks/${t.id}/lyrics`).then((r) => {
+    if (lyr.id !== t.id) return;
+    const timed = r.synced && (!t.duration || !r.duration || Math.abs(t.duration - r.duration) <= 8);
+    lyr.lines = timed ? parseLrc(r.synced).filter((l) => l.text) : null;
+    lyr.plain = r.plain || (r.synced ? parseLrc(r.synced).map((l) => l.text).join('\n') : null);
+    lyr.instrumental = r.instrumental;
+    renderLyrics();
+  }).catch(() => { if (lyr.id === t.id) renderLyrics(); });
+}
+
+function renderLyrics() {
+  const box = el('div', { class: 'pl-lyrics' + (lyr.lines?.length ? ' synced' : '') });
+  if (lyr.lines?.length) box.append(...lyr.lines.map((l) => el('button', { type: 'button', onclick: () => player.seek(l.t) }, l.text)));
+  else if (lyr.plain) box.append(...lyr.plain.split('\n').map((l) => el('p', {}, l || '\u00a0')));
+  else box.append(stageMsg(lyr.instrumental ? tr('Morceau instrumental.') : tr('Pas de paroles pour ce morceau.')));
+  ui.stage.replaceChildren(box);
+  lyr.at = -1;
+  if (lyr.lines?.length) highlight();
+}
+
+function highlight() {
+  const pos = position();
+  let i = -1;
+  while (i + 1 < lyr.lines.length && lyr.lines[i + 1].t <= pos + 0.3) i++;
+  if (i === lyr.at) return;
+  const rows = ui.stage.querySelectorAll('.pl-lyrics button');
+  rows[lyr.at]?.classList.remove('now');
+  rows[lyr.at]?.removeAttribute('aria-current');
+  lyr.at = i;
+  const row = rows[i];
+  if (!row) return;
+  row.classList.add('now');
+  row.setAttribute('aria-current', 'true');
+  const box = row.parentElement;
+  box.scrollTo({ top: row.offsetTop - box.clientHeight / 2 + row.offsetHeight / 2, behavior: reduceMotion.matches ? 'auto' : 'smooth' });
+}
+
+function startViz() {
+  cancelAnimationFrame(raf);
+  vizOn = true;
+  applyPrefs(); // crée le circuit Web Audio et son analyseur s'ils n'existent pas encore
+  if (!fx) { ui.stage.replaceChildren(stageMsg(tr('Visualiseur indisponible sur ce navigateur.'))); return; }
+  const c = el('canvas', { class: 'pl-viz', 'aria-hidden': 'true' });
+  ui.stage.replaceChildren(c, backend ? stageMsg(tr('Pas de spectre pendant une diffusion : le son est joué ailleurs.')) : '');
+  const g = c.getContext('2d'), data = new Uint8Array(fx.an.frequencyBinCount);
+  const color = getComputedStyle(ui.footer).getPropertyValue('--accent').trim() || '#3a3';
+  const BARS = 48;
+  const draw = () => {
+    if (stage !== 'viz') return;
+    const w = Math.round(c.clientWidth * devicePixelRatio), h = Math.round(c.clientHeight * devicePixelRatio);
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+    fx.an.getByteFrequencyData(data);
+    g.clearRect(0, 0, w, h);
+    g.fillStyle = color;
+    const bw = w / BARS;
+    for (let i = 0; i < BARS; i++) { // échelle logarithmique : les basses ne prennent pas toute la largeur
+      const v = data[Math.min(data.length - 1, Math.floor((data.length * 0.75) ** (i / BARS)))] / 255;
+      g.fillRect(i * bw + 1, h - v * h, Math.max(1, bw - 2), v * h);
+    }
+    raf = requestAnimationFrame(draw);
+  };
+  draw();
 }
 
 let fxDlg = null;
@@ -762,6 +861,7 @@ function offerResume(t) {
 function tick() {
   if (!ui) return;
   paintChapter();
+  paintStage();
   savePosition();
   const d = duration();
   ui.seek.max = d || 0;
@@ -876,6 +976,7 @@ function update() {
     ui.repeat.setAttribute('aria-pressed', q.repeat !== 'off');
     label(ui.repeat, text);
     if (!ui.panel.hidden) renderPanel();
+    if (stage === 'viz' && backend && !ui.stage.querySelector('.pl-st-msg')) startViz(); // diffusion lancée : on le dit
     tick();
   }
   player.events.dispatchEvent(new CustomEvent('change', { detail: { track: t, playing: on, queue: q } }));
@@ -977,6 +1078,11 @@ export function initPlayer(footer) {
   ui.volbtn, el('div', { class: 'pl-volpop' }, ui.vol));
   ui.qbtn = iconBtn('pl-qbtn', '☰', tr("File d'attente"), () => openPanel(ui.panel.hidden));
   ui.fx = iconBtn('pl-fx', '≋', tr('Réglages audio'), openAudioPrefs);
+  ui.lyrbtn = iconBtn('pl-lyrbtn', '', tr('Paroles'), () => setStage('lyrics'), 'mic');
+  ui.vizbtn = iconBtn('pl-vizbtn', '', tr('Visualiseur'), () => setStage('viz'), 'viz');
+  ui.lyrbtn.setAttribute('aria-pressed', 'false');
+  ui.vizbtn.setAttribute('aria-pressed', 'false');
+  ui.stage = el('div', { class: 'pl-stage', hidden: true, role: 'region', 'aria-label': tr('Paroles et visualiseur') });
   ui.qbtn.setAttribute('aria-expanded', 'false');
   ui.msg = el('p', { class: 'pl-msg', role: 'status' });
   // chapitre en cours d'un long mix, encadré par « précédent » et « suivant » ; masqué sans chapitres
@@ -1009,7 +1115,7 @@ export function initPlayer(footer) {
   footer.replaceChildren(ui.panel, ui.msg,
     el('div', { class: 'pl-bar' },
       el('div', { class: 'pl-top' }, ui.collapse, el('span', { class: 'pl-now' }, tr('En cours de lecture')), ui.doc),
-      el('div', { class: 'pl-info' }, ui.cover, ui.title, ui.artist, ui.rel, ui.meta, ui.cast),
+      el('div', { class: 'pl-info' }, ui.cover, ui.stage, ui.title, ui.artist, ui.rel, ui.meta, ui.cast),
       el('div', { class: 'pl-controls' },
         ui.shuffle,
         iconBtn('pl-prev', '', tr('Précédent'), () => player.prev(), 'prev'),
@@ -1017,7 +1123,7 @@ export function initPlayer(footer) {
         iconBtn('pl-next', '', tr('Suivant'), () => player.next(), 'next'),
         ui.repeat),
       el('div', { class: 'pl-seek' }, ui.elapsed, ui.wave, ui.total),
-      el('div', { class: 'pl-tools' }, ui.chap, ui.rate, volwrap, ui.fx, ui.fav, ui.qbtn,
+      el('div', { class: 'pl-tools' }, ui.chap, ui.rate, volwrap, ui.lyrbtn, ui.vizbtn, ui.fx, ui.fav, ui.qbtn,
         el('span', { id: 'cast-slot' })), // emplacement du bouton cast (cast.js)
       el('p', { class: 'pl-hint' }, tr('Balayez pour changer de piste'))), progress);
 

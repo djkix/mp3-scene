@@ -1397,6 +1397,10 @@ def test_live_sets_split_into_festivals_radio_shows_and_artists(user_client, set
     assert get("artist") == {"Carl Cox": (3, None)}  # club ou autre : par artiste, casse confondue
     page = user_client.get("/api/festival", params={"name": "carl cox", "type": "artist"}).json()
     assert [x["fyear"] for x in page["items"]] == [2012, 2010, 2008]
+    # page d'un artiste : où il joue, lu dans l'artiste de la release ou dans un morceau du nom
+    lives = lambda who: [(x["type"], x["name"], x["sets"]) for x in user_client.get("/api/artist-info", params={"name": who}).json()["lives"]]
+    assert lives("Carl Cox") == [("artist", "Carl Cox", 3)]
+    assert lives("Armin") == [("radio", "A State of Trance", 1), ("festival", "Tomorrowland", 1)]
     # photo d'un festival ou d'une émission : première pochette d'album dont le titre commence par son nom
     buf = io.BytesIO()
     Image.new("RGB", (40, 40), "red").save(buf, "JPEG")
@@ -1429,3 +1433,50 @@ def test_admin_sets_own_photo_by_upload_or_address(admin_client, user_client, mo
     monkeypatch.setattr(coversearch, "fetch", lambda url: seen.append(url) or buf.getvalue())
     body = {**q, "url": "https://encrypted-tbn0.gstatic.com/images?q=x"}
     assert admin_client.post("/api/admin/photo/url", json=body, headers=h).status_code == 204 and seen == [body["url"]]
+
+
+def test_lyrics_are_fetched_once_per_song_and_skipped_for_long_mixes(user_client, library, settings, monkeypatch):
+    from app import lyrics
+    calls = []
+    monkeypatch.setattr(lyrics, "find", lambda artist, title: calls.append((artist, title)) or
+                        {"synced": "[00:01.00] Show me love", "plain": "Show me love", "duration": 271.0, "instrumental": False})
+    c = db.connect(settings.data_dir)
+    rid = c.execute("SELECT id FROM releases LIMIT 1").fetchone()[0]
+    ids = []
+    for i, (title, dur) in enumerate([("Show Me Love (Club Mix)", 400), ("Show Me Love - Radio Edit", 210), ("Live Set", 3600)]):
+        ids.append(c.execute("INSERT INTO tracks(release_id, relpath, size, title, artist, duration) VALUES (?,?,1,?,?,?)",
+                             (rid, f"ly{i}.mp3", title, "Robin S feat. X", dur)).lastrowid)
+    c.commit()
+    get = lambda tid: user_client.get(f"/api/tracks/{tid}/lyrics").json()
+    assert get(ids[0])["synced"].endswith("Show me love") and calls == [("Robin S", "Show Me Love (Club Mix)")]
+    assert get(ids[1])["plain"] == "Show me love" and len(calls) == 1  # autre version du même morceau : en base
+    assert get(ids[2])["plain"] is None and len(calls) == 1             # long mix : pas de recherche
+    assert lyrics.clean_title("Crazy [Dub] (Edit)") == "Crazy"
+
+
+def test_labels_join_their_parent_label_family(user_client, admin_client, settings):
+    from app.routes_library import label_base
+    conn = db.connect(settings.data_dir)
+    labels = ["Toolroom Records", "Toolroom Records [UK]", "Toolroom Productions Ltd", "Toolroom Trax", "Toolroom Longplayer",
+              "Toolroom Presents Leaders Of The New School", "Leaders of the New School/Toolroom", "Defected", "Big Beat Records", "Big Life"]
+    for i, lab in enumerate(labels):
+        conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, label)"
+                     " VALUES (?,?,'','Singles',0,0,10,0,0,?)", (f"l{i}", f"l{i}", lab))
+    conn.commit()
+    assert label_base("Toolroom Records [UK]") == "Toolroom" and label_base("Toolroom Productions Ltd") == "Toolroom"
+    rows = {g["name"]: (g["releases"], g.get("labels")) for g in user_client.get("/api/groups", params={"by": "label"}).json()}
+    assert rows["Toolroom"] == (7, 7)                                   # la famille réunit les sept
+    assert rows["Big Beat Records"] == (1, 1) and rows["Big Life"] == (1, 1)  # « Big » n'est pas une maison mère
+    info = user_client.get("/api/group-info", params={"by": "label", "name": "Toolroom"}).json()
+    assert info["n"] == 7 and len(info["members"]) == 7
+    assert user_client.get("/api/group-info", params={"by": "label", "name": "Toolroom", "sub": "Toolroom Trax"}).json()["n"] == 1
+    # liste d'une famille : plusieurs labels dans la même requête
+    got = user_client.get("/api/releases", params=[("label", "Toolroom Trax"), ("label", "Toolroom Longplayer")]).json()["items"]
+    assert len(got) == 2
+    # règles : un label gardé à part, puis la famille défaite
+    h = {"X-CSRF": "1"}
+    assert admin_client.put("/api/admin/labels/rules", json={"name": "Toolroom Longplayer", "family": ""}, headers=h).status_code == 204
+    rows = {g["name"]: g["releases"] for g in user_client.get("/api/groups", params={"by": "label"}).json()}
+    assert rows["Toolroom"] == 6 and rows["Toolroom Longplayer"] == 1
+    assert admin_client.put("/api/admin/labels/rules", json={"name": "Toolroom", "family": ""}, headers=h).status_code == 204
+    assert "Toolroom" not in {g["name"] for g in user_client.get("/api/groups", params={"by": "label"}).json()}

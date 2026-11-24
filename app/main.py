@@ -30,11 +30,12 @@ class NoCacheStatic(StaticFiles):
         return response
 
 
+# media-src data: : son silencieux qui autorise le second élément audio sur mobile (enchaînement sans blanc) ;
 # style 'unsafe-inline' : attributs style posés par l'interface (largeur des barres, couleurs des graphiques) ;
 # aucun script en ligne n'est servi. « www.gstatic.com » sans schéma : celui de la page (https en production), le SDK
 # Cast chargeant ses fichiers par des adresses sans schéma
 CSP = ("default-src 'self'; script-src 'self' www.gstatic.com; style-src 'self' 'unsafe-inline'; "
-       "img-src 'self' https: data: blob:; media-src 'self' blob:; connect-src 'self' https://api.github.com; "
+       "img-src 'self' https: data: blob:; media-src 'self' blob: data:; connect-src 'self' https://api.github.com; "
        "frame-src 'self' www.gstatic.com; font-src 'self'; object-src 'none'; base-uri 'self'; "
        "form-action 'self'; frame-ancestors 'none'")
 

@@ -4,7 +4,7 @@
 
 **Collection de releases MP3 « scene » — bibliothèque · lecteur web · Chromecast · PWA**
 
-[![Version](https://img.shields.io/badge/version-1.75.1-purple?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.76.0-purple?style=for-the-badge)](CHANGELOG.md)
 [![Stack](https://img.shields.io/badge/stack-FastAPI_·_SQLite_·_JavaScript_pur-blue?style=for-the-badge)](#stack-technique)
 [![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
 
@@ -391,6 +391,10 @@ git tag v1.2.0 && git push origin v1.2.0
 ## Historique des versions
 
 Le détail est dans le [journal des modifications](CHANGELOG.md).
+
+### 1.76.0 — 24 novembre 2026
+
+**Familles de labels, paroles et visualiseur** : labels réunis sous leur maison mère, paroles synchronisées, spectre animé, lives d'un artiste.
 
 ### 1.75.0 — 24 novembre 2026
 

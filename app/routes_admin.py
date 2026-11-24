@@ -18,7 +18,8 @@ from .routes_library import RELEASE_COLS, RELEASE_FROM, Dir, Sort, _all_series, 
 # libellé au journal d'activité de chaque action d'administration : (méthode, route) -> libellé
 _ACTIONS = {
     # comptes : inscrits par leurs routes, avec le nom du compte et ce qui a changé
-    ("POST", "/scan"): "Scan lancé", ("PUT", "/scan/schedule"): "Scan quotidien réglé", ("POST", "/classify"): "Reclassement",
+    ("POST", "/scan"): "Scan lancé", ("PUT", "/scan/schedule"): "Scan quotidien réglé", ("PUT", "/labels/rules"): "Famille de labels réglée",
+    ("DELETE", "/labels/rules"): "Règle de famille de labels retirée", ("POST", "/classify"): "Reclassement",
     ("PATCH", "/releases/{rid}"): "Correction", ("PATCH", "/releases"): "Correction en lot",
     ("PUT", "/releases/{rid}/cover"): "Pochette ajoutée", ("POST", "/releases/{rid}/cover/fetch"): "Pochette ajoutée", ("DELETE", "/releases/{rid}/cover"): "Pochette retirée",
     ("PUT", "/titles/aliases"): "Titres fusionnés", ("DELETE", "/titles/aliases"): "Titres séparés",
@@ -306,6 +307,30 @@ def set_series_rule(body: SeriesRule, conn=Depends(get_conn)):
     if not name:
         raise HTTPException(400, "Nom de série manquant.")
     conn.execute("INSERT OR REPLACE INTO series_rules(key, name, family) VALUES (?,?,?)", (name.casefold(), name, family))
+    conn.commit()
+
+
+@router.get("/labels/rules")
+def label_rules(conn=Depends(get_conn)):
+    """Familles de labels réglées à la main : label (ou famille) -> famille ; vide : jamais regroupé."""
+    return [dict(r) for r in conn.execute("SELECT name, family FROM label_rules ORDER BY name COLLATE NOCASE")]
+
+
+@router.put("/labels/rules", status_code=204)
+def set_label_rule(body: SeriesRule, conn=Depends(get_conn)):
+    """Rattache un label à une famille, ou (famille vide) le garde à part ; au nom d'une famille, vide la défait.
+    Un nom rattaché à lui-même (« Toolroom » -> « Toolroom ») réunit tous les labels qui commencent par ce nom."""
+    name, family = body.name.strip(), body.family.strip()
+    if not name:
+        raise HTTPException(400, "Nom de label manquant.")
+    conn.execute("INSERT OR REPLACE INTO label_rules(key, name, family) VALUES (?,?,?)", (name.casefold(), name, family))
+    conn.commit()
+
+
+@router.delete("/labels/rules", status_code=204)
+def drop_label_rule(name: str = Query(max_length=200), conn=Depends(get_conn)):
+    if conn.execute("DELETE FROM label_rules WHERE key=?", (name.strip().casefold(),)).rowcount == 0:
+        raise HTTPException(404, "Règle introuvable.")
     conn.commit()
 
 

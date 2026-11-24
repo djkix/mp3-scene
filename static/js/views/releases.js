@@ -328,7 +328,7 @@ export function render(container, params) {
       : ['artist', 'label', 'grp', 'genre', 'year'].includes(pin?.key) ? (() => {
         const p = multiQuery({ genre: pin.key === 'genre' ? [].concat(pin.value).join('|') : genre, year: pin.key === 'year' ? pin.value : year });
         p.set('by', 'category');
-        if (!['genre', 'year'].includes(pin.key)) p.set(pin.key, pin.value);
+        if (!['genre', 'year'].includes(pin.key)) for (const v of [].concat(pin.value)) p.append(pin.key, v); // famille de labels : plusieurs
         return api('/groups?' + p).then((rows) => Object.fromEntries(rows.map((c) => [c.name, c.releases])));
       })() : null });
   return () => { dead = true; dispose(); };

@@ -47,6 +47,10 @@ CREATE TABLE IF NOT EXISTS tracks(
   relpath TEXT NOT NULL, disc INTEGER NOT NULL DEFAULT 1, size INTEGER NOT NULL,
   title TEXT, artist TEXT, duration REAL, bitrate INTEGER, genre TEXT, bpm REAL, key TEXT,
   tags_read INTEGER NOT NULL DEFAULT 0);
+-- paroles lues sur LRCLIB, par morceau (artiste et titre réduits) : toutes les versions les partagent ; une ligne
+-- vide retient qu'il n'y en a pas (nouvel essai après 30 jours)
+CREATE TABLE IF NOT EXISTS lyrics(key TEXT PRIMARY KEY, synced TEXT, plain TEXT, duration REAL, instrumental INTEGER NOT NULL DEFAULT 0,
+  fetched_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS favorites(
   user_id INTEGER NOT NULL REFERENCES users ON DELETE CASCADE,
   kind TEXT NOT NULL CHECK(kind IN ('release','track')),
@@ -95,6 +99,8 @@ CREATE INDEX IF NOT EXISTS idx_tracks_tags_read ON tracks(tags_read);
 CREATE INDEX IF NOT EXISTS idx_folders_parent ON folders(parent);
 
 -- familles de séries réglées à la main : série (ou famille) -> famille ; vide : jamais regroupée
+-- familles de labels réglées à la main : label (ou famille) -> famille ; vide : gardé à part ou famille défaite
+CREATE TABLE IF NOT EXISTS label_rules(key TEXT PRIMARY KEY, name TEXT NOT NULL, family TEXT NOT NULL DEFAULT '');
 CREATE TABLE IF NOT EXISTS series_rules(key TEXT PRIMARY KEY, name TEXT NOT NULL, family TEXT NOT NULL DEFAULT '');
 -- texte des NFO, pour la recherche (rowid : identifiant de la release) ; sans contenu : seul l'index est gardé
 CREATE VIRTUAL TABLE IF NOT EXISTS nfo_fts USING fts5(text, content='', contentless_delete=1, tokenize='unicode61');

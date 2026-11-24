@@ -4,6 +4,24 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.76.0](https://github.com/djkix/mp3-scene/compare/v1.75.1...v1.76.0) (2026-11-24)
+
+### Résumé
+
+**Familles de labels, paroles, visualiseur et lives d'un artiste.**
+
+- Familles de labels : un label qui commence par le nom d'une maison mère (sans « Records », « Productions », « Ltd »,
+  pays entre crochets), ou la porte après une barre, la rejoint. L'onglet Labels montre une ligne « Toolroom » ; sa
+  page a un bloc par label. Règles manuelles dans Admin › Règles (rattacher, garder à part, défaire, réunir par début).
+- Paroles (LRCLIB, par le serveur, gardées en base par morceau) : un picto dans le lecteur ; en plein écran sur
+  téléphone, elles remplacent la pochette, sur ordinateur un panneau au-dessus de la barre. Synchronisées quand la
+  version minutée a la même durée (à 8 s près), sinon en texte ; un clic sur une ligne y mène.
+- Visualiseur : spectre animé au même endroit, Web Audio créé seulement à son ouverture.
+- Page d'un artiste : rubrique « Lives » (festivals, émissions, clubs et autres où il joue).
+- Lecteur sur ordinateur : la pastille du format n'apparaît qu'à partir de 1 600 px, pour garder les outils sur une ligne.
+- Correctif : la politique de sécurité bloquait depuis la 1.71.0 le son silencieux qui autorise le second élément
+  audio sur mobile (enchaînement de la piste suivante).
+
 ## [1.75.1](https://github.com/djkix/mp3-scene/compare/v1.75.0...v1.75.1) (2026-11-24)
 
 ### Résumé
