@@ -1163,6 +1163,7 @@ export function initPlayer(footer) {
   });
   mobile.addEventListener('change', () => expand(false));  // rotation / redimensionnement vers la vue bureau
   addEventListener('hashchange', () => expand(false));     // lien vers la fiche depuis le lecteur plein écran
+  addEventListener('hashchange', () => { if (stage) setStage(stage); }); // paroles, visualiseur : refermés à chaque changement de page
 
   // Requête lancée tout de suite, réponse appliquée dans l'ordre des clics : une lecture en retard
   // n'écrase pas les pistes ajoutées après elle.

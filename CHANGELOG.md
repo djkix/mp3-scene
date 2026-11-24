@@ -4,6 +4,12 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.76.1](https://github.com/djkix/mp3-scene/compare/v1.76.0...v1.76.1) (2026-11-24)
+
+### Résumé
+
+- Le panneau des paroles ou du visualiseur se referme à chaque changement de page : il ne masque plus le contenu.
+
 ## [1.76.0](https://github.com/djkix/mp3-scene/compare/v1.75.1...v1.76.0) (2026-11-24)
 
 ### Résumé
