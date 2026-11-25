@@ -1037,7 +1037,8 @@ function update() {
       ui.cover.hidden = true;
       if (cover) ui.cover.src = cover; else ui.cover.removeAttribute('src');
     }
-    ui.rel.href = ui.doc.href = t ? relHref(t.release_name, t.release_id) : '#/';
+    // piste de Navidrome : sa page d'album dans l'onglet Navidrome (elle n'a pas de fiche dans la bibliothèque)
+    ui.rel.href = ui.doc.href = !t ? '#/' : t.nd ? (t.nd_album ? `#/navidrome/album/${encodeURIComponent(t.nd_album)}` : '#/navidrome') : relHref(t.release_name, t.release_id);
     // plein écran : source, débit et groupe de la release (absents d'une file enregistrée avant la 1.33.0)
     // groupe, source, débit, fréquence, format (MP3, FLAC…) : seuls le groupe et la source sont en pastille ; les points de séparation sont à part
     // fréquence : lue dans le fichier (une requête par piste), ajoutés dès qu'ils arrivent

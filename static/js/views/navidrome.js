@@ -68,7 +68,12 @@ export function render(container, params) {
             [a.year, a.genre, tr('{0} pistes', a.tracks.length), a.duration ? fmtDuration(a.duration) : ''].filter(Boolean).map((x) => ` · ${x}`).join('')),
           el('p', { class: 'detail-actions' },
             el('button', { type: 'button', class: 'primary', onclick: () => player.playTracks(a.tracks.slice(), 0) }, tr('Lire')),
-            el('button', { type: 'button', onclick: () => player.enqueue(a.tracks.slice()) }, tr('Ajouter à la file'))))), list);
+            el('button', { type: 'button', onclick: () => player.enqueue(a.tracks.slice()) }, tr('Ajouter à la file'))))), list,
+      // commentaire des tags de chaque piste (souvent la tracklist d'un mix), puis les notes de l'album
+      ...a.tracks.filter((t) => t.comment).flatMap((t) => [el('h2', { class: 'nfo-h nd-h' }, a.tracks.length > 1 ? `${tr('Infos')} · ${t.title}` : tr('Infos')),
+        el('pre', { class: 'nd-notes' }, t.comment)]),
+      ...(a.notes ? [el('h2', { class: 'nfo-h nd-h' }, tr("À propos de l'album")), el('p', { class: 'nd-notes' }, a.notes)] : []),
+      a.tracks[0]?.path ? el('p', { class: 'nd-path muted' }, a.tracks[0].path.replace(/[^/]*$/, '')) : '');
       done();
     }).catch(fail);
   } else if (what === 'artist' && id) {

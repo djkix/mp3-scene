@@ -4,6 +4,17 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.82.2](https://github.com/djkix/mp3-scene/compare/v1.82.1...v1.82.2) (2026-11-25)
+
+### Résumé
+
+**Navidrome : lien de la release et infos de l'album.**
+
+- Lecteur : pour une piste de Navidrome, le nom de la release ouvre sa page d'album dans l'onglet Navidrome (au lieu
+  de « Release introuvable »).
+- Page d'un album Navidrome : le commentaire des tags de chaque piste (souvent la tracklist d'un mix), les notes de
+  l'album quand Navidrome en a (texte seul) et le dossier.
+
 ## [1.82.1](https://github.com/djkix/mp3-scene/compare/v1.82.0...v1.82.1) (2026-11-25)
 
 ### Résumé

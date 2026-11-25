@@ -69,7 +69,10 @@ def _song(x: dict) -> dict:
             "bitrate": (x.get("bitRate") or 0) * 1000 or None, "genre": x.get("genre"), "disc": x.get("discNumber") or 1,
             "track": x.get("track"), "year": x.get("year"), "suffix": (x.get("suffix") or "").lower(),
             "cover": f"/api/navidrome/cover/{urllib.parse.quote(x['coverArt'])}" if x.get("coverArt") else None,
-            "filename": x.get("path", "").rsplit("/", 1)[-1] or x.get("title") or ""}
+            "filename": x.get("path", "").rsplit("/", 1)[-1] or x.get("title") or "",
+            # commentaire des tags : la tracklist d'un mix s'y trouve souvent ; Subsonic ne donne pas les .txt du dossier
+            "comment": (x.get("comment") or "").strip() or None, "size": x.get("size"),
+            "path": x.get("path")}
 
 
 def _album(x: dict) -> dict:
@@ -140,8 +143,14 @@ def artist(aid: str, request: Request):
 def album(aid: str, request: Request):
     if not re.match(ND_ID, aid):
         raise HTTPException(404, "Album introuvable.")
-    a = call(_settings(request), "getAlbum", id=aid).get("album") or {}
-    return {**_album({"id": aid, **a}), "tracks": [_song(x) for x in a.get("song", [])]}
+    s = _settings(request)
+    a = call(s, "getAlbum", id=aid).get("album") or {}
+    try:  # notes de l'album (biographie, description) si Navidrome en a ; facultatif
+        notes = (call(s, "getAlbumInfo2", id=aid).get("albumInfo") or {}).get("notes")
+    except HTTPException:
+        notes = None
+    return {**_album({"id": aid, **a}), "tracks": [_song(x) for x in a.get("song", [])],
+            "notes": re.sub(r"<[^>]+>", "", notes or "").strip() or None}  # texte seul : jamais de HTML venu d'ailleurs
 
 
 @router.get("/search")

@@ -7,7 +7,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import pytest
 
 SONG = {"id": "s1", "title": "Strobe", "artist": "deadmau5", "album": "For Lack", "albumId": "al1", "duration": 600,
-        "bitRate": 320, "suffix": "flac", "coverArt": "al1", "path": "deadmau5/For Lack/01 Strobe.flac", "track": 1}
+        "bitRate": 320, "suffix": "flac", "coverArt": "al1", "path": "deadmau5/For Lack/01 Strobe.flac", "track": 1,
+        "comment": "Tracklist :\n1. A - B\n2. C - D"}
 AUDIO = bytes(range(256)) * 40  # 10 240 octets
 
 
@@ -51,6 +52,7 @@ class Fake(BaseHTTPRequestHandler):
                 "getAlbum": {"album": {"name": "For Lack", "artist": "deadmau5", "song": [SONG]}},
                 "getArtists": {"artists": {"index": [{"artist": [{"id": "ar1", "name": "deadmau5", "albumCount": 1}]}]}},
                 "search3": {"searchResult3": {"song": [SONG]}},
+                "getAlbumInfo2": {"albumInfo": {"notes": "<p>Un <b>grand</b> album</p>"}},
                 "getRandomSongs": {"randomSongs": {"song": [SONG]}},
                 "getArtist": {"artist": {"name": "deadmau5", "album": [{"id": "al1", "name": "For Lack", "year": 2008}]}},
                 "getSong": {"song": SONG}}[method]
@@ -83,7 +85,9 @@ def test_navidrome_browse_search_stream_and_cast(navidrome, settings, user_clien
     assert user_client.get("/api/navidrome/status").json() == {"enabled": True, "ok": True}
     assert user_client.get("/api/navidrome/albums").json()[0]["cover"] == "/api/navidrome/cover/al1"
     assert user_client.get("/api/navidrome/artists").json() == [{"id": "ar1", "name": "deadmau5", "albums": 1}]
-    t = user_client.get("/api/navidrome/album/al1").json()["tracks"][0]
+    album = user_client.get("/api/navidrome/album/al1").json()
+    assert album["notes"] == "Un grand album" and album["tracks"][0]["comment"].startswith("Tracklist")  # HTML retiré
+    t = album["tracks"][0]
     assert (t["id"], t["nd"], t["title"], t["release_name"], t["bitrate"], t["suffix"]) == ("nd:s1", "s1", "Strobe", "For Lack", 320000, "flac")
     assert user_client.get("/api/navidrome/search", params={"q": "strobe"}).json()["tracks"][0]["id"] == "nd:s1"
     # morceaux à l'unité : les listes et la page d'un artiste se montrent en pistes
