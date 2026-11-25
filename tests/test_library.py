@@ -1565,3 +1565,24 @@ def test_txt_stands_in_for_a_missing_nfo(user_client, library, settings, tmp_pat
     tid = user_client.get(f"/api/releases/{bid}").json()["tracks"][0]["id"]
     assert "Mixé par Bicep" in user_client.get(f"/api/releases/{bid}/nfo", params={"track": tid}).text  # seul .txt du dossier
     assert user_client.get(f"/api/releases/{bid}/nfo", params={"track": 99999}).status_code == 404
+
+
+def test_lives_in_the_singles_folder_go_to_live_and_radio(admin_client, settings):
+    from app.naming import looks_live
+    assert looks_live("Hardwell-Live_at_Tomorrowland_2014-WEB-2014-GRP") and looks_live("Carl_Cox-Essential_Mix-WEB-2010-X")
+    assert not looks_live("Martin_Garrix-Tomorrowland_Anthem-WEB-2014-X")          # un morceau, pas un set
+    assert not looks_live("Moby-Almost_Home__Live_At_The_Fonda_LA-2CD-2014-DLiTE")  # en CD : un album
+    conn = db.connect(settings.data_dir)
+    for path in ("Singles/H/Hardwell-Live_at_Tomorrowland_2014-WEB-2014-GRP", "Singles/M/Martin_Garrix-Tomorrowland_Anthem-WEB-2014-X",
+                 "Live And Radio/Carl_Cox-Live-SAT-2010-X"):
+        conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo)"
+                     " VALUES (?,?,?,?,0,0,1,1,0)", (path, path.rsplit("/", 1)[1], path.rsplit("/", 1)[0], path.split("/")[0]))
+    db.categorize(conn)
+    conn.commit()
+    cats = dict(conn.execute("SELECT name, category FROM releases"))
+    assert cats["Hardwell-Live_at_Tomorrowland_2014-WEB-2014-GRP"] == "Live And Radio"
+    assert cats["Martin_Garrix-Tomorrowland_Anthem-WEB-2014-X"] == "Singles"
+    q = admin_client.get("/api/admin/quality").json()
+    assert q["live_in_singles"] == 1  # à déplacer sur le NAS : son dossier est encore parmi les singles
+    names = [r["name"] for r in admin_client.get("/api/admin/quality", params={"kind": "live_in_singles"}).json()["items"]]
+    assert names == ["Hardwell-Live_at_Tomorrowland_2014-WEB-2014-GRP"]

@@ -126,6 +126,23 @@ def kind(name: str) -> str | None:
     return "single" if f["source"] in ("CDS", "CDM", "SINGLE") else None
 
 
+# « …-Live_at_Tomorrowland… », « …_DJ_Set_@_Fabric… », « Live_au_Rex » : un set, même sans tag de diffusion
+_SET_AT = re.compile(r"(?:^|[-_ (])(?:live|dj[-_ ]?set|set)[-_ ]+(?:at|au|@|from|à)[-_ ]", re.I)
+
+
+def looks_live(name: str) -> bool:
+    """Un nom rangé parmi les singles qui est en fait un live : il cite un festival, une émission de radio connue, ou
+    dit « Live at… » (sans CD : un « Live at Wembley » en 2CD est un album)."""
+    if _CD.search(name):
+        return False
+    if _SET_AT.search(name):
+        return True
+    # un morceau qui porte le nom d'un festival (« Tomorrowland_Anthem », « …_(Ultra_Remix) ») reste un single
+    if re.search(r"(?i)(?:^|[-_ (])(?:anthem|theme|remix|edit|rework|bootleg|vip|official)(?:[-_ )]|$)", name):
+        return False
+    return bool(festival(name) or (r := radio(name)) and r[2])
+
+
 def _clean(s):
     return s.replace("_", " ").strip() or None
 

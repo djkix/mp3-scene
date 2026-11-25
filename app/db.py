@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 
 from app import artists, genres, nfo
-from app.naming import album_like, group, kind, one_song, parse_release_name, unwrap
+from app.naming import album_like, group, kind, looks_live, one_song, parse_release_name, unwrap
 
 SCHEMA = Path(__file__).with_name("schema.sql")
 VERSION = 1  # PRAGMA user_version ; à incrémenter avec une migration si le schéma change
@@ -175,7 +175,7 @@ def categorize(conn) -> None:
     """Catégorie de chaque release : celle que les tags de son nom indiquent, sinon son dossier racine.
 
     Dans le dossier des singles, une release sans tag de single et d'au moins dix pistes est rangée dans « Albums »,
-    seule catégorie sans dossier à elle.
+    seule catégorie sans dossier à elle ; un live sans tag de diffusion (festival cité, « Live at… ») dans Live & Radio.
 
     Une catégorie est toujours un dossier racine existant : « live » désigne celui dont le nom contient « live » ou
     « radio », etc. Sans dossier correspondant, la release garde le sien."""
@@ -194,6 +194,9 @@ def categorize(conn) -> None:
 
     def category(r):
         top, k = r["path"].split("/", 1)[0], kind(r["name"])
+        # dans le dossier des singles, un live sans tag de diffusion (« Live at Tomorrowland », un festival cité)
+        if k is None and top == target["single"] and looks_live(r["name"]):
+            k = "live"
         if k is None and top == target["single"] and album_like(r["name"], r["track_count"]) \
                 and not one_song(titles.get(r["id"], [])):
             return "Albums"

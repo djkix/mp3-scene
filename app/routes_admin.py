@@ -848,6 +848,9 @@ QUALITY = {
     "no_artist": "COALESCE(r.tag_artist, r.artist) IS NULL",
     # même artiste et même titre dans le nom qu'une autre release (index idx_releases_dupe)
     # ; un doublon est réglé dès qu'une version est gardée et les autres masquées
+    # lives rangés dans Live & Radio alors que leur dossier est sur le disque parmi les singles : à déplacer sur le NAS
+    "live_in_singles": "(lower(r.category) LIKE '%live%' OR lower(r.category) LIKE '%radio%')"
+                       " AND lower(substr(r.path, 1, instr(r.path || '/', '/') - 1)) LIKE '%single%'",
     "dupes": "r.hidden=0 AND EXISTS (SELECT 1 FROM releases d WHERE lower(d.artist)=lower(r.artist) AND lower(d.title)=lower(r.title)"
              " AND d.id!=r.id AND d.hidden=0)",
 }
@@ -891,7 +894,7 @@ def apply_genres(conn=Depends(get_conn)):
 
 
 @router.get("/quality")
-def quality(kind: Literal["no_nfo", "no_tracks", "no_tags", "unreadable", "low_bitrate", "no_year", "no_genre", "no_cover", "no_artist", "dupes"] | None = None,
+def quality(kind: Literal["no_nfo", "no_tracks", "no_tags", "unreadable", "low_bitrate", "no_year", "no_genre", "no_cover", "no_artist", "live_in_singles", "dupes"] | None = None,
             sort: Sort | None = None, dir: Dir = "asc", offset: int = Query(0, ge=0, le=MAX_INT),
             limit: int = Query(50, ge=1, le=MAX_INT), ids: int = Query(0, ge=0, le=1),
             user=Depends(require_admin), conn=Depends(get_conn)):

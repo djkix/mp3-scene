@@ -10,7 +10,7 @@ import { area, columns, donut, shares, stacked } from '../charts.js';
 
 const KINDS = [['no_nfo', 'Sans NFO'], ['no_tags', 'Sans tags'], ['unreadable', 'Pistes illisibles'], ['low_bitrate', 'Débit inférieur à 192 kbit/s'],
   ['no_year', 'Sans année'], ['no_genre', 'Sans genre'], ['no_cover', 'Sans pochette'], ['no_tracks', 'Sans piste'], ['no_artist', 'Sans artiste'],
-  ['dupes', 'Doublons possibles']];
+  ['live_in_singles', 'Lives dans le dossier Singles'], ['dupes', 'Doublons possibles']];
 const tabBtn = (label, on, hash) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(on),
   onclick: () => { location.hash = hash; } }, label);
 

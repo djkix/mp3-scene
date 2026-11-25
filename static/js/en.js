@@ -548,6 +548,7 @@ export const EN = {
   'Accès': 'Access',
   'Partages': 'Shares',
   'Sans artiste': 'No artist',
+  'Lives dans le dossier Singles': 'Lives in the Singles folder',
   'Les tags du nom décident (SAT, DVBS, date complète : Live & Radio ; VA : Compilations ; CDM, CDS : Singles), sinon le dossier. Dans Singles, dix pistes sans tag de single font un album.': 'The tags in the name decide (SAT, DVBS, full date: Live & Radio; VA: Compilations; CDM, CDS: Singles), otherwise the folder. In Singles, ten tracks with no single tag make an album.',
   'Casse, accents, espaces et ponctuation sont ignorés. Un featuring ou un « vs » rejoint l’artiste principal ; un « & » aussi, sauf si le duo a au moins autant de releases que son premier membre.': 'Case, accents, spaces and punctuation are ignored. A featuring or a “vs” joins the main artist; so does an “&”, unless the duo has at least as many releases as its first member.',
   'Le suffixe _INT est retiré et la casse unifiée. Ce qui n’a pas la forme d’un nom de groupe (année, source, bout de titre) est rangé dans P2P.': 'The _INT suffix is removed and case unified. Anything that does not look like a group name (year, source, piece of title) goes to P2P.',

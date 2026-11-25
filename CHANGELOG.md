@@ -4,6 +4,19 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.81.0](https://github.com/djkix/mp3-scene/compare/v1.80.1...v1.81.0) (2026-11-25)
+
+### Résumé
+
+**Lives rangés dans les Singles.**
+
+- Dans le dossier des singles, une release qui dit « Live at… », « DJ Set @… » ou cite un festival ou une émission
+  de radio connus passe dans Live & Radio, même sans tag de diffusion (SAT, FM…), et rejoint la page de son
+  festival. Un morceau qui porte le nom d'un festival (« Tomorrowland Anthem », remix, edit) reste un single ; une
+  release en CD garde sa catégorie.
+- Contrôle qualité « Lives dans le dossier Singles » : les releases de Live & Radio dont le dossier est encore parmi
+  les singles sur le disque, à déplacer sur le NAS (l'application ne touche jamais aux fichiers).
+
 ## [1.80.1](https://github.com/djkix/mp3-scene/compare/v1.80.0...v1.80.1) (2026-11-25)
 
 ### Résumé
