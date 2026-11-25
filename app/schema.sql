@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS artist_aliases(key TEXT PRIMARY KEY, alias TEXT NOT N
 CREATE TABLE IF NOT EXISTS tracks(
   id INTEGER PRIMARY KEY, release_id INTEGER NOT NULL REFERENCES releases ON DELETE CASCADE,
   relpath TEXT NOT NULL, disc INTEGER NOT NULL DEFAULT 1, size INTEGER NOT NULL,
-  title TEXT, artist TEXT, duration REAL, bitrate INTEGER, genre TEXT, bpm REAL, key TEXT,
+  title TEXT, artist TEXT, duration REAL, bitrate INTEGER, genre TEXT, bpm REAL, key TEXT, year INTEGER,
   tags_read INTEGER NOT NULL DEFAULT 0);
 -- paroles lues sur LRCLIB, par morceau (artiste et titre réduits) : toutes les versions les partagent ; une ligne
 -- vide retient qu'il n'y en a pas (nouvel essai après 30 jours)

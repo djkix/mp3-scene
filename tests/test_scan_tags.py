@@ -251,3 +251,27 @@ def test_scan_never_follows_a_symlinked_nfo_or_cue(conn, music, make_mp3, tmp_pa
     assert conn.execute("SELECT COUNT(*) FROM nfo_fts WHERE nfo_fts MATCH 'ok'").fetchone()[0] == 1
     tid = conn.execute("SELECT id, relpath FROM tracks").fetchone()
     assert cue.for_tracks(d, [(tid[0], tid[1])]) == {}
+
+
+def test_year_comes_from_tags_when_the_name_has_none(conn, music, make_mp3):
+    d = music / "S/Ace Of Base - The Ultimate Collection"
+    d.mkdir(parents=True)
+    for i, y in enumerate(["2005", "2005-03-01", "1993"]):
+        make_mp3(d / f"0{i}.mp3", title="T", year=y)
+    scan_structure(conn, music, now=1.0)
+    scan_tags(conn, music)
+    assert conn.execute("SELECT year FROM releases").fetchone()[0] == 2005  # la plus fréquente
+    assert sc._year("10/05/1999") == 1999 and sc._year("0000") is None and sc._year(None) is None
+
+
+def test_cover_found_in_the_tags_of_a_later_track(music, make_mp3):
+    from mutagen.id3 import APIC, ID3
+    d = music / "S/Album"
+    d.mkdir(parents=True)
+    make_mp3(d / "01.mp3", title="A")
+    make_mp3(d / "02.mp3", title="B")
+    assert not sc._has_cover(music, "S/Album", ["01.mp3", "02.mp3"])
+    tags = ID3(d / "02.mp3")
+    tags.add(APIC(encoding=3, mime="image/jpeg", type=3, data=b"\xff\xd8jpeg"))
+    tags.save()
+    assert sc._has_cover(music, "S/Album", ["01.mp3", "02.mp3"])  # la première piste n'en a pas, la deuxième si

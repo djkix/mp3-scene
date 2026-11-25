@@ -369,7 +369,7 @@ class _Watched:
 
 
 def _read_tags(path):
-    """(titre, artiste, genre, durée, débit, BPM, tonalité) du fichier, champs None s'il n'est pas lisible.
+    """(titre, artiste, genre, durée, débit, BPM, tonalité, année) du fichier, champs None s'il n'est pas lisible.
 
     Lève OSError si le fichier ne peut pas être lu (absent, NFS indisponible) : la piste reste à lire."""
     with security.open_regular(path) as raw:  # lecture seule, sans suivre de lien symbolique
@@ -381,11 +381,17 @@ def _read_tags(path):
         if f.error is not None:  # erreur d'E/S, quoi que mutagen en ait fait (avalée, enveloppée…)
             raise f.error
     if m is None:
-        return None, None, None, None, None, None, None
+        return None, None, None, None, None, None, None, None
     info = getattr(m, "info", None)
     return (_first(m.tags, "title"), unwrap(_first(m.tags, "artist")), genres.normalize(_first(m.tags, "genre")),
             getattr(info, "length", None), getattr(info, "bitrate", None), _bpm(_first(m.tags, "bpm")),
-            _first(m.tags, "initialkey"))
+            _first(m.tags, "initialkey"), _year(_first(m.tags, "date") or _first(m.tags, "originaldate")))
+
+
+def _year(v):
+    """Année d'un tag de date (« 1999 », « 1999-05-10 », « 10/05/1999 ») ; None si elle n'est pas plausible."""
+    m = re.search(r"(?<!\d)(19[5-9]\d|20\d\d)(?!\d)", v or "")
+    return int(m[1]) if m and int(m[1]) <= time.localtime().tm_year + 1 else None
 
 
 def _bpm(v):
@@ -405,7 +411,10 @@ def _aggregate(conn, rids):
             " genre=(SELECT genre FROM tracks WHERE release_id=:r ORDER BY disc, relpath LIMIT 1),"
             " duration=(SELECT sum(duration) FROM tracks WHERE release_id=:r),"
             " tag_artist=(SELECT CASE WHEN count(DISTINCT artist)=1 AND count(artist)=count(*) THEN max(artist) END"
-            "  FROM tracks WHERE release_id=:r) WHERE id=:r", {"r": rid})
+            "  FROM tracks WHERE release_id=:r),"
+            # sans année dans le nom (album du web…), la plus fréquente dans les tags de ses pistes
+            " year=COALESCE(year, (SELECT year FROM tracks WHERE release_id=:r AND year IS NOT NULL"
+            "  GROUP BY year ORDER BY count(*) DESC, year LIMIT 1)) WHERE id=:r", {"r": rid})
 
 
 def scan_tags(conn, root: Path, should_stop: Callable[[], bool] = lambda: False) -> int:
@@ -432,7 +441,7 @@ def _scan_tags(conn, root, should_stop):
                 done.append((*_read_tags(security.as_roots(root).path(t["path"], t["relpath"])), t["id"]))
             except OSError as e:
                 log.warning("piste illisible, relue au prochain scan : %s/%s (%s)", t["path"], t["relpath"], e)
-        conn.executemany("UPDATE tracks SET title=?, artist=?, genre=?, duration=?, bitrate=?, bpm=?, key=?, tags_read=1"
+        conn.executemany("UPDATE tracks SET title=?, artist=?, genre=?, duration=?, bitrate=?, bpm=?, key=?, year=?, tags_read=1"
                          " WHERE id=?", done)
         read += len(done)
         _aggregate(conn, {t["release_id"] for t in rows})
@@ -575,22 +584,27 @@ def _scan_cues(conn, root, should_stop):
         conn.commit()
 
 
-def _has_cover(root, path, first):
-    """Image dans le dossier de la release, sinon incluse dans les tags de sa première piste (comme la fiche)."""
+COVER_TRACKS = 3  # pistes dont l'image des tags est cherchée (la première n'en a pas toujours)
+
+
+def _has_cover(root, path, firsts):
+    """Image dans le dossier de la release, sinon incluse dans les tags de l'une de ses premières pistes (comme la
+    fiche). `firsts` : chemins relatifs des premières pistes, ou un seul (anciens appels)."""
     roots = security.as_roots(root)
     if security.regular_names(roots.path(path), tuple(IMAGES)):
         return True
-    if first is None:
-        return False
-    with security.open_regular(roots.path(path, first), roots.base(path)) as raw:  # lecture seule
-        f = _Watched(raw)
-        try:
-            found = bool(ID3(f).getall("APIC"))
-        except Exception:  # pas de tags, ou corrompus
-            found = False
-        if f.error is not None:
-            raise f.error
-    return found
+    for first in ([firsts] if isinstance(firsts, str) else firsts or []):
+        with security.open_regular(roots.path(path, first), roots.base(path)) as raw:  # lecture seule
+            f = _Watched(raw)
+            try:
+                found = bool(ID3(f).getall("APIC"))
+            except Exception:  # pas de tags, ou corrompus
+                found = False
+            if f.error is not None:
+                raise f.error
+        if found:
+            return True
+    return False
 
 
 def _scan_covers(conn, root, should_stop):
@@ -598,7 +612,8 @@ def _scan_covers(conn, root, should_stop):
     last = 0
     while not should_stop():
         rows = conn.execute(
-            "SELECT r.id, r.path, (SELECT relpath FROM tracks WHERE release_id=r.id ORDER BY disc, relpath LIMIT 1) AS first"
+            "SELECT r.id, r.path, (SELECT group_concat(relpath, char(31)) FROM (SELECT relpath FROM tracks WHERE release_id=r.id"
+            f" ORDER BY disc, relpath LIMIT {COVER_TRACKS})) AS firsts"
             " FROM releases r WHERE r.has_cover IS NULL AND r.id>? ORDER BY r.id LIMIT ?", (last, TAG_BATCH)).fetchall()
         if not rows:
             break
@@ -606,7 +621,7 @@ def _scan_covers(conn, root, should_stop):
         done = []  # lot lu avant d'écrire, comme pour les tags
         for r in rows:
             try:
-                done.append((_has_cover(root, r["path"], r["first"]), r["id"]))
+                done.append((_has_cover(root, r["path"], (r["firsts"] or "").split("\x1f") if r["firsts"] else []), r["id"]))
             except OSError as e:
                 log.warning("pochette non vérifiée, à refaire au prochain scan : %s (%s)", r["path"], e)
         conn.executemany("UPDATE releases SET has_cover=? WHERE id=?", done)

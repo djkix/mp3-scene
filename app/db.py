@@ -35,6 +35,12 @@ def init(data_dir: Path) -> None:
             conn.execute("ALTER TABLE scan_state ADD COLUMN daily_at INTEGER")
         # 1.80.0 : un .txt tient lieu de NFO ; les releases sans NFO sont relistées une fois au prochain scan
         # (mtime remis à zéro) pour découvrir le leur. Pistes, favoris et écoutes sont conservés.
+        # 1.83.0 : l'année est aussi lue dans les tags ; les pistes des releases sans année sont relues une fois
+        if "tag_year" not in {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}:
+            conn.execute("ALTER TABLE scan_state ADD COLUMN tag_year INTEGER")
+            conn.execute("UPDATE tracks SET tags_read=0 WHERE release_id IN (SELECT id FROM releases WHERE year IS NULL)")
+            conn.execute("UPDATE releases SET tags_done=0 WHERE year IS NULL")
+            conn.execute("UPDATE releases SET has_cover=NULL WHERE has_cover=0")  # image cherchée aussi dans les pistes suivantes
         if "txt_nfo" not in {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}:
             conn.execute("ALTER TABLE scan_state ADD COLUMN txt_nfo INTEGER")
             conn.execute("UPDATE releases SET mtime=0 WHERE has_nfo=0")
@@ -45,7 +51,8 @@ def init(data_dir: Path) -> None:
                                  ("releases", "cue_done", "INTEGER"),  # NULL : fichiers .cue pas encore lus
                                  ("tracks", "bpm", "REAL"), ("tracks", "key", "TEXT"),  # ajoutées en 1.61.0
                                  ("releases", "nfo_indexed", "INTEGER"),  # NULL : texte du NFO pas encore indexé (1.65.0)
-                                 ("waveforms", "loudness", "REAL")):  # volume moyen, 1.79.0
+                                 ("waveforms", "loudness", "REAL"),  # volume moyen, 1.79.0
+                                 ("tracks", "year", "INTEGER")):  # année des tags, 1.83.0
             if col not in {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {kind}")
         classify(conn)  # données rangées par une version antérieure : mêmes règles que le scanner d'aujourd'hui

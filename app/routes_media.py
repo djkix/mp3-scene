@@ -204,11 +204,13 @@ def _find_cover(request: Request, conn, rid: int):
             st = os.stat(path)
             if stat.S_ISREG(st.st_mode) and st.st_size <= COVER_MAX:
                 return path, None, IMAGE_TYPES[os.path.splitext(name)[1].lower()]
-        first = conn.execute("SELECT relpath FROM tracks WHERE release_id=? ORDER BY disc, relpath LIMIT 1",
-                             (rid,)).fetchone()
-        if first:
-            with open(roots.safe(row["path"], first["relpath"]), "rb") as fh:  # lecture seule
-                pics = ID3(fh).getall("APIC")
+        # image des tags de l'une des premières pistes (la première n'en a pas toujours)
+        for first in conn.execute("SELECT relpath FROM tracks WHERE release_id=? ORDER BY disc, relpath LIMIT 3", (rid,)):
+            try:
+                with open(roots.safe(row["path"], first["relpath"]), "rb") as fh:  # lecture seule
+                    pics = ID3(fh).getall("APIC")
+            except Exception:  # pas de tags ID3 (FLAC, M4A…) ou tags illisibles : piste suivante
+                continue
             if pics and pics[0].mime in IMAGE_TYPES.values() and len(pics[0].data) <= COVER_MAX:
                 return None, pics[0].data, pics[0].mime
     except HTTPException:

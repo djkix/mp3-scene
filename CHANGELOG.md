@@ -4,6 +4,18 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.83.0](https://github.com/djkix/mp3-scene/compare/v1.82.3...v1.83.0) (2026-11-25)
+
+### Résumé
+
+**Année des tags, pochettes des pistes suivantes, picto lecture.**
+
+- Une release dont le nom ne donne pas l'année (album du web…) prend la plus fréquente dans les tags de ses pistes.
+  Au premier scan après la mise à jour, les pistes des releases sans année sont relues une fois.
+- Pochette : l'image incluse dans les tags est cherchée dans les trois premières pistes, pas seulement la première.
+  Les releases marquées sans pochette sont revérifiées au prochain scan.
+- Listes de releases : un picto lecture devant le nom lance la release ; un clic sur la ligne ouvre sa fiche.
+
 ## [1.82.3](https://github.com/djkix/mp3-scene/compare/v1.82.2...v1.82.3) (2026-11-25)
 
 ### Résumé

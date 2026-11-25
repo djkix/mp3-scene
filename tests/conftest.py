@@ -30,12 +30,12 @@ def music(settings):
 
 @pytest.fixture
 def make_mp3():
-    from mutagen.id3 import ID3, TCON, TIT2, TPE1
+    from mutagen.id3 import ID3, TCON, TDRC, TIT2, TPE1
 
-    def make(path, title=None, artist=None, genre=None, frames=40):
+    def make(path, title=None, artist=None, genre=None, frames=40, year=None):
         # trames MPEG-1 Layer III, 128 kbit/s, 44,1 kHz : en-tête + 413 octets nuls = 417 octets
         path.write_bytes((b"\xff\xfb\x90\x64" + b"\x00" * 413) * frames)
-        tags = [f(encoding=3, text=v) for f, v in ((TIT2, title), (TPE1, artist), (TCON, genre)) if v]
+        tags = [f(encoding=3, text=v) for f, v in ((TIT2, title), (TPE1, artist), (TCON, genre), (TDRC, year)) if v]
         if tags:
             id3 = ID3()
             for t in tags:
