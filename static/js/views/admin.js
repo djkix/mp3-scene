@@ -6,6 +6,7 @@ import { t, locale, catLabel } from '../i18n.js';
 import { relName, relHref } from '../dom.js';
 import * as account from './account.js';
 import * as shares from './shares.js';
+import { area } from '../charts.js';
 
 const ROLES = [['user', t('Utilisateur')], ['admin', t('Administrateur')]];
 const PHASES = { idle: t('Au repos'), structure: t('Analyse des dossiers…'), tags: t('Lecture des tags…'), error: t('Erreur') };
@@ -448,7 +449,14 @@ export function render(container, params = {}) {
         card(t('Utilisateurs'), o && String(o.users), [], link('#/admin/users', t('Gérer les utilisateurs'))),
         card(t('Liens de partage'), null, [[t('Actifs'), v('o', (x) => x.shares)], [t('Ouvertures'), v('o', (x) => x.share_opens)]],
           link('#/admin/shares', t('Gérer les liens'))));
-      sys.replaceChildren(card(t('Version'), ver && (ver.update ? t('Mise à jour disponible') : ver.latest ? t('À jour') : null),
+      // espace des volumes (musique sur le NAS, données de l'application) et taille de la collection mois après mois
+      const disk = (x) => (x ? t('{0} libres sur {1}', fmtSize(x.free), fmtSize(x.total)) : '—');
+      const full = o?.music_disk && o.music_disk.used / o.music_disk.total;
+      const storage = card(t('Stockage'), full != null ? `${Math.round(full * 100)} %` : null,
+        [[t('Musique (NAS)'), v('o', (x) => disk(x.music_disk))], [t('Données'), v('o', (x) => disk(x.data_disk))]]);
+      if (o?.growth?.length > 1) storage.insertBefore(el('div', { class: 'ad-chart' }, el('p', { class: 'hint' }, t('Taille de la collection')),
+        area(t('Taille de la collection'), o.growth.map((g) => g.size), o.growth.map((g) => `${g.name} : ${fmtSize(g.size)}`))), storage.lastChild);
+      sys.replaceChildren(storage, card(t('Version'), ver && (ver.update ? t('Mise à jour disponible') : ver.latest ? t('À jour') : null),
         [[t('Version installée'), ver ? ver.version : '…'], [t('Base de données'), v('o', (x) => fmtSize(x.db_size))],
           [t('Vignettes'), v('o', (x) => fmtSize(x.thumbs_size))], [t('Cache de conversion'), v('o', (x) => fmtSize(x.transcode_size))]],
         o?.transcode_size ? clearCache : null,

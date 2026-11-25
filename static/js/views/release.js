@@ -292,7 +292,7 @@ async function loadNfo(id, slot, isDead) {
     const fit = () => {
       pre.style.fontSize = '';
       const ratio = (slot.clientWidth - 18) / (pre.scrollWidth - 16); // hors marge intérieure et bordure du bloc
-      if (ratio < 1) pre.style.fontSize = `${Math.max(4, Math.floor(110 * ratio) / 10)}px`;
+      if (ratio < 1) pre.style.fontSize = `${Math.max(4, Math.floor(160 * ratio) / 10)}px`; // 16 px : taille d'origine de la police VGA
     };
     new ResizeObserver(fit).observe(slot); // premier calcul, puis rotation de l'écran ou redimensionnement
   } catch { /* NFO facultatif */ }

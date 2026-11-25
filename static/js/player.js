@@ -443,7 +443,7 @@ function startViz() {
   // anneau : la pochette ronde au centre, le spectre rayonne autour en traits arrondis (couleur d'accent du thème),
   // symétrique gauche-droite : les basses en haut, les aigus en bas
   const g = c.getContext('2d'), data = new Uint8Array(fx.an.frequencyBinCount);
-  const color = getComputedStyle(ui.footer).getPropertyValue('--accent').trim() || '#3a3';
+  const accent = getComputedStyle(ui.footer).getPropertyValue('--accent').trim() || '#3a3';
   const RAYS = 72;
   const art = ui.cover; // la pochette du lecteur : déjà chargée, ou celle par défaut s'il n'y en a pas
   const draw = () => {
@@ -453,6 +453,7 @@ function startViz() {
     fx.an.getByteFrequencyData(data);
     g.clearRect(0, 0, w, h);
     const cx = w / 2, cy = h / 2, r0 = Math.min(w, h) * 0.24, room = Math.min(w, h) * 0.22;
+    const color = ui.footer.style.getPropertyValue('--cover-ray') || accent; // teinte de la pochette, sinon l'accent
     g.save();
     g.beginPath();
     g.arc(cx, cy, r0 * 0.92, 0, Math.PI * 2);
@@ -786,6 +787,34 @@ const REPEAT = {
 
 const NO_COVER = '/icons/cover-default.svg';
 
+// Teinte de la pochette : la couleur moyenne de ses pixels assez vifs (ni presque noirs, ni presque blancs, ni gris),
+// sur une réduction à 24 × 24. Le plein écran s'en sert pour son fond (--cover-tint, mêlée au fond du thème) et
+// l'anneau du visualiseur pour ses rayons (--cover-ray, plus claire). Pochette par défaut ou trop terne : pas de teinte.
+function coverTint() {
+  const f = ui.footer, img = ui.cover;
+  let rgb = null;
+  if (!img.src.endsWith(NO_COVER)) {
+    try {
+      const c = document.createElement('canvas');
+      c.width = c.height = 24;
+      const g = c.getContext('2d', { willReadFrequently: true });
+      g.drawImage(img, 0, 0, 24, 24);
+      const px = g.getImageData(0, 0, 24, 24).data;
+      let r = 0, gr = 0, b = 0, n = 0;
+      for (let i = 0; i < px.length; i += 4) {
+        const hi = Math.max(px[i], px[i + 1], px[i + 2]), lo = Math.min(px[i], px[i + 1], px[i + 2]);
+        if (hi < 40 || lo > 225 || hi - lo < 30) continue; // noir, blanc, gris
+        r += px[i]; gr += px[i + 1]; b += px[i + 2]; n++;
+      }
+      if (n > 20) rgb = [r / n, gr / n, b / n].map(Math.round);
+    } catch { /* image illisible par le canevas */ }
+  }
+  if (!rgb) { f.style.removeProperty('--cover-tint'); f.style.removeProperty('--cover-ray'); return; }
+  const hi = Math.max(...rgb), up = (v) => Math.round(Math.min(255, v * (230 / hi))); // même teinte, éclaircie pour les rayons
+  f.style.setProperty('--cover-tint', `rgb(${rgb.join(' ')})`);
+  f.style.setProperty('--cover-ray', `rgb(${rgb.map(up).join(' ')})`);
+}
+
 // `ico` : icône dessinée en CSS (data-ico) à la place d'un caractère
 function iconBtn(cls, glyph, label, onclick, ico = null) {
   return el('button', { type: 'button', class: 'icon ' + cls, title: label, 'aria-label': label, 'data-ico': ico, onclick }, glyph);
@@ -1060,7 +1089,7 @@ export function initPlayer(footer) {
   });
   // pochette : masquée tant qu'elle n'est pas chargée ; sans image, la pochette par défaut
   ui.cover = el('img', { class: 'pl-cover', alt: '', hidden: true,
-    onload: () => { ui.cover.hidden = false; },
+    onload: () => { ui.cover.hidden = false; coverTint(); },
     onerror: () => { if (ui.cover.src.endsWith(NO_COVER)) ui.cover.hidden = true; else ui.cover.src = NO_COVER; } });
   ui.cast = el('span', { class: 'pl-cast' }); // « Diffusion sur <appareil> » (textContent : nom non fiable)
   ui.play = iconBtn('pl-play', '', tr('Lecture'), () => player.toggle(), 'play');

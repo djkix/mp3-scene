@@ -2,6 +2,7 @@ import io
 import os
 import re
 import sqlite3
+import shutil
 import time
 from typing import Literal
 
@@ -274,7 +275,28 @@ def overview(request: Request, conn=Depends(get_conn)):
             "db_size": size(data.glob("mp3scene.db*")),
             # ponytail: parcourt data/thumbs/ à chaque appel (une entrée par release, ~0,1 s pour 45 000)
             "thumbs_size": size((data / "thumbs").glob("*")) if (data / "thumbs").is_dir() else 0,
-            "transcode_size": size((data / "transcode").glob("*")) if (data / "transcode").is_dir() else 0}
+            "transcode_size": size((data / "transcode").glob("*")) if (data / "transcode").is_dir() else 0,
+            "music_disk": _disk(request.app.state.settings.music_root), "data_disk": _disk(data),
+            "growth": _growth(conn)}
+
+
+def _disk(path) -> dict | None:
+    """Espace du volume (total, utilisé, libre) ; None s'il est illisible."""
+    try:
+        u = shutil.disk_usage(path)
+    except OSError:
+        return None
+    return {"total": u.total, "used": u.used, "free": u.free}
+
+
+def _growth(conn) -> list[dict]:
+    """Taille de la collection à la fin de chaque mois (24 derniers mois), d'après la date d'ajout des releases."""
+    months = conn.execute("SELECT strftime('%Y-%m', added_at, 'unixepoch') AS m, SUM(size) FROM releases GROUP BY 1 ORDER BY 1").fetchall()
+    total, out = 0, []
+    for m, size in months:
+        total += size or 0
+        out.append({"name": m, "size": total})
+    return out[-24:]
 
 
 @router.delete("/transcode", status_code=204)

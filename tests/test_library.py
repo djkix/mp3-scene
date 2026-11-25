@@ -1480,3 +1480,15 @@ def test_labels_join_their_parent_label_family(user_client, admin_client, settin
     assert rows["Toolroom"] == 6 and rows["Toolroom Longplayer"] == 1
     assert admin_client.put("/api/admin/labels/rules", json={"name": "Toolroom", "family": ""}, headers=h).status_code == 204
     assert "Toolroom" not in {g["name"] for g in user_client.get("/api/groups", params={"by": "label"}).json()}
+
+
+def test_overview_reports_disk_space_and_collection_growth(admin_client, settings):
+    conn = db.connect(settings.data_dir)
+    for i, (when, size) in enumerate([(1700000000, 100), (1702700000, 50), (1702800000, 25)]):  # nov. 2023, déc. 2023 ×2
+        conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo)"
+                     " VALUES (?,?,'','Singles',0,?,?,0,0)", (f"g{i}", f"g{i}", when, size))
+    conn.commit()
+    o = admin_client.get("/api/admin/overview").json()
+    assert o["data_disk"]["total"] > 0 and o["data_disk"]["free"] <= o["data_disk"]["total"]
+    sizes = [g["size"] for g in o["growth"]]
+    assert sizes == sorted(sizes) and sizes[-1] >= 175  # taille cumulée, croissante

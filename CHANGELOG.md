@@ -4,6 +4,20 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.77.0](https://github.com/djkix/mp3-scene/compare/v1.76.3...v1.77.0) (2026-11-25)
+
+### Résumé
+
+**NFO à l'ancienne, lecteur aux couleurs de la pochette, stockage dans Admin.**
+
+- NFO affichés avec la police VGA d'origine (IBM VGA 8 × 16, page de code 437, VileR, CC BY-SA 4.0) : l'art ASCII
+  des groupes tombe juste, blocs et cadres compris.
+- Lecteur plein écran : le fond prend la teinte de la pochette (mêlée au fond du thème), et les rayons du
+  visualiseur aussi ; rien ne change avec une pochette terne ou celle par défaut.
+- Admin › Vue d'ensemble : carte « Stockage » avec l'espace libre du NAS et des données, et la taille de la
+  collection mois après mois (24 derniers mois).
+- Lecteur réduit sur téléphone : les pictos paroles et visualiseur n'y apparaissent plus (plein écran seulement).
+
 ## [1.76.3](https://github.com/djkix/mp3-scene/compare/v1.76.2...v1.76.3) (2026-11-24)
 
 ### Résumé

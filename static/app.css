@@ -30,6 +30,8 @@
 }
 @font-face { font-family: Inter; src: url("/fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
 @font-face { font-family: "JetBrains Mono"; src: url("/fonts/jetbrains-mono.woff2") format("woff2"); font-weight: 100 800; font-display: swap; }
+/* NFO : police VGA d'origine (8 × 16, page de code 437) : l'art ASCII des groupes tombe juste. VileR, CC BY-SA 4.0 */
+@font-face { font-family: "IBM VGA 8x16"; src: url("/fonts/ibm-vga-8x16.woff") format("woff"); font-display: swap; }
 /* libellé technique : petites capitales à chasse fixe */
 .rel-head, thead th, .tabs button, .detail-actions :is(button, .btn), .filters button, .detail-info dt, .nfo-h, .page h2, .stats h2,
 tr.disc th, .crumbs, .pl-count, .pl-q-head h2 {
@@ -352,8 +354,9 @@ google-cast-launcher:hover { background: var(--hover); }
   #player:not(.expanded) .pl-cover { grid-row: 1 / -1; }
   #player:not(.expanded) .pl-title { grid-row: 2; }
   #player:not(.expanded) .pl-artist { grid-row: 3; }
-  .pl-rel, .pl-seek, .pl-qbtn, .pl-fx, .pl-lyrbtn, .pl-vizbtn, .pl-volwrap, .pl-chap, .pl-controls :is(.pl-shuffle, .pl-prev, .pl-repeat) { display: none; }
-  #player:not(.expanded) .pl-stage { display: none; }
+  .pl-rel, .pl-seek, .pl-qbtn, .pl-fx, .pl-volwrap, .pl-chap, .pl-controls :is(.pl-shuffle, .pl-prev, .pl-repeat) { display: none; }
+  /* paroles, visualiseur : seulement en plein écran (#player : plus fort que la règle [data-ico] des icônes) */
+  #player:not(.expanded) :is(.pl-lyrbtn, .pl-vizbtn, .pl-stage) { display: none; }
   /* plein écran : paroles ou spectre à la place de la pochette, à la même taille */
   #player.expanded .pl-stage:not([hidden]) { position: static; order: -3; width: clamp(170px, calc(100dvh - 495px), min(100%, 420px)); height: auto;
     aspect-ratio: 1; margin: 0 0 8px; border: 1px solid var(--line); border-radius: 8px; box-shadow: none; }
@@ -407,7 +410,7 @@ google-cast-launcher:hover { background: var(--hover); }
   .pl-meta .sep { color: var(--muted); font-weight: 400; }
   .pl-meta .chip { letter-spacing: .08em; }
   .pl-meta .chip.src { color: var(--accent-text); }
-  #player.expanded { background: var(--bg); }
+  #player.expanded { background: var(--bg); background: color-mix(in srgb, var(--cover-tint, var(--bg)) 30%, var(--bg)); } /* teinte de la pochette */
   #player.expanded .pl-tools { padding: 6px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
   #player.expanded .pl-seek .pl-time:first-child { color: var(--accent-text); font-weight: 600; }
   /* outils : égaliseur et favori avec leur libellé, file en pastille avec le nombre de pistes */
@@ -714,7 +717,8 @@ tr.disc th { background: var(--hover); color: var(--fg); padding-block: 8px; }
 .detail .rel-info { display: flex; flex-wrap: wrap; gap: 0 10px; grid-area: info; }
 .detail .unit { display: inline; }
 .nfo { width: fit-content; /* bloc centré, texte aligné à gauche : l'art ASCII reste en place */
-  font: 11px/1 "Cascadia Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace; white-space: pre; overflow-x: auto;
+  font: 16px/1 "IBM VGA 8x16", "Cascadia Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace; white-space: pre; overflow-x: auto;
+  -webkit-font-smoothing: none; font-smooth: never;
   max-width: 100%; margin: 0 auto; padding: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); }
 .tabs { display: flex; gap: 4px; padding: 10px 12px; overflow-x: auto; }
 .tabs button { flex: none; padding: 7px 12px; }
