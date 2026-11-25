@@ -1,5 +1,5 @@
 import { api, fmtDate, fmtSize, session } from '../api.js';
-import { el, relName, relHref } from '../dom.js';
+import { el, relName, relHref, noCover } from '../dom.js';
 import { t as tr, catLabel } from '../i18n.js';
 import { trackList } from './tracklist.js';
 import { player } from '../player.js';
@@ -68,14 +68,15 @@ export function row(rel, pick = null, onPick = () => {}) {
   },
   // vignette : chargée seulement quand la ligne approche de l'écran ; sans pochette, la place reste vide
   el('img', { class: 'rel-thumb', src: `/api/releases/${rel.id}/thumb`, alt: '', loading: 'lazy', width: 40, height: 40,
-    onerror: (e) => { e.target.style.visibility = 'hidden'; } }),
+    onerror: noCover }),
   el('span', { class: 'rel-name' },
-    el('button', { type: 'button', class: 'icon rel-play', 'data-ico': 'play', title: tr('Lire'), 'aria-label': tr('Lire {0}', relName(rel.name)),
-      onclick: play }),
     pick && el('input', { type: 'checkbox', class: 'rel-pick', value: rel.id, checked: pick.has(rel.id), 'aria-label': tr('Sélectionner {0}', rel.name),
       onchange: (e) => { if (e.target.checked) pick.add(rel.id); else pick.delete(rel.id); onPick(); } }),
     since() && rel.added_at > since() ? el('span', { class: 'new' }, tr('nouveau')) : null,
-    rel.hidden ? el('span', { class: 'new' }, tr('masquée')) : null, relName(rel.name),
+    rel.hidden ? el('span', { class: 'new' }, tr('masquée')) : null,
+    // badge « nouveau » puis le picto lecture, collés au nom
+    el('button', { type: 'button', class: 'icon rel-play', 'data-ico': 'play', title: tr('Lire'), 'aria-label': tr('Lire {0}', relName(rel.name)),
+      onclick: play }), relName(rel.name),
     // apparitions d'un artiste : ses pistes dans cette release (trois au plus), comme le chapitre d'un mix
     rel.by?.length ? el('small', { class: 'trk-chapter' }, `↳ ${rel.by.slice(0, 3).map((x) => `${rel.by_artist} - ${x}`).join(' · ')}${rel.by.length > 3 ? ' …' : ''}`) : null),
   // même ordre que HEAD ; sur mobile, .rel-info devient une ligne de détails sous le nom

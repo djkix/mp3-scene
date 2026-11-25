@@ -3,7 +3,7 @@
 // releases correspondantes. Les filtres Genre et Année sont dans l'adresse et suivent d'une page à l'autre.
 import { api, fmtDate, fmtDuration, fmtSize, session } from '../api.js';
 import { player, watchPlaying } from '../player.js';
-import { el, relName, relHref } from '../dom.js';
+import { el, relName, relHref, noCover } from '../dom.js';
 import { t as tr, catLabel, artistLabel } from '../i18n.js';
 import * as releases from './releases.js';
 import { trackList } from './tracklist.js';
@@ -345,7 +345,7 @@ function setRow(t, rel) {
     onclick: (e) => { if (!e.target.closest('button, a')) play(); },
     onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) play(); } },
   el('img', { class: 'rel-thumb', src: `/api/releases/${rel.id}/thumb`, alt: '', loading: 'lazy', width: 40, height: 40,
-    onerror: (e) => { e.target.style.visibility = 'hidden'; } }),
+    onerror: noCover }),
   el('span', { class: 'rel-name' }, t.label || (t.title ? (t.artist ? `${t.artist} - ${t.title}` : t.title) : t.filename)),
   el('span', { class: 'rel-info' },
     el('span', { class: 'mid' }, (t.genre || rel.genre) ? el('span', { class: 'chip' }, t.genre || rel.genre) : ''),

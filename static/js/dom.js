@@ -22,3 +22,7 @@ export const relName = (name) => String(name ?? '').replace(/ /g, '_');
 // Adresse de la fiche d'une release : son nom, lisible, et son identifiant, qui seul la désigne sans erreur
 // (deux releases peuvent porter le même nom, et un nom tout en chiffres serait pris pour un identifiant).
 export const relHref = (name, id) => `#/release/${encodeURIComponent(name)}${id ? `?id=${id}` : ''}`;
+
+// Vignette sans pochette : la même pochette par défaut que le lecteur (masquée si elle-même manque)
+export const NO_COVER = '/icons/cover-default.svg';
+export const noCover = (e) => { if (e.target.src.endsWith(NO_COVER)) e.target.style.visibility = 'hidden'; else e.target.src = NO_COVER; };

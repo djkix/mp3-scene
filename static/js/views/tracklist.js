@@ -1,6 +1,6 @@
 // Liste de pistes à défilement infini : pistes favorites, historique, résultats de recherche, contenu d'une playlist.
 import { api, fmtDate, fmtDuration } from '../api.js';
-import { el, relName, relHref } from '../dom.js';
+import { el, relName, relHref, noCover } from '../dom.js';
 import { player, watchPlaying } from '../player.js';
 import { t as tr, locale } from '../i18n.js';
 import { addButton } from '../playlist-add.js';
@@ -94,7 +94,7 @@ export function trackList(container, { path, empty, history = false, remove = nu
       onclick: (e) => { if (!e.target.closest('button, a')) play(); },
       onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) play(); } },
     el('img', { class: 'rel-thumb', src: `/api/releases/${t.release_id}/thumb`, alt: '', loading: 'lazy', width: 40, height: 40,
-      onerror: (e) => { e.target.style.visibility = 'hidden'; } }),
+      onerror: noCover }),
     el('span', { class: 'rel-name' }, t.title ? (t.artist ? `${t.artist} - ${t.title}` : t.title) : t.filename,
       t.chapter ? el('small', { class: 'trk-chapter' }, `↳ ${fmtDuration(t.chapter.start)} · ${[t.chapter.artist, t.chapter.title].filter(Boolean).join(' - ')}`) : null),
     el('span', { class: 'rel-info' },

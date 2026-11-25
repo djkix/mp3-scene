@@ -2,7 +2,7 @@
 // #/navidrome?view=newest|random|frequent|artists, #/navidrome?q=… (recherche), #/navidrome/album/<id>,
 // #/navidrome/artist/<id>. Le serveur Mp3 Scene relaie tout : le navigateur ne connaît ni l'adresse ni le compte.
 import { api, fmtDuration } from '../api.js';
-import { el } from '../dom.js';
+import { el, noCover, NO_COVER } from '../dom.js';
 import { t as tr } from '../i18n.js';
 import { player, watchPlaying } from '../player.js';
 import { tabs } from './groups.js';
@@ -26,8 +26,8 @@ function trackRows(list, tracks, loose = false, append = false) {
   const rows = tracks.map((t, i) => el('li', { class: 'rel trk nd-trk', tabIndex: 0, 'data-track': t.id,
     onclick: (e) => { if (!e.target.closest('button, a')) play(t); },
     onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) play(t); } },
-  loose ? el('img', { class: 'rel-thumb', src: t.cover ? `${t.cover}?size=80` : '', alt: '', loading: 'lazy', width: 40, height: 40,
-    onerror: (e) => { e.target.style.visibility = 'hidden'; } }) : el('span', { class: 'nd-no' }, String(t.track || i + 1)),
+  loose ? el('img', { class: 'rel-thumb', src: t.cover ? `${t.cover}?size=80` : NO_COVER, alt: '', loading: 'lazy', width: 40, height: 40,
+    onerror: noCover }) : el('span', { class: 'nd-no' }, String(t.track || i + 1)),
   el('span', { class: 'rel-name' }, t.artist ? `${t.artist} - ${t.title}` : t.title),
   el('span', { class: 'rel-info' }, el('span', { class: 'mid' }, loose && t.year ? String(t.year) : ''),
     el('span', { class: 'mid' }, t.duration ? fmtDuration(t.duration) : '—'),

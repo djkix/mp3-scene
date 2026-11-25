@@ -4,6 +4,17 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.83.1](https://github.com/djkix/mp3-scene/compare/v1.83.0...v1.83.1) (2026-11-25)
+
+### Résumé
+
+**Listes plus lisibles sur téléphone, pochette par défaut.**
+
+- Listes de releases : le badge « nouveau » avant le picto lecture ; sur téléphone, badge et picto plus serrés pour
+  laisser la place au nom.
+- Une release ou une piste sans pochette affiche la même pochette par défaut que le lecteur, au lieu d'une case vide
+  (listes, pistes, sets des festivals, onglet Navidrome).
+
 ## [1.83.0](https://github.com/djkix/mp3-scene/compare/v1.82.3...v1.83.0) (2026-11-25)
 
 ### Résumé
