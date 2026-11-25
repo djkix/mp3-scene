@@ -4,6 +4,19 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.81.1](https://github.com/djkix/mp3-scene/compare/v1.81.0...v1.81.1) (2026-11-25)
+
+### Résumé
+
+**Disques nommés réunis à leur album.**
+
+- Un sous-dossier qui commence par CD, Disc ou Disk suivi d'un numéro est un disque de l'album qui le contient, quoi
+  qui suive : « CD3 - Mixed by Axwell », « CD1 [Sunshine Disc] », « CD1 Mixed by … », « Disc1-V-Rock »,
+  « Cd 2 (DJ Kost Mix) », « CD1-TDG ». Ils formaient chacun une release à part ; au prochain scan, l'album réuni
+  les remplace (favoris et écoutes posés sur les disques séparés ne suivent pas).
+- Compilations « année - Ministry of Sound / Hed Kandi - titre [nCD] » : nom affiché « série - titre »
+  (« Ministry_of_Sound_-_Clubbers_Guide_2010 »), relu sur le dossier ; année, artiste VA, label et série inchangés.
+
 ## [1.81.0](https://github.com/djkix/mp3-scene/compare/v1.80.1...v1.81.0) (2026-11-25)
 
 ### Résumé

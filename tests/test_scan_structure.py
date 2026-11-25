@@ -372,3 +372,22 @@ def test_moved_release_keeps_its_corrections_and_custom_cover(conn, music):
     assert scan_structure(conn, music, now=2.0)["moved"] == 1
     assert conn.execute("SELECT path, genre FROM overrides").fetchone()[:] == ("T/Art-Two-WEB-2015-GRP", "Disco")
     assert name("T/Art-Two-WEB-2015-GRP").read_bytes() == b"jpg" and not name("S/A/Art-Two-WEB-2015-GRP").exists()
+
+
+def test_named_disc_folders_join_their_album(conn, music):
+    from app import db
+    base = "Compilations/MoS/2010 - Ministry of Sound - Clubbers Guide 2010 [3CD]"
+    for i, d in enumerate(["CD1 - Mixed by Hook N Sling", "CD2 [Sunset Disc]", "CD3 Mixed by Axwell"], 1):
+        mk(music, f"{base}/{d}", [f"0{i}-a.mp3"])
+    mk(music, "Compilations/MoS/VA-Old_Skool-WEB-2016-P2P/CD1-TDG", ["01-a.mp3"])
+    mk(music, "Compilations/MoS/VA-Old_Skool-WEB-2016-P2P/CDM", ["01-b.mp3"])  # pas un disque : une release à part
+    scan_structure(conn, music, now=1.0)
+    db.categorize(conn)
+    rels = {r["path"].rsplit("/", 1)[1]: r for r in conn.execute("SELECT * FROM releases")}
+    assert set(rels) == {"2010 - Ministry of Sound - Clubbers Guide 2010 [3CD]", "VA-Old_Skool-WEB-2016-P2P", "CDM"}
+    mos = rels["2010 - Ministry of Sound - Clubbers Guide 2010 [3CD]"]
+    assert [t["disc"] for t in conn.execute("SELECT disc FROM tracks WHERE release_id=? ORDER BY disc", (mos["id"],))] == [1, 2, 3]
+    assert (mos["name"], mos["title"], mos["year"]) == ("Ministry_of_Sound_-_Clubbers_Guide_2010", "Ministry of Sound Clubbers Guide 2010", 2010)
+    conn.execute("UPDATE releases SET name='VA-Ministry_of_Sound_Clubbers_Guide_2010-3CD-2010' WHERE id=?", (mos["id"],))
+    db.categorize(conn)  # nom donné par une version antérieure : relu sur le dossier
+    assert conn.execute("SELECT name FROM releases WHERE id=?", (mos["id"],)).fetchone()[0] == "Ministry_of_Sound_-_Clubbers_Guide_2010"

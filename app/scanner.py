@@ -19,7 +19,9 @@ from app import artists, backup, cue, db, genres, nfo, security
 from app.naming import parse_release_name, unwrap
 
 # sous-dossier de disque : « CD1 », « Disc 2 », ou un simple numéro (« 1 », « 02 »)
-DISC_RE = re.compile(r"^(?:(?:cd|disc|disk)[ _-]?(\d+)|(\d{1,2}))$", re.IGNORECASE)
+# sous-dossier disque : « CD2 », « Disc 3 », « 02 », ou nommé après son numéro (« CD3 - Mixed by Axwell »,
+# « CD1 [Sunshine Disc] », « Disc1-V-Rock », « Cd 2 (DJ Kost Mix) ») ; « CDM » n'en est pas un
+DISC_RE = re.compile(r"^(?:(?:cd|disc|disk)[ _-]?(\d+)(?:[ _\-:(\[].*)?|(\d{1,2}))$", re.IGNORECASE)
 BATCH = 500
 TAG_BATCH = 200
 # pistes indexées ; tout ce qui n'est pas du MP3 est converti à l'écoute (routes_media)

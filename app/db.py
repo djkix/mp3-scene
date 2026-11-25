@@ -153,20 +153,21 @@ def dated_series(conn) -> None:
     """Range les compilations « année - série - titre » comme le reste de leur série : artiste VA, année du nom,
     label de la série, titre « série + titre » sans le suffixe « [2CD] ». L'artiste des tags est écarté.
 
-    Leur nom affiché prend aussi la forme des autres releases de la série : « 1995_-_Ministry_of_Sound_-_The_Annual_1_[2CD] »
-    devient « VA-Ministry_of_Sound_The_Annual_1-2CD-1995 ». Seul le nom en base change : le dossier sur le disque
-    garde le sien (la release est retrouvée par son chemin)."""
+    Leur nom affiché devient « série - titre » : « 2010 - Ministry of Sound - Clubbers Guide 2010 [3CD] » s'affiche
+    « Ministry_of_Sound_-_Clubbers_Guide_2010 » (l'année et le nombre de disques restent dans les informations).
+    Seul le nom en base change : le dossier sur le disque garde le sien (la release est retrouvée par son chemin).
+    Le nom est relu sur le dossier, pour que celui donné par une version antérieure (« VA-…-2CD-1995 ») suive."""
     # ponytail: deux séries connues, en dur ; une table de séries si d'autres collections datées arrivent
-    for r in conn.execute("SELECT id, name, artist, tag_artist, title, year, label FROM releases"
-                          " WHERE name GLOB '[12][0-9][0-9][0-9][ _]-[ _]*'").fetchall():
-        m = _DATED.match(r["name"])
+    dated = "'[12][0-9][0-9][0-9][ _]-[ _]*'"
+    for r in conn.execute(f"SELECT id, name, path FROM releases WHERE name GLOB {dated} OR path GLOB '*'||{dated}").fetchall():
+        folder = r["path"].rsplit("/", 1)[-1]
+        m = _DATED.match(folder) if re.match(r"[12]\d{3}[ _]-[ _]", folder) else _DATED.match(r["name"])
         known = m and DATED_SERIES.get(re.sub(r"[^a-z]", "", m[2].lower()))
         if not known:
             continue
         tail = re.search(r"\s*\[([^\]]*)\]?\s*$", m[3])  # « [2CD] », « [WEB] », ou un crochet jamais refermé
         rest = " ".join(re.sub(r"[-_]", " ", m[3][:tail.start()] if tail else m[3]).split())
-        tag = re.sub(r"[^A-Za-z0-9]", "", tail[1]) if tail else ""
-        name = "-".join(filter(None, [f"VA-{known[0]} {rest}".replace(" ", "_"), tag, m[1]]))
+        name = f"{known[0]} - {rest}".replace(" ", "_")
         conn.execute("UPDATE releases SET name=?, artist='VA', tag_artist=NULL, title=?, year=?, label=? WHERE id=?",
                      (name, f"{known[0]} {rest}", int(m[1]), known[1], r["id"]))
 
