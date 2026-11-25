@@ -4,6 +4,16 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.81.3](https://github.com/djkix/mp3-scene/compare/v1.81.2...v1.81.3) (2026-11-25)
+
+### Résumé
+
+**Lives d'un artiste : ses sets seulement.**
+
+- Sur la page d'un artiste, un festival, une émission ou « Clubs et autres » de la ligne Lives n'ouvre plus que ses
+  sets à lui (son set dans un dossier aux sets en vrac compris). Le titre de la page mène à tous les sets du
+  festival et revient à l'artiste.
+
 ## [1.81.2](https://github.com/djkix/mp3-scene/compare/v1.81.1...v1.81.2) (2026-11-25)
 
 ### Résumé

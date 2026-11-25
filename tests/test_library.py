@@ -1411,6 +1411,13 @@ def test_festivals_group_live_sets_by_festival_then_year(user_client, settings):
     page = user_client.get("/api/festival", params={"name": "INOX Electronique Festival"}).json()
     assert page["items"][0]["fyear"] == 2012 and [t["title"] for t in page["items"][0]["sets"]] == ["A", "B"]
     assert "sets" not in page["items"][1]
+    # depuis la page d'un artiste : ses sets seulement, y compris sa piste dans le dossier en vrac
+    conn.execute("UPDATE tracks SET artist='Bob' WHERE release_id=? AND title='A'", (rid,))
+    conn.commit()
+    mine = user_client.get("/api/festival", params={"name": "INOX Electronique Festival", "artist": "bob"}).json()["items"]
+    assert [x["fyear"] for x in mine] == [2012, 2007] and [t["title"] for t in mine[0]["sets"]] == ["A"]
+    assert {l["name"]: l["sets"] for l in user_client.get("/api/artist-info", params={"name": "Bob"}).json()["lives"]} == {"INOX Electronique Festival": 2}
+    assert user_client.get("/api/festival", params={"name": "INOX Electronique Festival", "artist": "Personne"}).json()["items"] == []
 
 
 def test_live_sets_split_into_festivals_radio_shows_and_artists(user_client, settings, monkeypatch):

@@ -108,7 +108,8 @@ function detail(container, kind, params) {
       ...group(tr('Souvent avec'), [...a.with.map((w) => chip(`#/artists/${encodeURIComponent(w.name)}`, w.name, w.tracks)),
         ...(a.with.length ? [el('button', { type: 'button', class: 'chip keep', onclick: () => artistMap(a.name) }, tr('Carte'))] : [])]),
       // festivals, émissions et lives de club où il joue ; chacun mène à sa page de Live & Radio
-      ...group(tr('Lives'), (a.lives || []).map((l) => chip(`#/festivals/${encodeURIComponent(l.name)}` + qs({ type: l.type === 'festival' ? '' : l.type }),
+      // ses sets seulement ; la page du festival propose ensuite de voir tous les autres
+      ...group(tr('Lives'), (a.lives || []).map((l) => chip(`#/festivals/${encodeURIComponent(l.name)}` + qs({ type: l.type === 'festival' ? '' : l.type, artist: a.name }),
         l.type === 'artist' ? tr('Clubs et autres') : l.name, l.sets))),
       ...group(tr('Vos plus écoutées'), a.top.map((r) => chip(relHref(r.name, r.id), r.title || relName(r.name), r.plays))));
   }).catch(() => {}); // facultatif
@@ -351,7 +352,7 @@ function setRow(t, rel) {
 }
 
 function festivalPage(container, params) {
-  const name = params.rest, { category = '' } = params, type = liveType(params.type);
+  const name = params.rest, { category = '', artist = '' } = params, type = liveType(params.type);
   const status = el('p', { class: 'status', role: 'status' }, tr('Chargement…'));
   const facts = el('p', { class: 'fest-facts' });
   const back = '#/categories' + qs({ category, type: type === 'festival' ? '' : type });
@@ -361,10 +362,13 @@ function festivalPage(container, params) {
   const jump = el('nav', { class: 'letters fest-years', 'aria-label': tr('Années') });
   const body = el('div');
   container.replaceChildren(tabs('categories'),
-    el('h1', { class: 'grp-title' }, el('a', { href: back }, category ? catLabel(category) : tr('Catégories')), ' › ', name),
+    el('h1', { class: 'grp-title' }, el('a', { href: back }, category ? catLabel(category) : tr('Catégories')), ' › ',
+      // venu de la page d'un artiste : ses sets seulement, avec un lien vers tous ceux du festival
+      artist ? el('a', { href: `#/festivals/${encodeURIComponent(name)}` + qs({ type: type === 'festival' ? '' : type, category }) }, name) : name,
+      artist ? [' › ', el('a', { href: `#/artists/${encodeURIComponent(artist)}` }, artistLabel(artist))] : null),
     el('div', { class: 'fest-head' }, photo, el('div', {}, facts, photoBtn || '')), jump, status, body);
   let dead = false, watch = null;
-  api('/festival?' + new URLSearchParams({ name, type })).then((f) => {
+  api('/festival?' + new URLSearchParams({ name, type, ...(artist && { artist }) })).then((f) => {
     if (dead) return;
     const years = new Map();
     // un dossier aux sets en vrac compte pour chacun de ses sets, rangés avec les autres de la même année

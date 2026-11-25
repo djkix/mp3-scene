@@ -635,19 +635,33 @@ def artist_info(name: str = Query(min_length=1, max_length=200), user=Depends(cu
             "with": partners, "lives": _artist_lives(conn, name)}
 
 
-def _artist_lives(conn, name: str) -> list[dict]:
-    """Festivals, émissions et lives de club où l'artiste joue : son nom est l'artiste de la release ou l'un des
-    morceaux du nom (« Tomorrowland_2013-Dimitri_Vegas_And_Like_Mike-SAT-… », « Ultra_…_2016_-_Fedde_Le_Grand_Live »)."""
+def _artist_sets(conn, name: str) -> tuple[set, dict]:
+    """Sets de Live & Radio d'un artiste : (releases où il joue, {dossier aux sets en vrac: ses pistes à lui}). Il joue
+    une release si son nom en est l'artiste ou l'un des morceaux du nom (« Tomorrowland_2013-Dimitri_Vegas_And_Like_
+    Mike-SAT-… », « Ultra_…_2016_-_Fedde_Le_Grand_Live ») ; dans un dossier aux sets en vrac, si une piste est de lui."""
     me = artists.fold(name)
+    if not me:
+        return set(), {}
     # ponytail: relit les noms de Live & Radio à chaque page d'artiste (quelques ms) ; mettre en cache si besoin
     mine = {r["id"] for r in conn.execute(f"SELECT r.id, r.name, COALESCE(r.tag_artist, r.artist) AS who FROM releases r"
                                          f" WHERE r.hidden=0 AND {_LIVE_CAT}")
-            if me and (artists.fold(r["who"] or "") == me
-                       or any(artists.fold(re.sub(r"(?i)[_ ]live$", "", seg.strip("_ "))) == me for seg in r["name"].split("-")))}
+            if artists.fold(r["who"] or "") == me
+            or any(artists.fold(re.sub(r"(?i)[_ ]live$", "", seg.strip("_ "))) == me for seg in r["name"].split("-"))}
+    bulk = {}
+    for t in conn.execute(f"SELECT t.id, t.release_id, t.artist, r.name FROM tracks t JOIN releases r ON r.id=t.release_id"
+                          f" WHERE r.hidden=0 AND r.track_count>1 AND {_LIVE_CAT} AND r.name LIKE '%=%'"):
+        if t["release_id"] not in mine and naming.ORNAMENT.search(t["name"]) and artists.fold(t["artist"] or "") == me:
+            bulk.setdefault(t["release_id"], set()).add(t["id"])
+    return mine, bulk
+
+
+def _artist_lives(conn, name: str) -> list[dict]:
+    """Festivals, émissions et lives de club où l'artiste joue, avec son nombre de sets dans chacun."""
+    mine, bulk = _artist_sets(conn, name)
     out = []
     for t in ("festival", "radio", "artist"):
         for g in _live_sets(conn, t).values():
-            n = sum(1 for x in g["sets"] if x[0] in mine)
+            n = sum(1 if x[0] in mine else len(bulk.get(x[0], ())) for x in g["sets"])
             if n:
                 out.append({"type": t, "name": _live_name(g), "sets": n})
     return sorted(out, key=lambda x: (-x["sets"], x["name"].casefold()))
@@ -1034,13 +1048,17 @@ def festivals(request: Request, type: LiveType = "festival", conn=Depends(get_co
 
 @router.get("/api/festival")
 def festival_page(name: str = Query(min_length=1, max_length=200), type: LiveType = "festival",
+                  artist: str | None = Query(None, min_length=1, max_length=200),
                   user=Depends(current_user), conn=Depends(get_conn)):
     """Sets d'un festival, d'une émission ou d'un artiste, du plus récent au plus ancien ; `fyear` est l'année du set
-    (celle de son nom)."""
+    (celle de son nom). `artist` : seulement les sets de cet artiste (depuis sa page)."""
     g = _live_sets(conn, type).get(artists.fold(name) if type == "artist" else festival_key(name))
     if g is None:
         raise HTTPException(404, "Introuvable.")
-    year = {x[0]: x[1] for x in g["sets"]}
+    mine, bulk_mine = _artist_sets(conn, artist) if artist else (None, None)
+    year = {x[0]: x[1] for x in g["sets"] if mine is None or x[0] in mine or x[0] in bulk_mine}
+    if not year:
+        return {"name": _live_name(g), "items": []}
     items = [{**_release(x), "fyear": year[x["id"]]} for x in conn.execute(
         f"SELECT {RELEASE_COLS} FROM {RELEASE_FROM} WHERE r.id IN ({','.join('?' * len(year))})", (user["id"], *year))]
     # dossier d'événement aux sets en vrac : ses pistes, une par set, affichées au même niveau que les autres
@@ -1048,7 +1066,8 @@ def festival_page(name: str = Query(min_length=1, max_length=200), type: LiveTyp
     for x in items:
         if x["id"] in bulk:
             x["sets"] = [_track(t) for t in conn.execute(f"SELECT {TRACK_COLS} FROM {TRACK_FROM} WHERE t.release_id=?"
-                                                         " ORDER BY t.disc, t.relpath", (user["id"], x["id"]))]
+                                                         " ORDER BY t.disc, t.relpath", (user["id"], x["id"]))
+                         if mine is None or x["id"] in mine or t["id"] in bulk_mine.get(x["id"], ())]
     items.sort(key=lambda x: (x["fyear"] or 0, x["date"] or 0, x["name"].lower()), reverse=True)
     return {"name": _live_name(g), "items": items}
 
