@@ -4,6 +4,19 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.81.2](https://github.com/djkix/mp3-scene/compare/v1.81.1...v1.81.2) (2026-11-25)
+
+### Résumé
+
+**Favoris filtrables, épisodes de radio datés renommés.**
+
+- Favoris › Releases : mêmes filtres (catégories, genres, années, sources) et même groupement par type que les
+  autres listes, du plus récent au plus ancien.
+- Épisodes d'une émission connue rangés « date - émission - artiste » (« 2002-06-09_-_Essential_Mix_-_Michel_de_Hey ») :
+  nom affiché « Artiste-Émission-date » (« Michel_de_Hey-Essential_Mix-2002-06-09 »), artiste, titre, année et date
+  de diffusion renseignés ; un lieu après « @ » rejoint le titre. Sans artiste, rien à sa place. Le dossier sur le
+  disque ne change pas.
+
 ## [1.81.1](https://github.com/djkix/mp3-scene/compare/v1.81.0...v1.81.1) (2026-11-25)
 
 ### Résumé

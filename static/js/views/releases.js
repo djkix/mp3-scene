@@ -267,7 +267,8 @@ export function render(container, params) {
       ...(pin?.key === 'genre' ? [] : [multi(tr('Genre'), tr('Genres'), 'genre', f.genres, genre, setFilter)]), yearSelect(f, year, setFilter, multi),
       multi(tr('Source'), tr('Sources'), 'source', f.sources, source, setFilter),
       ...(category || genre || year || source ? [el('button', { type: 'button', class: 'reset', onclick: () => setFilter() }, tr('Réinitialiser'))] : []),
-      ...(q || !Object.values(filters).some((v) => v.length) ? [] : [smart]), ...(sel ? [sel.button] : []));
+      // favoris : une playlist intelligente ne retient pas ce filtre, elle ne serait pas ce qui est affiché
+      ...(q || pin?.key === 'favorites' || !Object.values(filters).some((v) => v.length) ? [] : [smart]), ...(sel ? [sel.button] : []));
   }).catch(() => {});
   // chaque filtre peut porter plusieurs valeurs : paramètre répété dans la requête (genre=House&genre=Techno)
   const many = (v) => (v ? v.split('|') : []);
@@ -318,7 +319,7 @@ export function render(container, params) {
     query.set('limit', PAGE);
     return api('/releases?' + query + tri);
   // derniers ajouts (accueil sans filtre) par date d'ajout, même si la colonne Date montre celle du NFO ; recherche, filtre, groupe ou artiste par ordre alphabétique
-  }, { empty: tr('Aucun résultat'), // un artiste : ses albums d'abord, puis ses singles, ses compilations et ses lives, chaque groupe par nom
+  }, { empty: params.empty || tr('Aucun résultat'), // un artiste : ses albums d'abord, puis ses singles, ses compilations et ses lives, chaque groupe par nom
     // page d'un artiste, d'un label, d'un groupe, d'un genre, recherche : albums d'abord, puis singles, compilations,
     // live, chaque groupe par nom ; derniers ajouts par date d'ajout
     sort: q || pin ? ['kind', 'asc'] : category || genre || year || source ? ['name', 'asc'] : ['added', 'desc'],

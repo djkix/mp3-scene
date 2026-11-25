@@ -391,3 +391,20 @@ def test_named_disc_folders_join_their_album(conn, music):
     conn.execute("UPDATE releases SET name='VA-Ministry_of_Sound_Clubbers_Guide_2010-3CD-2010' WHERE id=?", (mos["id"],))
     db.categorize(conn)  # nom donné par une version antérieure : relu sur le dossier
     assert conn.execute("SELECT name FROM releases WHERE id=?", (mos["id"],)).fetchone()[0] == "Ministry_of_Sound_-_Clubbers_Guide_2010"
+
+
+def test_dated_radio_episodes_are_named_artist_show_date(conn, music):
+    from app import db
+    for d in ["2002-06-09_-_Essential_Mix_-_Michel_de_Hey", "2002-05-05_Essential_Mix_-_Pete_Tong_&_BT_@_Coachella_Festival",
+              "2002-04-21_Essential_Mix", "2002-01-13_-_Essential_Mix_-_H-Foundation", "2002-01-13_-_Random_Show_-_Bob"]:
+        mk(music, f"Live And Radio/Essential Mix/{d}", ["01-a.mp3"])
+    scan_structure(conn, music, now=1.0)
+    db.categorize(conn)
+    got = {r["path"].rsplit("/", 1)[1]: r for r in conn.execute("SELECT * FROM releases")}
+    m = got["2002-06-09_-_Essential_Mix_-_Michel_de_Hey"]
+    assert (m["name"], m["artist"], m["title"], m["year"]) == ("Michel_de_Hey-Essential_Mix-2002-06-09", "Michel de Hey", "Essential Mix", 2002)
+    assert m["released_at"] == 1023624000  # 9 juin 2002, midi UTC
+    assert got["2002-05-05_Essential_Mix_-_Pete_Tong_&_BT_@_Coachella_Festival"]["name"] == "Pete_Tong_&_BT-Essential_Mix_@_Coachella_Festival-2002-05-05"
+    assert got["2002-04-21_Essential_Mix"]["name"] == "Essential_Mix-2002-04-21"  # sans artiste : rien à sa place
+    assert got["2002-01-13_-_Essential_Mix_-_H-Foundation"]["name"] == "H-Foundation-Essential_Mix-2002-01-13"
+    assert got["2002-01-13_-_Random_Show_-_Bob"]["name"] == "2002-01-13_-_Random_Show_-_Bob"  # émission inconnue : intact

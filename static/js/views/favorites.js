@@ -2,7 +2,7 @@
 import { api } from '../api.js';
 import { el } from '../dom.js';
 import { t as tr } from '../i18n.js';
-import { releaseList } from './releases.js';
+import * as releases from './releases.js';
 import { trackList } from './tracklist.js';
 import * as playlists from './playlists.js';
 import * as stats from './stats.js';
@@ -31,7 +31,7 @@ export function render(container, params) {
       sub(tr('Releases'), byRel, '#/favorites?tab=history&by=releases')), list);
     if (!byRel) return trackList(list, { path: '/history', history: true, empty: tr('Aucune écoute') });
     // tri « played » : l'ordre du serveur, tant qu'aucune colonne n'est choisie
-    return releaseList(list, (offset, tri) => api(`/history/releases?offset=${offset}&limit=${PAGE}${tri.includes('played') ? '' : tri}`),
+    return releases.releaseList(list, (offset, tri) => api(`/history/releases?offset=${offset}&limit=${PAGE}${tri.includes('played') ? '' : tri}`),
       { empty: tr('Aucune écoute'), sort: ['played', 'desc'] });
   }
   if (tab === 'tracks') {
@@ -41,6 +41,7 @@ export function render(container, params) {
     return trackList(list, { path: '/favorites/tracks', empty: tr('Aucune piste favorite'),
       remove: { url: (t) => `/favorites/track/${t.id}`, icon: '♥︎', label: tr('Retirer des favoris') } });
   }
-  return releaseList(body, (offset, tri) => api(`/releases?favorites=1&offset=${offset}&limit=${PAGE}${tri}`),
-    { empty: tr('Aucune release favorite') });
+  // mêmes filtres (catégories, genres, années, sources) et même groupement par type que les autres listes
+  return releases.render(body, { ...params, q: '', empty: tr('Aucune release favorite'),
+    pin: { key: 'favorites', value: '1', base: '#/favorites' } });
 }

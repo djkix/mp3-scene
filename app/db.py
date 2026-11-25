@@ -1,10 +1,11 @@
+import datetime
 import os
 import re
 import sqlite3
 from pathlib import Path
 
 from app import artists, genres, nfo
-from app.naming import album_like, group, kind, looks_live, one_song, parse_release_name, unwrap
+from app.naming import album_like, group, kind, known_show, looks_live, one_song, parse_release_name, unwrap
 
 SCHEMA = Path(__file__).with_name("schema.sql")
 VERSION = 1  # PRAGMA user_version ; à incrémenter avec une migration si le schéma change
@@ -172,6 +173,34 @@ def dated_series(conn) -> None:
                      (name, f"{known[0]} {rest}", int(m[1]), known[1], r["id"]))
 
 
+# épisode daté d'une émission : « 2002-06-09_-_Essential_Mix_-_Michel_de_Hey », « 2002-04-28__Essential_mix_-_Roger_sanchez »,
+# « 2002-04-21_Essential_Mix » (sans artiste)
+_EPISODE_NAME = re.compile(r"(\d{4})-(\d{2})-(\d{2})[ _]*(?:-[ _]*)?(.+?)(?:[ _]+-[ _]+(.+))?$")
+
+
+def dated_episodes(conn) -> None:
+    """Épisodes d'une émission connue rangés « date - émission - artiste » : nom affiché « Artiste-Émission-date »
+    comme les autres (« Michel_de_Hey-Essential_Mix-2002-06-09 », sans artiste « Essential_Mix-2002-04-21 »),
+    artiste et titre renseignés, année et date de diffusion tirées du nom. Un lieu après « @ » rejoint le titre
+    (« Essential Mix @ Coachella Festival »). Le nom est relu sur le dossier ; le dossier sur le disque ne change pas."""
+    for r in conn.execute("SELECT id, path, released_at FROM releases WHERE path GLOB '*[12][0-9][0-9][0-9]-[01][0-9]-[0-3][0-9]*'").fetchall():
+        m = _EPISODE_NAME.fullmatch(r["path"].rsplit("/", 1)[-1])
+        show = m and known_show(m[4])
+        if not show:
+            continue
+        who, _, where = (m[5] or "").partition("@")
+        who = " ".join(who.replace("_", " ").split())
+        title = show + (" @ " + " ".join(where.replace("_", " ").split()) if where.strip(" _") else "")
+        name = "-".join(filter(None, [who, title, f"{m[1]}-{m[2]}-{m[3]}"])).replace(" ", "_")
+        try:
+            aired = datetime.datetime(int(m[1]), int(m[2]), int(m[3]), 12, tzinfo=datetime.timezone.utc).timestamp()
+        except ValueError:  # 2002-13-45
+            aired = None
+        conn.execute("UPDATE releases SET name=?, artist=?, tag_artist=NULL, title=?, year=?,"
+                     " released_at=CASE WHEN COALESCE(released_at, 0)=0 THEN ? ELSE released_at END WHERE id=?",
+                     (name, who or None, title, int(m[1]), aired, r["id"]))
+
+
 def categorize(conn) -> None:
     """Catégorie de chaque release : celle que les tags de son nom indiquent, sinon son dossier racine.
 
@@ -181,6 +210,7 @@ def categorize(conn) -> None:
     Une catégorie est toujours un dossier racine existant : « live » désigne celui dont le nom contient « live » ou
     « radio », etc. Sans dossier correspondant, la release garde le sien."""
     dated_series(conn)
+    dated_episodes(conn)
     rows = conn.execute("SELECT id, name, path, category, track_count FROM releases").fetchall()
     tops = sorted({r["path"].split("/", 1)[0] for r in rows})
     target = {k: next((t for t in tops if re.search(p, t, re.I)), None) for k, p in _KIND_FOLDER.items()}

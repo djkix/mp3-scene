@@ -281,6 +281,13 @@ _RADIO_WORDS = re.compile(r"\b(radio ?show|podcast|broadcast|radio)\b", re.I)
 _EPISODE = re.compile(r"(\s*\((?:[^)]*)\)|\s+(?:episode|ep|#|vol\.?|part)?\s*\d[\d.\s-]*$)", re.I)
 
 
+def known_show(text: str) -> str | None:
+    """Graphie d'une émission de radio connue si `text` (tirets bas ou espaces) n'est que son nom : « Essential_mix »
+    -> « Essential Mix » ; None sinon."""
+    t = re.sub(r"[\s_]+", " ", text).strip()
+    return next((v for k, v in _SHOWS.items() if re.fullmatch(k, t, re.I)), None)
+
+
 def radio(name: str) -> tuple[str, int | None, bool] | None:
     """(émission, année) d'une release de radio : émission connue citée dans le nom (« Armin_van_Buuren-A_State_of_
     Trance_1100-SAT-… »), sinon titre d'une release de source radio ou qui se dit « radio show », « podcast »…
