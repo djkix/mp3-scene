@@ -87,6 +87,9 @@ export function row(rel, pick = null, onPick = () => {}) {
 
 // même ordre que le tri « kind » du serveur : albums, singles, compilations, live et radio
 const KIND = [/album/i, /single/i, /compil/i, /live|radio/i];
+// rang d'une catégorie dans l'ordre par type (albums, singles, compilations, live, le reste) et son intertitre coloré
+export const kindOf = (c) => { const k = KIND.findIndex((re) => re.test(c || '')); return k < 0 ? 4 : k; };
+export const cap = (category, n = el('small')) => el('li', { class: `rel-cap kind-${kindOf(category)}` }, el('span', { class: 'cap-pill' }, catLabel(category), n));
 
 // Liste infinie par pages de 50. fetchPage(offset, tri) -> {items, has_more}, où `tri` vaut '&sort=…&dir=…'.
 // `sort` : tri affiché au départ, [clé, sens]. Retourne la fonction de nettoyage.
@@ -136,14 +139,13 @@ export function releaseList(container, fetchPage, { empty = tr('Aucun résultat'
       list.append(...page.items.flatMap((r) => {
         const li = row(r, pick, onPick);
         if (sortKey !== 'kind') return [li];
-        const k = KIND.findIndex((re) => re.test(r.category || ''));
-        li.classList.add(`kind-${k < 0 ? 4 : k}`);
+        li.classList.add(`kind-${kindOf(r.category)}`);
         if (r.category === lastCat) return [li];
         lastCat = r.category;
         // même pastille que les années de l'artiste : la catégorie, son nombre de releases en petit
         const n = el('small');
         counts?.then((c) => { if (c[r.category]) n.textContent = ` ${c[r.category]}`; }).catch(() => {});
-        return [el('li', { class: `rel-cap kind-${k < 0 ? 4 : k}` }, el('span', { class: 'cap-pill' }, catLabel(r.category), n)), li];
+        return [cap(r.category, n), li];
       }));
       offset += page.items.length;
       done = !page.has_more;

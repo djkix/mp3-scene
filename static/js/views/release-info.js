@@ -10,14 +10,14 @@ const enc = encodeURIComponent;
 // Une pastille sans lien est grise : seules les vertes se cliquent.
 export function infoRows(rel, el) {
   return [[t('Artiste'), rel.artist, (v) => `#/artists/${enc(v)}`, 'cls'], [t('Titre'), rel.title],
-    [t('Source'), rel.source, (v) => `#/?source=${enc(v)}`, 'src'], [t('Année'), rel.year, (v) => `#/?year=${enc(v)}`, 'cls'],
+    [t('Source'), rel.source, (v) => `#/?source=${enc(v)}`, 'src'], [t('Année'), rel.year, (v) => `#/years/${enc(v)}`, 'cls'],
     [t('Date'), rel.date == null ? null : fmtDate(rel.date), null, 'num'], [t('Groupe'), rel.grp, (v) => `#/groups/${enc(v)}`, 'src'],
     [t('Label'), rel.label, (v) => `#/labels/${enc(v)}`, 'ed'],
     [t('Catalogue'), rel.catalog, rel.label ? () => `#/labels/${enc(rel.label)}` : null, 'ed'],
-    [t('Catégorie'), rel.category && catLabel(rel.category), () => `#/?category=${enc(rel.category)}`, 'cls'],
+    [t('Catégorie'), rel.category && catLabel(rel.category), () => `#/categories?category=${enc(rel.category)}`, 'cls'],
     // série : ajoutée une fois ses volumes connus (deux au moins), elle mène à la page de la série
     [t('Série'), rel.series_name, (v) => `#/series/${enc(v)}`, 'cls', 'series'],
-    [t('Genre'), rel.genre, (v) => `#/?genre=${enc(v)}`, 'cls'],
+    [t('Genre'), rel.genre, (v) => `#/genres/${enc(v)}`, 'cls'],
     [t('Taille'), rel.size == null ? null : fmtSize(rel.size), null, 'num'],
     [t('Durée'), rel.duration == null ? null : fmtDuration(rel.duration), null, 'num'],
     [t('Format'), rel.format, null, 'num'],

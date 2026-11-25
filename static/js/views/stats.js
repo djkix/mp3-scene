@@ -47,7 +47,7 @@ export function render(container, params) {
       el('td', {}, t.title ? (t.artist ? `${t.artist} - ${t.title}` : t.title) : t.filename), el('td', { class: 'num' }, String(t.plays))))),
       block(tr('Artistes les plus écoutés'), tr('Artiste'), s.artists.map((x) =>
         el('tr', {}, el('td', {}, x.name), el('td', { class: 'num' }, String(x.plays))))),
-      block(tr('Genres les plus écoutés'), tr('Genre'), s.genres.map(linked((n) => `#/?genre=${enc(n)}`))),
+      block(tr('Genres les plus écoutés'), tr('Genre'), s.genres.map(linked((n) => `#/genres/${enc(n)}`))),
       block(tr('Groupes les plus écoutés'), tr('Groupe'), s.groups.map(linked((n) => `#/groups/${enc(n)}`))));
   }).catch((err) => { if (!dead) status.textContent = err.message; });
   return () => { dead = true; };

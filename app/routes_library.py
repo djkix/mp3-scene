@@ -628,7 +628,7 @@ def _artist_lives(conn, name: str) -> list[dict]:
 
 
 @router.get("/api/group-info")
-def group_info(by: Literal["label", "grp", "genre"], name: str = Query(min_length=1, max_length=200),
+def group_info(by: Literal["label", "grp", "genre", "year"], name: str = Query(min_length=1, max_length=200),
                sub: str | None = Query(None, max_length=200), conn=Depends(get_conn)):
     """En-tête de la page d'un label, d'un groupe ou d'un genre : nombre, poids, années couvertes, et ce qu'on y
     trouve le plus (artistes, genres, puis les groupes d'un label ou les labels d'un groupe ou d'un genre).
@@ -658,7 +658,9 @@ def group_info(by: Literal["label", "grp", "genre"], name: str = Query(min_lengt
             f"SELECT {col} AS name, COUNT(*) AS releases FROM releases r WHERE {mine} AND {col} IS NOT NULL AND {extra}"
             " GROUP BY 1 ORDER BY releases DESC, 1 COLLATE NOCASE LIMIT 8", names)]
     art = "COALESCE(r.tag_artist, r.artist)"
-    return {**total, "artists": top(art, f"lower({art}) NOT IN ('va', 'various', 'various artists')"),
+    cats = [dict(x) for x in conn.execute(f"SELECT r.category AS name, COUNT(*) AS releases, SUM(r.size) AS size FROM releases r"
+                                          f" WHERE {mine} GROUP BY r.category ORDER BY releases DESC", names)]
+    return {**total, "categories": cats, "artists": top(art, f"lower({art}) NOT IN ('va', 'various', 'various artists')"),
             "genres": [] if by == "genre" else top("r.genre"), "members": members if len(members) > 1 else [],
             "others": top("r.grp" if by == "label" else "NULLIF(r.label, '')")}
 

@@ -54,7 +54,7 @@ function detail(container, kind, params) {
   const head = el('div', { class: 'art-head' }, el('div', {}, photo, table, photoBtn), chips);
   // label ou groupe : le même bloc en deux colonnes, résumé à gauche, ce qu'on y trouve le plus à droite
   const facts = el('table', { class: 'art-sum' }), found = el('div', { class: 'art-chips' });
-  const info = (kind === 'labels' || kind === 'groups' || kind === 'genres') && el('div', { class: 'art-head' },
+  const info = (kind === 'labels' || kind === 'groups' || kind === 'genres' || kind === 'years') && el('div', { class: 'art-head' },
     kind === 'labels' ? el('div', {}, photo, facts, photoBtn) : facts, found);
   // genre : sa famille (« House » réunit « Deep House », « Tech House »…), un bloc par genre comme pour les séries ;
   // un clic s'y limite, un second revient à l'ensemble. La liste attend de connaître la famille.
@@ -74,7 +74,8 @@ function detail(container, kind, params) {
     }
     const line = (label, value) => el('tr', {}, el('th', { scope: 'row' }, label), el('td', {}, value));
     facts.replaceChildren(el('tbody', {}, line(tr('Releases'), String(g.n)), line(tr('Poids'), fmtSize(g.size)),
-      g.first ? line(tr('Années'), g.first === g.last ? String(g.first) : `${g.first} – ${g.last}`) : null));
+      ...(g.categories || []).map((c) => line(catLabel(c.name), `${c.releases} · ${fmtSize(c.size)}`)),
+      g.first && kind !== 'years' ? line(tr('Années'), g.first === g.last ? String(g.first) : `${g.first} – ${g.last}`) : null));
     const group = (label, route, rows) => (rows.length ? [el('p', {}, label), el('div', {}, rows.map((r) => el('a', { class: 'chip',
       href: `#/${route}/${encodeURIComponent(r.name)}` }, route === 'artists' ? artistLabel(r.name) : r.name, el('small', {}, String(r.releases)))))] : []);
     found.replaceChildren(...group(tr('Artistes'), 'artists', g.artists), ...group(tr('Genres'), 'genres', g.genres),
@@ -354,10 +355,21 @@ function series(container, params) {
       ys.length ? line(tr('Années'), Math.min(...ys) === Math.max(...ys) ? String(ys[0]) : `${Math.min(...ys)} – ${Math.max(...ys)}`) : null));
     const group = (label, items) => (items.length ? [el('p', {}, label), el('div', {}, items)] : []);
     const chip = (route, [k, v]) => el('a', { class: 'chip', href: `#/${route}/${encodeURIComponent(k)}` }, k, el('small', {}, String(v.n)));
-    found.replaceChildren(...group(tr('Genres'), tally('genre').slice(0, 8).map((g) => chip('genres', g))),
+    // artistes les plus présents, hors « VA » des compilations
+    const solo = (x) => x.artist && !/^(va|various( artists)?)$/i.test(x.artist);
+    const artists = Object.entries(shown.filter(solo).reduce((m, x) => { (m[x.artist] ??= { n: 0 }).n++; return m; }, {})).sort((p, q) => q[1].n - p[1].n);
+    found.replaceChildren(...group(tr('Artistes'), artists.slice(0, 8).map((a) => chip('artists', a))),
+      ...group(tr('Genres'), tally('genre').slice(0, 8).map((g) => chip('genres', g))),
       ...group(tr('Labels'), tally('label').slice(0, 8).map((l) => chip('labels', l))),
       ...group(tr('Volumes absents'), missing.map((v) => el('span', { class: 'chip' }, String(v)))));
-    list.replaceChildren(...shown.map((x) => releases.row(x)));
+    // groupées par type comme ailleurs (albums, singles, compilations, live), l'ordre des volumes gardé dans chacun
+    const byKind = [...shown].sort((p, q) => releases.kindOf(p.category) - releases.kindOf(q.category) || (releases.kindOf(p.category) === 4 ? (p.category || '').localeCompare(q.category || '') : 0));
+    const n = (c) => el('small', {}, ` ${shown.filter((x) => x.category === c).length}`);
+    list.replaceChildren(...byKind.flatMap((x, i) => {
+      const li = releases.row(x);
+      li.classList.add(`kind-${releases.kindOf(x.category)}`);
+      return i && byKind[i - 1].category === x.category ? [li] : [releases.cap(x.category, n(x.category)), li];
+    }));
     status.textContent = shown.length ? '' : tr('Aucun résultat');
   }
   releases.loadFilters().then((f) => {

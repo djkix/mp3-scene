@@ -4,6 +4,19 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.78.0](https://github.com/djkix/mp3-scene/compare/v1.77.0...v1.78.0) (2026-11-25)
+
+### Résumé
+
+**Rubriques harmonisées.**
+
+- Page d'une série : releases groupées par type (albums, singles, compilations, live) avec leurs couleurs, l'ordre
+  des volumes gardé dans chaque groupe, et les artistes les plus présents à côté des genres et des labels.
+- Page d'une année : même en-tête que les labels et les genres (chiffres, artistes, genres, labels).
+- Labels, groupes, genres, années : le résumé détaille chaque type (nombre et poids).
+- Fiche d'une release : Genre, Année et Catégorie mènent à leur page d'Explorer, plus à une liste filtrée ; les
+  genres des statistiques aussi.
+
 ## [1.77.0](https://github.com/djkix/mp3-scene/compare/v1.76.3...v1.77.0) (2026-11-25)
 
 ### Résumé

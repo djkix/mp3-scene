@@ -1086,6 +1086,9 @@ def test_genre_guess_group_info_and_track_artist_case(admin_client, settings):
     info = admin_client.get("/api/group-info", params={"by": "label", "name": "Yellow"}).json()
     assert (info["n"], info["first"], info["last"]) == (4, 2000, 2007) and info["artists"][0] == {"name": "Bob", "releases": 3}
     assert info["others"] == [{"name": "GRP", "releases": 3}, {"name": "XYZ", "releases": 1}]
+    assert sum(c["releases"] for c in info["categories"]) == 4 and sum(c["size"] for c in info["categories"]) == 20
+    year = admin_client.get("/api/group-info", params={"by": "year", "name": "2004"}).json()  # page d'une année
+    assert year["n"] == 1 and year["others"] == [] and year["categories"][0]["releases"] == 1
     db.merge_track_artists(conn)
     assert [r[0] for r in conn.execute("SELECT DISTINCT artist FROM tracks WHERE artist LIKE 'axwell'")] == ["Axwell"]  # la mixte l'emporte
 
