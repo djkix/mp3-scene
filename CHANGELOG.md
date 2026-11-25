@@ -4,6 +4,17 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.80.1](https://github.com/djkix/mp3-scene/compare/v1.80.0...v1.80.1) (2026-11-25)
+
+### Résumé
+
+**Fiche d'un set d'un dossier aux sets en vrac.**
+
+- Live & Radio : le « i » d'un set rangé avec d'autres dans un même dossier (« -=_INOX_Electronique_Festival_2012_=- »)
+  ouvre une fiche à son nom, avec ce seul set et un lien vers le dossier entier.
+- Son .txt (ou .nfo) est celui qui porte le même nom que son fichier ; s'il n'en a pas, aucun autre ne s'affiche
+  à sa place, sauf si le dossier n'en compte qu'un.
+
 ## [1.80.0](https://github.com/djkix/mp3-scene/compare/v1.79.0...v1.80.0) (2026-11-25)
 
 ### Résumé

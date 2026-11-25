@@ -19,8 +19,13 @@ export function render(container, params) {
   // l'identifiant (?id=) désigne la release sans erreur ; à défaut, le nom, ou un identifiant seul (anciens liens).
   // Un identifiant qui n'existe plus (release rescannée ailleurs) retombe sur le nom.
   const byName = () => api(/^\d+$/.test(id) ? `/releases/${id}` : `/release-by-name?name=${encodeURIComponent(id)}`);
-  (/^\d+$/.test(params.id || '') ? api(`/releases/${params.id}`).catch((err) => { if (err.status === 404) return byName(); throw err; }) : byName()).then((rel) => {
+  (/^\d+$/.test(params.id || '') ? api(`/releases/${params.id}`).catch((err) => { if (err.status === 404) return byName(); throw err; }) : byName()).then((whole) => {
     if (dead) return;
+    // un set d'un dossier d'événement aux sets en vrac (?track=) : la fiche ne montre que lui, sous son nom, avec un
+    // lien vers le dossier entier ; son .txt est celui qui porte le même nom que son fichier
+    const set = whole.tracks.length > 1 ? whole.tracks.find((x) => String(x.id) === params.track) : null;
+    const rel = set ? { ...whole, tracks: [set], track_count: 1, size: set.size, duration: set.duration, bitrate: set.bitrate,
+      set_name: set.title ? (set.artist ? `${set.artist} - ${set.title}` : set.title) : set.filename } : whole;
     const nfo = el('div'), sim = el('div'), vers = el('div'), chap = el('div');
     container.replaceChildren(el('div', { class: 'detail' }, header(rel), trackTable(rel), chap, vers, nfo, sim));
     // série (« Global Underground 47 ») : ligne du bloc d'informations, avec volume précédent et suivant
@@ -66,7 +71,7 @@ export function render(container, params) {
     api(`/releases/${rel.id}/similar`).then((list) => {
       if (!dead && list.length) sim.replaceChildren(el('h2', { class: 'nfo-h' }, t('Releases similaires')), el('ul', { class: 'rel-list' }, list.map((x) => row(x))));
     }).catch(() => {}); // facultatif
-    if (rel.has_nfo) loadNfo(rel.id, nfo, () => dead);
+    if (rel.has_nfo) loadNfo(rel.id, nfo, () => dead, set?.id);
   }).catch((err) => {
     if (dead) return;
     container.replaceChildren(el('p', { class: 'status', role: 'alert' },
@@ -89,7 +94,8 @@ function header(rel) {
   if (rel.tracks[0]) api(`/tracks/${rel.tracks[0].id}/tech`)
     .then((d) => info.paint({ sample_rate: d.sample_rate })).catch(() => {}); // facultatif
   return el('header', { class: 'detail-head' },
-    el('h1', { class: 'detail-name' }, relName(rel.name)),
+    el('h1', { class: 'detail-name' }, rel.set_name || relName(rel.name)),
+    rel.set_name ? el('p', { class: 'detail-set muted' }, t('Set du dossier'), ' ', el('a', { href: relHref(rel.name, rel.id) }, relName(rel.name))) : null,
     el('div', { class: 'detail-top' },
       // pochette facultative : sans image (404), le lien disparaît
       el('a', { class: 'cover', href: `/api/releases/${rel.id}/cover`, target: '_blank', rel: 'noopener' },
@@ -280,9 +286,9 @@ function trackTable(rel) {
     el('tbody', {}, rows)));
 }
 
-async function loadNfo(id, slot, isDead) {
+async function loadNfo(id, slot, isDead, track = null) {
   try {
-    const res = await fetch(`/api/releases/${encodeURIComponent(id)}/nfo`, { credentials: 'same-origin' });
+    const res = await fetch(`/api/releases/${encodeURIComponent(id)}/nfo${track ? `?track=${track}` : ''}`, { credentials: 'same-origin' });
     if (!res.ok) return; // 404 : rien à afficher
     const text = await res.text();
     if (isDead()) return;

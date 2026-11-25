@@ -347,7 +347,7 @@ function setRow(t, rel) {
   el('span', { class: 'rel-actions' },
     el('button', { type: 'button', class: 'icon', title: tr('Ajouter à la file'), 'aria-label': tr('Ajouter à la file'), onclick: () => player.enqueue([t]) }, '+'),
     releases.favButton(t, 'track'),
-    el('a', { class: 'icon rel-doc', href: relHref(rel.name, rel.id), title: tr('Détail de la release'), 'aria-label': tr('Détail de la release') })));
+    el('a', { class: 'icon rel-doc', href: `${relHref(rel.name, rel.id)}&track=${t.id}`, title: tr('Détail du set'), 'aria-label': tr('Détail du set') })));
 }
 
 function festivalPage(container, params) {

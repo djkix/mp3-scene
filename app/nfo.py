@@ -9,11 +9,16 @@ from app import security
 SUFFIXES = (".nfo", ".txt")
 
 
-def read(folder, root, limit: int) -> str | None:
+def read(folder, root, limit: int, stem: str | None = None) -> str | None:
     """Texte du NFO du dossier : le premier .nfo, sinon le premier .txt (les mixes en ont souvent un à la place, avec
     la tracklist). None sans l'un ni l'autre. Un .nfo est en page de code 437 (art ASCII) ; un .txt en UTF-8, sinon
-    en Windows-1252. Lève OSError si le fichier est illisible ; liens symboliques ignorés."""
+    en Windows-1252. Lève OSError si le fichier est illisible ; liens symboliques ignorés.
+    `stem` : nom (sans extension) d'un set d'un dossier aux sets en vrac ; seul le fichier qui porte ce nom lui revient,
+    ou le seul NFO du dossier s'il n'y en a qu'un."""
     names = security.regular_names(Path(folder), SUFFIXES)
+    if stem is not None:
+        own = [n for n in names if n.rsplit(".", 1)[0].casefold() == stem.casefold()]
+        names = own or (names if len(names) == 1 else [])
     name = next((n for n in names if n.lower().endswith(".nfo")), names[0] if names else None)
     if name is None:
         return None

@@ -1104,14 +1104,21 @@ def versions(rid: Id, user=Depends(current_user), conn=Depends(get_conn)):
 
 
 @router.get("/api/releases/{rid}/nfo")
-def release_nfo(rid: Id, request: Request, conn=Depends(get_conn)):
+def release_nfo(rid: Id, request: Request, track: int | None = Query(None, ge=1, le=MAX_INT), conn=Depends(get_conn)):
+    """Texte du NFO (ou du .txt qui en tient lieu). `track` : un set d'un dossier aux sets en vrac, qui n'a que le sien."""
     settings = request.app.state.settings
     row = conn.execute("SELECT path FROM releases WHERE id=?", (rid,)).fetchone()
     if row is None:
         raise HTTPException(404, "Release introuvable.")
+    stem = None
+    if track is not None:
+        t = conn.execute("SELECT relpath FROM tracks WHERE id=? AND release_id=?", (track, rid)).fetchone()
+        if t is None:
+            raise HTTPException(404, "Piste introuvable.")
+        stem = t["relpath"].rsplit("/", 1)[-1].rsplit(".", 1)[0]
     folder = safe_path(settings.music_root, row["path"])
     try:
-        text = nfo.read(folder, settings.music_root, NFO_MAX)  # .nfo, sinon .txt
+        text = nfo.read(folder, settings.music_root, NFO_MAX, stem)  # .nfo, sinon .txt
     except OSError:
         text = None
     if text is None:

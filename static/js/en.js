@@ -275,6 +275,8 @@ export const EN = {
   'Nombre': 'Count',
   'Souvent avec': 'Often with',
   'Carte': 'Map',
+  'Set du dossier': 'Set from the folder',
+  'Détail du set': 'Set details',
   'Recherche vocale': 'Voice search',
   'Mode soirée': 'Party mode',
   'Rien ne joue pour le moment.': 'Nothing is playing right now.',

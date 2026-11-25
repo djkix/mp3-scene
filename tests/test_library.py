@@ -1555,3 +1555,13 @@ def test_txt_stands_in_for_a_missing_nfo(user_client, library, settings, tmp_pat
     assert nfo.read(tmp_path, tmp_path, 100) == "█"  # un .nfo passe avant le .txt
     (tmp_path / "vide").mkdir()
     assert nfo.read(tmp_path / "vide", tmp_path, 100) is None
+    # dossier aux sets en vrac : à chaque set son .txt, du même nom que son fichier
+    bulk = tmp_path / "bulk"
+    bulk.mkdir()
+    (bulk / "Clamaran - Live 2012.txt").write_text("Clamaran", encoding="utf-8")
+    (bulk / "Guetta - Live 2012.txt").write_text("Guetta", encoding="utf-8")
+    assert nfo.read(bulk, tmp_path, 100, "clamaran - live 2012") == "Clamaran"
+    assert nfo.read(bulk, tmp_path, 100, "Dada Life - Live 2012") is None  # pas le sien : rien plutôt qu'un autre
+    tid = user_client.get(f"/api/releases/{bid}").json()["tracks"][0]["id"]
+    assert "Mixé par Bicep" in user_client.get(f"/api/releases/{bid}/nfo", params={"track": tid}).text  # seul .txt du dossier
+    assert user_client.get(f"/api/releases/{bid}/nfo", params={"track": 99999}).status_code == 404
