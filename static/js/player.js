@@ -189,7 +189,15 @@ let fetching = false, fetchRetry = 0;
 const LIGHT = new Set(['m4a', 'mp4', 'ogg', 'opus']);
 const NATIVE = { flac: 'audio/flac', wav: 'audio/wav', m4a: 'audio/mp4', mp4: 'audio/mp4', ogg: 'audio/ogg', opus: 'audio/ogg; codecs=opus' };
 const probe = typeof Audio === 'function' ? new Audio() : null;
+// piste de Navidrome (onglet Navidrome) : relayée par le serveur ; MP3 et formats lisibles ici tels quels, le reste
+// converti en MP3 par Navidrome. Pas de paroles, forme d'onde, chapitres, favoris ni historique pour elle.
+const local = (t) => !!t && !t.nd;
+export const coverOf = (t) => (t.nd ? t.cover || '' : `/api/releases/${t.release_id}/cover`);
 function streamUrl(t) {
+  if (t.nd) {
+    const type = t.suffix === 'mp3' ? 'audio/mpeg' : NATIVE[t.suffix];
+    return `/api/navidrome/stream/${encodeURIComponent(t.nd)}${type && probe?.canPlayType(type) ? '?original=1' : ''}`;
+  }
   const ext = String(t.filename || '').split('.').pop().toLowerCase();
   const type = (prefs.original || LIGHT.has(ext) || t.duration >= LONG) && NATIVE[ext];
   return `/api/tracks/${encodeURIComponent(t.id)}/stream${type && probe?.canPlayType(type) ? '?original=1' : ''}`;
@@ -419,6 +427,7 @@ function paintStage() {
   if (!t) { lyr = { id: null }; ui.stage.replaceChildren(stageMsg(tr('Rien en lecture.'))); return; }
   if (lyr.id === t.id) { if (lyr.lines) highlight(); return; }
   lyr = { id: t.id, at: -1 };
+  if (!local(t)) return renderLyrics(); // piste de Navidrome : pas de paroles
   ui.stage.replaceChildren(stageMsg(tr('Chargement…')));
   api(`/tracks/${t.id}/lyrics`).then((r) => {
     if (lyr.id !== t.id) return;
@@ -787,7 +796,7 @@ function metadata(t) {
   if (!ms) return;
   ms.metadata = t && typeof MediaMetadata === 'function'
     ? new MediaMetadata({ title: title(t), artist: t.artist || '', album: t.release_name || '',
-      artwork: [{ src: `/api/releases/${t.release_id}/cover` }] }) // pochette sur l'écran verrouillé, ignorée si absente
+      artwork: [{ src: coverOf(t) }] }) // pochette sur l'écran verrouillé, ignorée si absente
     : null;
 }
 
@@ -896,7 +905,7 @@ function loadChapters(t) {
   chapters = [];
   shownChapter = -2;
   paintChapter();
-  if (!t || (t.duration || 0) < 600) return; // une piste courte n'a pas de chapitres : pas de requête
+  if (!local(t) || (t.duration || 0) < 600) return; // une piste courte n'a pas de chapitres : pas de requête
   api(`/tracks/${t.id}/chapters`).then((list) => { if (chaptersFor === t.id) { chapters = list; shownChapter = -2; paintChapter(); } }).catch(() => {});
 }
 
@@ -921,14 +930,14 @@ function skipChapter(dir) {
 // Garde la position d'une longue piste toutes les quinze secondes ; l'oublie dans la dernière minute.
 function savePosition() {
   const t = player.queue.current(), d = duration(), pos = position();
-  if (!t || backend || d < LONG || !playing() || Math.abs(Date.now() - savedAt) < 15000) return;
+  if (!local(t) || backend || d < LONG || !playing() || Math.abs(Date.now() - savedAt) < 15000) return;
   savedAt = Date.now();
   api(`/positions/${t.id}`, { method: 'PUT', body: { pos: d - pos < 60 ? 0 : Math.floor(pos) } }).catch(() => {});
 }
 
 // Au lancement d'une longue piste depuis le début : propose de reprendre là où l'écoute s'était arrêtée.
 function offerResume(t) {
-  if (!t || (t.duration || 0) < LONG) return;
+  if (!local(t) || (t.duration || 0) < LONG) return;
   api(`/positions/${t.id}`).then(({ pos }) => {
     if (!ui || player.queue.current()?.id !== t.id || pos < 60 || position() > 30) return;
     ui.msg.replaceChildren(el('button', { type: 'button', class: 'primary', onclick: () => { seek(pos); flash(''); } },
@@ -986,7 +995,7 @@ function loadWave(t) {
   if (id === waveId) return;
   waveId = id;
   ui.wave.classList.remove('has-wave'); // curseur simple en attendant (premier calcul : jusqu'à une minute pour un long mix)
-  if (id === null) return;
+  if (id === null || !local(t)) return;
   api(`/tracks/${id}/waveform`).then((w) => {
     if (w.peaks?.length) peaksOf.set(id, w.peaks);
     if (Number.isFinite(w.loudness)) {
@@ -1004,7 +1013,7 @@ function update() {
   loadChapters(t);
   if (t && on && t.id !== logged) { // une fois par piste lancée, en local comme en cast ; un échec est sans conséquence
     logged = t.id;
-    api(`/history/${t.id}`, { method: 'POST' }).catch(() => {});
+    if (local(t)) api(`/history/${t.id}`, { method: 'POST' }).catch(() => {});
   }
   if (!t) logged = null;
   if (ms) ms.playbackState = t ? (on ? 'playing' : 'paused') : 'none';
@@ -1022,7 +1031,7 @@ function update() {
     }
     ui.rel.textContent = relName(t?.release_name);
     loadWave(t);
-    const cover = t ? `/api/releases/${t.release_id}/cover` : '';
+    const cover = t ? coverOf(t) : '';
     if (ui.cover.dataset.src !== cover) { // même release : l'image n'est pas rechargée à chaque piste
       ui.cover.dataset.src = cover;
       ui.cover.hidden = true;
@@ -1035,7 +1044,7 @@ function update() {
     const d = t && tech.id === t.id ? tech.d : null;
     if (t && tech.id !== t.id) {
       tech = { id: t.id, d: null };
-      api(`/tracks/${t.id}/tech`).then((r) => { if (tech.id === t.id) { tech.d = r; update(); } }).catch(() => {}); // facultatif
+      if (local(t)) api(`/tracks/${t.id}/tech`).then((r) => { if (tech.id === t.id) { tech.d = r; update(); } }).catch(() => {}); // facultatif
     }
     // un pictogramme devant chaque information (data-ico : masque dessiné en CSS)
     const meta = !t ? [] : [t.grp && el('span', { class: 'chip', 'data-ico': 'users' }, t.grp),
@@ -1044,6 +1053,7 @@ function update() {
       d?.sample_rate && el('span', { 'data-ico': 'sine' }, `${(d.sample_rate / 1000).toLocaleString()} KHZ`),
       /\.\w+$/.test(t.filename || '') && el('span', { 'data-ico': 'note' }, t.filename.split('.').pop().toUpperCase())].filter(Boolean);
     ui.meta.replaceChildren(...meta.flatMap((x, i) => (i ? [el('span', { class: 'sep', 'aria-hidden': 'true' }, '·'), x] : [x])));
+    ui.fav.hidden = !!t?.nd; // pas de favori pour une piste de Navidrome
     ui.fav.textContent = t?.favorite ? '♥︎' : '♡︎';
     ui.fav.setAttribute('aria-pressed', !!t?.favorite);
     label(ui.fav, t?.favorite ? tr('Retirer des favoris') : tr('Ajouter aux favoris'));
@@ -1122,7 +1132,7 @@ export function initPlayer(footer) {
   ui.rate = el('span', { class: 'pl-rate' }); // débit de la piste, barre du bureau large
   ui.fav = iconBtn('pl-fav', '♡︎', tr('Ajouter aux favoris'), async () => {
     const t = q().current();
-    if (!t) return;
+    if (!local(t)) return;
     t.favorite = !t.favorite; // optimiste
     update();
     try { await api(`/favorites/track/${t.id}`, { method: t.favorite ? 'PUT' : 'DELETE' }); } catch { t.favorite = !t.favorite; update(); }

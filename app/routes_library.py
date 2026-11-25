@@ -16,7 +16,7 @@ from . import artists, coversearch, lyrics, naming, nfo
 from .naming import complete_title, festival, festival_key, radio as radio_show
 from .routes_media import DECODE, IMAGE_ERRORS
 from .deps import MAX_INT, Id, current_user, get_conn
-from .security import safe_path
+
 
 router = APIRouter(dependencies=[Depends(current_user)])
 
@@ -1135,9 +1135,9 @@ def release_nfo(rid: Id, request: Request, track: int | None = Query(None, ge=1,
         if t is None:
             raise HTTPException(404, "Piste introuvable.")
         stem = t["relpath"].rsplit("/", 1)[-1].rsplit(".", 1)[0]
-    folder = safe_path(settings.music_root, row["path"])
+    folder = settings.roots.safe(row["path"])
     try:
-        text = nfo.read(folder, settings.music_root, NFO_MAX, stem)  # .nfo, sinon .txt
+        text = nfo.read(folder, settings.roots.base(row["path"]), NFO_MAX, stem)  # .nfo, sinon .txt
     except OSError:
         text = None
     if text is None:

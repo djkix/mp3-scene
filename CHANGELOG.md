@@ -4,6 +4,21 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.82.0](https://github.com/djkix/mp3-scene/compare/v1.81.3...v1.82.0) (2026-11-25)
+
+### Résumé
+
+**Onglet Navidrome, dossiers de musique supplémentaires.**
+
+- Onglet Navidrome dans Explorer (avec `NAVIDROME_URL`, `NAVIDROME_USER`, `NAVIDROME_PASSWORD`) : derniers ajouts,
+  albums au hasard ou les plus écoutés, artistes, recherche et page d'un album, lus dans le lecteur de Mp3 Scene
+  (file d'attente, déplacement, Chromecast). Le serveur Mp3 Scene relaie tout : le compte Navidrome ne parvient
+  jamais au navigateur. MP3, FLAC, M4A et OGG lus tels quels, le reste converti en MP3 par Navidrome. Pas de
+  paroles, forme d'onde, favoris ni historique pour ces pistes.
+- Dossiers de musique supplémentaires (`MUSIC_EXTRA`, « Nom=/chemin » séparés par « ; ») : chacun apparaît comme
+  un dossier racine de la bibliothèque, donc une catégorie, avec scan, lecture, NFO, pochettes et téléchargement.
+  Un dossier non monté au moment du scan garde ses releases.
+
 ## [1.81.3](https://github.com/djkix/mp3-scene/compare/v1.81.2...v1.81.3) (2026-11-25)
 
 ### Résumé

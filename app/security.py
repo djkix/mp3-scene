@@ -175,6 +175,37 @@ def regular_names(folder, suffixes: tuple[str, ...]) -> list[str]:
         return sorted(e.name for e in it if e.name.lower().endswith(suffixes) and e.is_file(follow_symlinks=False))
 
 
+class Roots:
+    """Dossiers de musique : le principal (MUSIC_ROOT) et des dossiers supplémentaires, chacun sous un nom de dossier
+    racine virtuel (« 05.Web Albums » -> /extra/albums). Les chemins en base restent relatifs (« 05.Web Albums/X »)
+    et la racine qui les porte se déduit de leur premier segment."""
+
+    def __init__(self, main, extra: dict | None = None):
+        self.main, self.extra = Path(main), {k: Path(v) for k, v in (extra or {}).items()}
+
+    def split(self, rel: str) -> tuple[Path, str]:
+        """(racine sur le disque, chemin sous elle) d'un chemin relatif de la bibliothèque."""
+        first, _, rest = rel.partition("/")
+        return (self.extra[first], rest) if first in self.extra else (self.main, rel)
+
+    def path(self, rel: str, *more: str) -> Path:
+        """Chemin sur le disque, sans vérification (scan)."""
+        base, rest = self.split(rel)
+        return Path(base, rest, *more)
+
+    def base(self, rel: str) -> Path:
+        return self.split(rel)[0]
+
+    def safe(self, rel: str, *more: str) -> Path:
+        """Chemin résolu sous sa racine et existant (requêtes) ; sinon 404."""
+        base, rest = self.split(rel)
+        return safe_path(base, *([rest] if rest else []), *more)
+
+
+def as_roots(root) -> Roots:
+    return root if isinstance(root, Roots) else Roots(root)
+
+
 def safe_path(root: Path, *parts: str) -> Path:
     """Chemin résolu (liens symboliques suivis) sous `root` et existant ; sinon 404."""
     root = root.resolve()

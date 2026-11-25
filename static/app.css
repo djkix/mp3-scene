@@ -934,3 +934,14 @@ body.party-on #view { max-width: none; padding: 0; margin: 0; }
   .party-cover { width: min(80vw, 50vh); align-self: center; }
   .party-next { list-style-position: inside; padding: 0; }
 }
+
+/* onglet Navidrome : pistes d'un album ou d'une recherche (numéro à la place de la vignette) */
+@media (min-width: 700px) { .nd-trk { grid-template-columns: 32px minmax(0, 1fr) 5rem 6rem 3.5rem 40px; } }
+.nd-no { grid-area: thumb; color: var(--muted); font: 12px var(--mono); text-align: right; }
+@media (min-width: 700px) { .nd-no { grid-area: auto; } }
+.nd-head { margin: 12px; }
+.nd-head .grp-title { margin: 0 0 4px; }
+.nd-title { margin: 12px; }
+.nd-artists { margin: 12px; line-height: 2.2; }
+.nd-find input { flex: 1 1 320px; max-width: 520px; }
+.nd-h { margin: 16px 12px 6px; }

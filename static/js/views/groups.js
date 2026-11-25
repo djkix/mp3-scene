@@ -16,9 +16,18 @@ const KINDS = { groups: ['Groupes', 'Groupe', 'grp', 'grp'], artists: ['Artistes
   titles: ['Titres', 'Titre', 'title', null], years: ['Années', 'Année', 'year', 'year'] }; // un titre (toutes ses versions) ouvre une liste de pistes // une série ouvre sa propre page (volumes dans l'ordre), pas une liste épinglée
 // Onglets d'Explorer, dans l'ordre affiché.
 const TABS = [['artists', 'Artistes'], ['titles', 'Titres'], ['genres', 'Genres'], ['years', 'Années'], ['categories', 'Catégories'], ['series', 'Séries'], ['labels', 'Labels'], ['groups', 'Groupes']];
-export const tabs = (current, genre = '', year = '') => el('div', { class: 'tabs', role: 'tablist', 'aria-label': tr('Explorer') },
-  TABS.map(([k, label]) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(k === current),
-    onclick: () => { location.hash = `#/${k}` + qs({ genre: k === 'genres' ? '' : genre, year }); } }, tr(label))));
+// onglet Navidrome en dernier, seulement si le serveur en a un de configuré (demandé une fois par session)
+let navidromeOn = null;
+export const tabs = (current, genre = '', year = '') => {
+  const bar = el('div', { class: 'tabs', role: 'tablist', 'aria-label': tr('Explorer') },
+    TABS.map(([k, label]) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(k === current),
+      onclick: () => { location.hash = `#/${k}` + qs({ genre: k === 'genres' ? '' : genre, year }); } }, tr(label))));
+  (navidromeOn ??= api('/navidrome/status').then((s) => s.enabled).catch(() => false)).then((on) => {
+    if (on) bar.append(el('button', { type: 'button', role: 'tab', 'aria-selected': String(current === 'navidrome'),
+      onclick: () => { location.hash = '#/navidrome'; } }, 'Navidrome'));
+  });
+  return bar;
+};
 
 const qs = (o) => { const s = String(new URLSearchParams(Object.entries(o).filter(([, v]) => v))); return s ? '?' + s : ''; };
 const count = (n) => `${n} ${n > 1 ? tr('releases') : tr('release')}`;

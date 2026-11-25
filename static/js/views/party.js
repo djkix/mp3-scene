@@ -6,7 +6,7 @@
 import { api } from '../api.js';
 import { el, relName } from '../dom.js';
 import { t as tr, locale } from '../i18n.js';
-import { player } from '../player.js';
+import { coverOf, player } from '../player.js';
 import { Queue } from '../queue.js';
 
 const name = (t) => (t.title ? t.title : t.filename || '');
@@ -35,7 +35,7 @@ export function render(container) {
     const key = [t.id, ...coming.map((x) => x.id)].join();
     if (key === shown) return;
     shown = key;
-    const src = `/api/releases/${t.release_id}/cover`;
+    const src = coverOf(t);
     if (cover.getAttribute('src') !== src) {
       cover.hidden = false;
       cover.onerror = () => { cover.hidden = true; };

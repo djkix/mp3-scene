@@ -27,7 +27,7 @@ Image.MAX_IMAGE_PIXELS = 25_000_000
 DECODE = threading.BoundedSemaphore(2)  # deux décodages d'image à la fois au plus : la mémoire reste bornée
 warnings.simplefilter("error", Image.DecompressionBombWarning)
 IMAGE_ERRORS = (ValueError, OSError, Image.DecompressionBombError, Image.DecompressionBombWarning)
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from . import cue, db
 from .deps import MAX_INT, Id, current_user, get_conn
@@ -113,7 +113,7 @@ def _track_file(request: Request, conn, track_id: int, download: bool = False, h
                        (track_id,)).fetchone()
     if row is None:
         raise HTTPException(404, "Piste introuvable.")
-    path = safe_path(request.app.state.settings.music_root, row["path"], row["relpath"])
+    path = request.app.state.settings.roots.safe(row["path"], row["relpath"])
     try:
         st = os.stat(path)
         if not stat.S_ISREG(st.st_mode):  # avant open() : ouvrir une FIFO bloquerait le thread
@@ -190,7 +190,7 @@ def pick_cover(names: list[str]) -> str | None:
 def _find_cover(request: Request, conn, rid: int):
     """Pochette d'une release : (chemin, None, type) pour une image du dossier, (None, octets, type) pour celle
     incluse dans les tags de la première piste. 404 s'il n'y en a pas."""
-    root = request.app.state.settings.music_root
+    roots = request.app.state.settings.roots
     row = conn.execute("SELECT path FROM releases WHERE id=?", (rid,)).fetchone()
     if row is None:
         raise HTTPException(404, "Release introuvable.")
@@ -198,16 +198,16 @@ def _find_cover(request: Request, conn, rid: int):
     if custom.is_file():  # pochette déposée par un administrateur : elle passe avant celle du dossier
         return custom, None, "image/jpeg"
     try:
-        name = pick_cover([p.name for p in safe_path(root, row["path"]).iterdir()])
+        name = pick_cover([p.name for p in roots.safe(row["path"]).iterdir()])
         if name:
-            path = safe_path(root, row["path"], name)
+            path = roots.safe(row["path"], name)
             st = os.stat(path)
             if stat.S_ISREG(st.st_mode) and st.st_size <= COVER_MAX:
                 return path, None, IMAGE_TYPES[os.path.splitext(name)[1].lower()]
         first = conn.execute("SELECT relpath FROM tracks WHERE release_id=? ORDER BY disc, relpath LIMIT 1",
                              (rid,)).fetchone()
         if first:
-            with open(safe_path(root, row["path"], first["relpath"]), "rb") as fh:  # lecture seule
+            with open(roots.safe(row["path"], first["relpath"]), "rb") as fh:  # lecture seule
                 pics = ID3(fh).getall("APIC")
             if pics and pics[0].mime in IMAGE_TYPES.values() and len(pics[0].data) <= COVER_MAX:
                 return None, pics[0].data, pics[0].mime
@@ -280,7 +280,7 @@ def _chapters(request: Request, conn, rid: int) -> dict[int, list[dict]]:
         return out
     tracks = [(t["id"], t["relpath"]) for t in conn.execute("SELECT id, relpath FROM tracks WHERE release_id=? ORDER BY disc, relpath", (rid,))]
     try:
-        return cue.for_tracks(safe_path(request.app.state.settings.music_root, row["path"]), tracks)
+        return cue.for_tracks(request.app.state.settings.roots.safe(row["path"]), tracks)
     except (OSError, HTTPException):
         return {}
 
@@ -310,7 +310,7 @@ def tech(track_id: Id, request: Request, conn=Depends(get_conn)):
                        (track_id,)).fetchone()
     if row is None:
         raise HTTPException(404, "Piste introuvable.")
-    path = safe_path(request.app.state.settings.music_root, row["path"], row["relpath"])
+    path = request.app.state.settings.roots.safe(row["path"], row["relpath"])
     try:
         with open(path, "rb") as fh:  # lecture seule
             m = mutagen.File(fh)
@@ -399,7 +399,7 @@ def waveform(track_id: Id, request: Request, conn=Depends(get_conn)):
                        (track_id,)).fetchone()
     if row is None:
         raise HTTPException(404, "Piste introuvable.")
-    path = safe_path(request.app.state.settings.music_root, row["path"], row["relpath"])
+    path = request.app.state.settings.roots.safe(row["path"], row["relpath"])
     if not _wave_lock.acquire(timeout=LOCK_WAIT):  # un calcul déjà en cours : le client redemandera plus tard
         raise busy()
     try:
@@ -480,7 +480,7 @@ def release_zip(rid: Id, request: Request, conn=Depends(get_conn)):
     row = conn.execute("SELECT path, name FROM releases WHERE id=?", (rid,)).fetchone()
     if row is None:
         raise HTTPException(404, "Release introuvable.")
-    folder = safe_path(request.app.state.settings.music_root, row["path"])
+    folder = request.app.state.settings.roots.safe(row["path"])
     if not folder.is_dir():
         raise HTTPException(404, "Dossier introuvable.")
     return StreamingResponse(_zip_stream(row["name"], _release_files(folder)), media_type="application/zip",
@@ -488,17 +488,29 @@ def release_zip(rid: Id, request: Request, conn=Depends(get_conn)):
 
 
 class CastRequest(BaseModel):
-    track_ids: Annotated[list[Annotated[int, Field(ge=1, le=MAX_INT)]], Field(min_length=1, max_length=500)]
+    track_ids: Annotated[list[Annotated[int, Field(ge=1, le=MAX_INT)]], Field(max_length=500)] = []
+    # pistes de Navidrome (identifiant Subsonic) : relayées par /cast/nd/…
+    nd_ids: Annotated[list[Annotated[str, Field(pattern=r"^[A-Za-z0-9_.-]{1,80}$")]], Field(max_length=500)] = []
+
+    @model_validator(mode="after")
+    def _some(self):
+        if not self.track_ids and not self.nd_ids:
+            raise ValueError("aucune piste")
+        return self
 
 
 @router.post("/api/cast/urls")
 def cast_urls(body: CastRequest, request: Request, conn=Depends(get_conn)):
     settings = request.app.state.settings
     ids = sorted(set(body.track_ids))
-    found = conn.execute(f"SELECT id FROM tracks WHERE id IN ({','.join('?' * len(ids))})", ids).fetchall()
+    found = conn.execute(f"SELECT id FROM tracks WHERE id IN ({','.join('?' * len(ids))})", ids).fetchall() if ids else []
     exp = int(time.time()) + CAST_TTL
-    return {"urls": {str(r["id"]): f"{settings.public_url}/cast/{r['id']}?exp={exp}"
-                                    f"&sig={sign_track(settings.secret_key, r['id'], exp)}" for r in found}}
+    urls = {str(r["id"]): f"{settings.public_url}/cast/{r['id']}?exp={exp}"
+                          f"&sig={sign_track(settings.secret_key, r['id'], exp)}" for r in found}
+    if settings.navidrome_url:
+        urls.update({f"nd:{n}": f"{settings.public_url}/cast/nd/{n}?exp={exp}&sig={sign_track(settings.secret_key, f'nd:{n}', exp)}"
+                     for n in set(body.nd_ids)})
+    return {"urls": urls}
 
 
 @cast_router.api_route("/cast/{track_id}", methods=["GET", "HEAD"])

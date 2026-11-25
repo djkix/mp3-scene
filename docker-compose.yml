@@ -18,6 +18,12 @@ services:
       PUBLIC_URL: https://mp3.exemple.fr   # adresse publique HTTPS, sans slash final (URL envoyées au Chromecast)
       TZ: Europe/Paris                     # heure des journaux, du scan quotidien et de la sauvegarde
       # DISCOGS_TOKEN: ${DISCOGS_TOKEN}    # pochettes cherchées aussi sur Discogs (facultatif)
+      # Dossiers de musique supplémentaires (facultatif) : « Nom=/chemin » séparés par « ; », montés plus bas
+      # MUSIC_EXTRA: "05.Web Albums=/extra/albums;06.Fresh House=/extra/fresh"
+      # Onglet Navidrome (facultatif) : valeurs dans .env
+      # NAVIDROME_URL: ${NAVIDROME_URL:-}
+      # NAVIDROME_USER: ${NAVIDROME_USER:-}
+      # NAVIDROME_PASSWORD: ${NAVIDROME_PASSWORD:-}
       # Sauvegarde nocturne de la base (facultative) : décommentez avec les deux volumes plus bas.
       # BACKUP_DIR: /backup                # dossier des sauvegardes dans le conteneur
       # BACKUP_HOUR: "3"                   # heure à partir de laquelle la sauvegarde du jour est faite
@@ -30,6 +36,7 @@ services:
     volumes:
       - music:/music:ro        # lecture seule côté conteneur
       - ./data:/data           # base SQLite : à sauvegarder
+      # - /chemin/vers/albums:/extra/albums:ro   # un par dossier de MUSIC_EXTRA, en lecture seule
       # - /chemin/vers/nas/mp3-scene:/backup   # un dossier daté par jour, sept gardés ; inscriptible par l'UID 1000
       # - .:/stack:ro                          # pour que la sauvegarde copie aussi ce fichier compose et le .env
 

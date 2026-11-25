@@ -38,6 +38,16 @@ class ScanError(Exception):
     pass
 
 
+class _Extra:
+    """Dossier supplémentaire présenté comme une entrée de os.scandir (chemin et stat) au parcours."""
+
+    def __init__(self, path):
+        self.path = os.fsencode(path)
+
+    def stat(self, follow_symlinks=True):
+        return os.stat(self.path)
+
+
 def _list(path: bytes) -> list:
     with os.scandir(path) as it:
         return list(it)
@@ -126,6 +136,8 @@ def _follow_move(conn, old, new):
 
 
 def _scan_structure(conn, root, now):
+    roots = security.as_roots(root)
+    root = roots.main
     root_b = os.fsencode(root)
     try:
         top = _list(root_b)
@@ -213,8 +225,11 @@ def _scan_structure(conn, root, now):
             name = _decode(e)
             if name is None:
                 skipped += 1
-            else:
+            elif name not in roots.extra:  # un dossier du même nom qu'une racine supplémentaire serait confondu avec elle
                 push(stack, e, name)
+    # dossiers supplémentaires (MUSIC_EXTRA) : parcourus comme des dossiers racines de la bibliothèque, sous leur nom
+    for name, path in roots.extra.items():
+        push(stack, _Extra(path), name)
     while stack:
         path, rel, mtime = stack.pop()
         try:
@@ -414,7 +429,7 @@ def _scan_tags(conn, root, should_stop):
         done = []  # lot lu entièrement avant d'écrire : pas de verrou d'écriture pendant les lectures NFS
         for t in rows:
             try:
-                done.append((*_read_tags(Path(root, t["path"], t["relpath"])), t["id"]))
+                done.append((*_read_tags(security.as_roots(root).path(t["path"], t["relpath"])), t["id"]))
             except OSError as e:
                 log.warning("piste illisible, relue au prochain scan : %s/%s (%s)", t["path"], t["relpath"], e)
         conn.executemany("UPDATE tracks SET title=?, artist=?, genre=?, duration=?, bitrate=?, bpm=?, key=?, tags_read=1"
@@ -442,7 +457,8 @@ def _nfo_info(root, path):
     une date ou un label absents. Sans numéro dans le NFO, celui du nom : « Artist-Title-(CAT001)-WEB-2019-GRP »."""
     in_name = re.search(r"-\(([^()]{2,30})\)-", _name(path))
     cat = in_name and in_name.group(1).replace("_", " ")
-    text = nfo.read(Path(root, path), root, 1024 * 1024)
+    roots = security.as_roots(root)
+    text = nfo.read(roots.path(path), roots.base(path), 1024 * 1024)
     if text is None:
         return 0, "", cat
     label, nfo_cat = nfo.label(text)
@@ -520,7 +536,8 @@ def _scan_nfo_text(conn, root, should_stop):
         done = []  # lot lu avant d'écrire, comme pour les tags
         for r in rows:
             try:
-                done.append((r["id"], nfo.read(Path(root, r["path"]), root, 200 * 1024) or ""))
+                roots = security.as_roots(root)
+                done.append((r["id"], nfo.read(roots.path(r["path"]), roots.base(r["path"]), 200 * 1024) or ""))
             except OSError as e:
                 log.warning("NFO illisible, indexé au prochain scan : %s (%s)", r["path"], e)
         for rid, text in done:
@@ -546,7 +563,7 @@ def _scan_cues(conn, root, should_stop):
         for r in rows:
             tracks = [(t["id"], t["relpath"]) for t in conn.execute("SELECT id, relpath FROM tracks WHERE release_id=?", (r["id"],))]
             try:
-                found = cue.for_tracks(Path(root, r["path"]), tracks)
+                found = cue.for_tracks(security.as_roots(root).path(r["path"]), tracks)
             except OSError as e:
                 log.warning("fichiers .cue non lus, à refaire au prochain scan : %s (%s)", r["path"], e)
                 continue
@@ -560,11 +577,12 @@ def _scan_cues(conn, root, should_stop):
 
 def _has_cover(root, path, first):
     """Image dans le dossier de la release, sinon incluse dans les tags de sa première piste (comme la fiche)."""
-    if security.regular_names(Path(root, path), tuple(IMAGES)):
+    roots = security.as_roots(root)
+    if security.regular_names(roots.path(path), tuple(IMAGES)):
         return True
     if first is None:
         return False
-    with security.open_regular(Path(root, path, first), root) as raw:  # lecture seule
+    with security.open_regular(roots.path(path, first), roots.base(path)) as raw:  # lecture seule
         f = _Watched(raw)
         try:
             found = bool(ID3(f).getall("APIC"))
@@ -676,7 +694,7 @@ class Runner:
         conn = None
         try:
             conn = db.connect(self.settings.data_dir)
-            root = self.settings.music_root
+            root = self.settings.roots  # dossier principal et dossiers supplémentaires (MUSIC_EXTRA)
             log.info("scan lancé : %s", "dossiers puis tags" if structure else "reprise de la lecture des tags")
             # reprise des tags seule : l'avertissement du scan précédent (ou l'interruption) reste affiché
             conn.execute("UPDATE scan_state SET status=?, started_at=?, finished_at=NULL"

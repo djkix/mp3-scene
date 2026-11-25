@@ -13,6 +13,7 @@ import * as library from './views/library.js';
 import * as admin from './views/admin.js';
 import * as offlineView from './views/offline.js';
 import * as party from './views/party.js';
+import * as navidrome from './views/navidrome.js';
 import { offline } from './offline.js';
 import { initPlayer, player } from './player.js';
 import { initCast } from './cast.js';
@@ -40,6 +41,7 @@ const ROUTES = {
   library,
   admin,
   party,
+  navidrome,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -117,7 +119,7 @@ async function route() {
   }).catch(() => {});
   document.querySelectorAll('#nav a').forEach((a) =>
     a.classList.toggle('active', a.dataset.route === name || (name === 'search' && a.dataset.route === '')
-      || (['artists', 'titles', 'genres', 'years', 'labels', 'categories', 'series', 'festivals', 'folders'].includes(name) && a.dataset.route === 'groups')
+      || (['artists', 'titles', 'genres', 'years', 'labels', 'categories', 'series', 'festivals', 'folders', 'navidrome'].includes(name) && a.dataset.route === 'groups')
       || (['library', 'admin'].includes(name) && a.dataset.route === 'account')));
   const search = $('search');
   if (name !== 'search' && search.value) search.value = '';

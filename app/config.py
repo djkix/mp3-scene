@@ -1,5 +1,5 @@
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -20,8 +20,34 @@ class Settings:
     backup_hour: int = 3             # heure du serveur à partir de laquelle la sauvegarde du jour est faite
     discogs_token: str | None = None  # jeton personnel Discogs (pochettes des singles et maxis) ; None : Deezer et iTunes seuls
     stack_dir: Path = Path("/stack")
+    # serveur Navidrome (API Subsonic) parcouru dans l'onglet Navidrome ; sans adresse, l'onglet n'apparaît pas
+    # dossiers de musique supplémentaires : nom de dossier racine (« 05.Web Albums ») -> chemin dans le conteneur
+    extra_roots: dict = field(default_factory=dict)
+    navidrome_url: str = ""
+    navidrome_user: str = ""
+    navidrome_password: str = ""
     # réseaux d'où X-Forwarded-For est cru (le reverse proxy) ; par défaut la boucle locale et les réseaux privés
     trusted_proxies: tuple = TRUSTED_DEFAULT  # dossier de la pile (compose, .env), monté en lecture seule s'il est à copier
+
+
+    @property
+    def roots(self):
+        from .security import Roots
+        return Roots(self.music_root, self.extra_roots)
+
+
+def _extra(value: str) -> dict:
+    """MUSIC_EXTRA : « Nom=/chemin;Nom 2=/chemin2 » (le nom devient un dossier racine de la bibliothèque)."""
+    out = {}
+    for item in value.split(";"):
+        name, sep, path = item.partition("=")
+        name, path = name.strip(), path.strip()
+        if not sep or not name or not path or "/" in name:
+            if item.strip():
+                raise RuntimeError(f"MUSIC_EXTRA : « {item.strip()} » n'a pas la forme Nom=/chemin.")
+            continue
+        out[name] = Path(path)
+    return out
 
 
 def load() -> Settings:
@@ -42,6 +68,10 @@ def load() -> Settings:
         backup_hour=min(23, max(0, int(os.environ.get("BACKUP_HOUR") or 3))),
         stack_dir=Path(os.environ.get("STACK_DIR", "/stack")),
         discogs_token=os.environ.get("DISCOGS_TOKEN") or None,
+        extra_roots=_extra(os.environ.get("MUSIC_EXTRA", "")),
+        navidrome_url=os.environ.get("NAVIDROME_URL", "").rstrip("/"),
+        navidrome_user=os.environ.get("NAVIDROME_USER", ""),
+        navidrome_password=os.environ.get("NAVIDROME_PASSWORD", ""),
         **({"trusted_proxies": tuple(x.strip() for x in os.environ["TRUSTED_PROXIES"].split(",") if x.strip())}
            if os.environ.get("TRUSTED_PROXIES") else {}),
     )

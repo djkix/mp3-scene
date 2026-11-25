@@ -295,3 +295,36 @@ def test_fifo_is_404_and_skipped_by_zip(user_client, conn, settings, library):
     assert user_client.get(f"/api/tracks/{tid}/stream").status_code == 404
     names = zipfile.ZipFile(io.BytesIO(user_client.get(f"/api/releases/{release(conn, A)['id']}/zip").content)).namelist()
     assert len(names) == 3 and not any("pipe" in n for n in names)
+
+
+def test_extra_music_folders_are_scanned_played_and_read(user_client, settings, tmp_path):
+    from app import db
+    from app.scanner import scan_structure
+    from app.config import _extra
+    assert _extra("05.Web Albums=/extra/albums; 06.Fresh House = /extra/fresh") == {"05.Web Albums": Path("/extra/albums"), "06.Fresh House": Path("/extra/fresh")}
+    with pytest.raises(RuntimeError):
+        _extra("pas de chemin")
+    web = tmp_path / "web"
+    rel = web / "A-Z" / "Bob-Album-WEB-2020-GRP"
+    rel.mkdir(parents=True)
+    (rel / "01-bob-song.mp3").write_bytes(b"ID3mp3data")
+    (rel / "cover.jpg").write_bytes(b"\xff\xd8jpeg")
+    (rel / "infos.txt").write_text("Tracklist du web", encoding="utf-8")
+    (settings.music_root / "Singles" / "S-Song-WEB-2020-G").mkdir(parents=True)
+    (settings.music_root / "Singles" / "S-Song-WEB-2020-G" / "01.mp3").write_bytes(b"x")
+    settings.extra_roots = {"05.Web Albums": web}
+    conn = db.connect(settings.data_dir)
+    scan_structure(conn, settings.roots, now=1.0)
+    db.categorize(conn)
+    conn.commit()
+    r = conn.execute("SELECT id, path, category, has_nfo FROM releases WHERE name='Bob-Album-WEB-2020-GRP'").fetchone()
+    assert (r["path"], r["category"], r["has_nfo"]) == ("05.Web Albums/A-Z/Bob-Album-WEB-2020-GRP", "05.Web Albums", 1)
+    tid = conn.execute("SELECT id FROM tracks WHERE release_id=?", (r["id"],)).fetchone()[0]
+    assert user_client.get(f"/api/tracks/{tid}/stream").content == b"ID3mp3data"   # lu dans le dossier supplémentaire
+    assert user_client.get(f"/api/releases/{r['id']}/nfo").text == "Tracklist du web"
+    assert user_client.get(f"/api/releases/{r['id']}/cover").content == b"\xff\xd8jpeg"
+    settings.extra_roots = {"05.Web Albums": tmp_path / "absent"}  # dossier non monté : ses releases sont gardées
+    scan_structure(conn, settings.roots, now=2.0)
+    assert conn.execute("SELECT COUNT(*) FROM releases WHERE path LIKE '05.Web Albums/%'").fetchone()[0] == 1
+    settings.extra_roots = {}  # dossier supplémentaire retiré de la configuration : plus rien n'y est lu
+    assert user_client.get(f"/api/tracks/{tid}/stream").status_code == 404

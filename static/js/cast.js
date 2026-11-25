@@ -61,7 +61,9 @@ function setup(player) {
     const missing = [...new Set(ids.map(String))].filter((id) => !urls.has(id));
     for (const b of batches(missing)) {
       const at = Date.now();
-      const r = await api('/cast/urls', { method: 'POST', body: { track_ids: b.map(Number) } });
+      // pistes de Navidrome (« nd:… ») : relayées par le serveur, sous leur propre adresse signée
+      const r = await api('/cast/urls', { method: 'POST', body: { track_ids: b.filter((id) => !id.startsWith('nd:')).map(Number),
+        nd_ids: b.filter((id) => id.startsWith('nd:')).map((id) => id.slice(3)) } });
       fetchedAt ??= at;
       for (const [id, url] of Object.entries(r.urls || {})) urls.set(id, url);
     }

@@ -4,7 +4,7 @@
 
 **Collection de releases MP3 « scene » — bibliothèque · lecteur web · Chromecast · PWA**
 
-[![Version](https://img.shields.io/badge/version-1.81.3-purple?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.82.0-purple?style=for-the-badge)](CHANGELOG.md)
 [![Stack](https://img.shields.io/badge/stack-FastAPI_·_SQLite_·_JavaScript_pur-blue?style=for-the-badge)](#stack-technique)
 [![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
 
@@ -343,6 +343,9 @@ Une base créée par une version plus récente de l'appli est refusée au démar
 | `DATA_DIR` | non (`/data`) | Dossier de la base SQLite |
 | `TRUSTED_PROXIES` | non (boucle locale, réseaux privés) | Réseaux (CIDR, séparés par des virgules) d'où `X-Forwarded-For` est cru : l'adresse du reverse proxy |
 | `BACKUP_ENV` | non | `1` : la sauvegarde copie aussi le `.env` de la pile (en clair) |
+| `MUSIC_EXTRA` | non | Dossiers de musique supplémentaires, `Nom=/chemin;Nom 2=/chemin2` : chaque dossier monté dans le conteneur apparaît dans la bibliothèque comme un dossier racine (une catégorie) portant ce nom |
+| `NAVIDROME_URL` | non | Adresse d'un serveur Navidrome (API Subsonic) vue depuis le conteneur, par exemple `http://192.168.1.201:4533` : ajoute l'onglet Navidrome |
+| `NAVIDROME_USER`, `NAVIDROME_PASSWORD` | avec `NAVIDROME_URL` | Compte Navidrome utilisé par le serveur Mp3 Scene (jamais transmis au navigateur) |
 
 ---
 
@@ -391,6 +394,10 @@ git tag v1.2.0 && git push origin v1.2.0
 ## Historique des versions
 
 Le détail est dans le [journal des modifications](CHANGELOG.md).
+
+### 1.82.0 — 25 novembre 2026
+
+**Navidrome et dossiers supplémentaires** : onglet Navidrome pour écouter son catalogue dans Mp3 Scene, et plusieurs dossiers de musique (`MUSIC_EXTRA`).
 
 ### 1.81.0 — 25 novembre 2026
 
