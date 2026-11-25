@@ -396,14 +396,25 @@ def test_named_disc_folders_join_their_album(conn, music):
 def test_dated_radio_episodes_are_named_artist_show_date(conn, music):
     from app import db
     for d in ["2002-06-09_-_Essential_Mix_-_Michel_de_Hey", "2002-05-05_Essential_Mix_-_Pete_Tong_&_BT_@_Coachella_Festival",
-              "2002-04-21_Essential_Mix", "2002-01-13_-_Essential_Mix_-_H-Foundation", "2002-01-13_-_Random_Show_-_Bob"]:
+              "2002-04-21_Essential_Mix", "2002-01-13_-_Essential_Mix_-_H-Foundation"]:
         mk(music, f"Live And Radio/Essential Mix/{d}", ["01-a.mp3"])
+    mk(music, "Live And Radio/Divers/2002-01-13_-_Random_Show_-_Bob", ["01-a.mp3"])
     scan_structure(conn, music, now=1.0)
     db.categorize(conn)
     got = {r["path"].rsplit("/", 1)[1]: r for r in conn.execute("SELECT * FROM releases")}
     m = got["2002-06-09_-_Essential_Mix_-_Michel_de_Hey"]
     assert (m["name"], m["artist"], m["title"], m["year"]) == ("Michel_de_Hey-Essential_Mix-2002-06-09", "Michel de Hey", "Essential Mix", 2002)
     assert m["released_at"] == 1023624000  # 9 juin 2002, midi UTC
+    # Essential Mix : toujours « Artiste-Essential_Mix-date », quel que soit le format
+    from app.db import em_name
+    assert em_name("2016-03-19_-_Riva_Starr_&_Axwell_-_Essential_Mix", None, None, None)[0] == "Riva_Starr_&_Axwell-Essential_Mix-2016-03-19"
+    assert em_name("Essential Mix_2012_01_07_qrip", "L-Vis 1990", "", "x.mp3")[:2] == ("L-Vis_1990-Essential_Mix-2012-01-07", "L-Vis 1990")
+    assert em_name("Carl_Cox_-_Essential_Mix-SAT-10-09-1994-TALiON", None, None, None)[0] == "Carl_Cox-Essential_Mix-1994-10-09"
+    assert em_name("2015 10 31 Essential Mix #1136 - Master Series 05 - Dave Clarke", "Dave Clarke", "", None)[0] == "Dave_Clarke-Essential_Mix_Master_Series_05-2015-10-31"
+    assert em_name("2002-01-13 Essential Mix - H-Foundation", None, None, None)[0] == "H-Foundation-Essential_Mix-2002-01-13"
+    assert em_name("Pete_Tong_-_Live_at_Circus_Liverpool_(500th_Essential_Mix)-SAT-04-23-2010-TALiON", None, None, None)[0] == "Pete_Tong-Essential_Mix_Live_at_Circus_Liverpool_(500th)-2010-04-23"
+    assert em_name("BBC Radio 1s Essential Mix 2021 Week 50 - Alan Fitpatrick", None, None, None)[0] == "Alan_Fitpatrick-Essential_Mix-2021-S50"
+    assert em_name("Mauro Picotto - BBC Radio1 Essential Mix", None, None, None) is None  # sans date : nom gardé
     assert got["2002-05-05_Essential_Mix_-_Pete_Tong_&_BT_@_Coachella_Festival"]["name"] == "Pete_Tong_&_BT-Essential_Mix_@_Coachella_Festival-2002-05-05"
     assert got["2002-04-21_Essential_Mix"]["name"] == "Essential_Mix-2002-04-21"  # sans artiste : rien à sa place
     assert got["2002-01-13_-_Essential_Mix_-_H-Foundation"]["name"] == "H-Foundation-Essential_Mix-2002-01-13"

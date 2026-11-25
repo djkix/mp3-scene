@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
 from PIL import Image
 
-from . import artists, coversearch, lyrics, naming, nfo
+from . import artists, coversearch, db, lyrics, naming, nfo
 from .naming import complete_title, festival, festival_key, radio as radio_show
 from .routes_media import DECODE, IMAGE_ERRORS
 from .deps import MAX_INT, Id, current_user, get_conn
@@ -1018,7 +1018,8 @@ def _live_sets(conn, kind: str) -> dict:
         grp = out.setdefault(key, {"names": Counter(), "sets": []})
         grp["names"][name] += 1
         # dossier d'événement (« -=_INOX_2012_=- ») qui réunit ses sets en vrac, un fichier chacun : autant de sets
-        n = r["track_count"] if r["track_count"] > 1 and naming.ORNAMENT.search(r["name"]) else 1
+        # (ou « Essential Mix Collection 2005 », un dossier d'année qui réunit ses mixes)
+        n = r["track_count"] if r["track_count"] > 1 and (naming.ORNAMENT.search(r["name"]) or re.search(r"(?i)collection", r["name"])) else 1
         grp["sets"].append((r["id"], year or r["year"], r["size"] or 0, bool(r["has_cover"]), n))
     return out
 
@@ -1068,6 +1069,11 @@ def festival_page(name: str = Query(min_length=1, max_length=200), type: LiveTyp
             x["sets"] = [_track(t) for t in conn.execute(f"SELECT {TRACK_COLS} FROM {TRACK_FROM} WHERE t.release_id=?"
                                                          " ORDER BY t.disc, t.relpath", (user["id"], x["id"]))
                          if mine is None or x["id"] in mine or t["id"] in bulk_mine.get(x["id"], ())]
+            for t in x["sets"]:  # Essential Mix d'un dossier d'année : nommé comme les autres (« Skream-Essential_Mix-2020-S01 »)
+                got = "essential mix" in (x["path"] + t["filename"]).lower().replace("_", " ") and \
+                    db.em_name(t["filename"].rsplit(".", 1)[0], t["artist"], t["title"], t["filename"])
+                if got:
+                    t["label"] = got[0]
     items.sort(key=lambda x: (x["fyear"] or 0, x["date"] or 0, x["name"].lower()), reverse=True)
     return {"name": _live_name(g), "items": items}
 

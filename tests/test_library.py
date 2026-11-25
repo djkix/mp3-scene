@@ -1593,3 +1593,16 @@ def test_lives_in_the_singles_folder_go_to_live_and_radio(admin_client, settings
     assert q["live_in_singles"] == 1  # à déplacer sur le NAS : son dossier est encore parmi les singles
     names = [r["name"] for r in admin_client.get("/api/admin/quality", params={"kind": "live_in_singles"}).json()["items"]]
     assert names == ["Hardwell-Live_at_Tomorrowland_2014-WEB-2014-GRP"]
+
+
+def test_essential_mix_year_collection_lists_each_mix_as_a_set(user_client, settings):
+    conn = db.connect(settings.data_dir)
+    rid = conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo)"
+                       " VALUES ('Live And Radio/-= Essential Mix =-/Essential Mix Collection 2005', 'Essential Mix Collection 2005',"
+                       " '', 'Live And Radio', 0, 0, 2, 2, 0)").lastrowid
+    conn.executemany("INSERT INTO tracks(release_id, relpath, size, artist, title) VALUES (?,?,1,?,?)",
+                     [(rid, "Essential Mix - 2005-01-02 - Radio Soulwax.mp3", "Essential Mix", ""),
+                      (rid, "Radio_1s_Essential_Mix_2005 Week 03_Skream.mp3", "BBC Radio 1", "Skream")])
+    conn.commit()
+    page = user_client.get("/api/festival", params={"name": "Essential Mix", "type": "radio"}).json()
+    assert [t["label"] for t in page["items"][0]["sets"]] == ["Radio_Soulwax-Essential_Mix-2005-01-02", "Skream-Essential_Mix-2005-S03"]

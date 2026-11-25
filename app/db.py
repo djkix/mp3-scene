@@ -207,6 +207,111 @@ def dated_episodes(conn) -> None:
 EXTRA_KINDS: dict = {}
 
 
+# Essential Mix : tous les formats de noms ramenés à « Artiste-Essential_Mix-date » (voir essential_mixes)
+_EM = re.compile(r"(?:bbc\s+)?(?:radio\s*1'?s?\s+)?essential\s+mix(?:\s*#\s*\d+)?", re.I)
+_EM_JUNK = re.compile(r"(?i)\b(?:qrip|bbc\s*radio\s*1|radio\s*1'?s?|mixesdb\.com)\b")
+_EM_DATE = re.compile(r"(?<!\d)(?:((?:19|20)\d\d)[-_. ]{1,3}(\d\d)[-_. ]{1,3}(\d\d)|(\d\d)[-_. ](\d\d)[-_. ]((?:19|20)\d\d))(?!\d)")
+_EM_WEEK = re.compile(r"(?<!\d)((?:19|20)\d\d)\s+week\s+(\d{1,2})\b", re.I)
+_NOT_ARTIST = {"", "essential mix", "bbc radio 1", "radio 1", "various", "va", "various artists"}
+
+
+_EM_SRC = {"SAT", "CABLE", "DAB", "DVBS", "DVBC", "DVBT", "DVB", "STREAM", "WEB", "FM", "LINE", "PROPER", "REPACK", "READ_NFO", "INT"}
+_EM_LIVE = re.compile(r"(?i)\s+((?:live\s+(?:at|@|from|in)|@)\s+.+)$")
+
+
+def _em_parse(text: str):
+    """(date « AAAA-MM-JJ » ou « AAAA-S50 » ou None, [artiste, précisions…]) d'un nom d'Essential Mix, sans l'émission,
+    la date ni les mentions inutiles (qrip, BBC Radio 1, tags et groupe d'un nom scene)."""
+    t = text.replace("_", " ")
+    date = None
+    if m := _EM_DATE.search(t):
+        if m[1]:
+            y, mo, d = int(m[1]), int(m[2]), int(m[3])
+        else:  # date scene « 10-09-1994 » : mois d'abord, sauf si le premier nombre dépasse 12
+            a, b, y = int(m[4]), int(m[5]), int(m[6])
+            mo, d = (b, a) if a > 12 else (a, b)
+        if 1 <= mo <= 12 and 1 <= d <= 31:
+            date = f"{y:04d}-{mo:02d}-{d:02d}"
+    elif m := _EM_WEEK.search(t):
+        date = f"{m[1]}-S{int(m[2]):02d}"
+    # nom scene (« Artiste_-_Essential_Mix-SAT-10-09-1994-GROUPE ») : ce qui précède la source
+    segs = text.split("-")
+    cut = next((i for i, x in enumerate(segs) if i and x.strip("_ ").upper() in _EM_SRC), None)
+    if cut is not None:  # segments séparés par des tirets : artiste, titre…
+        t = " - ".join(segs[:cut]).replace("_", " ")
+    if m and cut is None:
+        t = t[:m.start()] + " " + t[m.end():]
+    t = re.sub(r"(?i)\(([^()]*?)\b(?:bbc\s+)?(?:radio\s*1'?s?\s+)?essential\s+mix\b([^()]*)\)", lambda x: f"({(x[1] + x[2]).strip()})", t)
+    t = re.sub(r"\(\s*\)", " ", t)
+    t = _EM.sub(" - ", t, count=1)  # la première mention : « Celebrate 20 Years of Essential Mix » garde la sienne
+    t = _EM_JUNK.sub(" ", t)
+    t = re.sub(r"\bEM\b|\bREAD NFO\b", " ", t)
+    parts = [" ".join(p.split()).strip(" -:#,") for p in re.split(r"\s+-\s*|\s*-\s+|\s+-$", t)]
+    parts = [p for p in parts if p and not re.fullmatch(r"[\d\s#.]+", p)]
+    if parts and (lm := _EM_LIVE.search(parts[0])):  # « John Digweed Live @ Heavens » : le lieu rejoint le titre
+        parts = [parts[0][:lm.start()].strip(" ,"), lm[1], *parts[1:]]
+    return date, parts
+
+
+def em_name(folder: str, tag_artist: str | None, tag_title: str | None, filename: str | None):
+    """(nom affiché, artiste, titre, date) d'un Essential Mix, d'après le nom de son dossier ou de son fichier et les
+    tags de sa piste ; None sans date. Voir essential_mixes."""
+    date, parts = _em_parse(folder)
+    if not date:
+        return None
+    tag = (tag_artist or "").strip()
+    # l'artiste des tags, s'il figure dans le nom ailleurs qu'en tête (« Master Series 05 - Dave Clarke »), passe devant
+    if tag.lower() not in _NOT_ARTIST and len(parts) > 1 and any(p.lower() == tag.lower() for p in parts[1:]):
+        parts = [next(p for p in parts if p.lower() == tag.lower()), *[p for p in parts if p.lower() != tag.lower()]]
+    artist, extra = (parts[0], parts[1:]) if parts else ("", [])
+    if re.match(r"(?i)(?:at|of|from|in|part)\b", artist):  # « Essential Mix at 25 », « Part 2 » : une précision
+        artist, extra = "", parts
+    if artist.lower() in _NOT_ARTIST or re.fullmatch(r"(?i)essential mix collection.*", artist):
+        artist = ""
+    if not artist:  # pas d'artiste dans le nom : les tags de la piste, sinon le nom de son fichier
+        if tag.lower() not in _NOT_ARTIST:
+            artist = tag
+        elif (tag_title or "").strip() and not _EM.search(tag_title) and not _EM_DATE.search(tag_title):
+            artist = tag_title.strip()  # « BBC Radio 1 | Alan Fitzpatrick »
+        elif filename and (_EM.search(Path(filename).stem.replace("_", " ")) or _EM_DATE.search(filename)):
+            _, fparts = _em_parse(Path(filename).stem)  # un nom de fichier qui décrit l'épisode, pas « 01-a.mp3 »
+            artist = next((p for p in fparts if p.lower() not in _NOT_ARTIST and not re.match(r"(?i)part\b", p)), "")
+    title = " ".join(extra) if extra and extra[0].lower().startswith("essential mix") else " ".join(["Essential Mix", *extra])
+    return "-".join(filter(None, [artist, title, date])).replace(" ", "_"), artist or None, title, date
+
+
+def essential_mixes(conn) -> None:
+    """Essential Mix (BBC Radio 1) : nom affiché « Artiste-Essential_Mix-date » quel que soit le format du dossier
+    (« 2016-03-19_-_Riva_Starr_&_Axwell_-_Essential_Mix », « Essential Mix_2012_01_07_qrip », « 2015 12 05 Essential Mix
+    #1141 - Matthias Tanzmann », « Carl_Cox_-_Essential_Mix-SAT-10-09-1994-TALiON »…). L'artiste vient du nom, sinon
+    des tags de la première piste, sinon du nom de son fichier ; une précision (« Live at Drumsheds », « Master
+    Series 05 », « Part 1 ») rejoint le titre. Artiste, titre, année et date de diffusion sont renseignés. Le nom est
+    relu sur le dossier à chaque fois ; le dossier sur le disque ne change pas. Un dossier « Collection » qui réunit
+    plusieurs mixes garde son nom : ses fichiers sont des sets à part (pages de Live & Radio)."""
+    rows = conn.execute(
+        "SELECT r.id, r.path, t.artist, t.title, t.relpath FROM releases r LEFT JOIN tracks t ON t.id="
+        "(SELECT id FROM tracks WHERE release_id=r.id ORDER BY disc, relpath LIMIT 1)"
+        " WHERE lower(replace(r.path, '_', ' ')) LIKE '%essential mix%'").fetchall()
+    for r in rows:
+        folder = r["path"].rsplit("/", 1)[-1]
+        if re.search(r"(?i)collection", folder):
+            continue
+        got = em_name(folder, r["artist"], r["title"], r["relpath"])
+        if not got:
+            continue
+        name, artist, title, date = got
+        year = int(date[:4])
+        aired = None
+        if len(date) == 10:
+            try:
+                aired = datetime.datetime(year, int(date[5:7]), int(date[8:10]), 12, tzinfo=datetime.timezone.utc).timestamp()
+            except ValueError:
+                pass
+        conn.execute("UPDATE releases SET name=?, artist=?, tag_artist=NULL, title=?, year=?,"
+                     " released_at=CASE WHEN COALESCE(released_at, 0)=0 THEN ? ELSE released_at END WHERE id=?",
+                     (name, artist, title, year, aired, r["id"]))
+
+
 def categorize(conn) -> None:
     """Catégorie de chaque release : celle que les tags de son nom indiquent, sinon son dossier racine.
 
@@ -217,6 +322,7 @@ def categorize(conn) -> None:
     « radio », etc. Sans dossier correspondant, la release garde le sien."""
     dated_series(conn)
     dated_episodes(conn)
+    essential_mixes(conn)
     rows = conn.execute("SELECT id, name, path, category, track_count FROM releases").fetchall()
     tops = sorted({r["path"].split("/", 1)[0] for r in rows})
     target = {k: next((t for t in tops if re.search(p, t, re.I)), None) for k, p in _KIND_FOLDER.items()}

@@ -346,7 +346,7 @@ function setRow(t, rel) {
     onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) play(); } },
   el('img', { class: 'rel-thumb', src: `/api/releases/${rel.id}/thumb`, alt: '', loading: 'lazy', width: 40, height: 40,
     onerror: (e) => { e.target.style.visibility = 'hidden'; } }),
-  el('span', { class: 'rel-name' }, t.title ? (t.artist ? `${t.artist} - ${t.title}` : t.title) : t.filename),
+  el('span', { class: 'rel-name' }, t.label || (t.title ? (t.artist ? `${t.artist} - ${t.title}` : t.title) : t.filename)),
   el('span', { class: 'rel-info' },
     el('span', { class: 'mid' }, (t.genre || rel.genre) ? el('span', { class: 'chip' }, t.genre || rel.genre) : ''),
     el('span', { class: 'mid' }, fmtDate(rel.date)),

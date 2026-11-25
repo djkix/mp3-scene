@@ -4,6 +4,20 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.82.3](https://github.com/djkix/mp3-scene/compare/v1.82.2...v1.82.3) (2026-11-25)
+
+### Résumé
+
+**Essential Mix nommés de façon cohérente.**
+
+- Tout Essential Mix s'affiche « Artiste-Essential_Mix-date », quel que soit le format du dossier
+  (« 2016-03-19_-_Riva_Starr_&_Axwell_-_Essential_Mix », « Essential Mix_2012_01_07_qrip », « 2015 12 05 Essential Mix
+  #1141 - … », noms scene « …-SAT-10-09-1994-GROUPE », « … 2021 Week 50 - … »). L'artiste vient du nom, sinon des
+  tags de la piste, sinon d'un nom de fichier qui décrit l'épisode ; un lieu ou une précision (« Live at … »,
+  « Master Series 05 », « Part 1 ») rejoint le titre. Artiste, titre, année et date de diffusion sont renseignés.
+- Les dossiers « Essential Mix Collection AAAA » qui réunissent leurs mixes en vrac les présentent un par un, nommés
+  de la même façon, dans la page de l'émission (Live & Radio › Radio).
+
 ## [1.82.2](https://github.com/djkix/mp3-scene/compare/v1.82.1...v1.82.2) (2026-11-25)
 
 ### Résumé
