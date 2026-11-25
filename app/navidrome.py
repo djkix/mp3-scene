@@ -9,6 +9,7 @@ import json
 import re
 import secrets
 import time
+from concurrent.futures import ThreadPoolExecutor
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -97,6 +98,26 @@ def albums(request: Request, type: Literal["newest", "recent", "frequent", "rand
     return [_album(a) for a in (data.get("albumList2") or {}).get("album", [])]
 
 
+def _songs(s, albums: list[dict]) -> list[dict]:
+    """Pistes d'une liste d'albums, dans l'ordre des albums. Dans une bibliothèque de morceaux à l'unité, chaque
+    « album » n'a qu'une piste : la liste se montre en pistes. Albums lus en parallèle (serveur local, rapide)."""
+    # ponytail: un getAlbum par album (60 au plus par page, 8 à la fois) ; Subsonic n'a pas de liste de pistes récentes
+    with ThreadPoolExecutor(8) as pool:
+        found = list(pool.map(lambda a: (call(s, "getAlbum", id=a["id"]).get("album") or {}).get("song", []), albums))
+    return [_song(x) for songs in found for x in songs]
+
+
+@router.get("/tracks")
+def tracks(request: Request, type: Literal["newest", "recent", "frequent", "random", "starred"] = "newest",
+           offset: int = Query(0, ge=0, le=100000), size: int = Query(60, ge=1, le=100)):
+    """Pistes des derniers ajouts, des dernières écoutées, des plus écoutées ou au hasard (pages de `size` albums)."""
+    s = _settings(request)
+    if type == "random":
+        return [_song(x) for x in (call(s, "getRandomSongs", size=size).get("randomSongs") or {}).get("song", [])]
+    albums = (call(s, "getAlbumList2", type=type, size=size, offset=offset).get("albumList2") or {}).get("album", [])
+    return _songs(s, albums)
+
+
 @router.get("/artists")
 def artists(request: Request):
     data = call(_settings(request), "getArtists")
@@ -108,8 +129,11 @@ def artists(request: Request):
 def artist(aid: str, request: Request):
     if not re.match(ND_ID, aid):
         raise HTTPException(404, "Artiste introuvable.")
-    a = call(_settings(request), "getArtist", id=aid).get("artist") or {}
-    return {"id": aid, "name": a.get("name"), "albums": sorted((_album(x) for x in a.get("album", [])), key=lambda x: -(x["year"] or 0))}
+    s = _settings(request)
+    a = call(s, "getArtist", id=aid).get("artist") or {}
+    albums = sorted(a.get("album", []), key=lambda x: -(x.get("year") or 0))
+    # ponytail: toutes les pistes de l'artiste d'un coup ; paginer si un artiste dépasse quelques centaines d'albums
+    return {"id": aid, "name": a.get("name"), "albums": [_album(x) for x in albums], "tracks": _songs(s, albums[:300])}
 
 
 @router.get("/album/{aid}")

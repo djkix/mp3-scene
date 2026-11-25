@@ -87,3 +87,11 @@ def test_festival_and_year_read_from_set_names():
         assert festival(name) is None, name
     assert festival_key("INOX Electronique Festival") == festival_key("INOX Electronic Festival") == "inox"
     assert festival_key("Ultra Music Festival") == festival_key("Ultra Festival")
+
+
+def test_numbered_show_with_a_guest_is_a_radio_episode():
+    from app.naming import kind, radio
+    n = "Bonkers_Beats_266-With_Rob_Da_Rhythm-LIVE-WEB-2026-XTC_iNT"
+    assert radio(n) == ("Bonkers Beats", 2026, True) and kind(n) == "live"  # tag LIVE suivi de WEB : un live
+    assert radio("Blink_182-Live_in_Paris-LIVE-WEB-2001-X") is None          # un numéro sans invité : pas une émission
+    assert kind("Moby-Almost_Home-LIVE-2CD-2014-X") is None                  # en CD : un album

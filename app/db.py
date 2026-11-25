@@ -201,6 +201,12 @@ def dated_episodes(conn) -> None:
                      (name, who or None, title, int(m[1]), aired, r["id"]))
 
 
+# dossiers supplémentaires (MUSIC_EXTRA « Nom=/chemin>albums ») rangés comme les albums ou comme les singles plutôt
+# qu'en catégorie à part : nom du dossier racine -> « albums » | « singles ». Renseigné au démarrage (main).
+# ponytail: réglage global du processus, comme la configuration qu'il reflète ; passer `settings` si cela gêne
+EXTRA_KINDS: dict = {}
+
+
 def categorize(conn) -> None:
     """Catégorie de chaque release : celle que les tags de son nom indiquent, sinon son dossier racine.
 
@@ -216,21 +222,29 @@ def categorize(conn) -> None:
     target = {k: next((t for t in tops if re.search(p, t, re.I)), None) for k, p in _KIND_FOLDER.items()}
     # ponytail: toutes les releases sont réanalysées à chaque démarrage et à chaque scan (moins d'une seconde pour
     # 50 000) ; ne traiter que les nouvelles si cela devient sensible
+    # dossiers rangés comme les singles : le leur, et les dossiers supplémentaires qui le rejoignent
+    singles = {target["single"]} | {n for n, k in EXTRA_KINDS.items() if k == "singles"}
+    singles.discard(None)
     titles = {}  # pistes des candidats albums : dix versions d'un même morceau restent un single
-    for rid, title in conn.execute(
-            "SELECT t.release_id, COALESCE(t.title, t.relpath) FROM tracks t JOIN releases r ON r.id=t.release_id"
-            " WHERE r.track_count>=10 AND r.path LIKE ? ESCAPE '!'",
-            (re.sub(r"([!%_])", r"!\1", target["single"] or "\0") + "/%",)):
-        titles.setdefault(rid, []).append(title)
+    for top in singles:
+        for rid, title in conn.execute(
+                "SELECT t.release_id, COALESCE(t.title, t.relpath) FROM tracks t JOIN releases r ON r.id=t.release_id"
+                " WHERE r.track_count>=10 AND r.path LIKE ? ESCAPE '!'", (re.sub(r"([!%_])", r"!\1", top) + "/%",)):
+            titles.setdefault(rid, []).append(title)
 
     def category(r):
         top, k = r["path"].split("/", 1)[0], kind(r["name"])
+        extra = EXTRA_KINDS.get(top)
         # dans le dossier des singles, un live sans tag de diffusion (« Live at Tomorrowland », un festival cité)
-        if k is None and top == target["single"] and looks_live(r["name"]):
+        if k is None and (top in singles or extra) and looks_live(r["name"]):
             k = "live"
-        if k is None and top == target["single"] and album_like(r["name"], r["track_count"]) \
+        if k is None and extra == "albums":
+            return "Albums"
+        if k is None and top in singles and album_like(r["name"], r["track_count"]) \
                 and not one_song(titles.get(r["id"], [])):
             return "Albums"
+        if k is None and extra == "singles":
+            k = "single"
         return target.get(k) or top
 
     conn.executemany("UPDATE releases SET category=? WHERE id=?",

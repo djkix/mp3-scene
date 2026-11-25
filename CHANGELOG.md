@@ -4,6 +4,20 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.82.1](https://github.com/djkix/mp3-scene/compare/v1.82.0...v1.82.1) (2026-11-25)
+
+### Résumé
+
+**Navidrome en morceaux, dossiers rangés avec Albums ou Singles, émissions numérotées.**
+
+- Onglet Navidrome : derniers ajouts, au hasard, les plus écoutés et page d'un artiste en liste de morceaux
+  (pochette, année, durée), « Voir plus » par pages de 60 ; artistes par lettre, alphabet en haut. La recherche ne
+  montre en albums que ceux de plusieurs morceaux.
+- `MUSIC_EXTRA` : « Nom=/chemin>albums » ou « >singles » range les releases d'un dossier supplémentaire avec les
+  albums ou les singles au lieu d'une catégorie à part.
+- Live & Radio : un nom numéroté suivi de son invité (« Bonkers_Beats_266-With_Rob_Da_Rhythm-… ») est l'épisode
+  d'une émission ; le tag LIVE suivi d'une source (« …-LIVE-WEB-2026-… ») range la release dans Live & Radio.
+
 ## [1.82.0](https://github.com/djkix/mp3-scene/compare/v1.81.3...v1.82.0) (2026-11-25)
 
 ### Résumé

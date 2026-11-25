@@ -275,6 +275,8 @@ export const EN = {
   'Nombre': 'Count',
   'Souvent avec': 'Often with',
   'Carte': 'Map',
+  'Autres au hasard': 'More at random',
+  'Voir plus': 'Show more',
   'Derniers ajouts': 'Recently added',
   'Au hasard': 'Random',
   'Les plus écoutés': 'Most played',

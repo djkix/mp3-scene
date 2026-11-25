@@ -18,21 +18,28 @@ const albumTile = (a) => el('li', {}, el('a', { class: 'fest', href: `#/navidrom
   el('span', { class: 'fest-text' }, el('span', { class: 'fest-name' }, a.name),
     el('span', { class: 'fest-meta' }, [a.artist, a.year].filter(Boolean).join(' · ')))));
 
-// pistes : un clic joue la liste à partir de celle-ci (la file reçoit toute la liste)
-function trackRows(list, tracks, withAlbum = false) {
-  const play = (i) => player.playTracks(tracks.slice(), i);
-  list.replaceChildren(...tracks.map((t, i) => el('li', { class: 'rel trk nd-trk', tabIndex: 0, 'data-track': t.id,
-    onclick: (e) => { if (!e.target.closest('button, a')) play(i); },
-    onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) play(i); } },
-  el('span', { class: 'nd-no' }, withAlbum ? '' : String(t.track || i + 1)),
-  el('span', { class: 'rel-name' }, t.artist ? `${t.artist} - ${t.title}` : t.title,
-    withAlbum && t.nd_album ? el('small', { class: 'trk-chapter' }, el('a', { href: `#/navidrome/album/${enc(t.nd_album)}` }, t.release_name)) : null),
-  el('span', { class: 'rel-info' }, el('span', { class: 'mid' }, t.duration ? fmtDuration(t.duration) : '—'),
+// pistes : un clic joue la liste à partir de celle-ci (la file reçoit toute la liste). `loose` : morceaux à
+// l'unité (derniers ajouts, artiste, recherche) avec leur pochette et leur année ; sinon les pistes d'un album, numérotées
+function trackRows(list, tracks, loose = false, append = false) {
+  const all = append ? (list.tracks = [...(list.tracks || []), ...tracks]) : (list.tracks = tracks);
+  const play = (t) => player.playTracks(all.slice(), all.indexOf(t));
+  const rows = tracks.map((t, i) => el('li', { class: 'rel trk nd-trk', tabIndex: 0, 'data-track': t.id,
+    onclick: (e) => { if (!e.target.closest('button, a')) play(t); },
+    onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) play(t); } },
+  loose ? el('img', { class: 'rel-thumb', src: t.cover ? `${t.cover}?size=80` : '', alt: '', loading: 'lazy', width: 40, height: 40,
+    onerror: (e) => { e.target.style.visibility = 'hidden'; } }) : el('span', { class: 'nd-no' }, String(t.track || i + 1)),
+  el('span', { class: 'rel-name' }, t.artist ? `${t.artist} - ${t.title}` : t.title),
+  el('span', { class: 'rel-info' }, el('span', { class: 'mid' }, loose && t.year ? String(t.year) : ''),
+    el('span', { class: 'mid' }, t.duration ? fmtDuration(t.duration) : '—'),
     el('span', { class: 'mid rate' }, t.bitrate ? `${Math.round(t.bitrate / 1000)} kbit/s` : ''),
     el('span', { class: 'mid' }, (t.suffix || '').toUpperCase())),
   el('span', { class: 'rel-actions' }, el('button', { type: 'button', class: 'icon', title: tr('Ajouter à la file'), 'aria-label': tr('Ajouter à la file'),
-    onclick: () => player.enqueue([t]) }, '+')))));
+    onclick: () => player.enqueue([t]) }, '+'))));
+  if (append) list.append(...rows); else list.replaceChildren(...rows);
 }
+
+// première lettre d'un nom, « # » pour ce qui ne commence pas par une lettre (comme les listes d'artistes)
+const letterOf = (name) => { const c = String(name || '').normalize('NFD').replace(/^[^\p{L}\p{N}]+/u, '')[0]?.toUpperCase() || '#'; return /[A-Z]/.test(c) ? c : '#'; };
 
 export function render(container, params) {
   const status = el('p', { class: 'status', role: 'status' }, tr('Chargement…'));
@@ -67,7 +74,13 @@ export function render(container, params) {
   } else if (what === 'artist' && id) {
     api(`/navidrome/artist/${enc(id)}`).then((a) => {
       if (dead) return;
-      body.replaceChildren(el('h1', { class: 'grp-title nd-title' }, a.name), el('ul', { class: 'fest-wall' }, a.albums.map(albumTile)));
+      const list = el('ul', { class: 'rel-list' });
+      trackRows(list, a.tracks, true);
+      body.replaceChildren(el('div', { class: 'nd-head' }, el('h1', { class: 'grp-title' }, a.name),
+        el('p', { class: 'fest-facts' }, tr('{0} pistes', a.tracks.length)),
+        el('p', { class: 'detail-actions' },
+          el('button', { type: 'button', class: 'primary', onclick: () => player.playTracks(a.tracks.slice(), 0) }, tr('Lire')),
+          el('button', { type: 'button', onclick: () => player.enqueue(a.tracks.slice()) }, tr('Ajouter à la file')))), list);
       done();
     }).catch(fail);
   } else if (params.q) {
@@ -75,6 +88,7 @@ export function render(container, params) {
       if (dead) return;
       const list = el('ul', { class: 'rel-list' });
       trackRows(list, r.tracks, true);
+      r.albums = r.albums.filter((x) => x.songs > 1); // un album d'un seul morceau : déjà dans les pistes
       body.replaceChildren(
         ...(r.artists.length ? [el('p', { class: 'grp-kinds direct' }, el('span', { class: 'muted' }, tr('Artistes') + ' '),
           ...r.artists.map((x) => el('a', { class: 'chip', href: `#/navidrome/artist/${enc(x.id)}` }, x.name, el('small', {}, ` ${x.albums ?? ''}`))))] : []),
@@ -86,16 +100,36 @@ export function render(container, params) {
   } else if (view === 'artists') {
     api('/navidrome/artists').then((list) => {
       if (dead) return;
-      body.replaceChildren(el('p', { class: 'grp-kinds direct nd-artists' }, list.map((x) =>
+      // lettres en haut, comme les listes d'artistes de la bibliothèque ; la première qui a des artistes par défaut
+      const have = new Set(list.map((x) => letterOf(x.name)));
+      const letters = ['#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'];
+      const letter = letters.includes(params.letter) ? params.letter : letters.find((l) => have.has(l) && l !== '#') || '#';
+      body.replaceChildren(el('div', { class: 'letters nd-letters', role: 'group', 'aria-label': tr('Initiale') }, letters.map((l) =>
+        el('button', { type: 'button', 'aria-pressed': String(l === letter), disabled: !have.has(l),
+          onclick: () => { location.hash = `#/navidrome?view=artists&letter=${enc(l)}`; } }, l))),
+      el('p', { class: 'grp-kinds direct nd-artists' }, list.filter((x) => letterOf(x.name) === letter).map((x) =>
         el('a', { class: 'chip', href: `#/navidrome/artist/${enc(x.id)}` }, x.name, el('small', {}, ` ${x.albums ?? ''}`)))));
       done();
     }).catch(fail);
   } else {
-    api(`/navidrome/albums?type=${view}&size=120`).then((list) => {
-      if (dead) return;
-      body.replaceChildren(el('ul', { class: 'fest-wall' }, list.map(albumTile)));
-      status.textContent = list.length ? '' : tr('Aucun résultat');
-    }).catch(fail);
+    // morceaux par pages de 60 ; « Au hasard » en tire 60 autres à chaque fois
+    const list = el('ul', { class: 'rel-list' });
+    let offset = 0;
+    const more = el('button', { type: 'button', class: 'nd-more', onclick: () => page(true) }, tr(view === 'random' ? 'Autres au hasard' : 'Voir plus'));
+    const page = (append) => {
+      more.disabled = true;
+      api(`/navidrome/tracks?type=${view}&size=60&offset=${offset}`).then((tracks) => {
+        if (dead) return;
+        if (view !== 'random') offset += 60;
+        trackRows(list, tracks, true, append && view !== 'random');
+        more.disabled = false;
+        more.hidden = view !== 'random' && tracks.length === 0;
+        status.textContent = list.children.length ? '' : tr('Aucun résultat');
+        watch.mark();
+      }).catch(fail);
+    };
+    body.replaceChildren(list, el('p', { class: 'nd-foot' }, more));
+    page(false);
   }
   return () => { dead = true; watch.stop(); };
 }

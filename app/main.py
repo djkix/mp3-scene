@@ -78,6 +78,7 @@ async def lifespan(app: FastAPI):
     if not app.state.settings.public_url.startswith(("http://", "https://")):
         log.warning("PUBLIC_URL est vide ou invalide (attendu : https://mp3.exemple.fr) : les URL envoyées au "
                     "Chromecast seraient relatives et le cast ne fonctionnera pas.")
+    db.EXTRA_KINDS = dict(app.state.settings.extra_kinds)  # avant init : la catégorie des releases en dépend
     db.init(app.state.settings.data_dir)
     _bootstrap_admin(app.state.settings)
     app.state.runner.resume()

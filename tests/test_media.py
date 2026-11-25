@@ -301,9 +301,11 @@ def test_extra_music_folders_are_scanned_played_and_read(user_client, settings, 
     from app import db
     from app.scanner import scan_structure
     from app.config import _extra
-    assert _extra("05.Web Albums=/extra/albums; 06.Fresh House = /extra/fresh") == {"05.Web Albums": Path("/extra/albums"), "06.Fresh House": Path("/extra/fresh")}
-    with pytest.raises(RuntimeError):
-        _extra("pas de chemin")
+    assert _extra("05.Web Albums=/extra/albums>albums; 06.Fresh House = /extra/fresh") == \
+        ({"05.Web Albums": Path("/extra/albums"), "06.Fresh House": Path("/extra/fresh")}, {"05.Web Albums": "albums"})
+    for bad in ("pas de chemin", "X=/x>videos"):
+        with pytest.raises(RuntimeError):
+            _extra(bad)
     web = tmp_path / "web"
     rel = web / "A-Z" / "Bob-Album-WEB-2020-GRP"
     rel.mkdir(parents=True)
@@ -323,6 +325,16 @@ def test_extra_music_folders_are_scanned_played_and_read(user_client, settings, 
     assert user_client.get(f"/api/tracks/{tid}/stream").content == b"ID3mp3data"   # lu dans le dossier supplémentaire
     assert user_client.get(f"/api/releases/{r['id']}/nfo").text == "Tracklist du web"
     assert user_client.get(f"/api/releases/{r['id']}/cover").content == b"\xff\xd8jpeg"
+    # rangé avec les albums, puis avec les singles, au lieu d'une catégorie à part
+    db.EXTRA_KINDS = {"05.Web Albums": "albums"}
+    try:
+        db.categorize(conn)
+        assert conn.execute("SELECT category FROM releases WHERE id=?", (r["id"],)).fetchone()[0] == "Albums"
+        db.EXTRA_KINDS = {"05.Web Albums": "singles"}
+        db.categorize(conn)
+        assert conn.execute("SELECT category FROM releases WHERE id=?", (r["id"],)).fetchone()[0] == "Singles"
+    finally:
+        db.EXTRA_KINDS = {}
     settings.extra_roots = {"05.Web Albums": tmp_path / "absent"}  # dossier non monté : ses releases sont gardées
     scan_structure(conn, settings.roots, now=2.0)
     assert conn.execute("SELECT COUNT(*) FROM releases WHERE path LIKE '05.Web Albums/%'").fetchone()[0] == 1

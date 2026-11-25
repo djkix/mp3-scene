@@ -120,7 +120,8 @@ def kind(name: str) -> str | None:
     if (m := _full_date(name)) and not _CD.search(name) and not _SINGLE_TAG.search(name[:m.start()] + "-" + name[m.end():]):
         return "live"
     # « Live » ou « Concert » seul : pas un live si le nom parle aussi de CD
-    if (f["source"] == "LIVE" or re.search(r"(?:^|[-_ (])concerts?(?:[-_ )]|$)", name, re.I)) \
+    # tag LIVE en segment entier, même suivi d'une source (« …-LIVE-WEB-2026-XTC »)
+    if (f["source"] == "LIVE" or "LIVE" in tags or re.search(r"(?:^|[-_ (])concerts?(?:[-_ )]|$)", name, re.I)) \
             and not _CD.search(name) and not _LIVE_VERB.search(name):
         return "live"
     return "single" if f["source"] in ("CDS", "CDM", "SINGLE") else None
@@ -281,6 +282,10 @@ _RADIO_WORDS = re.compile(r"\b(radio ?show|podcast|broadcast|radio)\b", re.I)
 _EPISODE = re.compile(r"(\s*\((?:[^)]*)\)|\s+(?:episode|ep|#|vol\.?|part)?\s*\d[\d.\s-]*$)", re.I)
 
 
+_NUMBERED_SHOW = re.compile(r"^(.*[^\W\d_].*?)\s+(?:#|ep\.?\s*|episode\s*)?\d{1,4}$", re.I)  # « Bonkers Beats 266 »
+_GUEST = re.compile(r"^(?:with|w/|guest|guests|feat\.?|ft\.?|pres\.?|presents|b2b)\s", re.I)       # « With Rob Da Rhythm »
+
+
 def known_show(text: str) -> str | None:
     """Graphie d'une émission de radio connue si `text` (tirets bas ou espaces) n'est que son nom : « Essential_mix »
     -> « Essential Mix » ; None sinon."""
@@ -301,6 +306,9 @@ def radio(name: str) -> tuple[str, int | None, bool] | None:
     if m:
         key = next(k for k in _SHOWS if re.fullmatch(k, m[1], re.I))
         return _SHOWS[key], year, True
+    # « Bonkers_Beats_266-With_Rob_Da_Rhythm-… » : un nom numéroté suivi de son invité, c'est l'épisode d'une émission
+    if len(segs) > 1 and (m := _NUMBERED_SHOW.match(segs[0])) and _GUEST.match(segs[1]):
+        return m[1].strip(), year, True
     radio_src = any(_RADIO_SRC.match(s) for s in segs[1:])
     for s in segs[1:2] if len(segs) > 1 else segs[:1]:
         if radio_src or _RADIO_WORDS.search(s):

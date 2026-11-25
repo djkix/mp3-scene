@@ -51,6 +51,8 @@ class Fake(BaseHTTPRequestHandler):
                 "getAlbum": {"album": {"name": "For Lack", "artist": "deadmau5", "song": [SONG]}},
                 "getArtists": {"artists": {"index": [{"artist": [{"id": "ar1", "name": "deadmau5", "albumCount": 1}]}]}},
                 "search3": {"searchResult3": {"song": [SONG]}},
+                "getRandomSongs": {"randomSongs": {"song": [SONG]}},
+                "getArtist": {"artist": {"name": "deadmau5", "album": [{"id": "al1", "name": "For Lack", "year": 2008}]}},
                 "getSong": {"song": SONG}}[method]
         self._json({"status": "ok", **data})
 
@@ -84,6 +86,10 @@ def test_navidrome_browse_search_stream_and_cast(navidrome, settings, user_clien
     t = user_client.get("/api/navidrome/album/al1").json()["tracks"][0]
     assert (t["id"], t["nd"], t["title"], t["release_name"], t["bitrate"], t["suffix"]) == ("nd:s1", "s1", "Strobe", "For Lack", 320000, "flac")
     assert user_client.get("/api/navidrome/search", params={"q": "strobe"}).json()["tracks"][0]["id"] == "nd:s1"
+    # morceaux à l'unité : les listes et la page d'un artiste se montrent en pistes
+    assert [t["id"] for t in user_client.get("/api/navidrome/tracks").json()] == ["nd:s1"]
+    assert [t["id"] for t in user_client.get("/api/navidrome/tracks", params={"type": "random"}).json()] == ["nd:s1"]
+    assert [t["title"] for t in user_client.get("/api/navidrome/artist/ar1").json()["tracks"]] == ["Strobe"]
     # le son passe par Mp3 Scene, déplacement compris ; le mot de passe ne sort jamais vers le navigateur
     r = user_client.get("/api/navidrome/stream/s1", params={"original": 1})
     assert r.status_code == 200 and r.content == AUDIO and r.headers["content-type"] == "audio/flac"

@@ -23,6 +23,8 @@ class Settings:
     # serveur Navidrome (API Subsonic) parcouru dans l'onglet Navidrome ; sans adresse, l'onglet n'apparaît pas
     # dossiers de musique supplémentaires : nom de dossier racine (« 05.Web Albums ») -> chemin dans le conteneur
     extra_roots: dict = field(default_factory=dict)
+    # dossiers supplémentaires rangés avec les albums ou les singles (« >albums », « >singles ») : nom -> genre
+    extra_kinds: dict = field(default_factory=dict)
     navidrome_url: str = ""
     navidrome_user: str = ""
     navidrome_password: str = ""
@@ -36,18 +38,23 @@ class Settings:
         return Roots(self.music_root, self.extra_roots)
 
 
-def _extra(value: str) -> dict:
-    """MUSIC_EXTRA : « Nom=/chemin;Nom 2=/chemin2 » (le nom devient un dossier racine de la bibliothèque)."""
-    out = {}
+def _extra(value: str) -> tuple[dict, dict]:
+    """MUSIC_EXTRA : « Nom=/chemin;Nom 2=/chemin2>albums » -> ({nom: chemin}, {nom: « albums » | « singles »}). Le nom
+    devient un dossier racine de la bibliothèque ; « >albums » ou « >singles » range ses releases avec les albums ou
+    les singles au lieu d'en faire une catégorie à part."""
+    roots, kinds = {}, {}
     for item in value.split(";"):
         name, sep, path = item.partition("=")
-        name, path = name.strip(), path.strip()
-        if not sep or not name or not path or "/" in name:
+        path, _, kind = path.partition(">")
+        name, path, kind = name.strip(), path.strip(), kind.strip().lower()
+        if not sep or not name or not path or "/" in name or kind not in ("", "albums", "singles"):
             if item.strip():
-                raise RuntimeError(f"MUSIC_EXTRA : « {item.strip()} » n'a pas la forme Nom=/chemin.")
+                raise RuntimeError(f"MUSIC_EXTRA : « {item.strip()} » n'a pas la forme Nom=/chemin, Nom=/chemin>albums ou Nom=/chemin>singles.")
             continue
-        out[name] = Path(path)
-    return out
+        roots[name] = Path(path)
+        if kind:
+            kinds[name] = kind
+    return roots, kinds
 
 
 def load() -> Settings:
@@ -57,6 +64,7 @@ def load() -> Settings:
     if len(secret) < MIN_SECRET:  # la valeur n'apparaît jamais dans le message
         raise RuntimeError(f"La variable d'environnement SECRET_KEY doit contenir au moins {MIN_SECRET} caractères ; "
                            "générez-en une avec : python3 -c \"import secrets; print(secrets.token_urlsafe(48))\"")
+    extra = _extra(os.environ.get("MUSIC_EXTRA", ""))
     return Settings(
         music_root=Path(os.environ.get("MUSIC_ROOT", "/music")),
         data_dir=Path(os.environ.get("DATA_DIR", "/data")),
@@ -68,7 +76,7 @@ def load() -> Settings:
         backup_hour=min(23, max(0, int(os.environ.get("BACKUP_HOUR") or 3))),
         stack_dir=Path(os.environ.get("STACK_DIR", "/stack")),
         discogs_token=os.environ.get("DISCOGS_TOKEN") or None,
-        extra_roots=_extra(os.environ.get("MUSIC_EXTRA", "")),
+        extra_roots=extra[0], extra_kinds=extra[1],
         navidrome_url=os.environ.get("NAVIDROME_URL", "").rstrip("/"),
         navidrome_user=os.environ.get("NAVIDROME_USER", ""),
         navidrome_password=os.environ.get("NAVIDROME_PASSWORD", ""),
