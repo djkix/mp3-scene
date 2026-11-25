@@ -6,7 +6,7 @@ import { releaseList } from './releases.js';
 import { navBar } from './admin.js';
 import { picker, findCover } from './release.js';
 import { player } from '../player.js';
-import { area, columns, donut, shares } from '../charts.js';
+import { area, columns, donut, shares, stacked } from '../charts.js';
 
 const KINDS = [['no_nfo', 'Sans NFO'], ['no_tags', 'Sans tags'], ['unreadable', 'Pistes illisibles'], ['low_bitrate', 'Débit inférieur à 192 kbit/s'],
   ['no_year', 'Sans année'], ['no_genre', 'Sans genre'], ['no_cover', 'Sans pochette'], ['no_tracks', 'Sans piste'], ['no_artist', 'Sans artiste'],
@@ -39,10 +39,10 @@ function stats(box, isDead) {
   sel.value = '30';
   const status = el('p', { class: 'status', role: 'status' });
   const tiles = el('div', { class: 'ad-metrics st-tiles' }), top = el('div', { class: 'st-row st-wide' }), parts = el('div', { class: 'st-row' }),
-    time = el('div', { class: 'st-row' }), ranks = el('div', { class: 'stats' });
+    time = el('div', { class: 'st-row' }), genreTime = el('div', { class: 'st-row st-wide' }), ranks = el('div', { class: 'stats' });
   // enrichissements : BPM, chapitres, titres, séries, photos, rattachements (chargés à part, plus lents)
   const extraTiles = el('div', { class: 'ad-metrics st-tiles' }), extraRow = el('div', { class: 'st-row' }), extraRanks = el('div', { class: 'stats' });
-  box.replaceChildren(el('div', { class: 'filters' }, sel), status, tiles, top, parts, time, ranks,
+  box.replaceChildren(el('div', { class: 'filters' }, sel), status, tiles, top, parts, time, genreTime, ranks,
     el('h2', { class: 'st-sub' }, tr('Enrichissements')), extraTiles, extraRow, extraRanks);
   const d = {};
   const n = (x) => Number(x).toLocaleString();
@@ -71,6 +71,14 @@ function stats(box, isDead) {
         r.length ? el('p', { class: 'axis' }, el('span', {}, String(r[0].name)), el('span', {}, String(r.at(-1).name))) : null);
     };
     time.replaceChildren(byTime(tr('Par année'), s ? s.years : [], 1), byTime(tr('Ajouts par mois'), s ? s.months : [], 2));
+    // frise des genres : part de chaque famille de genres par année de sortie, le reste sous « Autres »
+    const gy = s?.genre_years;
+    genreTime.replaceChildren(panel(tr('Genres par année'), !gy ? el('p', {}, wait) : gy.years.length < 2 ? el('p', {}, '—') : [
+      stacked(tr('Genres par année'), gy.rows, [...gy.genres, tr('Autres')], gy.years.map((y, i) => {
+        const t = gy.rows[i].reduce((a, b) => a + b, 0);
+        return `${y} : ` + [...gy.genres, tr('Autres')].map((g, k) => `${g} ${Math.round(100 * gy.rows[i][k] / t)} %`).join(' · ');
+      })),
+      el('p', { class: 'axis' }, el('span', {}, String(gy.years[0])), el('span', {}, String(gy.years.at(-1))))]));
     const t = (r) => hours(r.duration);
     ranks.replaceChildren(...(u ? [block(tr('Artistes les plus écoutés'), u.artists, undefined, t), block(tr('Releases les plus écoutées'), u.releases, undefined, t, false),
       block(tr('Pistes les plus écoutées'), u.tracks, undefined, t, false), block(tr('Par utilisateur'), u.users, undefined, t)] : []),

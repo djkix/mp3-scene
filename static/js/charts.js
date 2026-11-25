@@ -58,6 +58,22 @@ export function area(label, values, texts = null) {
     + `<polyline points="${pts.join(' ')}" fill="none" stroke-width="2" vector-effect="non-scaling-stroke" style="stroke:var(--c1)"/>`, `0 0 ${w} ${h}`), texts);
 }
 
+// Aires empilées en parts (100 %) : `rows[i]` donne, pour la période i, la valeur de chaque série ; `names` en donne les
+// noms (légende) ; `texts` : libellé exact de chaque période.
+export function stacked(label, rows, names, texts) {
+  const w = 300, h = 100, n = rows.length, x = (i) => (n > 1 ? (i * w / (n - 1)) : i * w).toFixed(1);
+  const shares = rows.map((r) => { const t = r.reduce((a, b) => a + b, 0) || 1; return r.map((v) => v / t); });
+  let below = rows.map(() => 0);
+  const layers = names.map((_, k) => {
+    const top = below.map((b, i) => b + shares[i][k]);
+    const pts = [...top.map((v, i) => `${x(i)},${(h - v * h).toFixed(1)}`), ...below.map((v, i) => `${x(i)},${(h - v * h).toFixed(1)}`).reverse()];
+    below = top;
+    return `<polygon points="${pts.join(' ')}" style="fill:${COLORS[k % 6]}"/>`;
+  }).join('');
+  return el('div', {}, readout(svg(label, layers, `0 0 ${w} ${h}`), texts),
+    el('ul', { class: 'legend legend-row' }, names.map((nm, k) => el('li', {}, el('i', { style: `background:${COLORS[k % 6]}` }), el('span', {}, nm)))));
+}
+
 // Colonnes : une par période, dans l'ordre donné ; `texts` : libellé exact de chaque colonne.
 export function columns(label, values, color = 0, texts = null) {
   const max = Math.max(1, ...values), w = 300, h = 60, step = w / Math.max(1, values.length);

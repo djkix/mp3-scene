@@ -4,6 +4,24 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.79.0](https://github.com/djkix/mp3-scene/compare/v1.78.0...v1.79.0) (2026-11-25)
+
+### Résumé
+
+**Mode soirée, volume égalisé, carte des collaborations.**
+
+- Live & Radio : un dossier d'événement qui réunit ses sets en vrac (« -=_INOX_Electronique_Festival_2012_=- »,
+  un fichier par set) les affiche un par un, au même niveau que les autres sets de l'année, et les compte chacun.
+- Volume égalisé (Réglages audio, activé par défaut) : le volume moyen de chaque piste est mesuré avec sa forme
+  d'onde à la première écoute ; les pistes trop fortes sont baissées. Sans effet sur iPhone (iOS ignore ce volume).
+- Carte des collaborations : depuis « Souvent avec » sur la page d'un artiste, ses principaux partenaires en cercle,
+  reliés entre eux ; un clic recentre sur l'un d'eux.
+- Admin › Statistiques : frise des genres, la part des cinq grandes familles de genres par année de sortie.
+- Mode soirée (picto TV du lecteur plein écran) : page seule pour une télé ou une tablette, pochette en grand,
+  titre, artiste, pistes à suivre et heure ; elle suit ce qui joue sur n'importe quel appareil du compte.
+- Recherche vocale : un micro dans la barre de recherche, avec la reconnaissance du navigateur.
+- Pages d'artiste, de label, de groupe, de genre et recherche : dans chaque type, du plus récent au plus ancien.
+
 ## [1.78.0](https://github.com/djkix/mp3-scene/compare/v1.77.0...v1.78.0) (2026-11-25)
 
 ### Résumé

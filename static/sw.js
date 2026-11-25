@@ -1,6 +1,6 @@
 // Service worker classique (non module). Ne met en cache que la coquille de l'interface :
 // jamais l'audio, jamais l'API, jamais le SDK Cast (autre origine).
-const VERSION = 'v115';
+const VERSION = 'v116';
 const CACHE = 'mp3-scene-' + VERSION;
 const PRECACHE = [
   '/',
@@ -30,6 +30,7 @@ const PRECACHE = [
   '/js/views/playlists.js',
   '/js/views/login.js',
   '/js/views/offline.js',
+  '/js/views/party.js',
   '/js/views/release-info.js',
   '/js/views/release.js',
   '/js/views/releases.js',

@@ -77,9 +77,9 @@ CREATE TABLE IF NOT EXISTS shares(
   id INTEGER PRIMARY KEY, token TEXT UNIQUE NOT NULL, user_id INTEGER NOT NULL REFERENCES users ON DELETE CASCADE,
   kind TEXT NOT NULL CHECK(kind IN ('r','p')), item_id INTEGER NOT NULL,
   created_at REAL NOT NULL, expires_at REAL NOT NULL, opens INTEGER NOT NULL DEFAULT 0);
--- forme d'onde : 800 crêtes (un octet chacune), calculées à la première écoute
+-- forme d'onde : 800 crêtes (un octet chacune), calculées à la première écoute ; loudness : volume moyen (dBFS)
 CREATE TABLE IF NOT EXISTS waveforms(
-  track_id INTEGER PRIMARY KEY REFERENCES tracks ON DELETE CASCADE, peaks BLOB NOT NULL);
+  track_id INTEGER PRIMARY KEY REFERENCES tracks ON DELETE CASCADE, peaks BLOB NOT NULL, loudness REAL);
 -- daily_at : heure (0-23, heure du serveur) du scan quotidien ; NULL : scan manuel seulement
 CREATE TABLE IF NOT EXISTS scan_state(
   id INTEGER PRIMARY KEY CHECK(id=1), status TEXT NOT NULL DEFAULT 'idle',

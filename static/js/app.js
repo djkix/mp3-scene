@@ -12,6 +12,7 @@ import * as account from './views/account.js';
 import * as library from './views/library.js';
 import * as admin from './views/admin.js';
 import * as offlineView from './views/offline.js';
+import * as party from './views/party.js';
 import { offline } from './offline.js';
 import { initPlayer, player } from './player.js';
 import { initCast } from './cast.js';
@@ -38,6 +39,7 @@ const ROUTES = {
   account,
   library,
   admin,
+  party,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -100,7 +102,7 @@ async function route() {
   }
   const mod = ROUTES[name];
   const loggedIn = !!session.user && name !== 'login';
-  $('topbar').hidden = $('player').hidden = !loggedIn;
+  $('topbar').hidden = $('player').hidden = !loggedIn || name === 'party'; // mode soirée : la page seule
   const isAdmin = loggedIn && session.user.role === 'admin';
   // un administrateur n'a qu'une entrée pour ses réglages et ceux du serveur : Admin (son compte en est une section)
   const own = document.querySelector('#nav a[data-route="account"]');
@@ -139,6 +141,33 @@ $('search').addEventListener('input', (e) => {
     location.replace(q ? '#/search?q=' + encodeURIComponent(q) + tracks : '#/'); // remplace l'entrée : pas d'historique à chaque frappe
   }, 250);
 });
+
+// Recherche vocale : un micro dans la barre de recherche quand le navigateur sait reconnaître la parole (Chrome,
+// Safari, Edge). La phrase reconnue remplit la recherche comme si elle avait été tapée. La reconnaissance est celle
+// du navigateur (Chrome l'envoie à Google, Safari la fait sur l'appareil ou chez Apple) : rien ne passe par le serveur.
+const Speech = globalThis.SpeechRecognition || globalThis.webkitSpeechRecognition;
+if (Speech) {
+  const box = $('search');
+  const wrap = el('span', { class: 'search-wrap' });
+  box.replaceWith(wrap);
+  let rec = null;
+  const mic = el('button', { type: 'button', class: 'icon search-mic', 'data-ico': 'mic', title: t('Recherche vocale'), 'aria-label': t('Recherche vocale'),
+    'aria-pressed': 'false', onclick: () => {
+      if (rec) return rec.stop();
+      rec = new Speech();
+      rec.lang = lang === 'fr' ? 'fr-FR' : 'en-US';
+      rec.interimResults = true;
+      rec.onresult = (e) => {
+        box.value = [...e.results].map((r) => r[0].transcript).join(' ').trim();
+        box.dispatchEvent(new Event('input'));
+      };
+      rec.onend = () => { rec = null; mic.setAttribute('aria-pressed', 'false'); };
+      rec.onerror = () => {}; // refus du micro, silence : onend suit
+      mic.setAttribute('aria-pressed', 'true');
+      rec.start();
+    } });
+  wrap.append(box, mic);
+}
 
 // Une fenêtre (réglages audio, détails techniques, playlist, correction) se ferme d'un clic ou d'un appui à côté :
 // un clic sur le fond a la fenêtre elle-même pour cible, hors de son cadre.

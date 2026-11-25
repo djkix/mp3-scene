@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
 from PIL import Image
 
-from . import artists, coversearch, lyrics, nfo
+from . import artists, coversearch, lyrics, naming, nfo
 from .naming import complete_title, festival, festival_key, radio as radio_show
 from .routes_media import DECODE, IMAGE_ERRORS
 from .deps import MAX_INT, Id, current_user, get_conn
@@ -47,9 +47,11 @@ SORTS = {"name": "r.name COLLATE NOCASE", "genre": "r.genre COLLATE NOCASE", "da
          "bitrate": BITRATE,
          # ponytail: écoutes de tous les comptes, sous-requête par ligne ; colonne releases.plays si le tri devient lent
          "plays": "(SELECT COUNT(*) FROM plays p JOIN tracks t ON t.id=p.track_id WHERE t.release_id=r.id)"}
-# page d'un artiste : ses albums d'abord, puis ses singles, ses compilations, ses lives, chacun par nom
+# page d'un artiste : ses albums d'abord, puis ses singles, ses compilations, ses lives, chacun du plus récent au plus
+# ancien (année du nom, puis date du NFO ; sans année à la fin), puis par nom
 SORTS["kind"] = ("CASE WHEN r.category LIKE '%album%' THEN 0 WHEN r.category LIKE '%single%' THEN 1 WHEN r.category LIKE '%compil%'"
-                 " THEN 2 WHEN r.category LIKE '%live%' OR r.category LIKE '%radio%' THEN 3 ELSE 4 END, r.name COLLATE NOCASE")
+                 " THEN 2 WHEN r.category LIKE '%live%' OR r.category LIKE '%radio%' THEN 3 ELSE 4 END,"
+                 f" COALESCE(r.year, 0) DESC, COALESCE({DATE}, 0) DESC, r.name COLLATE NOCASE")
 Sort = Literal["name", "genre", "date", "added", "tracks", "size", "category", "bitrate", "plays", "kind"]
 Dir = Literal["asc", "desc"]
 
@@ -558,6 +560,45 @@ def track_versions(tid: Id, user=Depends(current_user), conn=Depends(get_conn)):
 _CREDIT = re.compile(r"\s*(?:\b(?:feat|ft|featuring|vs|versus|with|and|pres|presents)\b\.?|[&+,;/])\s*", re.I)
 
 
+def _partners(conn, name: str) -> tuple[dict, dict]:
+    """Artistes crédités avec `name` sur une même piste (« Bob Sinclar feat. Steve Edwards », « A & B ») :
+    ({clé: nombre de pistes}, {clé: graphie lue})."""
+    # ponytail: LIKE sur l'artiste de toutes les pistes (~0,1 s pour 500 000) ; table des crédits si trop lent
+    me, others, spelling = artists.fold(name), {}, {}
+    for credit, n in conn.execute("SELECT artist, COUNT(*) FROM tracks WHERE artist LIKE ? ESCAPE '!' AND artist!=? GROUP BY 1",
+                                  ("%" + re.sub(r"([!%_])", r"!\1", name) + "%", name)):
+        parts = {artists.fold(x): x.strip(" ()[]") for x in _CREDIT.split(credit) if x.strip(" ()[]")}
+        if me in parts:
+            for k, x in parts.items():
+                if k != me and k:
+                    others[k] = others.get(k, 0) + n
+                    spelling.setdefault(k, x)
+    return others, spelling
+
+
+def _shown(conn, n: str) -> str:
+    """Graphie d'un artiste associé : celle de ses releases s'il en a, sinon des capitales à un nom tout en minuscules."""
+    r = conn.execute("SELECT COALESCE(tag_artist, artist) FROM releases WHERE COALESCE(tag_artist, artist)=? COLLATE NOCASE"
+                     " LIMIT 1", (n,)).fetchone()
+    return r[0] if r else artists.capitalize(n)
+
+
+@router.get("/api/artist-graph")
+def artist_graph(name: str = Query(min_length=1, max_length=200), conn=Depends(get_conn)):
+    """Carte des collaborations : l'artiste (premier nœud), les 12 avec qui il signe le plus de pistes, et les liens
+    entre eux (`edges` : [i, j, pistes en commun])."""
+    others, spelling = _partners(conn, name)
+    keys = [k for k, _ in sorted(others.items(), key=lambda kv: (-kv[1], kv[0]))[:12]]
+    nodes = [{"name": _shown(conn, name), "tracks": sum(others.values())}] + [{"name": _shown(conn, spelling[k]), "tracks": others[k]} for k in keys]
+    edges = [[0, i + 1, others[k]] for i, k in enumerate(keys)]
+    index = {k: i + 1 for i, k in enumerate(keys)}
+    # ponytail: une recherche de crédits par voisin (12 × ~0,1 s) ; table des crédits si la carte tarde
+    for i, k in enumerate(keys):
+        theirs, _ = _partners(conn, spelling[k])
+        edges += [[i + 1, index[j], n] for j, n in theirs.items() if index.get(j, 0) > i + 1]
+    return {"nodes": nodes, "edges": edges}
+
+
 @router.get("/api/artist-info")
 def artist_info(name: str = Query(min_length=1, max_length=200), user=Depends(current_user), conn=Depends(get_conn)):
     """Fiche d'un artiste : nombre et poids de ses quatre listes (ses releases, celles où le nom l'associe à un
@@ -585,26 +626,11 @@ def artist_info(name: str = Query(min_length=1, max_length=200), user=Depends(cu
                           " IS NOT NULL GROUP BY 1 ORDER BY releases DESC, 1 COLLATE NOCASE", (name,)):
         merged.setdefault(artists.fold(x["name"]), {"name": x["name"], "releases": 0})["releases"] += x["releases"]
     labels = sorted(merged.values(), key=lambda l: -l["releases"])[:6]
-    # crédits des pistes où il figure avec d'autres : « Bob Sinclar feat. Steve Edwards », « A & B »
-    # ponytail: LIKE sur l'artiste de toutes les pistes (~0,1 s pour 500 000) ; table des crédits si trop lent
-    me, others, spelling = artists.fold(name), {}, {}
-    for credit, n in conn.execute("SELECT artist, COUNT(*) FROM tracks WHERE artist LIKE ? ESCAPE '!' AND artist!=? GROUP BY 1",
-                                  ("%" + re.sub(r"([!%_])", r"!\1", name) + "%", name)):
-        parts = {artists.fold(x): x.strip(" ()[]") for x in _CREDIT.split(credit) if x.strip(" ()[]")}
-        if me in parts:
-            for k, x in parts.items():
-                if k != me and k:
-                    others[k] = others.get(k, 0) + n
-                    spelling.setdefault(k, x)
+    others, spelling = _partners(conn, name)
     top = [dict(x) for x in conn.execute(
         f"SELECT r.id, r.name, r.title, COUNT(*) AS plays FROM plays p JOIN tracks t ON t.id=p.track_id JOIN releases r ON r.id=t.release_id"
         f" WHERE p.user_id=? AND {mine} GROUP BY r.id ORDER BY plays DESC, r.name COLLATE NOCASE LIMIT 5", (user["id"], name))]
-    # graphie des artistes associés : celle de leurs releases s'ils en ont, sinon des capitales à un nom tout en minuscules
-    def shown(n):
-        r = conn.execute("SELECT COALESCE(tag_artist, artist) FROM releases WHERE COALESCE(tag_artist, artist)=? COLLATE NOCASE"
-                         " LIMIT 1", (n,)).fetchone()
-        return r[0] if r else artists.capitalize(n)
-    partners = [{"name": shown(spelling[k]), "tracks": n} for k, n in sorted(others.items(), key=lambda kv: (-kv[1], kv[0]))[:8]]
+    partners = [{"name": _shown(conn, spelling[k]), "tracks": n} for k, n in sorted(others.items(), key=lambda kv: (-kv[1], kv[0]))[:8]]
     return {"name": canon[0] if canon else artists.capitalize(name), "lists": lists, "labels": labels, "top": top,
             "with": partners, "lives": _artist_lives(conn, name)}
 
@@ -952,13 +978,13 @@ LiveType = Literal["festival", "radio", "artist"]
 
 
 def _live_sets(conn, kind: str) -> dict:
-    """{clé: {"names": Counter des graphies, "sets": [(id, année, poids, pochette)]}} pour un type de live. Un set va
+    """{clé: {"names": Counter des graphies, "sets": [(id, année, poids, pochette, nombre de sets)]}} pour un type de live. Un set va
     au festival qu'il cite, sinon à l'émission de radio, sinon à son artiste ; année du nom, sinon celle de la release.
     Une émission tirée de la seule source (SAT, FM…) doit compter au moins deux épisodes : un set diffusé une fois
     reste à son artiste."""
     # ponytail: relu à chaque appel (quelques milliers de noms, quelques ms) ; mettre en cache si la liste grossit
     rows = []
-    for r in conn.execute(f"SELECT r.id, r.name, r.year, r.size, r.has_cover, COALESCE(r.tag_artist, r.artist) AS who "
+    for r in conn.execute(f"SELECT r.id, r.name, r.year, r.size, r.has_cover, r.track_count, COALESCE(r.tag_artist, r.artist) AS who "
                           f"FROM releases r WHERE r.hidden=0 AND {_LIVE_CAT}"):
         f = festival(r["name"])
         g = None if f else radio_show(r["name"])
@@ -977,7 +1003,9 @@ def _live_sets(conn, kind: str) -> dict:
             name, year, key = x[0], x[1], festival_key(x[0])
         grp = out.setdefault(key, {"names": Counter(), "sets": []})
         grp["names"][name] += 1
-        grp["sets"].append((r["id"], year or r["year"], r["size"] or 0, bool(r["has_cover"])))
+        # dossier d'événement (« -=_INOX_2012_=- ») qui réunit ses sets en vrac, un fichier chacun : autant de sets
+        n = r["track_count"] if r["track_count"] > 1 and naming.ORNAMENT.search(r["name"]) else 1
+        grp["sets"].append((r["id"], year or r["year"], r["size"] or 0, bool(r["has_cover"]), n))
     return out
 
 
@@ -993,11 +1021,11 @@ def festivals(request: Request, type: LiveType = "festival", conn=Depends(get_co
     pochette du set le plus récent qui en a une, et `photo` si une photo est déjà gardée."""
     rows, kind = [], "artist" if type == "artist" else "event"
     for g in _live_sets(conn, type).values():
-        ys = sorted({y for _, y, _, _ in g["sets"] if y})
+        ys = sorted({x[1] for x in g["sets"] if x[1]})
         covered = [x for x in g["sets"] if x[3]]
         name = _live_name(g)
         path = photo_path(request.app.state.settings.data_dir, kind, name)
-        rows.append({"name": name, "sets": len(g["sets"]), "size": sum(x[2] for x in g["sets"]),
+        rows.append({"name": name, "sets": sum(x[4] for x in g["sets"]), "size": sum(x[2] for x in g["sets"]),
                      "first": ys[0] if ys else None, "last": ys[-1] if ys else None, "years": len(ys),
                      "cover": max(covered, key=lambda x: (x[1] or 0, x[0]))[0] if covered else None,
                      "photo": path.is_file() and path.stat().st_size > 0})
@@ -1012,9 +1040,15 @@ def festival_page(name: str = Query(min_length=1, max_length=200), type: LiveTyp
     g = _live_sets(conn, type).get(artists.fold(name) if type == "artist" else festival_key(name))
     if g is None:
         raise HTTPException(404, "Introuvable.")
-    year = {i: y for i, y, _, _ in g["sets"]}
+    year = {x[0]: x[1] for x in g["sets"]}
     items = [{**_release(x), "fyear": year[x["id"]]} for x in conn.execute(
         f"SELECT {RELEASE_COLS} FROM {RELEASE_FROM} WHERE r.id IN ({','.join('?' * len(year))})", (user["id"], *year))]
+    # dossier d'événement aux sets en vrac : ses pistes, une par set, affichées au même niveau que les autres
+    bulk = {x[0] for x in g["sets"] if x[4] > 1}
+    for x in items:
+        if x["id"] in bulk:
+            x["sets"] = [_track(t) for t in conn.execute(f"SELECT {TRACK_COLS} FROM {TRACK_FROM} WHERE t.release_id=?"
+                                                         " ORDER BY t.disc, t.relpath", (user["id"], x["id"]))]
     items.sort(key=lambda x: (x["fyear"] or 0, x["date"] or 0, x["name"].lower()), reverse=True)
     return {"name": _live_name(g), "items": items}
 

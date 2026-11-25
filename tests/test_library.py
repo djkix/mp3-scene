@@ -150,6 +150,15 @@ def test_admin_library_and_quality(user_client, admin_client, library):
     assert sum(b["n"] for b in s["bitrates"]) == 5 and len(s["months"]) >= 1 and {c["name"] for c in s["categories"]} == {"Albums", "Singles"}
     assert [(f["name"], f["n"]) for f in s["formats"]] == [("mp3", 5)] and s["formats"][0]["size"] > 0
     assert sum(g["n"] for g in s["groups"]) == 3 and all(g["size"] > 0 for g in s["groups"])   # releases par groupe
+    assert s["genre_years"]["years"] == []  # trois releases : aucune année n'atteint 5
+    from app.routes_admin import _genre_years
+    from app import db as _db
+    c = _db.connect(admin_client.app.state.settings.data_dir)
+    for i, g in enumerate(["Deep House"] * 4 + ["House", "Techno", "Rock"]):
+        c.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, genre, year)"
+                  " VALUES (?,?,'','Singles',0,0,1,1,0,?,2001)", (f"gy{i}", f"gy{i}", g))
+    gy = _genre_years(c, top=1)
+    assert gy == {"genres": ["House"], "years": [2001], "rows": [[5, 2]]}  # Deep House rejoint House ; le reste à part
     cats = user_client.get("/api/groups?by=category&artist=A-Trak").json()   # page d'un artiste : ses releases par catégorie
     assert len(cats) == 1 and cats[0]["releases"] == 1 and cats[0]["size"] > 0
     q = admin_client.get("/api/admin/quality").json()
@@ -1011,6 +1020,14 @@ def test_artist_info_gives_years_labels_partners_and_top(user_client, library, s
     assert info["lists"]["releases"]["n"] == 1 and info["lists"]["releases"]["size"] > 0 and info["lists"]["mixes"] == {"n": 0, "size": 0}
     assert set(info["lists"]) == {"releases", "with", "appears", "mixes", "remixes"} and info["labels"] == [{"name": "Fool's Gold", "releases": 1}]
     assert info["with"] == [{"name": "Andrew Wyatt", "tracks": 1}] and [(x["id"], x["plays"]) for x in info["top"]] == [(rid, 1)]
+    # carte des collaborations : A-Trak au centre, ses partenaires, et les liens entre eux
+    conn.executemany("INSERT INTO tracks(release_id, relpath, size, title, artist) VALUES (?,'y.mp3',1,'Y',?)",
+                     [(rid, "A-Trak & Duck Sauce"), (rid, "Andrew Wyatt vs Duck Sauce")])
+    conn.commit()
+    g = user_client.get("/api/artist-graph", params={"name": "A-Trak"}).json()
+    names = [n["name"] for n in g["nodes"]]
+    assert names[0] == "A-Trak" and set(names[1:]) == {"Andrew Wyatt", "Duck Sauce"}
+    assert sorted(e[:2] for e in g["edges"]) == [[0, 1], [0, 2], [1, 2]]
 
 
 def test_tag_that_adds_a_mention_to_the_name_artist_is_dropped():
@@ -1379,6 +1396,17 @@ def test_festivals_group_live_sets_by_festival_then_year(user_client, settings):
     page = user_client.get("/api/festival", params={"name": "inox electronic festival"}).json()
     assert [x["fyear"] for x in page["items"]] == [2009, 2007]  # année de la release quand le nom n'en donne pas
     assert user_client.get("/api/festival", params={"name": "Inconnu"}).status_code == 404
+    # dossier d'événement aux sets en vrac, un fichier par set : chacun compte, au même niveau que les autres
+    conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, year)"
+                 " VALUES ('bulk','-=_INOX_Electronique_Festival_2012_=-','','Live And Radio',0,0,30,2,0,2012)")
+    rid = conn.execute("SELECT id FROM releases WHERE path='bulk'").fetchone()[0]
+    conn.executemany("INSERT INTO tracks(release_id, relpath, size, title) VALUES (?,?,15,?)", [(rid, "b.mp3", "B"), (rid, "a.mp3", "A")])
+    conn.commit()
+    got = {f["name"]: f["sets"] for f in user_client.get("/api/festivals").json()}
+    assert got["INOX Electronique Festival"] == 4
+    page = user_client.get("/api/festival", params={"name": "INOX Electronique Festival"}).json()
+    assert page["items"][0]["fyear"] == 2012 and [t["title"] for t in page["items"][0]["sets"]] == ["A", "B"]
+    assert "sets" not in page["items"][1]
 
 
 def test_live_sets_split_into_festivals_radio_shows_and_artists(user_client, settings, monkeypatch):
@@ -1495,3 +1523,14 @@ def test_overview_reports_disk_space_and_collection_growth(admin_client, setting
     assert o["data_disk"]["total"] > 0 and o["data_disk"]["free"] <= o["data_disk"]["total"]
     sizes = [g["size"] for g in o["growth"]]
     assert sizes == sorted(sizes) and sizes[-1] >= 175  # taille cumulée, croissante
+
+
+def test_kind_sort_puts_newest_first_within_each_category(user_client, settings):
+    conn = db.connect(settings.data_dir)
+    for i, (name, cat, year) in enumerate([("Moby-Ambient-1993-SW", "Albums", 1993), ("Moby-Innocents-2013-gnvr", "Albums", 2013),
+                                           ("Moby-Destroyed-2011-CaHeSo", "Albums", 2011), ("Moby-Porcelain-CDM-2000-X", "Singles", 2000)]):
+        conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, artist, year)"
+                     " VALUES (?,?,'',?,0,0,1,1,0,'Moby',?)", (f"k{i}", name, cat, year))
+    conn.commit()
+    items = user_client.get("/api/releases", params={"artist": "Moby", "sort": "kind", "dir": "asc"}).json()["items"]
+    assert [x["year"] for x in items] == [2013, 2011, 1993, 2000]  # albums du plus récent au plus ancien, puis singles

@@ -1,3 +1,4 @@
+from collections import Counter
 import io
 import os
 import re
@@ -14,7 +15,7 @@ from . import artists, backup, coversearch, db, genres, nfo, scanner, security
 from .deps import MAX_INT, Id, get_conn, require_admin
 from .naming import parse_release_name
 from .routes_media import COVER_MAX, IMAGE_ERRORS, save_cover
-from .routes_library import RELEASE_COLS, RELEASE_FROM, Dir, Sort, _all_series, _families, _order, _page, _release, titles, photo_candidates, photo_path, store_photo
+from .routes_library import RELEASE_COLS, RELEASE_FROM, Dir, Sort, _all_series, _families, _genre_families, _order, _page, _release, titles, photo_candidates, photo_path, store_photo
 
 # libellé au journal d'activité de chaque action d'administration : (méthode, route) -> libellé
 _ACTIONS = {
@@ -511,7 +512,25 @@ def library_stats(conn=Depends(get_conn)):
             "formats": rows("SELECT lower(replace(relpath, rtrim(relpath, replace(relpath, '.', '')), '')) AS name,"
                             " COUNT(*) AS n, SUM(size) AS size FROM tracks GROUP BY 1 ORDER BY n DESC"),
             "months": rows("SELECT strftime('%Y-%m', added_at, 'unixepoch') AS name, COUNT(*) AS n, SUM(size) AS size"
-                           " FROM releases GROUP BY 1 ORDER BY 1 DESC LIMIT 24")}
+                           " FROM releases GROUP BY 1 ORDER BY 1 DESC LIMIT 24"),
+            "genre_years": _genre_years(conn)}
+
+
+def _genre_years(conn, top: int = 5) -> dict:
+    """Frise des genres : par année de sortie, le nombre de releases des `top` familles de genres les plus fournies
+    (« Deep House » compte pour House), le reste dans une dernière colonne. Une année de moins de 5 releases est
+    laissée de côté (une part sur deux releases ne dit rien)."""
+    fam = _genre_families(conn)
+    counts, totals = {}, Counter()
+    for year, genre, n in conn.execute("SELECT year, genre, COUNT(*) FROM releases WHERE hidden=0 AND genre IS NOT NULL"
+                                       " AND year BETWEEN 1950 AND 2100 GROUP BY 1, 2"):
+        f = fam.get(genre, genre)
+        counts.setdefault(year, Counter())[f] += n
+        totals[f] += n
+    names = [g for g, _ in totals.most_common(top)]
+    years = sorted(y for y, c in counts.items() if sum(c.values()) >= 5)
+    return {"genres": names, "years": years,
+            "rows": [[counts[y][g] for g in names] + [sum(counts[y].values()) - sum(counts[y][g] for g in names)] for y in years]}
 
 
 class Correction(BaseModel):

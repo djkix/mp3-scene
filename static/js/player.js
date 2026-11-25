@@ -251,7 +251,7 @@ function stopFade() {
   const { old } = fade;
   fade = null;
   old.pause(); old.removeAttribute('src'); old.load();
-  for (const a of els) a.volume = userVol;
+  for (const a of els) a.volume = vol(a);
 }
 
 function prime() {
@@ -265,6 +265,7 @@ function prime() {
     if (!url) return; // pas encore en mémoire : enchaînement classique
     const o = other();
     o.preload = 'auto';
+    o.tid = t.id;
     o.src = url;
     o.load();
     primedId = t.id;
@@ -283,7 +284,7 @@ function swap(x) {
   const old = audio, t = player.queue.current();
   audio = other();
   primedId = null; loadedId = t.id; pendingPos = null; wantPlay = true;
-  audio.volume = x ? 0 : userVol;
+  audio.volume = x ? 0 : vol(audio);
   audio.play().catch(() => { // refusé (élément jamais activé, source illisible) : chargement classique
     if (loadedId !== t.id || audio === old) return;
     stopFade();
@@ -294,8 +295,8 @@ function swap(x) {
     const t0 = performance.now();
     fade = { old, timer: setInterval(() => {
       const k = Math.min(1, (performance.now() - t0) / (x * 1000));
-      audio.volume = userVol * k;
-      old.volume = userVol * (1 - k);
+      audio.volume = vol(audio) * k;
+      old.volume = vol(old) * (1 - k);
       if (k >= 1) stopFade();
     }, 50) };
   } else { old.removeAttribute('src'); old.load(); }
@@ -310,10 +311,20 @@ function swap(x) {
 // jusqu'au rechargement de la page.
 // ponytail: nivellement = compresseur (réduit les écarts de volume), pas une analyse ReplayGain piste par piste.
 const PREFS = KEY + '.audio';
-const prefs = { eq: [0, 0, 0], level: false, fade: 0, original: false, awake: true };
+const prefs = { eq: [0, 0, 0], level: false, fade: 0, original: false, awake: true, norm: true };
 try { Object.assign(prefs, JSON.parse(localStorage.getItem(PREFS))); } catch { /* absent ou corrompu */ }
 if (!Array.isArray(prefs.eq) || prefs.eq.length !== 3) prefs.eq = [0, 0, 0];
 let ctx = null, fx = null;
+
+// Volume égalisé : chaque piste ramenée vers un même volume moyen (mesuré avec sa forme d'onde, à la première écoute).
+// ponytail: atténuation seulement, par le volume de l'élément audio (sans Web Audio) : une piste trop forte baisse, une
+// trop faible reste telle quelle ; iOS ignore ce volume, l'égalisation n'y fait rien.
+const TARGET = -16; // dBFS (RMS)
+const loud = new Map(); // id de piste -> volume moyen mesuré
+const vol = (a) => {
+  const db = prefs.norm ? loud.get(a.tid) : null;
+  return userVol * (db ? Math.min(1, 10 ** ((TARGET - db) / 20)) : 1);
+};
 
 // Écran allumé : dans l'application installée (écran d'accueil), tant qu'elle est affichée, l'écran ne se met pas en
 // veille (API Screen Wake Lock : Chrome sur Android, Safari depuis iOS 16.4). Le verrou tombe quand l'application passe
@@ -504,6 +515,7 @@ function openAudioPrefs() {
   const [eqHelp, eqNote] = help(tr("Sur iPhone, l'égaliseur et le nivellement peuvent couper le son écran verrouillé : remettez-les à zéro puis rechargez la page."));
   const [fadeHelp, fadeNote] = help(canFade ? tr("Les pistes s'enchaînent sans blanc ; le fondu les fait se chevaucher, sauf entre deux pistes d'une même release.")
     : tr("Les pistes s'enchaînent sans blanc. Le fondu n'est pas possible sur cet appareil."));
+  const [normHelp, normNote] = help(tr('Les pistes plus fortes que la moyenne sont baissées, d’après leur volume mesuré à la première écoute.'));
   const [awakeHelp, awakeNote] = help(tr('Dans l’application installée sur l’écran d’accueil, l’écran ne se met pas en veille tant qu’elle est affichée. Sans effet dans un onglet du navigateur.'));
   const [origHelp, origNote] = help(tr('Sans ce réglage, ces fichiers sont écoutés convertis en MP3 320 kbit/s, plus légers. Il s’applique à partir de la piste suivante.'));
   fxDlg.replaceChildren(el('h2', {}, tr('Réglages audio')),
@@ -512,6 +524,8 @@ function openAudioPrefs() {
       el('h3', {}, tr('Enchaînement')),
       el('label', { class: 'fx-line' }, tr('Niveler le volume entre les pistes'), el('input', { type: 'checkbox', class: 'switch', role: 'switch',
         checked: prefs.level, onchange: (e) => { prefs.level = e.target.checked; applyPrefs(); } })),
+      ...(canFade ? [el('label', { class: 'fx-line' }, el('span', {}, tr('Volume égalisé'), normHelp), el('input', { type: 'checkbox', class: 'switch', role: 'switch',
+        checked: prefs.norm, onchange: (e) => { prefs.norm = e.target.checked; applyPrefs(); if (!fade) for (const a of els) a.volume = vol(a); } })), normNote] : []),
       el('div', { class: 'fx-line' }, el('span', {}, tr('Fondu enchaîné'), fadeHelp), fades), fadeNote,
       el('h3', {}, tr('Qualité')),
       el('label', { class: 'fx-line' }, el('span', {}, tr('Qualité d’origine pour les FLAC, WAV et M4A'), origHelp), el('input', { type: 'checkbox', class: 'switch', role: 'switch',
@@ -520,7 +534,7 @@ function openAudioPrefs() {
         el('label', { class: 'fx-line' }, el('span', {}, tr('Garder l’écran allumé'), awakeHelp), el('input', { type: 'checkbox', class: 'switch', role: 'switch',
           checked: prefs.awake, onchange: (e) => { prefs.awake = e.target.checked; applyPrefs(); } })), awakeNote] : [])),
     el('div', { class: 'fx-foot' },
-      el('button', { type: 'button', onclick: () => { prefs.eq = [0, 0, 0]; prefs.level = false; prefs.fade = 0; prefs.original = false; applyPrefs(); openAudioPrefs(); } }, tr('Réinitialiser')),
+      el('button', { type: 'button', onclick: () => { prefs.eq = [0, 0, 0]; prefs.level = false; prefs.fade = 0; prefs.original = false; prefs.norm = true; applyPrefs(); openAudioPrefs(); } }, tr('Réinitialiser')),
       el('button', { type: 'button', class: 'primary', onclick: () => fxDlg.close() }, tr('Fermer'))));
   if (!fxDlg.open) fxDlg.showModal();
 }
@@ -542,13 +556,17 @@ function load(play, pos = null) {
     offline.blob(t.id).then((b) => {
       if (loadedId !== t.id) return; // une autre piste a été chargée entre-temps
       if (b && !blobs.has(t.id)) blobs.set(t.id, URL.createObjectURL(b));
+      audio.tid = t.id;
       audio.src = blobs.get(t.id) || streamUrl(t);
+      audio.volume = vol(audio);
       if (wantPlay) start();
     });
     update();
     return tick();
   }
+  audio.tid = t.id;
   audio.src = blobs.get(t.id) || streamUrl(t);
+  audio.volume = vol(audio);
   if (play) start();
   update();
   tick();
@@ -621,7 +639,7 @@ function setVolume(v) {
   v = Math.min(1, Math.max(0, Number(v) || 0));
   if (backend) return backend.setVolume(v);
   userVol = v;
-  if (!fade) for (const a of els) a.volume = v; // ignoré par iOS : rien n'en dépend
+  if (!fade) for (const a of els) a.volume = vol(a); // ignoré par iOS : rien n'en dépend
   volUI();
   save();
 }
@@ -953,6 +971,10 @@ function loadWave(t) {
   ui.wave.classList.remove('has-wave'); // curseur simple en attendant (premier calcul : jusqu'à une minute pour un long mix)
   if (id === null) return;
   api(`/tracks/${id}/waveform`).then((w) => {
+    if (Number.isFinite(w.loudness)) {
+      loud.set(id, w.loudness);
+      if (!fade) for (const a of els) a.volume = vol(a);
+    }
     if (waveId !== id || !w.peaks?.length) return;
     ui.wave.style.setProperty('--wave', `url(${waveMask(w.peaks)})`);
     ui.wave.classList.add('has-wave');
@@ -1126,6 +1148,7 @@ export function initPlayer(footer) {
   ui.fx = iconBtn('pl-fx', '≋', tr('Réglages audio'), openAudioPrefs);
   ui.lyrbtn = iconBtn('pl-lyrbtn', '', tr('Paroles'), () => setStage('lyrics'), 'mic');
   ui.vizbtn = iconBtn('pl-vizbtn', '', tr('Visualiseur'), () => setStage('viz'), 'viz');
+  ui.tvbtn = iconBtn('pl-tvbtn', '', tr('Mode soirée'), () => { location.hash = '#/party'; }, 'tv');
   ui.lyrbtn.setAttribute('aria-pressed', 'false');
   ui.vizbtn.setAttribute('aria-pressed', 'false');
   ui.stage = el('div', { class: 'pl-stage', hidden: true, role: 'region', 'aria-label': tr('Paroles et visualiseur') });
@@ -1169,7 +1192,7 @@ export function initPlayer(footer) {
         iconBtn('pl-next', '', tr('Suivant'), () => player.next(), 'next'),
         ui.repeat),
       el('div', { class: 'pl-seek' }, ui.elapsed, ui.wave, ui.total),
-      el('div', { class: 'pl-tools' }, ui.chap, ui.rate, volwrap, ui.lyrbtn, ui.vizbtn, ui.fx, ui.fav, ui.qbtn,
+      el('div', { class: 'pl-tools' }, ui.chap, ui.rate, volwrap, ui.lyrbtn, ui.vizbtn, ui.tvbtn, ui.fx, ui.fav, ui.qbtn,
         el('span', { id: 'cast-slot' })), // emplacement du bouton cast (cast.js)
       el('p', { class: 'pl-hint' }, tr('Balayez pour changer de piste'))), progress);
 

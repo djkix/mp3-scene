@@ -1,5 +1,6 @@
 import hashlib
 import io
+import math
 import os
 import re
 import shutil
@@ -358,11 +359,15 @@ def reduce_peaks(peaks: list[int], points: int = WAVE_POINTS) -> bytes:
     return bytes(v * 255 // top for v in out)
 
 
-def compute_waveform(path) -> bytes | None:
+def compute_waveform(path) -> tuple[bytes, float | None] | None:
+    """(crêtes, volume moyen en dBFS) de la piste, lus d'un seul décodage ; None si elle ne se décode pas."""
     cmd = _decode_cmd(path)
     if cmd is None:
         return None
     peaks, deadline = [], time.monotonic() + WAVE_TIMEOUT
+    # volume moyen (RMS) pour égaliser le volume d'une piste à l'autre
+    # ponytail: un échantillon sur 8, sans pondération K du LUFS ; l'écart entre un vieux rip et un master récent suffit
+    energy = count = 0
     proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=SAFE_ENV)
     try:
         while chunk := proc.stdout.read(WAVE_WINDOW * 2):
@@ -371,18 +376,23 @@ def compute_waveform(path) -> bytes | None:
             samples = array("h", chunk[:len(chunk) & ~1])  # ordre des octets natif : petit-boutiste sur x86 et ARM
             if samples:
                 peaks.append(max(max(samples), -min(samples)))
+                sub = samples[::8]
+                energy += sum(v * v for v in sub)
+                count += len(sub)
     finally:
         proc.kill()
         proc.wait()
-    return reduce_peaks(peaks) or None
+    out = reduce_peaks(peaks)
+    return (out, round(10 * math.log10(energy / count / 32768 ** 2), 1) if energy else None) if out else None
 
 
 @router.get("/api/tracks/{track_id}/waveform")
 def waveform(track_id: Id, request: Request, conn=Depends(get_conn)):
-    """Forme d'onde de la piste : calculée à la première demande, puis gardée en base."""
+    """Forme d'onde de la piste et son volume moyen (`loudness`, dBFS) : calculés à la première demande, puis gardés
+    en base. Une forme d'onde gardée avant la 1.79.0 n'a pas de volume : elle est recalculée une fois."""
     def cached():
-        row = conn.execute("SELECT peaks FROM waveforms WHERE track_id=?", (track_id,)).fetchone()
-        return row and {"peaks": list(row["peaks"])}
+        row = conn.execute("SELECT peaks, loudness FROM waveforms WHERE track_id=? AND loudness IS NOT NULL", (track_id,)).fetchone()
+        return row and {"peaks": list(row["peaks"]), "loudness": row["loudness"]}
     if hit := cached():
         return hit
     row = conn.execute("SELECT r.path, t.relpath FROM tracks t JOIN releases r ON r.id=t.release_id WHERE t.id=?",
@@ -395,14 +405,16 @@ def waveform(track_id: Id, request: Request, conn=Depends(get_conn)):
     try:
         if hit := cached():  # calculée par une autre requête pendant l'attente
             return hit
-        peaks = compute_waveform(path)  # aucune écriture SQLite pendant la lecture du fichier
-        if not peaks:
+        got = compute_waveform(path)  # aucune écriture SQLite pendant la lecture du fichier
+        if not got:
             raise HTTPException(404, "Forme d'onde indisponible.")
-        conn.execute("INSERT OR REPLACE INTO waveforms(track_id, peaks) VALUES (?,?)", (track_id, peaks))
+        peaks, loudness = got
+        # piste muette (aucune énergie) : 0 plutôt que NULL, pour ne pas la recalculer à chaque écoute
+        conn.execute("INSERT OR REPLACE INTO waveforms(track_id, peaks, loudness) VALUES (?,?,?)", (track_id, peaks, loudness or 0))
         conn.commit()
     finally:
         _wave_lock.release()
-    return {"peaks": list(peaks)}
+    return {"peaks": list(peaks), "loudness": loudness or 0}
 
 
 class _Sink:

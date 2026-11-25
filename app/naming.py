@@ -130,7 +130,7 @@ def _clean(s):
     return s.replace("_", " ").strip() or None
 
 
-_ORNAMENT = re.compile(r"^[-_ ]*=+[-_ ]*|[-_ ]*=+[-_ ]*$")
+ORNAMENT = re.compile(r"^[-_ ]*=+[-_ ]*|[-_ ]*=+[-_ ]*$")
 
 
 def parse_release_name(name: str, legacy: bool = False) -> dict:
@@ -139,7 +139,7 @@ def parse_release_name(name: str, legacy: bool = False) -> dict:
     qu'elle a laissées (db.classify)."""
     # nom encadré de « -=_ … _=- » (« -=_Tomorrowland_2013_=- ») : un dossier d'événement ; le nom entier, sans
     # l'ornement, est le titre
-    adorned = not legacy and _ORNAMENT.search(name) and _ORNAMENT.sub("", name)
+    adorned = not legacy and ORNAMENT.search(name) and ORNAMENT.sub("", name)
     if adorned:
         name = adorned
     segs = name.split("-")
@@ -224,7 +224,7 @@ def festival(name: str) -> tuple[str, int | None] | None:
     """(festival, année) d'un set : « Tomorrowland_2013-… », « Artiste-Live_at_Ultra_Music_Festival_2015_(Miami)-… »,
     « Festival_Des_Vieilles_Charrues-DVBS-2009 ». Année lue après le nom du festival, sinon None (celle de la release
     sert alors). None si le nom ne cite aucun festival."""
-    for seg in re.split(r"-", name):
+    for seg in re.split(r"-", ORNAMENT.sub("", name)):  # « -=_INOX_2012_=- » : sans l'ornement
         s = re.sub(r"\s+", " ", seg.replace("_", " ")).strip()
         s = _LIVE_AT.sub("", s)
         s = re.sub(r"^live\s+", "", s, flags=re.I)

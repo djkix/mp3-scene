@@ -69,10 +69,14 @@ def test_waveform_reduce_and_cache(user_client, conn, monkeypatch, library):
     assert routes_media.reduce_peaks([1, 9, 2, 4], points=2) == bytes([255, 113])   # crête de chaque moitié
     tid = conn.execute("SELECT id FROM tracks ORDER BY id LIMIT 1").fetchone()[0]
     calls = []
-    monkeypatch.setattr(routes_media, "compute_waveform", lambda path: calls.append(path) or bytes([0, 128, 255]))
+    monkeypatch.setattr(routes_media, "compute_waveform", lambda path: calls.append(path) or (bytes([0, 128, 255]), -12.5))
     for _ in range(2):  # le second appel vient du cache
-        assert user_client.get(f"/api/tracks/{tid}/waveform").json() == {"peaks": [0, 128, 255]}
+        assert user_client.get(f"/api/tracks/{tid}/waveform").json() == {"peaks": [0, 128, 255], "loudness": -12.5}
     assert len(calls) == 1
+    conn.execute("UPDATE waveforms SET loudness=NULL")  # gardée avant la 1.79.0 : recalculée pour avoir le volume
+    conn.commit()
+    user_client.get(f"/api/tracks/{tid}/waveform")
+    assert len(calls) == 2
     assert user_client.get("/api/tracks/99999/waveform").status_code == 404
     monkeypatch.setattr(routes_media, "compute_waveform", lambda path: None)  # décodeur absent ou fichier illisible
     other = conn.execute("SELECT id FROM tracks ORDER BY id DESC LIMIT 1").fetchone()[0]

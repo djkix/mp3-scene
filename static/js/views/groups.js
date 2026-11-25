@@ -1,7 +1,8 @@
 // Explorer : releases regroupées par groupe (#/groups), artiste (#/artists) ou genre (#/genres), avec le nombre de
 // releases et le poids. #/groups/<nom>, #/artists/<nom>, #/labels/<nom> et #/genres/<nom> ouvrent les
 // releases correspondantes. Les filtres Genre et Année sont dans l'adresse et suivent d'une page à l'autre.
-import { api, fmtSize, session } from '../api.js';
+import { api, fmtDate, fmtDuration, fmtSize, session } from '../api.js';
+import { player, watchPlaying } from '../player.js';
 import { el, relName, relHref } from '../dom.js';
 import { t as tr, catLabel, artistLabel } from '../i18n.js';
 import * as releases from './releases.js';
@@ -104,7 +105,8 @@ function detail(container, kind, params) {
     const chip = (href, text, n) => el('a', { class: 'chip', href }, text, n ? el('small', {}, String(n)) : null);
     chips.replaceChildren(
       ...group(tr('Labels'), a.labels.map((l) => chip(`#/labels/${encodeURIComponent(l.name)}`, l.name, l.releases))),
-      ...group(tr('Souvent avec'), a.with.map((w) => chip(`#/artists/${encodeURIComponent(w.name)}`, w.name, w.tracks))),
+      ...group(tr('Souvent avec'), [...a.with.map((w) => chip(`#/artists/${encodeURIComponent(w.name)}`, w.name, w.tracks)),
+        ...(a.with.length ? [el('button', { type: 'button', class: 'chip keep', onclick: () => artistMap(a.name) }, tr('Carte'))] : [])]),
       // festivals, émissions et lives de club où il joue ; chacun mène à sa page de Live & Radio
       ...group(tr('Lives'), (a.lives || []).map((l) => chip(`#/festivals/${encodeURIComponent(l.name)}` + qs({ type: l.type === 'festival' ? '' : l.type }),
         l.type === 'artist' ? tr('Clubs et autres') : l.name, l.sets))),
@@ -123,6 +125,50 @@ function detail(container, kind, params) {
     .then(([g]) => { total.textContent = g ? `${count(g.releases)} · ${fmtSize(g.size)}` : ''; }).catch(() => {});
   if (family) return () => { dead = true; disposeList?.(); };
   return releases.render(list, { ...params, q: '', pin: appears ? { key: other, value: name, base, extra: { in: params.in } } : { key: pin, value: name, base } });
+}
+
+// Carte des collaborations : l'artiste au centre, ses partenaires en cercle (taille selon les pistes en commun), un
+// trait entre ceux qui signent ensemble. Un clic sur un partenaire le met au centre ; son nom ouvre sa page.
+// ponytail: disposition en cercle fixe, sans simulation de forces ; suffisant pour 12 voisins
+let mapDlg = null;
+async function artistMap(name) {
+  mapDlg ??= document.body.appendChild(el('dialog', { class: 'pl-add graph-dlg', onclick: (e) => { if (e.target === mapDlg) mapDlg.close(); } }));
+  const NS = 'http://www.w3.org/2000/svg', S = 600, C = S / 2;
+  const svg = (tag, attrs, ...kids) => {
+    const n = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    n.append(...kids);
+    return n;
+  };
+  const head = el('h2'), box = el('div', { class: 'graph-box' }, el('p', { class: 'status' }, tr('Chargement…')));
+  mapDlg.replaceChildren(head, box, el('div', { class: 'fx-foot' }, el('button', { type: 'button', class: 'primary', onclick: () => mapDlg.close() }, tr('Fermer'))));
+  if (!mapDlg.open) mapDlg.showModal();
+  head.replaceChildren(tr('Carte des collaborations'), ' · ', el('a', { href: `#/artists/${encodeURIComponent(name)}`, onclick: () => mapDlg.close() }, artistLabel(name)));
+  let g;
+  try { g = await api('/artist-graph?' + new URLSearchParams({ name })); } catch (err) { box.replaceChildren(el('p', { class: 'status' }, err.message)); return; }
+  if (g.nodes.length < 2) { box.replaceChildren(el('p', { class: 'status' }, tr('Aucune collaboration trouvée.'))); return; }
+  const top = Math.max(...g.nodes.slice(1).map((n) => n.tracks));
+  // au moins trois places sur le cercle : deux partenaires face à face cacheraient leur lien derrière l'artiste
+  const step = 2 * Math.PI / Math.max(3, g.nodes.length - 1);
+  const pos = g.nodes.map((_, i) => (i ? [C + 215 * Math.cos(step * (i - 1) - Math.PI / 2), C + 215 * Math.sin(step * (i - 1) - Math.PI / 2)] : [C, C]));
+  const lines = g.edges.map(([a, b, n]) => svg('line', { x1: pos[a][0], y1: pos[a][1], x2: pos[b][0], y2: pos[b][1],
+    class: a ? 'graph-link side' : 'graph-link', 'stroke-width': 1 + 3 * Math.min(1, n / top) }));
+  const dots = g.nodes.map((n, i) => {
+    const r = i ? 8 + 14 * Math.sqrt(n.tracks / top) : 26;
+    const [x, y] = pos[i];
+    const below = y >= C;
+    const node = svg('g', { class: i ? 'graph-node' : 'graph-node me', tabindex: i ? 0 : -1, role: i ? 'button' : 'img',
+      'aria-label': i ? tr('{0} : {1} pistes en commun', n.name, n.tracks) : n.name },
+    svg('title', {}, i ? tr('{0} : {1} pistes en commun', n.name, n.tracks) : n.name),
+    svg('circle', { cx: x, cy: y, r }),
+    svg('text', { x, y: i ? (below ? y + r + 15 : y - r - 7) : y + 4, 'text-anchor': 'middle' }, i ? n.name : ''));
+    if (i) {
+      node.addEventListener('click', () => artistMap(n.name));
+      node.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); artistMap(n.name); } });
+    }
+    return node;
+  });
+  box.replaceChildren(svg('svg', { viewBox: `-60 -10 ${S + 120} ${S + 20}`, class: 'graph' }, ...lines, ...dots));
 }
 
 // Administrateur : photos proposées pour un artiste ; un clic en valide une, gardée dans les données de l'application.
@@ -281,6 +327,29 @@ function festivalWall(box, params) {
 
 // Festival, émission ou artiste (#/festivals/<nom>?type=…) : ses sets, du plus récent au plus ancien, sous un intertitre par année (pastille
 // et liseré, comme les catégories d'un artiste). La rangée d'années mène à chacune et y place le focus.
+// Set d'un dossier d'événement aux sets en vrac (« -=_INOX_2012_=- ») : une piste, présentée comme une release
+// (mêmes colonnes, durée à la place du nombre de pistes) ; un clic joue les sets du dossier à partir de celui-ci.
+function setRow(t, rel) {
+  const play = () => player.playTracks(rel.sets.slice(), rel.sets.indexOf(t));
+  return el('li', { class: 'rel', tabIndex: 0, 'data-track': t.id,
+    onclick: (e) => { if (!e.target.closest('button, a')) play(); },
+    onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) play(); } },
+  el('img', { class: 'rel-thumb', src: `/api/releases/${rel.id}/thumb`, alt: '', loading: 'lazy', width: 40, height: 40,
+    onerror: (e) => { e.target.style.visibility = 'hidden'; } }),
+  el('span', { class: 'rel-name' }, t.title ? (t.artist ? `${t.artist} - ${t.title}` : t.title) : t.filename),
+  el('span', { class: 'rel-info' },
+    el('span', { class: 'mid' }, (t.genre || rel.genre) ? el('span', { class: 'chip' }, t.genre || rel.genre) : ''),
+    el('span', { class: 'mid' }, fmtDate(rel.date)),
+    el('span', { class: 'mid' }, t.duration == null ? '—' : fmtDuration(t.duration)),
+    el('span', { class: 'mid rate' }, t.bitrate ? `${Math.round(t.bitrate / 1000)} kbit/s` : ''),
+    el('span', { class: 'num' }, fmtSize(t.size)),
+    el('span', { class: 'rel-loc mid' }, catLabel(rel.category))),
+  el('span', { class: 'rel-actions' },
+    el('button', { type: 'button', class: 'icon', title: tr('Ajouter à la file'), 'aria-label': tr('Ajouter à la file'), onclick: () => player.enqueue([t]) }, '+'),
+    releases.favButton(t, 'track'),
+    el('a', { class: 'icon rel-doc', href: relHref(rel.name, rel.id), title: tr('Détail de la release'), 'aria-label': tr('Détail de la release') })));
+}
+
 function festivalPage(container, params) {
   const name = params.rest, { category = '' } = params, type = liveType(params.type);
   const status = el('p', { class: 'status', role: 'status' }, tr('Chargement…'));
@@ -294,28 +363,33 @@ function festivalPage(container, params) {
   container.replaceChildren(tabs('categories'),
     el('h1', { class: 'grp-title' }, el('a', { href: back }, category ? catLabel(category) : tr('Catégories')), ' › ', name),
     el('div', { class: 'fest-head' }, photo, el('div', {}, facts, photoBtn || '')), jump, status, body);
-  let dead = false;
+  let dead = false, watch = null;
   api('/festival?' + new URLSearchParams({ name, type })).then((f) => {
     if (dead) return;
     const years = new Map();
-    for (const x of f.items) (years.get(x.fyear) ?? years.set(x.fyear, []).get(x.fyear)).push(x);
+    // un dossier aux sets en vrac compte pour chacun de ses sets, rangés avec les autres de la même année
+    const rows = f.items.flatMap((x) => (x.sets ? x.sets.map((t) => ({ fyear: x.fyear, size: t.size, li: () => setRow(t, x) }))
+      : [{ ...x, li: () => releases.row(x) }]));
+    for (const x of rows) (years.get(x.fyear) ?? years.set(x.fyear, []).get(x.fyear)).push(x);
     const ys = [...years.keys()].filter(Boolean);
-    facts.textContent = [sets(f.items.length), ys.length > 1 ? tr('{0} années', ys.length) : yearSpan(ys[0], ys[0]),
-      fmtSize(f.items.reduce((n, x) => n + (x.size || 0), 0))].filter(Boolean).join(' · ');
+    facts.textContent = [sets(rows.length), ys.length > 1 ? tr('{0} années', ys.length) : yearSpan(ys[0], ys[0]),
+      fmtSize(rows.reduce((n, x) => n + (x.size || 0), 0))].filter(Boolean).join(' · ');
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const sections = [...years].map(([y, items]) => {
       const head = el('h2', { class: 'fest-cap rel-cap kind-3', tabIndex: -1 },
         el('span', { class: 'cap-pill' }, y ? String(y) : tr('Sans année'), el('small', {}, ` ${items.length}`)));
-      return [y, items.length, head, el('section', {}, head, el('ul', { class: 'rel-list' }, items.map((x) => releases.row(x))))];
+      return [y, items.length, head, el('section', {}, head, el('ul', { class: 'rel-list' }, items.map((x) => x.li())))];
     });
     if (sections.length > 1) jump.replaceChildren(...sections.map(([y, n, head]) => el('button', { type: 'button',
       'aria-label': `${y || tr('Sans année')} : ${sets(n)}`,
       onclick: () => { head.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' }); head.focus({ preventScroll: true }); } },
     `${y || '—'} `, el('small', {}, String(n)))));
     body.replaceChildren(...sections.map((x) => x[3]));
+    watch = watchPlaying(body);
+    watch.mark();
     status.textContent = '';
   }).catch((err) => { if (!dead) status.textContent = err.message; });
-  return () => { dead = true; };
+  return () => { dead = true; watch?.stop(); };
 }
 
 // Série (#/series/<nom>) : ses volumes dans l'ordre de leur numéro, et les numéros absents de la bibliothèque.
