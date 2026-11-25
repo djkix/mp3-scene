@@ -23,6 +23,7 @@ DISC_RE = re.compile(r"^(?:(?:cd|disc|disk)[ _-]?(\d+)|(\d{1,2}))$", re.IGNORECA
 BATCH = 500
 TAG_BATCH = 200
 # pistes indexées ; tout ce qui n'est pas du MP3 est converti à l'écoute (routes_media)
+NFO_SUFFIXES = nfo.SUFFIXES  # copie : `nfo` est aussi une variable locale de _files
 AUDIO = {".mp3", ".flac", ".wav", ".m4a", ".mp4", ".wma", ".ogg", ".opus", ".aiff", ".aif", ".ape", ".wv"}
 IMAGES = (".jpg", ".jpeg", ".png")  # mêmes types que routes_media.IMAGE_TYPES
 log = logging.getLogger(__name__)
@@ -78,7 +79,7 @@ def _files(entries, prefix="", disc=1):
         ext = os.path.splitext(name)[1].lower()
         if ext in AUDIO:
             tracks.append((prefix + name, disc, st))
-        elif ext == ".nfo":
+        elif ext in NFO_SUFFIXES:  # .nfo, ou .txt à sa place (mixes)
             nfo = True
     return tracks, size, nfo, skipped
 
@@ -437,13 +438,11 @@ def _scan_tags(conn, root, should_stop):
 def _nfo_info(root, path):
     """(date de sortie, label, catalogue) du premier NFO du dossier (le même que celui de la fiche) ; 0 et '' pour
     une date ou un label absents. Sans numéro dans le NFO, celui du nom : « Artist-Title-(CAT001)-WEB-2019-GRP »."""
-    names = security.regular_names(Path(root, path), (".nfo",))  # liens symboliques ignorés
     in_name = re.search(r"-\(([^()]{2,30})\)-", _name(path))
     cat = in_name and in_name.group(1).replace("_", " ")
-    if not names:
+    text = nfo.read(Path(root, path), root, 1024 * 1024)
+    if text is None:
         return 0, "", cat
-    with security.open_regular(Path(root, path, names[0]), root) as fh:  # lecture seule
-        text = fh.read(1024 * 1024).decode("cp437")
     label, nfo_cat = nfo.label(text)
     return nfo.release_date(text) or 0, label or "", nfo_cat or cat
 
@@ -519,12 +518,7 @@ def _scan_nfo_text(conn, root, should_stop):
         done = []  # lot lu avant d'écrire, comme pour les tags
         for r in rows:
             try:
-                names = security.regular_names(Path(root, r["path"]), (".nfo",))  # liens symboliques ignorés
-                text = ""
-                if names:
-                    with security.open_regular(Path(root, r["path"], names[0]), root) as fh:  # lecture seule
-                        text = fh.read(200 * 1024).decode("cp437")
-                done.append((r["id"], text))
+                done.append((r["id"], nfo.read(Path(root, r["path"]), root, 200 * 1024) or ""))
             except OSError as e:
                 log.warning("NFO illisible, indexé au prochain scan : %s (%s)", r["path"], e)
         for rid, text in done:

@@ -32,6 +32,11 @@ def init(data_dir: Path) -> None:
             conn.execute("ALTER TABLE releases ADD COLUMN released_at REAL")
         if "daily_at" not in {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}:  # ajoutée en 1.34.0
             conn.execute("ALTER TABLE scan_state ADD COLUMN daily_at INTEGER")
+        # 1.80.0 : un .txt tient lieu de NFO ; les releases sans NFO sont relistées une fois au prochain scan
+        # (mtime remis à zéro) pour découvrir le leur. Pistes, favoris et écoutes sont conservés.
+        if "txt_nfo" not in {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}:
+            conn.execute("ALTER TABLE scan_state ADD COLUMN txt_nfo INTEGER")
+            conn.execute("UPDATE releases SET mtime=0 WHERE has_nfo=0")
         # colonnes ajoutées en 1.36.0 (année corrigée) et en 1.37.0
         for table, col, kind in (("overrides", "year", "INTEGER"), ("overrides", "hidden", "INTEGER"), ("overrides", "cover", "INTEGER"),
                                  ("releases", "label", "TEXT"), ("releases", "catalog", "TEXT"),

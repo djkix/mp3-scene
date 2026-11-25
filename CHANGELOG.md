@@ -4,6 +4,21 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.80.0](https://github.com/djkix/mp3-scene/compare/v1.79.0...v1.80.0) (2026-11-25)
+
+### Résumé
+
+**Fichiers .txt des mixes, silences sautés.**
+
+- Une release sans NFO prend son premier fichier .txt à la place : affiché sur la fiche, et lu comme un NFO
+  (tracklist et chapitres des longs mixes, titres des pistes sans tags, date, label, recherche dans les NFO). Texte
+  en UTF-8 ou Windows-1252. Au premier scan après la mise à jour, les releases sans NFO sont relues une fois
+  (pistes, favoris et écoutes conservés).
+- Tracklists : « 01. [00:00] Artiste - Titre » et « 00:00 - Artiste - Titre » sont reconnues.
+- Dates en français : « Diffusé le 12/03/2010 », « Date de sortie : … », ou « Date : … » seule.
+- Sauter les silences (Réglages audio, activé par défaut) : un blanc d'au moins 1,5 s en début ou en fin de piste,
+  ou de 8 s au milieu (avant une piste cachée), repéré sur la forme d'onde, est sauté pendant la lecture.
+
 ## [1.79.0](https://github.com/djkix/mp3-scene/compare/v1.78.0...v1.79.0) (2026-11-25)
 
 ### Résumé

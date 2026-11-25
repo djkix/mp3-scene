@@ -5,6 +5,7 @@
 import { api, fmtDuration } from './api.js';
 import { t as tr } from './i18n.js';
 import { el, relName, relHref } from './dom.js';
+import { gaps } from './silence.js';
 import { Queue } from './queue.js';
 import { offline } from './offline.js';
 
@@ -311,7 +312,7 @@ function swap(x) {
 // jusqu'au rechargement de la page.
 // ponytail: nivellement = compresseur (réduit les écarts de volume), pas une analyse ReplayGain piste par piste.
 const PREFS = KEY + '.audio';
-const prefs = { eq: [0, 0, 0], level: false, fade: 0, original: false, awake: true, norm: true };
+const prefs = { eq: [0, 0, 0], level: false, fade: 0, original: false, awake: true, norm: true, skip: true };
 try { Object.assign(prefs, JSON.parse(localStorage.getItem(PREFS))); } catch { /* absent ou corrompu */ }
 if (!Array.isArray(prefs.eq) || prefs.eq.length !== 3) prefs.eq = [0, 0, 0];
 let ctx = null, fx = null;
@@ -321,6 +322,18 @@ let ctx = null, fx = null;
 // trop faible reste telle quelle ; iOS ignore ce volume, l'égalisation n'y fait rien.
 const TARGET = -16; // dBFS (RMS)
 const loud = new Map(); // id de piste -> volume moyen mesuré
+const peaksOf = new Map(); // id de piste -> forme d'onde, pour sauter ses silences
+
+// Sauter les silences : un blanc en tête ou en queue (1,5 s et plus), ou au milieu (8 s et plus, la piste cachée
+// après des minutes de vide), repéré sur la forme d'onde, est sauté pendant la lecture. Un blanc final mène à la fin
+// de la piste, donc à la suivante comme d'habitude.
+function skipSilence() {
+  const p = prefs.skip && !backend && !fade && !dragging && !audio.paused && peaksOf.get(audio.tid);
+  const d = audio.duration, pos = audio.currentTime;
+  if (!p || !(d > 0)) return;
+  const g = gaps(p, d).find(([a, b]) => pos >= a && pos < b - 0.5);
+  if (g) audio.currentTime = Math.min(g[1], d);
+}
 const vol = (a) => {
   const db = prefs.norm ? loud.get(a.tid) : null;
   return userVol * (db ? Math.min(1, 10 ** ((TARGET - db) / 20)) : 1);
@@ -515,6 +528,7 @@ function openAudioPrefs() {
   const [eqHelp, eqNote] = help(tr("Sur iPhone, l'égaliseur et le nivellement peuvent couper le son écran verrouillé : remettez-les à zéro puis rechargez la page."));
   const [fadeHelp, fadeNote] = help(canFade ? tr("Les pistes s'enchaînent sans blanc ; le fondu les fait se chevaucher, sauf entre deux pistes d'une même release.")
     : tr("Les pistes s'enchaînent sans blanc. Le fondu n'est pas possible sur cet appareil."));
+  const [skipHelp, skipNote] = help(tr('Les blancs en début et en fin de piste (et les longs silences avant une piste cachée) sont sautés, d’après la forme d’onde.'));
   const [normHelp, normNote] = help(tr('Les pistes plus fortes que la moyenne sont baissées, d’après leur volume mesuré à la première écoute.'));
   const [awakeHelp, awakeNote] = help(tr('Dans l’application installée sur l’écran d’accueil, l’écran ne se met pas en veille tant qu’elle est affichée. Sans effet dans un onglet du navigateur.'));
   const [origHelp, origNote] = help(tr('Sans ce réglage, ces fichiers sont écoutés convertis en MP3 320 kbit/s, plus légers. Il s’applique à partir de la piste suivante.'));
@@ -524,6 +538,8 @@ function openAudioPrefs() {
       el('h3', {}, tr('Enchaînement')),
       el('label', { class: 'fx-line' }, tr('Niveler le volume entre les pistes'), el('input', { type: 'checkbox', class: 'switch', role: 'switch',
         checked: prefs.level, onchange: (e) => { prefs.level = e.target.checked; applyPrefs(); } })),
+      el('label', { class: 'fx-line' }, el('span', {}, tr('Sauter les silences'), skipHelp), el('input', { type: 'checkbox', class: 'switch', role: 'switch',
+        checked: prefs.skip, onchange: (e) => { prefs.skip = e.target.checked; applyPrefs(); } })), skipNote,
       ...(canFade ? [el('label', { class: 'fx-line' }, el('span', {}, tr('Volume égalisé'), normHelp), el('input', { type: 'checkbox', class: 'switch', role: 'switch',
         checked: prefs.norm, onchange: (e) => { prefs.norm = e.target.checked; applyPrefs(); if (!fade) for (const a of els) a.volume = vol(a); } })), normNote] : []),
       el('div', { class: 'fx-line' }, el('span', {}, tr('Fondu enchaîné'), fadeHelp), fades), fadeNote,
@@ -534,7 +550,7 @@ function openAudioPrefs() {
         el('label', { class: 'fx-line' }, el('span', {}, tr('Garder l’écran allumé'), awakeHelp), el('input', { type: 'checkbox', class: 'switch', role: 'switch',
           checked: prefs.awake, onchange: (e) => { prefs.awake = e.target.checked; applyPrefs(); } })), awakeNote] : [])),
     el('div', { class: 'fx-foot' },
-      el('button', { type: 'button', onclick: () => { prefs.eq = [0, 0, 0]; prefs.level = false; prefs.fade = 0; prefs.original = false; prefs.norm = true; applyPrefs(); openAudioPrefs(); } }, tr('Réinitialiser')),
+      el('button', { type: 'button', onclick: () => { prefs.eq = [0, 0, 0]; prefs.level = false; prefs.fade = 0; prefs.original = false; prefs.norm = true; prefs.skip = true; applyPrefs(); openAudioPrefs(); } }, tr('Réinitialiser')),
       el('button', { type: 'button', class: 'primary', onclick: () => fxDlg.close() }, tr('Fermer'))));
   if (!fxDlg.open) fxDlg.showModal();
 }
@@ -762,6 +778,7 @@ on('pause', () => { update(); save(); });
 for (const ev of ['timeupdate', 'durationchange']) on(ev, tick);
 on('timeupdate', buffer);
 on('timeupdate', prime);
+on('timeupdate', skipSilence);
 for (const ev of ['seeked', 'ratechange']) on(ev, positionState);
 on('volumechange', volUI);
 
@@ -971,6 +988,7 @@ function loadWave(t) {
   ui.wave.classList.remove('has-wave'); // curseur simple en attendant (premier calcul : jusqu'à une minute pour un long mix)
   if (id === null) return;
   api(`/tracks/${id}/waveform`).then((w) => {
+    if (w.peaks?.length) peaksOf.set(id, w.peaks);
     if (Number.isFinite(w.loudness)) {
       loud.set(id, w.loudness);
       if (!fade) for (const a of els) a.volume = vol(a);

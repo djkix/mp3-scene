@@ -186,6 +186,8 @@ export const EN = {
   'Aigus': 'Treble',
   'Niveler le volume entre les pistes': 'Level the volume between tracks',
   'Volume égalisé': 'Normalised volume',
+  'Sauter les silences': 'Skip silences',
+  'Les blancs en début et en fin de piste (et les longs silences avant une piste cachée) sont sautés, d’après la forme d’onde.': 'Silence at the start and end of a track (and long gaps before a hidden track) is skipped, based on the waveform.',
   'Les pistes plus fortes que la moyenne sont baissées, d’après leur volume mesuré à la première écoute.': 'Tracks louder than average are turned down, based on their volume measured the first time they play.',
   'Fondu enchaîné': 'Crossfade',
   'Réinitialiser': 'Reset',

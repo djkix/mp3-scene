@@ -2,10 +2,35 @@
 import datetime
 import re
 import unicodedata
+from pathlib import Path
 
-# libellés par ordre de préférence : date de la release, du rip, de diffusion, puis de mise en vente
-_LABELS = (r"rel(?:ease|s)?[ ._]*date|rls[ ._]*date|\br[ ._]?date", r"rip[ ._]*date", r"air[ ._]*date",
-           r"(?:store|street|retail|str)[ ._]*date|\bs[ ._]?date")
+from app import security
+
+SUFFIXES = (".nfo", ".txt")
+
+
+def read(folder, root, limit: int) -> str | None:
+    """Texte du NFO du dossier : le premier .nfo, sinon le premier .txt (les mixes en ont souvent un à la place, avec
+    la tracklist). None sans l'un ni l'autre. Un .nfo est en page de code 437 (art ASCII) ; un .txt en UTF-8, sinon
+    en Windows-1252. Lève OSError si le fichier est illisible ; liens symboliques ignorés."""
+    names = security.regular_names(Path(folder), SUFFIXES)
+    name = next((n for n in names if n.lower().endswith(".nfo")), names[0] if names else None)
+    if name is None:
+        return None
+    with security.open_regular(Path(folder, name), root) as fh:  # lecture seule
+        data = fh.read(limit)
+    if name.lower().endswith(".nfo"):
+        return data.decode("cp437")
+    try:
+        return data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return data.decode("cp1252", "replace")
+
+# libellés par ordre de préférence : date de la release, du rip, de diffusion, puis de mise en vente, enfin une
+# « Date » seule ; en anglais (NFO) ou en français (les .txt des mixes : « Diffusé le 12/03/2010 »)
+_LABELS = (r"rel(?:ease|s)?[ ._]*date|rls[ ._]*date|\br[ ._]?date|date de sortie|sorti(?:e|e? le)\b", r"rip[ ._]*date",
+           r"air[ ._]*date|date de diffusion|diffus[ée]+(?: le)?|enregistr[ée]+(?: le)?|recorded(?: on)?|broadcast(?: on)?",
+           r"(?:store|street|retail|str)[ ._]*date|\bs[ ._]?date", r"\bdate\b")
 _MONTHS = {m: i + 1 for i, m in enumerate("jan feb mar apr may jun jul aug sep oct nov dec".split())}
 _S = r"[-./ ]"
 _DATE = re.compile(rf"(?:(?P<mon>[A-Za-z]{{3,9}}){_S}(?P<md>\d{{1,2}}){_S}(?P<my>\d{{4}})"   # Sep-11-2007
@@ -109,7 +134,8 @@ def label_key(v: str) -> str:
 _DISC = re.compile(r"^\W*(?:cd|disc|disk)\s*0*(\d+)\b", re.I)
 _TIME = r"\[?\(?(?:(\d{1,2}):)?(\d{1,3}):(\d{2})\)?\]?"
 _AFTER = re.compile(rf"^\s*\d{{1,3}}\s*[.)\-]?\s+(.+?)\s+{_TIME}\s*$")          # « 1. Artiste - Titre    4:00 »
-_BEFORE = re.compile(rf"^\s*{_TIME}\s+(?:\d{{1,3}}\s*[.)\-]?\s+)?(.+?)\s*$")       # « [00:00] 01. Artiste - Titre »
+# « [00:00] 01. Artiste - Titre », « 01. [00:00] Artiste - Titre », « 00:00 - Artiste - Titre »
+_BEFORE = re.compile(rf"^\s*(?:\d{{1,3}}\s*[.)]\s*)?{_TIME}\s*(?:[-\u2013|]\s+|\s)(?:\d{{1,3}}\s*[.)\-]?\s+)?(.+?)\s*$")
 
 
 def tracklist(text: str) -> list[list[dict]]:

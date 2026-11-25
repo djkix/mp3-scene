@@ -1111,12 +1111,12 @@ def release_nfo(rid: Id, request: Request, conn=Depends(get_conn)):
         raise HTTPException(404, "Release introuvable.")
     folder = safe_path(settings.music_root, row["path"])
     try:
-        nfo = next(n for n in sorted(p.name for p in folder.iterdir()) if n.lower().endswith(".nfo"))
-        with open(safe_path(settings.music_root, row["path"], nfo), "rb") as fh:  # lecture seule
-            data = fh.read(NFO_MAX)
-    except (StopIteration, OSError):
-        raise HTTPException(404, "NFO introuvable.") from None
-    return Response(data.decode("cp437"), media_type="text/plain; charset=utf-8")
+        text = nfo.read(folder, settings.music_root, NFO_MAX)  # .nfo, sinon .txt
+    except OSError:
+        text = None
+    if text is None:
+        raise HTTPException(404, "NFO introuvable.")
+    return Response(text, media_type="text/plain; charset=utf-8")
 
 
 @router.get("/api/favorites/tracks")

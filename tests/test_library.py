@@ -1198,6 +1198,10 @@ CD 2/2
     assert [(c["artist"], c["start"]) for c in d1] == [("An21 & MaxVangeli", 0), ("Sander van Doorn", 240), ("Tommyboy & Agebeat Pres. Crazibiza", 482)]
     assert d1[2]["title"] == "Spinning Around (Tommyboy Remix)" and [c["start"] for c in d2] == [0, 300]
     assert [c["start"] for c in nfo.tracklist("[00:00] A - B\n[03:30] C - D\n[10:05] E - F")[0]] == [0, 210, 605]
+    # formats des .txt de mixes : numéro puis début, début suivi d'un tiret
+    assert [c["start"] for c in nfo.tracklist("01. [00:00] A - B\n02. [05:30] C - D")[0]] == [0, 330]
+    assert [(c["artist"], c["start"]) for c in nfo.tracklist("00:00 - A - B\n1:02:10 - C - D")[0]] == [("A", 0), ("C", 3730)]
+    assert nfo.release_date("Diffusé le 12/03/2010") == nfo.release_date("Date : 12/03/2010") == nfo.release_date("Rel date: 2010-03-12") is not None
     conn = db.connect(settings.data_dir)
     rid = conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo)"
                        " VALUES ('m', 'm', '', 'Compilations', 0, 0, 1, 2, 1)").lastrowid
@@ -1534,3 +1538,20 @@ def test_kind_sort_puts_newest_first_within_each_category(user_client, settings)
     conn.commit()
     items = user_client.get("/api/releases", params={"artist": "Moby", "sort": "kind", "dir": "asc"}).json()["items"]
     assert [x["year"] for x in items] == [2013, 2011, 1993, 2000]  # albums du plus récent au plus ancien, puis singles
+
+
+def test_txt_stands_in_for_a_missing_nfo(user_client, library, settings, tmp_path):
+    import os
+    from app import nfo, scanner
+    bid = user_client.get("/api/releases", params={"q": "bicep"}).json()["items"][0]["id"]
+    folder = settings.music_root / user_client.get(f"/api/releases/{bid}").json()["path"]
+    (folder / "tracklist.txt").write_text("Mixé par Bicep\n1. A - B 4:00\n", encoding="utf-8")
+    assert "Mixé par Bicep" in user_client.get(f"/api/releases/{bid}/nfo").text  # un mix sans NFO, avec un .txt
+    with os.scandir(folder) as it:
+        assert scanner._files(list(it))[2] is True  # compté comme un NFO au scan
+    (tmp_path / "a.txt").write_bytes("Café".encode("cp1252"))
+    assert nfo.read(tmp_path, tmp_path, 100) == "Café"  # pas de l'UTF-8 : Windows-1252
+    (tmp_path / "z.nfo").write_bytes("█".encode("cp437"))
+    assert nfo.read(tmp_path, tmp_path, 100) == "█"  # un .nfo passe avant le .txt
+    (tmp_path / "vide").mkdir()
+    assert nfo.read(tmp_path / "vide", tmp_path, 100) is None
