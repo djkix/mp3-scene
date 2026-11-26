@@ -4,6 +4,24 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.84.4](https://github.com/djkix/mp3-scene/compare/v1.84.3...v1.84.4) (2026-11-26)
+
+### Résumé
+
+**La pochette lance la lecture.**
+
+- Listes de releases : le picto lecture est posé sur la pochette, en bas à droite ; un appui sur la pochette lance
+  la release, un appui ailleurs sur la ligne ouvre sa fiche.
+- Lecteur réduit sur téléphone : lecture/pause écartée du titre, suivant et cast resserrés ; la barre de
+  progression occupe toute la largeur, collée au bord haut du lecteur.
+- Nom d'une release sur téléphone : les deux lignes sont remplies (un long morceau sans tiret ne part plus à une
+  troisième ligne cachée, en laissant la deuxième presque vide).
+- Fiche d'une release : chemin du dossier sur une ligne (entier en bulle), copie au bout ; Discogs, Beatport,
+  YouTube (avec leur logo) et, pour un administrateur, ajouter, chercher ou retirer une pochette sur une seule rangée
+  de pictos ronds.
+- Listes de pistes et cartes de la fiche : largeur de la première colonne de nouveau correcte (une variable CSS
+  partageait son nom avec une couleur des graphiques depuis la 1.84.1).
+
 ## [1.84.3](https://github.com/djkix/mp3-scene/compare/v1.84.2...v1.84.3) (2026-11-26)
 
 ### Résumé

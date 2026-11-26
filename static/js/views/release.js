@@ -101,22 +101,24 @@ function header(rel) {
       el('a', { class: 'cover', href: `/api/releases/${rel.id}/cover`, target: '_blank', rel: 'noopener' },
         el('img', { src: `/api/releases/${rel.id}/cover`, alt: t('Pochette'), onerror: (e) => e.target.parentNode.remove() })),
       info),
-    // emplacement du dossier dans la bibliothèque (à copier pour l'ouvrir sur le NAS) et recherches de cette release
-    // sur des sites extérieurs : simples liens, rien n'est envoyé tant qu'on ne clique pas
-    el('p', { class: 'detail-links' },
+    // emplacement du dossier (à copier pour l'ouvrir sur le NAS), sur une ligne ; le chemin entier en bulle
+    el('p', { class: 'detail-links detail-path' },
       el('span', { class: 'path-ico', 'data-ico': 'folder', 'aria-hidden': 'true' }),
-      el('code', { title: t('Emplacement du dossier') }, rel.path),
-      el('button', { type: 'button', class: 'icon', title: t('Copier le chemin'), 'aria-label': t('Copier le chemin'), onclick: async () => {
+      el('code', { title: rel.path }, rel.path),
+      el('button', { type: 'button', class: 'icon', 'data-ico': 'copy', title: t('Copier le chemin'), 'aria-label': t('Copier le chemin'), onclick: async () => {
         try { await navigator.clipboard.writeText(rel.path); player.flash(t('Chemin copié.')); } catch { player.flash(t('Copie impossible dans ce navigateur.')); }
-      } }, '⧉')),
-    // recherches de cette release sur des sites extérieurs : simples liens, rien n'est envoyé tant qu'on ne clique pas
-    el('p', { class: 'detail-links' },
+      } })),
+    // une rangée de pictos ronds : recherches de cette release sur des sites extérieurs (simples liens, rien n'est
+    // envoyé tant qu'on ne clique pas), puis pour un administrateur les outils de pochette
+    el('div', { class: 'detail-tools' },
+      // logos dessinés dans la feuille de style (aucune image chargée depuis ces sites)
       ...[['Discogs', 'https://www.discogs.com/search/?type=release&q='], ['Beatport', 'https://www.beatport.com/search?q='],
-        ['YouTube', 'https://www.youtube.com/results?search_query=']].map(([site, url]) => el('a', { class: 'chip', target: '_blank', rel: 'noopener noreferrer',
+        ['YouTube', 'https://www.youtube.com/results?search_query=']].map(([site, url]) => el('a', { class: `round site site-${site.toLowerCase()}`,
+        target: '_blank', rel: 'noopener noreferrer', title: t('Chercher sur {0}', site), 'aria-label': t('Chercher sur {0}', site),
         // titre sans le nombre de disques collé à la fin (« Mystery Land 2010-2CD »), comme la recherche de pochettes
         href: url + encodeURIComponent([/^(va|various( artists)?)$/i.test(rel.artist || '') ? '' : rel.artist,
-          (rel.title || '').replace(/[-_ ]+\(?\d*x?(?:CD|DVD)\d*\)?\s*$/i, '')].filter(Boolean).join(' ')) }, site))),
-    session.user?.role === 'admin' ? coverTools(rel) : null,
+          (rel.title || '').replace(/[-_ ]+\(?\d*x?(?:CD|DVD)\d*\)?\s*$/i, '')].filter(Boolean).join(' ')) })),
+      ...(session.user?.role === 'admin' ? [el('span', { class: 'tools-sep', 'aria-hidden': 'true' }), ...coverTools(rel)] : [])),
     el('div', { class: 'detail-actions' },
       el('button', { type: 'button', class: 'primary', 'data-ico': 'play', disabled: !rel.tracks.length, onclick: play }, t('Lire')),
       el('button', { type: 'button', 'data-ico': 'queue', onclick: () => emit('queue-release', { releaseId: rel.id }) }, t('Ajouter à la file')),
@@ -144,10 +146,11 @@ function coverTools(rel) {
     } catch (err) { msg.textContent = err.message; }
   };
   const file = el('input', { type: 'file', accept: 'image/jpeg,image/png', hidden: true, onchange: () => { if (file.files[0]) send('PUT', file.files[0]); } });
-  return el('p', { class: 'detail-admin' }, file,
-    el('button', { type: 'button', onclick: () => file.click() }, rel.custom_cover ? t('Remplacer la pochette') : t('Ajouter une pochette')),
-    el('button', { type: 'button', onclick: () => findCover(rel) }, t('Chercher une pochette')),
-    rel.custom_cover ? el('button', { type: 'button', onclick: () => send('DELETE') }, t('Retirer la pochette ajoutée')) : null, msg);
+  const round = (ico, label, onclick) => el('button', { type: 'button', class: 'round', 'data-ico': ico, title: label, 'aria-label': label, onclick });
+  return [file,
+    round('img-up', rel.custom_cover ? t('Remplacer la pochette') : t('Ajouter une pochette'), () => file.click()),
+    round('img-find', t('Chercher une pochette'), () => findCover(rel)),
+    rel.custom_cover ? round('img-x', t('Retirer la pochette ajoutée'), () => send('DELETE')) : null, msg].filter(Boolean);
 }
 
 // Administrateur : pochettes proposées par la recherche du serveur (Deezer, iTunes, Discogs avec un jeton).

@@ -99,11 +99,16 @@ button:disabled { opacity: .6; cursor: default; }
 .rel-list, .sub-list { list-style: none; margin: 0; padding: 0; }
 .rel-head { margin-top: 12px; background: var(--panel); border-top: 1px solid var(--line); }
 .rel, .rel-head { display: grid; align-items: center; gap: 0 14px; padding: 6px 12px; border-bottom: 1px solid var(--line);
-  grid-template-columns: var(--c1, 40px) minmax(0, 1fr) 7rem 5rem 3rem 5.25rem 4.5rem 6.25rem 100px; } /* colonnes séparées par l'espace seul */
+  grid-template-columns: var(--rel-c1, 40px) minmax(0, 1fr) 7rem 5rem 3rem 5.25rem 4.5rem 6.25rem 100px; } /* colonnes séparées par l'espace seul */
 /* release : pochette (badge « nouveau » posé dessus) et picto lecture dans la première colonne */
-.rel:has(> .rel-cover), .rel-head:not(.trk) { --c1: 68px; }
-.rel-cover { align-self: center; position: relative; display: flex; align-items: center; gap: 6px; }
-.rel-cover .new { position: absolute; top: -5px; left: -5px; margin: 0; padding: 1px 4px; font-size: 9px; background: var(--accent); color: var(--on-accent); pointer-events: none; }
+/* release : la pochette lance la lecture ; badge « nouveau » en haut à gauche, picto lecture en bas à droite */
+.rel-cover { position: relative; display: block; align-self: center; width: max-content; min-width: 0; min-height: 0; height: auto;
+  padding: 0; border: 0; background: none; cursor: pointer; }
+.rel-cover .new { position: absolute; top: -5px; left: -5px; margin: 0; padding: 1px 4px; font-size: 9px; background: var(--accent); color: var(--on-accent); }
+.rel-cover .rel-play { position: absolute; right: -4px; bottom: -4px; display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--on-accent); }
+.rel-cover .rel-play::before { width: 12px; height: 12px; margin-left: 2px; }
+.rel-cover:hover .rel-play { filter: brightness(1.1); }
 .d-year { display: none; }
 .rel { cursor: pointer; }
 .rel-thumb { display: block; width: 40px; height: 40px; object-fit: cover; border-radius: 4px; background: var(--hover); }
@@ -307,7 +312,7 @@ google-cast-launcher:hover { background: var(--hover); }
 /* Mobile : onglets en bas (à portée de pouce), lecteur réduit au-dessus, lecteur plein écran au toucher du titre */
 @media (max-width: 699px) {
   :root { --nav-h: calc(52px + env(safe-area-inset-bottom)); }
-  .rel { grid-template-columns: var(--c1, 40px) minmax(0, 1fr) auto; gap: 4px 10px; grid-template-areas: "thumb name act" "thumb info act";
+  .rel { grid-template-columns: var(--rel-c1, 40px) minmax(0, 1fr) auto; gap: 4px 10px; grid-template-areas: "thumb name act" "thumb info act";
     margin: 8px 12px; padding: 10px 2px 10px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
   .rel-thumb, .rel-cover { grid-area: thumb; align-self: start; }
   .rel-head { display: none; }
@@ -350,9 +355,11 @@ google-cast-launcher:hover { background: var(--hover); }
 
   /* Lecteur réduit : filet de progression, titre sur deux lignes, lecture/pause, suivant, cast */
   #player { bottom: var(--nav-h); padding-bottom: 0; }
-  /* barre de 5 px tout en haut du lecteur, dans une zone d'appui de 16 px : un appui déplace la lecture */
-  .pl-progress { display: block; height: 16px; margin: 0 12px -6px; cursor: pointer;
-    background: linear-gradient(to right, var(--accent) calc(var(--p, 0) * 100%), var(--line) 0) center / 100% 5px no-repeat; }
+  /* barre de 5 px sur toute la largeur, collée au bord haut du lecteur (à la place de son filet) ; zone d'appui de
+     16 px qui empiète sur la ligne du titre sans la pousser : un appui déplace la lecture */
+  #player:not(.expanded) { border-top: 0; }
+  .pl-progress { display: block; position: relative; z-index: 1; height: 16px; margin: 0 0 -16px; cursor: pointer;
+    background: linear-gradient(to right, var(--accent) calc(var(--p, 0) * 100%), var(--line) 0) top / 100% 5px no-repeat; }
   .pl-bar { display: flex; gap: 2px; min-height: 64px; padding: 4px 4px 4px 12px; }
   .pl-info { flex: 1 1 0; }
   .pl-cover { width: 52px; height: 52px; }
@@ -367,6 +374,11 @@ google-cast-launcher:hover { background: var(--hover); }
   #player:not(.expanded) .pl-title { grid-row: 2; }
   #player:not(.expanded) .pl-artist { grid-row: 3; }
   .pl-rel, .pl-seek, .pl-qbtn, .pl-fx, .pl-volwrap, .pl-chap, .pl-controls :is(.pl-shuffle, .pl-prev, .pl-repeat) { display: none; }
+  /* lecture/pause écartée du titre, puis suivant et cast resserrés contre elle */
+  #player:not(.expanded) .pl-controls { gap: 0; margin-left: 12px; }
+  #player:not(.expanded) .pl-controls .pl-next { min-width: 36px; }
+  #player:not(.expanded) .pl-tools { gap: 0; }
+  #player:not(.expanded) google-cast-launcher { width: 36px; padding: 8px 6px; }
   /* paroles, visualiseur : seulement en plein écran (#player : plus fort que la règle [data-ico] des icônes) */
   #player:not(.expanded) :is(.pl-lyrbtn, .pl-vizbtn, .pl-tvbtn, .pl-stage) { display: none; }
   /* plein écran : paroles ou spectre à la place de la pochette, à la même taille */
@@ -570,6 +582,25 @@ thead th { color: var(--muted); background: var(--panel); padding-block: 8px; wh
 .detail-info dd .pill + .pill { margin-left: 4px; }
 .detail-links code { overflow-wrap: anywhere; opacity: .8; }
 .detail-links a.chip:hover { text-decoration: underline; }
+/* chemin du dossier sur une ligne (le chemin entier en bulle), copie au bout */
+.detail-path { flex-wrap: nowrap; }
+.detail-path code { min-width: 0; flex: 0 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
+.detail-path .icon { flex: none; min-width: 32px; height: 32px; min-height: 0; border: 0; background: none; color: var(--muted); }
+/* liens extérieurs et outils de pochette : une rangée de pictos ronds */
+.detail-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 12px; }
+.round { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; min-width: 0; min-height: 0;
+  padding: 0; border: 1px solid var(--line); border-radius: 50%; background: none; color: var(--fg); font: 600 11px var(--mono); letter-spacing: .02em; }
+.round:hover { border-color: var(--muted); color: var(--accent-text); }
+.round::before { width: 18px; height: 18px; }
+.round.site::before { content: ""; width: 22px; height: 22px; background-position: center; background-size: contain; background-repeat: no-repeat; }
+.site-discogs::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%23333'/%3E%3Ccircle cx='12' cy='12' r='8.5' fill='none' stroke='%23fff' stroke-width='.8' opacity='.55'/%3E%3Ccircle cx='12' cy='12' r='6.5' fill='none' stroke='%23fff' stroke-width='.8' opacity='.55'/%3E%3Ccircle cx='12' cy='12' r='4.5' fill='none' stroke='%23fff' stroke-width='.8' opacity='.55'/%3E%3Ccircle cx='12' cy='12' r='2.2' fill='%23fff'/%3E%3C/svg%3E"); }
+.site-beatport::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%2301ff95'/%3E%3Cpath d='M8.5 5.5v8.2a4.3 4.3 0 1 0 4.3-4.3H11' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E"); }
+.site-youtube::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='1.5' y='5' width='21' height='14' rx='4.5' fill='%23f00'/%3E%3Cpath d='M10 8.8v6.4l5.6-3.2z' fill='%23fff'/%3E%3C/svg%3E"); }
+.tools-sep { width: 1px; height: 24px; margin: 0 4px; background: var(--line); }
+[data-ico="copy"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='9' y='9' width='11' height='11' rx='2'/%3E%3Cpath d='M5 15V5a1 1 0 0 1 1-1h10'/%3E%3C/svg%3E"); }
+[data-ico="img-up"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 13v6H4V5h8'/%3E%3Cpath d='M4 17l5-5 4 4 2-2 5 5'/%3E%3Cpath d='M18 3v6M15 6l3-3 3 3'/%3E%3C/svg%3E"); }
+[data-ico="img-find"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 19H4V5h16v6'/%3E%3Cpath d='M4 16l5-5 4 4'/%3E%3Ccircle cx='17.5' cy='17.5' r='2.5'/%3E%3Cpath d='M19.5 19.5L22 22'/%3E%3C/svg%3E"); }
+[data-ico="img-x"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 12v7H4V5h8'/%3E%3Cpath d='M4 17l5-5 4 4'/%3E%3Cpath d='M16 4l5 5M21 4l-5 5'/%3E%3C/svg%3E"); }
 dialog.compare { max-width: min(96vw, 1100px); }
 .cmp th, .cmp td { vertical-align: top; text-align: left; white-space: normal; }
 .cmp td.best { color: var(--accent-text); font-weight: 600; }
@@ -738,7 +769,7 @@ td.num { text-align: right; white-space: nowrap; font: 12px var(--mono); font-va
 tr.disc th { background: var(--hover); color: var(--fg); padding-block: 8px; }
 .nfo-h { margin: 28px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line); color: var(--muted); }
 /* releases similaires de la fiche : lignes compactes (nom, détails dessous), comme sur mobile, quelle que soit la largeur */
-.detail .rel { grid-template-columns: var(--c1, 40px) minmax(0, 1fr) auto; gap: 2px 10px; grid-template-areas: "thumb name act" "thumb info act"; }
+.detail .rel { grid-template-columns: var(--rel-c1, 40px) minmax(0, 1fr) auto; gap: 2px 10px; grid-template-areas: "thumb name act" "thumb info act"; }
 .detail .rel-thumb, .detail .rel-cover { grid-area: thumb; }
 .detail .rel-name { grid-area: name; }
 .detail .rel-actions { grid-area: act; }
@@ -960,21 +991,19 @@ body.party-on #view { max-width: none; padding: 0; margin: 0; }
 .nd-letters { justify-content: center; margin: 12px; }
 .nd-notes { margin: 0 12px 12px; padding: 12px; border: 1px solid var(--line); border-radius: 6px; white-space: pre-wrap; font: 13px/1.5 var(--mono); overflow-wrap: anywhere; }
 .nd-path { margin: 12px; font: 12px var(--mono); overflow-wrap: anywhere; }
-#view .rel-play { display: inline-flex; vertical-align: -5px; width: 22px; height: 22px; min-width: 0; margin-right: 6px; border: 0; background: none; color: var(--accent); }
-#view .rel-cover .rel-play { margin: 0; }
 /* téléphone : badge et picto plus serrés, pour laisser la place au nom */
 @media (max-width: 699px) {
   .rel-name .new { margin-right: 4px; padding: 1px 4px; font-size: 9px; vertical-align: 1px; }
   /* picto lecture assez grand pour le doigt ; nom sur deux lignes au plus, le nom complet est sur la fiche */
-  .rel:has(> .rel-cover) { --c1: 88px; padding-left: 6px; column-gap: 8px; }
-  .rel-cover { gap: 2px; }
+  .rel:has(> .rel-cover) { --rel-c1: 56px; padding-left: 8px; column-gap: 12px; }
   .rel-cover .rel-thumb { width: 56px; height: 56px; }
-  #view .rel-cover .rel-play { width: 30px; height: 44px; margin: 0; padding: 0; }
-  #view .rel-cover .rel-play::before { width: 26px; height: 26px; }
-  .rel-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+  .rel-cover .rel-play { width: 28px; height: 28px; right: -6px; bottom: -6px; }
+  .rel-cover .rel-play::before { width: 14px; height: 14px; }
+  /* coupe à n'importe quel caractère : un long morceau sans tiret (« Im_Always_Here_Baywatch_Theme ») ne part pas
+     à la troisième ligne, cachée, en laissant la deuxième presque vide */
+  .rel-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; word-break: break-all; }
   /* informations : genre, pistes, débit, poids, catégorie, année */
   .rel-info > :nth-child(1) { order: 1; } .rel-info > :nth-child(3) { order: 2; } .rel-info > :nth-child(4) { order: 3; }
   .rel-info > :nth-child(5) { order: 4; } .rel-info > :nth-child(6) { order: 5; } .rel-info > :nth-child(2) { order: 6; }
   .d-full { display: none; } .d-year { display: inline; }
 }
-.rel-play:hover { color: var(--accent-text); }

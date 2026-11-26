@@ -59,20 +59,19 @@ export function row(rel, pick = null, onPick = () => {}) {
     onclick: () => emit('queue-release', { releaseId: rel.id }) }, '+');
   const detail = el('a', { class: 'icon rel-doc', href: relHref(rel.name, rel.id), title: tr('Détail de la release'),
     'aria-label': tr('Détail de la release') });
-  // un clic sur la ligne ouvre la fiche de la release ; le picto lecture devant le nom la lance
+  // un clic sur la ligne ouvre la fiche de la release ; un clic sur la pochette la lance
   const open = () => { location.hash = relHref(rel.name, rel.id); };
   return el('li', {
     class: 'rel', tabIndex: 0,
     onclick: (e) => { if (!e.target.closest('button, a, input')) open(); },
     onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) open(); },
   },
-  // vignette (chargée quand la ligne approche de l'écran) avec le badge « nouveau » posé dessus, puis le picto lecture
-  el('span', { class: 'rel-cover' },
+  // pochette (chargée quand la ligne approche de l'écran) : un appui lance la release ; badge « nouveau » et picto lecture posés dessus
+  el('button', { type: 'button', class: 'rel-cover', title: tr('Lire'), 'aria-label': tr('Lire {0}', relName(rel.name)), onclick: play },
     el('img', { class: 'rel-thumb', src: `/api/releases/${rel.id}/thumb`, alt: '', loading: 'lazy', width: 40, height: 40,
       onerror: noCover }),
     since() && rel.added_at > since() ? el('span', { class: 'new' }, tr('nouveau')) : null,
-    el('button', { type: 'button', class: 'icon rel-play', 'data-ico': 'play', title: tr('Lire'), 'aria-label': tr('Lire {0}', relName(rel.name)),
-      onclick: play })),
+    el('span', { class: 'rel-play', 'data-ico': 'play', 'aria-hidden': 'true' })),
   el('span', { class: 'rel-name' },
     pick && el('input', { type: 'checkbox', class: 'rel-pick', value: rel.id, checked: pick.has(rel.id), 'aria-label': tr('Sélectionner {0}', rel.name),
       onchange: (e) => { if (e.target.checked) pick.add(rel.id); else pick.delete(rel.id); onPick(); } }),
