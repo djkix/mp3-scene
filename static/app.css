@@ -963,8 +963,11 @@ body.party-on #view { max-width: none; padding: 0; margin: 0; }
 @media (max-width: 699px) {
   .rel-name .new { margin-right: 4px; padding: 1px 4px; font-size: 9px; vertical-align: 1px; }
   /* picto lecture assez grand pour le doigt ; nom sur deux lignes au plus, le nom complet est sur la fiche */
-  .rel:has(> .rel-cover) { --c1: 76px; }
-  #view .rel-cover .rel-play { width: 30px; height: 30px; margin: 0; padding: 0; }
+  .rel:has(> .rel-cover) { --c1: 88px; padding-left: 6px; column-gap: 8px; }
+  .rel-cover { gap: 2px; }
+  .rel-cover .rel-thumb { width: 56px; height: 56px; }
+  #view .rel-cover .rel-play { width: 30px; height: 44px; margin: 0; padding: 0; }
+  #view .rel-cover .rel-play::before { width: 26px; height: 26px; }
   .rel-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
   /* informations : genre, pistes, débit, poids, catégorie, année */
   .rel-info > :nth-child(1) { order: 1; } .rel-info > :nth-child(3) { order: 2; } .rel-info > :nth-child(4) { order: 3; }

@@ -4,6 +4,15 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.84.2](https://github.com/djkix/mp3-scene/compare/v1.84.1...v1.84.2) (2026-11-26)
+
+### Résumé
+
+**Pochette plus grande sur téléphone.**
+
+- Listes de releases sur téléphone : pochette de 56 px au lieu de 40, marge de gauche réduite, picto lecture plus
+  grand et collé à la pochette.
+
 ## [1.84.1](https://github.com/djkix/mp3-scene/compare/v1.84.0...v1.84.1) (2026-11-26)
 
 ### Résumé
