@@ -4,6 +4,19 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.84.3](https://github.com/djkix/mp3-scene/compare/v1.84.2...v1.84.3) (2026-11-26)
+
+### Résumé
+
+**Lecteur sur téléphone, Live & Radio sans erreur 422.**
+
+- Lecteur réduit : la barre de progression revient au-dessus du titre, un pixel plus fine ; pochette plus grande.
+- Lecteur plein écran : le nom de la release défile s'il est trop long ; l'artiste en plus grand (+2 px).
+- « Chercher une photo » devient un picto appareil photo (artistes, labels, festivals).
+- Live & Radio › Clubs et autres : les dossiers « -= Winter Music Conference 20xx =- » et « -= White Sensation … =- »
+  sont rangés dans Festivals ; un dossier orné sans artiste prend son nom (« INOX Strasbourg 2010 ») au lieu d'un nom
+  vide, dont la page renvoyait « Erreur 422 ».
+
 ## [1.84.2](https://github.com/djkix/mp3-scene/compare/v1.84.1...v1.84.2) (2026-11-26)
 
 ### Résumé

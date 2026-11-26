@@ -1054,7 +1054,8 @@ def _live_sets(conn, kind: str) -> dict:
         if t != kind:
             continue
         if t == "artist":
-            name, year = r["who"] or r["name"].split("-")[0].replace("_", " ").strip(), None
+            # sans artiste : début du nom, sans l'ornement (« -= INOX Strasbourg 2010 =- »), jamais vide
+            name, year = r["who"] or naming.ORNAMENT.sub("", r["name"]).split("-")[0].replace("_", " ").strip() or r["name"], None
             key = artists.fold(name)
         else:
             name, year, key = x[0], x[1], festival_key(x[0])

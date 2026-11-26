@@ -79,6 +79,8 @@ def test_festival_and_year_read_from_set_names():
         "Sunrise_Festival_2014-DVBC-26-07-2014-AFO": ("Sunrise Festival", 2014),
         "Indochine-Festival_Des_Vieilles_Charrues-DVBS-2009-JUST": ("Festival Des Vieilles Charrues", None),
         "Moby-Live_Au_Caprices_Festival_(Crans-Montana)-DVBS-2008-JUST": ("Caprices Festival", None),
+        "-= Winter Music Conference 2016 =-": ("Winter Music Conference", 2016),
+        "-= White Sensation 2008 - Prague =-": ("White Sensation", 2008),
     }
     for name, expected in cases.items():
         assert festival(name) == expected, name

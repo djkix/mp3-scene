@@ -60,7 +60,7 @@ function detail(container, kind, params) {
   const photoKind = { artists: 'artist', labels: 'label' }[kind];
   const photo = photoKind && el('img', { class: photoKind === 'label' ? 'art-photo logo' : 'art-photo', alt: '', src: '/api/photo?' + new URLSearchParams({ kind: photoKind, name }), onerror: (e) => e.target.remove() });
   const photoBtn = photoKind && session.user?.role === 'admin'
-    && el('button', { type: 'button', class: 'chip keep', onclick: () => findPhoto(photoKind, name).catch(() => {}) }, tr('Chercher une photo'));
+    && el('button', { type: 'button', class: 'chip keep photo-btn', 'data-ico': 'photo', title: tr('Chercher une photo'), 'aria-label': tr('Chercher une photo'), onclick: () => findPhoto(photoKind, name).catch(() => {}) });
   const head = el('div', { class: 'art-head' }, el('div', {}, photo, table, photoBtn), chips);
   // label ou groupe : le même bloc en deux colonnes, résumé à gauche, ce qu'on y trouve le plus à droite
   const facts = el('table', { class: 'art-sum' }), found = el('div', { class: 'art-chips' });
@@ -392,7 +392,7 @@ function festivalPage(container, params) {
   const back = '#/categories' + qs({ category, type: type === 'festival' ? '' : type });
   const photo = el('img', { class: 'art-photo', alt: '', src: '/api/photo?' + new URLSearchParams({ kind: photoKind(type), name }), onerror: (e) => e.target.remove() });
   const photoBtn = session.user?.role === 'admin'
-    && el('button', { type: 'button', class: 'chip keep', onclick: () => findPhoto(photoKind(type), name).catch(() => {}) }, tr('Chercher une photo'));
+    && el('button', { type: 'button', class: 'chip keep photo-btn', 'data-ico': 'photo', title: tr('Chercher une photo'), 'aria-label': tr('Chercher une photo'), onclick: () => findPhoto(photoKind(type), name).catch(() => {}) });
   const jump = el('nav', { class: 'letters fest-years', 'aria-label': tr('Années') });
   const body = el('div');
   container.replaceChildren(tabs('categories'),
@@ -531,6 +531,10 @@ function seriesMissing(container) {
 export function render(container, params) {
   if (params.kind === 'series' && params.rest) return series(container, params);
   if (params.kind === 'series' && params.missing) return seriesMissing(container);
+  if (params.kind === 'festivals' && !params.rest) { // sans nom : retour au mur de Live & Radio
+    location.replace('#/categories' + qs({ category: params.category, type: params.type }));
+    return undefined;
+  }
   if (params.kind === 'festivals') return festivalPage(container, params);
   if (params.kind === 'categories') return categories(container, params);
   if (params.kind === 'titles' && params.rest) return title(container, params);

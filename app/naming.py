@@ -231,7 +231,7 @@ def complete_title(title: str | None, filename: str, artist: bool = False) -> st
 _BRANDS = re.compile(r"^(tomorrowland|mysteryland|defqon\.?1|qlimax|awakenings|mayday|nature one|time warp|creamfields"
                      r"|electric daisy carnival|sensation|dance valley|global gathering|untold|parookaville|extrema outdoor"
                      r"|electric love|world club dome|airbeat one|medusa|dreambeach|love parade|street parade|coachella"
-                     r"|glastonbury|lollapalooza)\b", re.I)
+                     r"|glastonbury|lollapalooza|winter music conference|white sensation)\b", re.I)
 _LIVE_AT = re.compile(r"^(?:.*?\b)?(?:live|set|dj set)\s+(?:at|au|@|from|a|à)\s+", re.I)
 _FEST_YEAR = re.compile(r"\b(19[89]\d|20\d\d)\b")
 # mots qui ne distinguent pas deux festivals : « INOX Electronique Festival » = « INOX Electronic Festival »

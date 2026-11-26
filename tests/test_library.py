@@ -1437,6 +1437,11 @@ def test_live_sets_split_into_festivals_radio_shows_and_artists(user_client, set
     assert get("festival") == {"Tomorrowland": (1, None)}
     assert get("radio") == {"A State of Trance": (2, 3), "Vonyc Sessions": (1, None)}  # pochette : le set qui en a une
     assert get("artist") == {"Carl Cox": (3, None)}  # club ou autre : par artiste, casse confondue
+    # dossier orné sans artiste ni festival reconnu : son nom, jamais un nom vide (page refusée)
+    conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, year)"
+                 " VALUES ('orn','-= INOX Strasbourg 2010 =-','','Live And Radio',0,0,10,0,0,2010)"); conn.commit()
+    assert "INOX Strasbourg 2010" in get("artist")
+    conn.execute("DELETE FROM releases WHERE path='orn'"); conn.commit()
     page = user_client.get("/api/festival", params={"name": "carl cox", "type": "artist"}).json()
     assert [x["fyear"] for x in page["items"]] == [2012, 2010, 2008]
     # page d'un artiste : où il joue, lu dans l'artiste de la release ou dans un morceau du nom

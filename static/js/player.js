@@ -864,14 +864,16 @@ function iconBtn(cls, glyph, label, onclick, ico = null) {
   return el('button', { type: 'button', class: 'icon ' + cls, title: label, 'aria-label': label, 'data-ico': ico, onclick }, glyph);
 }
 
-// Titre trop long pour sa place : il défile d'un bout à l'autre (CSS) au lieu d'être coupé.
+// Titre (et nom de la release) trop long pour sa place : il défile d'un bout à l'autre (CSS) au lieu d'être coupé.
 function fitTitle() {
-  const span = ui?.title.firstElementChild;
-  if (!span) return;
-  const over = span.offsetWidth - ui.title.clientWidth;
-  ui.title.classList.toggle('long', over > 4);
-  ui.title.style.setProperty('--shift', `${-over}px`);
-  ui.title.style.setProperty('--dur', `${Math.max(6, Math.round(over / 20))}s`);
+  for (const box of ui ? [ui.title, ui.rel] : []) {
+    const span = box.firstElementChild;
+    if (!span) continue;
+    const over = span.offsetWidth - box.clientWidth;
+    box.classList.toggle('long', over > 4);
+    box.style.setProperty('--shift', `${-over}px`);
+    box.style.setProperty('--dur', `${Math.max(6, Math.round(over / 20))}s`);
+  }
 }
 
 function label(btn, text) {
@@ -1029,7 +1031,8 @@ function update() {
       ui.title.title = name;
       fitTitle();
     }
-    ui.rel.textContent = relName(t?.release_name);
+    const rel = relName(t?.release_name);
+    if (ui.rel.textContent !== rel) { ui.rel.replaceChildren(el('span', {}, rel)); fitTitle(); }
     loadWave(t);
     const cover = t ? coverOf(t) : '';
     if (ui.cover.dataset.src !== cover) { // même release : l'image n'est pas rechargée à chaque piste
@@ -1205,12 +1208,12 @@ export function initPlayer(footer) {
       el('button', { type: 'button', onclick: () => player.clear() }, tr('Vider la file')), ui.close),
     ui.list);
 
-  // lecteur réduit (mobile) : barre de progression sous la ligne du titre ; un appui déplace la lecture à cet endroit
+  // lecteur réduit (mobile) : barre de progression au-dessus de la ligne du titre ; un appui déplace la lecture à cet endroit
   const progress = el('div', { class: 'pl-progress', 'aria-hidden': 'true', onclick: (e) => {
     const r = e.currentTarget.getBoundingClientRect();
     if (duration()) player.seek(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * duration());
   } });
-  footer.replaceChildren(ui.panel, ui.msg,
+  footer.replaceChildren(ui.panel, ui.msg, progress,
     el('div', { class: 'pl-bar' },
       el('div', { class: 'pl-top' }, ui.collapse, el('span', { class: 'pl-now' }, tr('En cours de lecture')), ui.doc),
       el('div', { class: 'pl-info' }, ui.cover, ui.stage, ui.title, ui.artist, ui.rel, ui.meta, ui.cast),
@@ -1223,7 +1226,7 @@ export function initPlayer(footer) {
       el('div', { class: 'pl-seek' }, ui.elapsed, ui.wave, ui.total),
       el('div', { class: 'pl-tools' }, ui.chap, ui.rate, volwrap, ui.lyrbtn, ui.vizbtn, ui.tvbtn, ui.fx, ui.fav, ui.qbtn,
         el('span', { id: 'cast-slot' })), // emplacement du bouton cast (cast.js)
-      el('p', { class: 'pl-hint' }, tr('Balayez pour changer de piste'))), progress);
+      el('p', { class: 'pl-hint' }, tr('Balayez pour changer de piste'))));
 
   // Plein écran : balayage vers la gauche = piste suivante, vers la droite = précédente.
   // Ignoré s'il part de la barre de progression ou de la file, ou s'il est plutôt vertical (défilement).
