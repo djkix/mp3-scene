@@ -1059,8 +1059,8 @@ function update() {
     ui.meta.replaceChildren(...meta.flatMap((x, i) => (i ? [el('span', { class: 'sep', 'aria-hidden': 'true' }, '·'), x] : [x])));
     // dessous, centrés : genre et catégorie de la release, chacun mène à sa page (et referme le plein écran)
     const go = () => expand(false);
-    ui.tags.replaceChildren(...[d?.genre && el('a', { class: 'chip', href: `#/genres/${encodeURIComponent(d.genre)}`, onclick: go }, d.genre),
-      d?.category && el('a', { class: 'chip', href: `#/categories?category=${encodeURIComponent(d.category)}`, onclick: go }, catLabel(d.category))].filter(Boolean));
+    ui.tags.replaceChildren(...[d?.genre && el('a', { class: 'chip', 'data-ico': 'tag', href: `#/genres/${encodeURIComponent(d.genre)}`, onclick: go }, d.genre),
+      d?.category && el('a', { class: 'chip', 'data-ico': 'folder', href: `#/categories?category=${encodeURIComponent(d.category)}`, onclick: go }, catLabel(d.category))].filter(Boolean));
     ui.fav.hidden = !!t?.nd; // pas de favori pour une piste de Navidrome
     ui.fav.textContent = t?.favorite ? '♥︎' : '♡︎';
     ui.fav.setAttribute('aria-pressed', !!t?.favorite);

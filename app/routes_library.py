@@ -1,5 +1,6 @@
 import hashlib
 import io
+import json
 import os
 import re
 import threading
@@ -704,6 +705,39 @@ def group_info(request: Request, by: Literal["label", "grp", "genre", "year"], n
             "genres": [] if by == "genre" else top("r.genre"), "members": members if len(members) > 1 else [],
             "others": top("r.grp" if by == "label" else "NULLIF(r.label, '')"),
             "discogs": by == "label" and bool(request.app.state.settings.discogs_token)}
+
+
+BIO_TTL = 30 * 86400  # une biographie (ou son absence) est gardée un mois
+
+
+@router.get("/api/artist-bio")
+def artist_bio(request: Request, name: str = Query(min_length=1, max_length=200), conn=Depends(get_conn)):
+    """Biographie d'un artiste de la bibliothèque, en anglais (Discogs) et en français (Wikipédia), gardée un mois
+    dans les données de l'application (jeton DISCOGS_TOKEN)."""
+    settings = request.app.state.settings
+    if not settings.discogs_token:
+        raise HTTPException(404, "Discogs n'est pas configuré.")
+    if artists.fold(name) in artists._VA | {""} or not conn.execute(
+            "SELECT 1 FROM releases WHERE COALESCE(tag_artist, artist)=? COLLATE NOCASE LIMIT 1", (name,)).fetchone():
+        raise HTTPException(404, "Pas de biographie.")  # un nom absent de la bibliothèque : aucune recherche
+    path = settings.data_dir / "bios" / (hashlib.sha1(artists.fold(name).encode()).hexdigest()[:20] + ".json")
+    try:
+        got = json.loads(path.read_text())
+        fresh = time.time() - got.get("at", 0) < BIO_TTL
+    except (OSError, ValueError):
+        got, fresh = {}, False
+    if not fresh:
+        try:
+            got = {"at": time.time(), **coversearch.artist_bio(name, settings.discogs_token, artists.fold)}
+        except (OSError, ValueError, KeyError, TypeError) as e:
+            raise HTTPException(502, f"Discogs ne répond pas ({e.__class__.__name__}).")
+        path.parent.mkdir(exist_ok=True)
+        tmp = path.with_name(f"{path.stem}.{threading.get_ident()}.tmp")
+        tmp.write_text(json.dumps(got))
+        os.replace(tmp, path)
+    if not (got.get("en") or got.get("fr")):
+        raise HTTPException(404, "Pas de biographie.")
+    return {k: got.get(k) for k in ("en", "fr", "discogs", "wiki_fr")}
 
 
 _GAPS: dict = {}  # {clé du label: (heure, réponse de Discogs)}

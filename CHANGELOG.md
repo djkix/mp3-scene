@@ -4,6 +4,26 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.85.0](https://github.com/djkix/mp3-scene/compare/v1.84.5...v1.85.0) (2026-11-26)
+
+### Résumé
+
+**Biographie des artistes en français et en anglais.**
+
+- Page d'un artiste : sa biographie, en anglais d'après son profil Discogs et en français d'après le résumé de son
+  article Wikipédia (retrouvé par le lien Wikipédia de Discogs). La langue de l'interface d'abord, un bouton FR / EN
+  pour l'autre ; quatre lignes et « Lire la suite » ; la source en lien. Gardée un mois dans les données de
+  l'application. Il faut un jeton `DISCOGS_TOKEN`.
+- Lecteur plein écran : un picto devant le genre (étiquette) et devant la catégorie (dossier).
+- Sous-dossiers d'une compilation sans nom de release (« SALSOUL_CD1 », « Uncovered_1 », « Als Mixe CD1 »,
+  « 25 Avant Nova - 1956 ») : ils prennent le nom de la compilation suivi de leur disque,
+  « VA-The_Salsoul_Acapellas-2CD-2005_(CD1) », « VA-Kontor_Top_of_The_Clubs_Vol_41-3CD-2008_(CD1_-_Als_Mixe) ». Des
+  disques tous datés sont numérotés dans l'ordre des années (« VA-La_Boite_Noire_Radio_Nova_(1956-1980)-25CD-2010_(CD1_-_1956) »).
+  Artiste, titre, année et groupe sont ceux de la compilation.
+- Release d'un artiste rangée dans le dossier d'une compilation VA (« Axer-123__321-Promo_Vinyl-2006-TGX » dans
+  « VA-Sunshine_Live_House_Edition_Vol._1-3CD-2006-JiM ») : classée comme dans le dossier des singles, en Singles ou
+  en Albums (« Matt-RB_2_Rue-2001-FSP », 13 pistes) au lieu de Compilations.
+
 ## [1.84.5](https://github.com/djkix/mp3-scene/compare/v1.84.4...v1.84.5) (2026-11-26)
 
 ### Résumé

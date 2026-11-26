@@ -137,6 +137,55 @@ def label_photos(name: str, token: str) -> list[dict]:
             for r in data.get("results", []) if str(r.get("cover_image", "")).startswith("https://") and "spacer.gif" not in r["cover_image"]]
 
 
+def _discogs_text(profile: str) -> str:
+    """Profil Discogs sans son balisage : « [a=Daft Punk] », « [l=Virgin] » gardent le nom ; « [a123] » (renvoi par
+    numéro) disparaît ; « [url=…]texte[/url] » garde le texte ; gras, italique et souligné sont retirés."""
+    s = re.sub(r"\[(?:a|l|m|r)=([^\]]+)\]", r"\1", profile or "")
+    s = re.sub(r"\[(?:a|l|m|r)\d+\]", "", s)
+    s = re.sub(r"\[url=[^\]]*\](.*?)\[/url\]", r"\1", s, flags=re.S)
+    s = re.sub(r"\[/?(?:b|i|u|url)\]", "", s)
+    s = re.sub(r"[ \t]+", " ", s)
+    return re.sub(r"\n{3,}", "\n\n", s).strip()
+
+
+def _wiki_summary(lang: str, title: str) -> str | None:
+    data = _json(f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/" + urllib.parse.quote(title.replace(" ", "_"), safe=""))
+    return (data.get("extract") or "").strip() or None if data.get("type") != "disambiguation" else None
+
+
+def artist_bio(name: str, token: str, key) -> dict:
+    """Biographie d'un artiste : en anglais, son profil Discogs (l'artiste au même nom, `key` : clé de rapprochement) ;
+    en français, le résumé de son article Wikipédia, retrouvé par le lien Wikipédia que donne Discogs. {} si Discogs ne
+    le connaît pas. Lève OSError ou ValueError si Discogs ne répond pas ; une panne de Wikipédia laisse le français vide."""
+    auth = {"Authorization": f"Discogs token={token}"}
+    found = _json("https://api.discogs.com/database/search?" + urllib.parse.urlencode({"type": "artist", "q": name, "per_page": 10}), auth)
+    same = [r for r in found.get("results", []) if key(re.sub(r"\s*\(\d+\)$", "", r.get("title") or "")) == key(name)]
+    # « Bicep » avant « Bicep (2) », un homonyme
+    hit = min(same, key=lambda r: bool(re.search(r"\(\d+\)$", r.get("title") or "")), default=None)
+    if hit is None:
+        return {}
+    a = _json(f"https://api.discogs.com/artists/{int(hit['id'])}", auth)
+    out = {"en": _discogs_text(a.get("profile")) or None, "fr": None,
+           "discogs": a.get("uri") if str(a.get("uri", "")).startswith("https://www.discogs.com/") else None}
+    wiki = {m[1]: urllib.parse.unquote(m[2]) for u in a.get("urls") or []
+            if (m := re.match(r"https?://(en|fr)\.(?:m\.)?wikipedia\.org/wiki/([^?#]+)", str(u)))}
+    try:
+        if "fr" not in wiki and "en" in wiki:  # article anglais seul : son pendant français
+            q = _json("https://en.wikipedia.org/w/api.php?" + urllib.parse.urlencode(
+                {"action": "query", "prop": "langlinks", "lllang": "fr", "titles": wiki["en"], "format": "json", "formatversion": 2}))
+            links = (q.get("query", {}).get("pages") or [{}])[0].get("langlinks") or []
+            if links:
+                wiki["fr"] = links[0]["title"]
+        if "fr" in wiki:
+            out["fr"] = _wiki_summary("fr", wiki["fr"])
+            out["wiki_fr"] = "https://fr.wikipedia.org/wiki/" + urllib.parse.quote(wiki["fr"].replace(" ", "_"))
+        if not out["en"] and "en" in wiki:  # profil Discogs vide : le résumé anglais de Wikipédia
+            out["en"] = _wiki_summary("en", wiki["en"])
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return out
+
+
 DISCOGS_PAGES = 5  # 100 sorties par page : au-delà, la liste est tronquée (Discogs : 60 requêtes par minute)
 
 

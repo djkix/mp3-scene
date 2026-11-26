@@ -1650,3 +1650,67 @@ def test_label_gaps_lists_discogs_releases_missing_from_the_library(user_client,
         raise OSError("panne")
     monkeypatch.setattr(coversearch, "_json", down)
     assert user_client.get("/api/label-gaps", params={"name": "Autre label"}).status_code == 502
+
+
+def test_artist_bio_in_english_from_discogs_and_french_from_wikipedia(user_client, library, settings, monkeypatch):
+    from app import coversearch
+    assert user_client.get("/api/artist-bio", params={"name": "Bicep"}).status_code == 404  # sans jeton
+    monkeypatch.setattr(settings, "discogs_token", "jeton")
+    asked = []
+    def fake(url, headers=None):
+        asked.append(url)
+        if "database/search" in url:
+            return {"results": [{"id": 5, "title": "Bicep (2)"}, {"id": 4, "title": "Bicep"}]}
+        if "/artists/" in url:
+            assert url.endswith("/artists/4")  # le nom exact, pas l'homonyme « (2) »
+            return {"profile": "Duo from [a=Belfast Crew], signed to [l=Ninja Tune] [a123]. [url=http://x]Site[/url] [b]Live[/b].",
+                    "uri": "https://www.discogs.com/artist/5-Bicep", "urls": ["https://en.wikipedia.org/wiki/Bicep_(duo)"]}
+        if "langlinks" in url:
+            return {"query": {"pages": [{"langlinks": [{"lang": "fr", "title": "Bicep (groupe)"}]}]}}
+        assert "fr.wikipedia.org/api/rest_v1/page/summary/Bicep_%28groupe%29" in url
+        return {"type": "standard", "extract": "Bicep est un duo nord-irlandais."}
+    monkeypatch.setattr(coversearch, "_json", fake)
+    got = user_client.get("/api/artist-bio", params={"name": "Bicep"}).json()
+    assert got["en"] == "Duo from Belfast Crew, signed to Ninja Tune . Site Live."
+    assert got["fr"] == "Bicep est un duo nord-irlandais." and got["wiki_fr"] == "https://fr.wikipedia.org/wiki/Bicep_%28groupe%29"
+    assert got["discogs"] == "https://www.discogs.com/artist/5-Bicep"
+    n = len(asked)
+    assert user_client.get("/api/artist-bio", params={"name": "bicep"}).json()["fr"] and len(asked) == n  # gardée un mois
+    assert user_client.get("/api/artist-bio", params={"name": "Inconnu au bataillon"}).status_code == 404  # hors bibliothèque
+    monkeypatch.setattr(coversearch, "_json", lambda url, headers=None: (_ for _ in ()).throw(OSError("panne")))
+    assert user_client.get("/api/artist-bio", params={"name": "A-Trak"}).status_code == 502
+
+
+def test_disc_subfolders_take_the_release_name_and_their_cd(user_client, settings):
+    conn = db.connect(settings.data_dir)
+    C = "02.Various Artists - Compilations"
+    paths = [f"{C}/L-Z/VA-La_Boite_Noire_Radio_Nova_(1956-1980)-25CD-2010/25 Avant Nova - {y}" for y in (1957, 1956)]
+    paths += [f"{C}/-=Kontor=-/VA-Kontor_Top_of_The_Clubs_Vol_41-3CD-2008", f"{C}/-=Kontor=-/VA-Kontor_Top_of_The_Clubs_Vol_41-3CD-2008/Als Mixe CD1",
+              f"{C}/A/VA-The_Salsoul_Acapellas-2CD-2005/SALSOUL_CD2", f"{C}/A/VA-Ministry_Of_Sound_Uncovered-2CD-Unimixed-2009/Uncovered_1",
+              f"{C}/A/VA-God_Save_The_Groove_Vol.1_(Presented_by_Kryder)-WEB-2018-P2P/Mix_Cut",
+              f"{C}/A/VA-Ministry_Of_Sound_The_House_That_Garage_Built-3CD-2014/The_House_That_Garage_Built_M.O.S_[Disc_3]",
+              f"{C}/L-Z/VA-Sunshine_Live_House_Edition_Vol._1-3CD-2006-JiM/Axer-123__321-Promo_Vinyl-2006-TGX",
+              f"{C}/L-Z/VA-Les_pianos_en_Or-2001-FSP/Matt-RB_2_Rue-2001-FSP",
+              "01.Singles/A/Ignored_Letter_Folder_Child"]
+    for i, p in enumerate(paths):
+        conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo)"
+                     " VALUES (?,?,'',?,0,0,10,2,0)", (p, p.rsplit("/", 1)[1], p.split("/")[0]))
+    conn.commit()
+    db.categorize(conn)
+    conn.commit()
+    got = {r["path"].rsplit("/", 1)[1]: (r["name"], r["artist"], r["year"], r["category"]) for r in conn.execute("SELECT * FROM releases")}
+    assert got["25 Avant Nova - 1956"][:3] == ("VA-La_Boite_Noire_Radio_Nova_(1956-1980)-25CD-2010_(CD1_-_1956)", "VA", 2010)
+    assert got["25 Avant Nova - 1957"][0].endswith("_(CD2_-_1957)")
+    assert got["Als Mixe CD1"][0] == "VA-Kontor_Top_of_The_Clubs_Vol_41-3CD-2008_(CD1_-_Als_Mixe)"
+    assert got["SALSOUL_CD2"][0] == "VA-The_Salsoul_Acapellas-2CD-2005_(CD2)"
+    assert got["Uncovered_1"][0] == "VA-Ministry_Of_Sound_Uncovered-2CD-Unimixed-2009_(CD1)"
+    assert got["Mix_Cut"][0] == "VA-God_Save_The_Groove_Vol.1_(Presented_by_Kryder)-WEB-2018-P2P_(Mix_Cut)"
+    assert got["The_House_That_Garage_Built_M.O.S_[Disc_3]"][0] == "VA-Ministry_Of_Sound_The_House_That_Garage_Built-3CD-2014_(CD3)"
+    assert got["Axer-123__321-Promo_Vinyl-2006-TGX"][0] == "Axer-123__321-Promo_Vinyl-2006-TGX"   # nom de release : gardé
+    assert got["Axer-123__321-Promo_Vinyl-2006-TGX"][3] == "01.Singles"                            # release d'artiste : un single
+    conn.execute("UPDATE releases SET track_count=13 WHERE name='Matt-RB_2_Rue-2001-FSP'"); db.categorize(conn)
+    assert conn.execute("SELECT category FROM releases WHERE name='Matt-RB_2_Rue-2001-FSP'").fetchone()[0] == "Albums"  # ou un album
+    assert got["Ignored_Letter_Folder_Child"][0] == "Ignored_Letter_Folder_Child"
+    assert {v[3] for k, v in got.items() if "Avant" in k or "Mix" in k} == {C}
+    db.categorize(conn)  # relu sur le dossier : rien ne s'empile
+    assert conn.execute("SELECT name FROM releases WHERE path LIKE '%SALSOUL_CD2'").fetchone()[0] == "VA-The_Salsoul_Acapellas-2CD-2005_(CD2)"
