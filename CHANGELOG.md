@@ -4,6 +4,15 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.85.4](https://github.com/djkix/mp3-scene/compare/v1.85.3...v1.85.4) (2026-11-26)
+
+### Résumé
+
+**Navidrome : le plus récent d'abord.**
+
+- Onglet Navidrome : pistes et albums de la recherche, et pistes de la page d'un artiste, du plus récent au plus ancien
+  (année des tags), puis par titre.
+
 ## [1.85.3](https://github.com/djkix/mp3-scene/compare/v1.85.2...v1.85.3) (2026-11-26)
 
 ### Résumé

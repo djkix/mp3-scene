@@ -39,6 +39,9 @@ function trackRows(list, tracks, loose = false, append = false) {
 }
 
 // première lettre d'un nom, « # » pour ce qui ne commence pas par une lettre (comme les listes d'artistes)
+// plus récent d'abord (année des tags), puis par titre : recherche, page d'un artiste et ses albums
+const newestFirst = (list) => list.sort((a, b) => (b.year || 0) - (a.year || 0) || String(a.title || a.name || '').localeCompare(String(b.title || b.name || '')));
+
 const letterOf = (name) => { const c = String(name || '').normalize('NFD').replace(/^[^\p{L}\p{N}]+/u, '')[0]?.toUpperCase() || '#'; return /[A-Z]/.test(c) ? c : '#'; };
 
 export function render(container, params) {
@@ -80,7 +83,7 @@ export function render(container, params) {
     api(`/navidrome/artist/${enc(id)}`).then((a) => {
       if (dead) return;
       const list = el('ul', { class: 'rel-list' });
-      trackRows(list, a.tracks, true);
+      trackRows(list, newestFirst(a.tracks), true);
       body.replaceChildren(el('div', { class: 'nd-head' }, el('h1', { class: 'grp-title' }, a.name),
         el('p', { class: 'fest-facts' }, tr('{0} pistes', a.tracks.length)),
         el('p', { class: 'detail-actions' },
@@ -92,8 +95,8 @@ export function render(container, params) {
     api(`/navidrome/search?q=${enc(params.q)}`).then((r) => {
       if (dead) return;
       const list = el('ul', { class: 'rel-list' });
-      trackRows(list, r.tracks, true);
-      r.albums = r.albums.filter((x) => x.songs > 1); // un album d'un seul morceau : déjà dans les pistes
+      trackRows(list, newestFirst(r.tracks), true);
+      r.albums = newestFirst(r.albums.filter((x) => x.songs > 1)); // un album d'un seul morceau : déjà dans les pistes
       body.replaceChildren(
         ...(r.artists.length ? [el('p', { class: 'grp-kinds direct' }, el('span', { class: 'muted' }, tr('Artistes') + ' '),
           ...r.artists.map((x) => el('a', { class: 'chip', href: `#/navidrome/artist/${enc(x.id)}` }, x.name, el('small', {}, ` ${x.albums ?? ''}`))))] : []),
