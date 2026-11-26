@@ -4,6 +4,36 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.85.1](https://github.com/djkix/mp3-scene/compare/v1.85.0...v1.85.1) (2026-11-26)
+
+### Résumé
+
+**Discographies rangées par type, disques d'un album nommés d'après lui, labels en cartes.**
+
+- Discographie rangée par type (« Jean Michel Jarre/Albums/(1976) - Oxygene ») : chaque release prend un nom complet
+  (« Jean_Michel_Jarre-Oxygene-1976 »), son titre entier (« Oxygene 7-13 » au lieu de « Oxygene 7 ») et la catégorie de
+  son dossier : Albums, Compilations, Soundtracks et Tributes en Albums, Concerts en Live & Radio, « Singles, Maxis,
+  Promos » en Singles.
+- Disques d'un album sans nom de release (« Alcazar - Dancefloor Deluxe/Dancefloor Deluxe Disc 2 »,
+  « DJMAX Portable 2 Audio Trinity O.S.T/-Black- ») : « Alcazar_-_Dancefloor_Deluxe_(CD2) »,
+  « DJMAX_Portable_2_Audio_Trinity_O.S.T_(Black) ». Un sous-dossier daté (dossier de collection) reste une release à part.
+- Pictos : infobulle immédiate au survol de la souris ou au focus clavier, dans le style de l'application, sur tous
+  les boutons et liens sans texte (fiche, listes, lecteur), au lieu de l'infobulle lente du navigateur.
+- En-tête d'un artiste, d'un label ou d'un groupe : plus d'espace entre Artistes, Genres et Groupes, intitulés à la taille du reste.
+- Explorer › Labels : les plus fournis d'abord par défaut.
+- Photos d'artistes : sans photo au même nom, la première proposée par Deezer. Une recherche restée sans résultat
+  (souvent une panne passagère) est refaite au bout d'une semaine, au lieu d'être retenue pour toujours ; une photo
+  retirée par un administrateur ne revient pas. Les photos restées vides sont cherchées de nouveau dès la mise à jour.
+- Live & Radio : Electric Zoo, Mix Mission et Amsterdam Dance Event (« ADE » d'une diffusion) sont des festivals, avec
+  leur année (« Mix Mission » 2009 et non « Mix Mission 2009 »).
+- Live & Radio : « INOX Strasbourg 2010 » rejoint le festival INOX Electronique Festival.
+- Single ou album rangé dans le dossier des lives sans rien d'un live (référence de catalogue, remixes, tag SINGLE ou
+  plusieurs CD, comme « Toni_Braxton-Make_My_Heart_(Part_1)_(MuthaFunkaz_Remixes)-(CODE47)-WEB-2010-HFT ») : classé
+  comme dans le dossier des singles.
+- Nom d'une release : toujours une capitale en première lettre à l'écran (« Pete_tong_-_the_essential_selection-… »).
+- Page d'une famille de labels : une carte par label, avec son logo, son nom et son nombre de releases (deux colonnes
+  sur téléphone), au lieu de petits boutons.
+
 ## [1.85.0](https://github.com/djkix/mp3-scene/compare/v1.84.5...v1.85.0) (2026-11-26)
 
 ### Résumé

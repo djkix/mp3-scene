@@ -575,10 +575,23 @@ thead th { color: var(--muted); background: var(--panel); padding-block: 8px; wh
 .art-sum tr[aria-current="true"] td { opacity: 1; }
 .art-sum a { display: block; }
 .art-sum a:hover, .art-chips a:hover { text-decoration: underline; }
-.art-chips p { margin: 0 0 4px; font-size: 12px; opacity: .7; }
-.art-chips div { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-bottom: 8px; }
+.art-chips p { margin: 0 0 6px; font-size: 13px; font-weight: 500; color: var(--muted); }
+.art-chips div { display: flex; flex-wrap: wrap; gap: 6px 6px; margin-bottom: 16px; }
+.art-chips div:last-child { margin-bottom: 0; }
 .art-chips small { margin-left: 5px; opacity: .6; }
 @media (max-width: 700px) { .art-head { grid-template-columns: minmax(0, 1fr); } }
+.label-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; margin: 8px 12px 4px; }
+.label-card { display: flex; align-items: center; gap: 10px; min-height: 0; padding: 8px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--panel); color: var(--fg); text-align: left; text-transform: none; letter-spacing: 0; font: 13px var(--sans); }
+.label-card:hover { border-color: var(--muted); }
+.label-card[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.label-logo { position: relative; flex: none; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px;
+  border-radius: 6px; background: var(--hover); color: var(--muted); font: 600 12px var(--mono); overflow: hidden; }
+.label-logo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #fff; }
+.label-text { display: flex; flex-direction: column; min-width: 0; }
+.label-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.label-card small { opacity: .75; }
+@media (max-width: 699px) { .label-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } .label-card { gap: 8px; padding: 6px; } .label-logo { width: 32px; height: 32px; } }
 .art-bio { padding: 4px 12px 12px; }
 .bio-head { display: flex; align-items: center; gap: 10px; }
 .bio-head .nfo-h { margin: 8px 0; }
@@ -1030,3 +1043,6 @@ body.party-on #view { max-width: none; padding: 0; margin: 0; }
   .rel-info > :nth-child(5) { order: 4; } .rel-info > :nth-child(6) { order: 5; } .rel-info > :nth-child(2) { order: 6; }
   .d-full { display: none; } .d-year { display: inline; }
 }
+/* infobulle des pictos (tooltip.js) */
+.tip { position: fixed; z-index: 100; max-width: 240px; padding: 4px 8px; border-radius: 4px; background: var(--fg); color: var(--bg);
+  font: 500 12px/1.3 var(--sans); letter-spacing: 0; text-transform: none; pointer-events: none; white-space: normal; }

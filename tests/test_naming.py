@@ -81,10 +81,15 @@ def test_festival_and_year_read_from_set_names():
         "Moby-Live_Au_Caprices_Festival_(Crans-Montana)-DVBS-2008-JUST": ("Caprices Festival", None),
         "-= Winter Music Conference 2016 =-": ("Winter Music Conference", 2016),
         "-= White Sensation 2008 - Prague =-": ("White Sensation", 2008),
+        "Electric_Zoo_2009_-_Kaskade_Live-SAT-09-05-2009-TALiON": ("Electric Zoo", 2009),
+        "Mix_Mission_2009-Sunloverz-SAT-12-29-2009-TBM": ("Mix Mission", 2009),
+        "-= INOX Strasbourg 2010 =-": ("INOX Electronique Festival", 2010),
+        "ADE_2013_-_Hardwell_Live_At_WandW_and_Friends-(Beatclub_Amsterdam)-SBD-16-10-2013-SOB_INT": ("Amsterdam Dance Event", 2013),
+        "Amsterdam_Dance_Event_-_Dyro_Live_(Passenger_Terminal_Amsterdam)-SAT-10-19-2013-TALiON": ("Amsterdam Dance Event", None),
     }
     for name, expected in cases.items():
         assert festival(name) == expected, name
-    for name in ("Artist-Festival_Mix-WEB-2020-GRP", "Artist-Best_Festival_Anthems-WEB-2020-GRP",
+    for name in ("Artist-Festival_Mix-WEB-2020-GRP", "Artist-Best_Festival_Anthems-WEB-2020-GRP", "Dave_Lambert-ADE_2007-Sampler_CD-2007-WC2R",
                  "Armin_van_Buuren-A_State_of_Trance_1100-SAT-01-12-2022-GRP"):
         assert festival(name) is None, name
     assert festival_key("INOX Electronique Festival") == festival_key("INOX Electronic Festival") == "inox"

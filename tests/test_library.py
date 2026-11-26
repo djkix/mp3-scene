@@ -1231,9 +1231,26 @@ def test_artist_photo_is_taken_from_the_first_matching_result(app, user_client, 
     photo = lambda name, kind="artist": user_client.get("/api/photo", params={"kind": kind, "name": name}).status_code
     assert photo("Inconnu Absolu") == 404 and photo("Label Absent", "label") == 404  # absent de la base : rien n'est cherché
     assert photo("Bob Sinclar") == 200 and got == ["https://x/b.jpg"]
-    assert photo("VA") == 404 and photo("Personne") == 404 and len(got) == 1
+    assert photo("VA") == 404 and len(got) == 1
+    assert photo("Personne") == 200 and got[-1] == "https://x/a.jpg"  # aucun au même nom : la première proposée
+    # rien de proposé (panne passagère, nom inconnu) : fichier vide, nouvel essai au bout d'une semaine
+    import os, time as _t
+    from app.routes_library import photo_path
+    monkeypatch.setattr(coversearch, "artist_photos", lambda name: [])
+    c.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, artist)"
+              " VALUES ('p9','p9','','Singles',0,0,1,0,0,'Plus Tard')"); c.commit()
+    assert photo("Plus Tard") == 404
+    monkeypatch.setattr(coversearch, "artist_photos", lambda name: [{"url": "https://x/c.jpg", "thumb": "t", "title": "Plus Tard"}])
+    assert photo("Plus Tard") == 404  # moins d'une semaine : pas de nouvelle recherche
+    old = _t.time() - 8 * 86400
+    os.utime(photo_path(settings.data_dir, "artist", "Plus Tard"), (old, old))
+    assert photo("Plus Tard") == 200 and got[-1] == "https://x/c.jpg"
+    monkeypatch.setattr(coversearch, "artist_photos", lambda name: [{"url": "https://x/a.jpg", "thumb": "t", "title": "Bob Sinclar & Co"},
+                                                                    {"url": "https://x/b.jpg", "thumb": "t", "title": "bob sinclar"}])
+    n = len(got)
     assert admin_client.delete("/api/admin/photo", params={"kind": "artist", "name": "Bob Sinclar"}, headers={"X-CSRF": "1"}).status_code == 204
-    assert photo("Bob Sinclar") == 404 and len(got) == 1  # retirée : pas remise
+    p = photo_path(settings.data_dir, "artist", "Bob Sinclar"); os.utime(p, (old, old))
+    assert photo("Bob Sinclar") == 404 and len(got) == n  # retirée : pas remise, même au bout d'une semaine
     # label : Discogs, avec un jeton ; « Defected Records » et « Defected (2) » désignent le même label
     monkeypatch.setattr(coversearch, "label_photos", lambda name, token: [{"url": "https://x/l.jpg", "thumb": "t", "title": "Defected"}])
     assert photo("Defected Records", "label") == 404  # sans jeton : pas de recherche
@@ -1439,8 +1456,8 @@ def test_live_sets_split_into_festivals_radio_shows_and_artists(user_client, set
     assert get("artist") == {"Carl Cox": (3, None)}  # club ou autre : par artiste, casse confondue
     # dossier orné sans artiste ni festival reconnu : son nom, jamais un nom vide (page refusée)
     conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, year)"
-                 " VALUES ('orn','-= INOX Strasbourg 2010 =-','','Live And Radio',0,0,10,0,0,2010)"); conn.commit()
-    assert "INOX Strasbourg 2010" in get("artist")
+                 " VALUES ('orn','-= Sosumi Pool Party 2010 =-','','Live And Radio',0,0,10,0,0,2010)"); conn.commit()
+    assert "Sosumi Pool Party 2010" in get("artist")
     conn.execute("DELETE FROM releases WHERE path='orn'"); conn.commit()
     page = user_client.get("/api/festival", params={"name": "carl cox", "type": "artist"}).json()
     assert [x["fyear"] for x in page["items"]] == [2012, 2010, 2008]
@@ -1691,7 +1708,11 @@ def test_disc_subfolders_take_the_release_name_and_their_cd(user_client, setting
               f"{C}/A/VA-Ministry_Of_Sound_The_House_That_Garage_Built-3CD-2014/The_House_That_Garage_Built_M.O.S_[Disc_3]",
               f"{C}/L-Z/VA-Sunshine_Live_House_Edition_Vol._1-3CD-2006-JiM/Axer-123__321-Promo_Vinyl-2006-TGX",
               f"{C}/L-Z/VA-Les_pianos_en_Or-2001-FSP/Matt-RB_2_Rue-2001-FSP",
-              "01.Singles/A/Ignored_Letter_Folder_Child"]
+              "01.Singles/A/Ignored_Letter_Folder_Child",
+              "01.Singles/J/Jean_Michel_Jarre-Discography_1976-2007-CD-2013/Jean Michel Jarre/Albums/(1997) - Oxygene 7-13", "01.Singles/J/Jean_Michel_Jarre-Discography_1976-2007-CD-2013/Jean Michel Jarre/Concerts/(1994) - Hong Kong", "01.Singles/J/Jean_Michel_Jarre-Discography_1976-2007-CD-2013/Jean Michel Jarre/Singles, Maxis, Promos/(1997) - Oxygene 8",
+              "01.Singles/A/Alcazar - Dancefloor Deluxe/Dancefloor Deluxe Disc 2", "01.Singles/D/DJMAX Portable 2 Audio Trinity O.S.T/-Black-",
+              "03.Various Artists - Live And Radio/x", "03.Various Artists - Live And Radio/Toni_Braxton-Make_My_Heart_(Part_1)_(MuthaFunkaz_Remixes)-(CODE47)-WEB-2010-HFT",
+              "03.Various Artists - Live And Radio/Bonkers_Beats_2_On_Beat_106_Scotland-With_Scott_Brown-WEB-2021-XTC_iNT"]
     for i, p in enumerate(paths):
         conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo)"
                      " VALUES (?,?,'',?,0,0,10,2,0)", (p, p.rsplit("/", 1)[1], p.split("/")[0]))
@@ -1712,5 +1733,11 @@ def test_disc_subfolders_take_the_release_name_and_their_cd(user_client, setting
     assert conn.execute("SELECT category FROM releases WHERE name='Matt-RB_2_Rue-2001-FSP'").fetchone()[0] == "Albums"  # ou un album
     assert got["Ignored_Letter_Folder_Child"][0] == "Ignored_Letter_Folder_Child"
     assert {v[3] for k, v in got.items() if "Avant" in k or "Mix" in k} == {C}
+    assert got["(1997) - Oxygene 7-13"] == ("Jean_Michel_Jarre-Oxygene_7-13-1997", "Jean Michel Jarre", 1997, "Albums")  # 7 pistes : le dossier décide
+    assert got["(1994) - Hong Kong"][3] == "03.Various Artists - Live And Radio" and got["(1997) - Oxygene 8"][3] == "01.Singles"
+    assert got["Dancefloor Deluxe Disc 2"][0] == "Alcazar_-_Dancefloor_Deluxe_(CD2)"
+    assert got["-Black-"][0] == "DJMAX_Portable_2_Audio_Trinity_O.S.T_(Black)"
+    assert got["Toni_Braxton-Make_My_Heart_(Part_1)_(MuthaFunkaz_Remixes)-(CODE47)-WEB-2010-HFT"][3] == "01.Singles"  # rangé chez les lives
+    assert got["Bonkers_Beats_2_On_Beat_106_Scotland-With_Scott_Brown-WEB-2021-XTC_iNT"][3] == "03.Various Artists - Live And Radio"
     db.categorize(conn)  # relu sur le dossier : rien ne s'empile
     assert conn.execute("SELECT name FROM releases WHERE path LIKE '%SALSOUL_CD2'").fetchone()[0] == "VA-The_Salsoul_Acapellas-2CD-2005_(CD2)"

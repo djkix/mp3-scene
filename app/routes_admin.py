@@ -425,10 +425,11 @@ async def upload_photo(request: Request, kind: Literal["artist", "label", "event
 
 @router.delete("/photo", status_code=204)
 def drop_photo(request: Request, kind: Literal["artist", "label", "event"], name: str = Query(min_length=1, max_length=200)):
-    """Retire la photo ; un fichier vide empêche la recherche automatique de la remettre."""
+    """Retire la photo ; un fichier vide et sa marque « .none » empêchent la recherche automatique de la remettre."""
     path = photo_path(request.app.state.settings.data_dir, kind, name)
     path.parent.mkdir(exist_ok=True)
     path.write_bytes(b"")
+    path.with_suffix(".none").touch()
 
 
 @router.get("/suggestions")

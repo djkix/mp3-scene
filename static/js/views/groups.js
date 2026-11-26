@@ -80,8 +80,16 @@ function detail(container, kind, params) {
     if (dead) return;
     if (family) {
       genreNames = g.members.map((m) => m.name);
-      blocks.replaceChildren(...g.members.map((m) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(m.name === sub),
-        onclick: () => { location.hash = base + qs({ year: params.year, sub: m.name === sub ? '' : m.name }); } }, m.name, el('small', {}, ` ${m.releases}`))));
+      const pick = (m) => () => { location.hash = base + qs({ year: params.year, sub: m.name === sub ? '' : m.name }); };
+      // label : une carte par label de la famille, avec son logo, son nom et son nombre de releases
+      if (kind === 'labels') blocks.className = 'label-cards';
+      blocks.replaceChildren(...g.members.map((m) => (kind === 'labels'
+        ? el('button', { type: 'button', role: 'tab', class: 'label-card', 'aria-selected': String(m.name === sub), onclick: pick(m) },
+          el('span', { class: 'label-logo', 'aria-hidden': 'true' }, m.name.replace(/[^\p{L}\p{N}]/gu, '').slice(0, 2).toUpperCase(),
+            el('img', { src: '/api/photo?' + new URLSearchParams({ kind: 'label', name: m.name }), alt: '', loading: 'lazy', onerror: (e) => e.target.remove() })),
+          el('span', { class: 'label-text' }, el('span', { class: 'label-name' }, m.name),
+            el('small', {}, `${m.releases} ${m.releases > 1 ? tr('releases') : tr('release')}`)))
+        : el('button', { type: 'button', role: 'tab', 'aria-selected': String(m.name === sub), onclick: pick(m) }, m.name, el('small', {}, ` ${m.releases}`)))));
       disposeList = releases.render(list, { ...params, q: '', ...(kind === 'genres' && { genre: '' }),
         pin: { key: kind === 'genres' ? 'genre' : 'label', value: sub || (g.members.length ? g.members.map((m) => m.name) : name), base, extra: { sub } } });
     }
@@ -577,7 +585,8 @@ export function render(container, params) {
   const setFilter = (name, value) => { location.hash = `#/${kind}` + qs({ genre, year, category, [name]: value }); };
   // [libellé, clé, sens au premier clic] ; un titre compte des pistes (ses versions), les autres des releases
   const HEAD = [[tr(label), 'name', 1], [kind === 'titles' ? tr('Pistes') : tr('Releases'), 'releases', -1], [tr('Poids'), 'size', -1]];
-  let rows = [], key = 'name', dir = kind === 'years' ? -1 : 1, dead = false; // années : la plus récente d'abord
+  // années : la plus récente d'abord ; labels : les plus fournis d'abord
+  let rows = [], key = kind === 'labels' ? 'releases' : 'name', dir = kind === 'years' || kind === 'labels' ? -1 : 1, dead = false;
   // Lettres sous les filtres : « # » réunit ce qui ne commence pas par une lettre. La lettre choisie est dans
   // l'adresse (sans recharger la liste) pour la retrouver au retour d'une fiche.
   let letter = /^([A-Z]|#)$/.test(params.letter || '') ? params.letter : '';

@@ -783,6 +783,7 @@ def label_gaps(request: Request, name: str = Query(min_length=1, max_length=200)
 
 
 PHOTO_KINDS = Literal["artist", "label", "event"]  # event : festival ou émission de radio
+PHOTO_RETRY = 7 * 86400  # sans photo trouvée : nouvelle recherche au bout d'une semaine
 
 
 def photo_path(data_dir, kind: str, name: str):
@@ -803,6 +804,7 @@ def store_photo(data_dir, kind: str, name: str, url: str | None = None, data: by
         tmp = target.with_name(f"{target.stem}.{threading.get_ident()}.tmp")  # deux demandes simultanées : deux fichiers
         img.save(tmp, "JPEG", quality=88)
     os.replace(tmp, target)
+    target.with_suffix(".none").unlink(missing_ok=True)  # une photo choisie remplace un retrait
 
 
 def photo_candidates(settings, kind: str, name: str) -> list[dict]:
@@ -818,8 +820,9 @@ def photo_candidates(settings, kind: str, name: str) -> list[dict]:
 @router.get("/api/photo")
 def photo(request: Request, kind: PHOTO_KINDS, name: str = Query(min_length=1, max_length=200), conn=Depends(get_conn)):
     """Photo d'un artiste ou logo d'un label. À la première demande, la première proposition au même nom est prise
-    d'office ; un fichier vide retient qu'il n'y en a pas (ou qu'un administrateur l'a retirée) : pas de nouvelle
-    recherche."""
+    d'office (pour un artiste, à défaut, la première proposée). Un fichier vide retient qu'il n'y en a pas : nouvelle
+    recherche au bout d'une semaine (une panne passagère ne prive pas l'artiste de photo), sauf si un administrateur
+    l'a retirée (fichier « .none » à côté)."""
     settings = request.app.state.settings
     path = photo_path(settings.data_dir, kind, name)
     same = (lambda a, b: nfo.label_key(a) == nfo.label_key(b)) if kind == "label" \
@@ -836,10 +839,13 @@ def photo(request: Request, kind: PHOTO_KINDS, name: str = Query(min_length=1, m
             or len(label_members(conn, name)) > 1
         if not known:
             raise HTTPException(404, "Pas de photo.")
-    if searchable and not path.exists() and artists.fold(name) not in artists._VA | {""}:
-        # ponytail: une recherche à la première visite de chaque page ; rien n'est retenu d'une panne réseau
+    stale = path.is_file() and not path.stat().st_size and time.time() - path.stat().st_mtime > PHOTO_RETRY \
+        and not path.with_suffix(".none").exists()
+    if searchable and (stale or not path.exists()) and artists.fold(name) not in artists._VA | {""}:
+        # ponytail: une recherche à la première visite de chaque page, puis une par semaine tant qu'il n'y a rien
         try:
-            hit = next((x for x in photo_candidates(settings, kind, name) if same(x["title"], name)), None)
+            found = photo_candidates(settings, kind, name)
+            hit = next((x for x in found if same(x["title"], name)), None) or (found[0] if kind == "artist" and found else None)
             if hit:
                 store_photo(settings.data_dir, kind, name, hit["url"])
             else:

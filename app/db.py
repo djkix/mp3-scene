@@ -5,7 +5,7 @@ import sqlite3
 from pathlib import Path
 
 from app import artists, genres, nfo
-from app.naming import album_like, group, kind, known_show, looks_live, one_song, parse_release_name, unwrap
+from app.naming import album_like, group, kind, known_show, looks_live, one_song, parse_release_name, radio, unwrap
 
 SCHEMA = Path(__file__).with_name("schema.sql")
 VERSION = 1  # PRAGMA user_version ; à incrémenter avec une migration si le schéma change
@@ -41,6 +41,14 @@ def init(data_dir: Path) -> None:
             conn.execute("UPDATE tracks SET tags_read=0 WHERE release_id IN (SELECT id FROM releases WHERE year IS NULL)")
             conn.execute("UPDATE releases SET tags_done=0 WHERE year IS NULL")
             conn.execute("UPDATE releases SET has_cover=NULL WHERE has_cover=0")  # image cherchée aussi dans les pistes suivantes
+        # 1.85.1 : les photos d'artistes et de festivals restées vides (souvent une panne passagère de Deezer) sont
+        # cherchées de nouveau à la prochaine visite de leur page
+        if "photo_retry" not in {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}:
+            conn.execute("ALTER TABLE scan_state ADD COLUMN photo_retry INTEGER")
+            for sub in ("artists", "events"):
+                for f in (data_dir / sub).glob("*.jpg") if (data_dir / sub).is_dir() else ():
+                    if not f.stat().st_size and not f.with_suffix(".none").exists():
+                        f.unlink()
         # 1.84.5 : forme d'onde en volume moyen (RMS) au lieu des crêtes ; les formes d'onde gardées sont recalculées
         # à la prochaine écoute de chaque piste
         if "wave_rms" not in {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}:
@@ -296,6 +304,34 @@ def em_name(folder: str, tag_artist: str | None, tag_title: str | None, filename
     return "-".join(filter(None, [artist, title, date])).replace(" ", "_"), artist or None, title, date
 
 
+# discographie rangée par type : « Jean Michel Jarre/Albums/(1976) - Oxygene », « …/Concerts/(1994) - Hong Kong »
+_DISCO_ITEM = re.compile(r"^\((\d{4})\)\s*-\s*(.+)$")
+_DISCO_GROUPS = {"albums": "albums", "album": "albums", "compilations": "albums", "compilation": "albums", "soundtracks": "albums",
+                 "soundtrack": "albums", "tributes": "albums", "tribute": "albums", "best of": "albums", "concerts": "live",
+                 "live": "live", "lives": "live", "singles": "single", "singles maxis promos": "single", "maxis": "single",
+                 "eps": "single", "ep": "single", "remixes": "single"}
+
+
+def _disco(path: str) -> tuple | None:
+    """(artiste, titre, année, type) d'une release d'une discographie rangée par type, sinon None."""
+    parts = path.split("/")
+    if len(parts) < 4 or not (m := _DISCO_ITEM.match(parts[-1])):
+        return None
+    group = _DISCO_GROUPS.get(" ".join(re.findall(r"[a-z]+", parts[-2].lower())))
+    return (parts[-3], m[2].strip(), int(m[1]), group) if group else None
+
+
+def discographies(conn) -> None:
+    """Releases d'une discographie rangée par type nommées comme les autres : « (1976) - Oxygene » dans
+    « Jean Michel Jarre/Albums » devient « Jean_Michel_Jarre-Oxygene-1976 », titre entier (« Oxygene 7-13 »). Le type
+    du dossier fixe la catégorie (categorize). Seul le nom en base change, relu sur le dossier à chaque fois."""
+    for r in conn.execute("SELECT id, path FROM releases WHERE path LIKE '%/%/%/(%'").fetchall():
+        if got := _disco(r["path"]):
+            artist, title, year, _ = got
+            conn.execute("UPDATE releases SET name=?, artist=?, title=?, year=? WHERE id=?",
+                         (f"{artist}-{title}-{year}".replace(" ", "_"), artist, title, year, r["id"]))
+
+
 # sous-dossier d'une release qui n'a pas un nom de release : « SALSOUL_CD1 », « Uncovered_1 », « Mix_Cut »,
 # « The House That Garage Built M.O.S [Disc 2] », « 25 Avant Nova - 1980 » (un CD par année)
 _SCENE_END = re.compile(r"-(?:19|20)\d\d(?:-[^-]+)?$")
@@ -314,7 +350,12 @@ def disc_children(conn) -> None:
     groups = {}
     for r in conn.execute("SELECT id, path FROM releases WHERE path LIKE '%/%/%'"):
         *up, parent, child = r["path"].split("/")
-        if not _SCENE_END.search(child) and (_SCENE_END.search(parent) or _DATED_DIR.match(parent) or _MULTI_CD.search(parent)):
+        # parent sans nom de release (« Alcazar - Dancefloor Deluxe ») : seulement pour des disques (« Disc 1 », « -Black- »),
+        # et pas pour un dossier de lettre, orné ou de type (« A », « L-Z », « -=Kontor=- », « Albums »)
+        loose = up[1:] and len(parent) > 3 and not re.match(r"^-=|=-$", parent) and not _DISCO_GROUPS.get(parent.lower()) \
+            and (_DISC_NO.search(child) or re.fullmatch(r"-[^-]+-", child)) and not _DISCO_ITEM.match(child) \
+            and not re.search(r"(?<!\d)(?:19|20)\d\d(?!\d)|\d\d-\d\d", child)  # daté : une release à part (dossier de collection)
+        if not _SCENE_END.search(child) and (_SCENE_END.search(parent) or _DATED_DIR.match(parent) or _MULTI_CD.search(parent) or loose):
             groups.setdefault("/".join([*up, parent]), []).append((r["id"], child))
     for ppath, kids in groups.items():
         base = ppath.rsplit("/", 1)[-1]
@@ -385,6 +426,7 @@ def categorize(conn) -> None:
     « radio », etc. Sans dossier correspondant, la release garde le sien."""
     dated_series(conn)
     dated_episodes(conn)
+    discographies(conn)
     disc_children(conn)
     essential_mixes(conn)
     rows = conn.execute("SELECT id, name, path, category, track_count FROM releases").fetchall()
@@ -404,6 +446,8 @@ def categorize(conn) -> None:
 
     def category(r):
         top, k = r["path"].split("/", 1)[0], kind(r["name"])
+        if disco := _disco(r["path"]):  # discographie rangée par type : le dossier décide
+            return "Albums" if disco[3] == "albums" else target.get(disco[3]) or top
         extra = EXTRA_KINDS.get(top)
         # dans le dossier des singles, un live sans tag de diffusion (« Live at Tomorrowland », un festival cité)
         if k is None and (top in singles or extra) and looks_live(r["name"]):
@@ -414,6 +458,13 @@ def categorize(conn) -> None:
                 and not one_song(titles.get(r["id"], [])):
             return "Albums"
         if k is None and extra == "singles":
+            k = "single"
+        # single ou album rangé dans le dossier des lives sans rien d'un live (« Toni_Braxton-Make_My_Heart_(Part_1)_
+        # (MuthaFunkaz_Remixes)-(CODE47)-WEB-2010-HFT ») : une référence de catalogue, des remixes, le tag SINGLE ou des CD
+        if k is None and top == target["live"] and not looks_live(r["name"]) and not radio(r["name"]) \
+                and re.search(r"-\([A-Z0-9][^)]*\d[^)]*\)-|remix|(?:^|-)SINGLE-|\d+ ?x? ?CD\b", r["name"], re.I):
+            if album_like(r["name"], r["track_count"]):
+                return "Albums"
             k = "single"
         # release d'un artiste glissée dans le dossier d'une compilation VA (« Axer-123__321-Promo_Vinyl-2006-TGX » dans
         # « VA-Sunshine_Live_House_Edition_Vol._1-3CD-2006-JiM ») : rangée comme dans le dossier des singles

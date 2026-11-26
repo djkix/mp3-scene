@@ -1,4 +1,5 @@
 import './theme.js'; // en premier : applique le thème choisi
+import './tooltip.js';
 import { api, session } from './api.js';
 import { t, lang } from './i18n.js';
 import { el } from './dom.js';

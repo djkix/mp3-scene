@@ -17,7 +17,8 @@ export const encodePath = (p) => p.split('/').map(encodeURIComponent).join('/');
 
 // Nom de release tel qu'affiché : les espaces deviennent des « _ », comme dans les noms de la scène. L'adresse et la
 // recherche gardent le vrai nom.
-export const relName = (name) => String(name ?? '').replace(/ /g, '_');
+// nom d'une release à l'écran : soulignés à la place des espaces, première lettre en capitale (« pete_tong_-_… » -> « Pete_tong_-_… »)
+export const relName = (name) => { const s = String(name ?? '').replace(/ /g, '_'); return s.charAt(0).toLocaleUpperCase() + s.slice(1); };
 
 // Adresse de la fiche d'une release : son nom, lisible, et son identifiant, qui seul la désigne sans erreur
 // (deux releases peuvent porter le même nom, et un nom tout en chiffres serait pris pour un identifiant).

@@ -231,7 +231,9 @@ def complete_title(title: str | None, filename: str, artist: bool = False) -> st
 _BRANDS = re.compile(r"^(tomorrowland|mysteryland|defqon\.?1|qlimax|awakenings|mayday|nature one|time warp|creamfields"
                      r"|electric daisy carnival|sensation|dance valley|global gathering|untold|parookaville|extrema outdoor"
                      r"|electric love|world club dome|airbeat one|medusa|dreambeach|love parade|street parade|coachella"
-                     r"|glastonbury|lollapalooza|winter music conference|white sensation)\b", re.I)
+                     r"|glastonbury|lollapalooza|winter music conference|white sensation|electric zoo|mix mission|amsterdam dance event|ade|inox)\b", re.I)
+# sigle ou nom court -> nom affiché (« INOX Strasbourg 2010 » rejoint « INOX Electronique Festival »)
+_BRAND_NAMES = {"ade": "Amsterdam Dance Event", "inox": "INOX Electronique Festival"}
 _LIVE_AT = re.compile(r"^(?:.*?\b)?(?:live|set|dj set)\s+(?:at|au|@|from|a|à)\s+", re.I)
 _FEST_YEAR = re.compile(r"\b(19[89]\d|20\d\d)\b")
 # mots qui ne distinguent pas deux festivals : « INOX Electronique Festival » = « INOX Electronic Festival »
@@ -250,9 +252,12 @@ def festival(name: str) -> tuple[str, int | None] | None:
             m = re.match(r"^(festival [^\d(]+?)(?= *[\d(]|$)", s, re.I)
         else:
             m = _BRANDS.match(s) or re.match(r"^((?:\S+ ){1,4}?festival)\b(?! (?:mix|edit|version|anthem))", s, re.I)
+        # « ADE » seul : un festival seulement pour une diffusion (« ADE_2013_-_…-SBD-… »), pas un sampler (« ADE_2007-Sampler_CD »)
+        if m and m[1].lower() == "ade" and not re.search(r"-(?:SAT|FM|SBD|DAB|LINE|CABLE|DVB[CST]?|STREAM|RADIO|LIVE)-", name, re.I):
+            m = None
         if m:
             y = _FEST_YEAR.search(s[m.end():])
-            return m[1].strip(), int(y[1]) if y else None
+            return _BRAND_NAMES.get(m[1].strip().lower(), m[1].strip()), int(y[1]) if y else None
     return None
 
 
