@@ -1606,3 +1606,42 @@ def test_essential_mix_year_collection_lists_each_mix_as_a_set(user_client, sett
     conn.commit()
     page = user_client.get("/api/festival", params={"name": "Essential Mix", "type": "radio"}).json()
     assert [t["label"] for t in page["items"][0]["sets"]] == ["Radio_Soulwax-Essential_Mix-2005-01-02", "Skream-Essential_Mix-2005-S03"]
+
+
+def test_label_gaps_lists_discogs_releases_missing_from_the_library(user_client, library, settings, monkeypatch):
+    from app import coversearch, routes_library
+    assert user_client.get("/api/label-gaps", params={"name": "Ninja Tune"}).status_code == 404  # sans jeton
+    c = db.connect(settings.data_dir)
+    c.execute("UPDATE releases SET label='Ninja Tune Records', title='Glue' WHERE name LIKE 'Bicep-%'"); c.commit(); c.close()
+    asked = []
+    def fake(url, headers=None):
+        asked.append(url)
+        assert headers == {"Authorization": "Discogs token=jeton"}
+        if "type=label" in url:
+            return {"results": [{"id": 9, "title": "Ninja Tunes (2)", "uri": "/label/9-x"}, {"id": 7, "title": "Ninja Tune", "uri": "/label/7-Ninja-Tune"}]}
+        assert "/labels/7/releases" in url
+        page = int(url.rsplit("page=", 1)[1])
+        rel = lambda i, a, t, cat, y=2017: {"id": i, "artist": a, "title": t, "catno": cat, "year": y, "format": "File, MP3", "thumb": "https://i.example/t"}
+        return {"pagination": {"pages": 2}, "releases": [
+            rel(1, "Bicep", "Glue", "ZEN123"),            # titre parmi les releases du label
+            rel(2, "Bicep (2)", "Glue", "NT123V"),          # autre édition du même disque : fusionnée
+            rel(3, "Autre", "Inconnu", "NT999", 2019)] if page == 1 else [
+            rel(4, "A-Trak*", "Ibanez", "SP983"),            # référence lue dans le nom du dossier
+            rel(5, "Personne", "Rien", "none", None)]}
+    monkeypatch.setattr(coversearch, "_json", fake)
+    monkeypatch.setattr(settings, "discogs_token", "jeton")
+    routes_library._GAPS.clear()
+    got = user_client.get("/api/label-gaps", params={"name": "Ninja Tune"}).json()
+    assert (got["name"], got["url"], got["total"], got["owned"], got["truncated"]) == ("Ninja Tune", "https://www.discogs.com/label/7-Ninja-Tune", 4, 2, False)
+    assert [(m["artist"], m["title"], m["catno"]) for m in got["missing"]] == [("Autre", "Inconnu", "NT999"), ("Personne", "Rien", None)]
+    assert got["missing"][0]["url"] == "https://www.discogs.com/release/3"
+    n = len(asked)
+    user_client.get("/api/label-gaps", params={"name": "ninja tune"})
+    assert len(asked) == n  # gardé en mémoire
+    assert user_client.get("/api/group-info", params={"by": "label", "name": "Ninja Tune Records"}).json()["discogs"] is True
+    monkeypatch.setattr(coversearch, "_json", lambda url, headers=None: {"results": []})
+    assert user_client.get("/api/label-gaps", params={"name": "Inconnu"}).status_code == 404
+    def down(url, headers=None):
+        raise OSError("panne")
+    monkeypatch.setattr(coversearch, "_json", down)
+    assert user_client.get("/api/label-gaps", params={"name": "Autre label"}).status_code == 502

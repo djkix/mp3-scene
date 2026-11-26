@@ -137,6 +137,42 @@ def label_photos(name: str, token: str) -> list[dict]:
             for r in data.get("results", []) if str(r.get("cover_image", "")).startswith("https://") and "spacer.gif" not in r["cover_image"]]
 
 
+DISCOGS_PAGES = 5  # 100 sorties par page : au-delà, la liste est tronquée (Discogs : 60 requêtes par minute)
+
+
+def label_releases(name: str, token: str, key) -> dict | None:
+    """Sorties d'un label sur Discogs : le label au même nom (`key` : clé de rapprochement des labels), puis ses
+    sorties, une par artiste et titre (un même disque sort en vinyle, CD et fichier). None si le label est inconnu.
+    Lève OSError ou ValueError si Discogs ne répond pas."""
+    auth = {"Authorization": f"Discogs token={token}"}
+    found = _json("https://api.discogs.com/database/search?" + urllib.parse.urlencode({"type": "label", "q": name, "per_page": 10}), auth)
+    hit = next((r for r in found.get("results", []) if key(re.sub(r"\s*\(\d+\)$", "", r.get("title") or "")) == key(name)), None)
+    if hit is None:
+        return None
+    out, seen, pages = [], {}, 1
+    for page in range(1, DISCOGS_PAGES + 1):
+        data = _json(f"https://api.discogs.com/labels/{int(hit['id'])}/releases?per_page=100&sort=year&sort_order=desc&page={page}", auth)
+        pages = (data.get("pagination") or {}).get("pages") or 1
+        for r in data.get("releases", []):
+            artist = re.sub(r"\s*\(\d+\)$|\*$", "", (r.get("artist") or "").strip())
+            k = (_key(artist), _key(r.get("title")))
+            cat = r.get("catno") if r.get("catno") and r.get("catno").lower() != "none" else None
+            if k in seen:  # autre édition du même disque : ses références servent aussi au rapprochement
+                seen[k]["catnos"] += [cat] if cat else []
+                continue
+            seen[k] = {"id": r.get("id"), "artist": artist, "title": r.get("title") or "", "catnos": [cat] if cat else [],
+                       "year": r.get("year") or None, "format": r.get("format") or "",
+                       "thumb": r["thumb"] if str(r.get("thumb", "")).startswith("https://") else None,
+                       "url": f"https://www.discogs.com/release/{int(r['id'])}" if r.get("id") else None}
+            out.append(seen[k])
+        if page >= pages:
+            break
+    uri = hit.get("uri") or ""
+    return {"name": re.sub(r"\s*\(\d+\)$", "", hit.get("title") or name),
+            "url": "https://www.discogs.com" + uri if uri.startswith("/") else None,
+            "releases": out, "truncated": pages > DISCOGS_PAGES}
+
+
 _VARIOUS = {"va", "various", "variousartists"}
 
 

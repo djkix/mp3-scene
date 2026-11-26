@@ -3,7 +3,7 @@
 // releases correspondantes. Les filtres Genre et Année sont dans l'adresse et suivent d'une page à l'autre.
 import { api, fmtDate, fmtDuration, fmtSize, session } from '../api.js';
 import { player, watchPlaying } from '../player.js';
-import { el, relName, relHref, noCover } from '../dom.js';
+import { el, relName, relHref, noCover, NO_COVER } from '../dom.js';
 import { t as tr, catLabel, artistLabel } from '../i18n.js';
 import * as releases from './releases.js';
 import { trackList } from './tracklist.js';
@@ -64,8 +64,11 @@ function detail(container, kind, params) {
   const head = el('div', { class: 'art-head' }, el('div', {}, photo, table, photoBtn), chips);
   // label ou groupe : le même bloc en deux colonnes, résumé à gauche, ce qu'on y trouve le plus à droite
   const facts = el('table', { class: 'art-sum' }), found = el('div', { class: 'art-chips' });
+  const left = kind === 'labels' && el('div', {}, photo, facts, photoBtn);
   const info = (kind === 'labels' || kind === 'groups' || kind === 'genres' || kind === 'years') && el('div', { class: 'art-head' },
-    kind === 'labels' ? el('div', {}, photo, facts, photoBtn) : facts, found);
+    left || facts, found);
+  // label : ce qui manque, d'après sa discographie sur Discogs (le serveur garde la réponse un jour)
+  const gaps = el('section', { class: 'gaps', hidden: true });
   // genre : sa famille (« House » réunit « Deep House », « Tech House »…), un bloc par genre comme pour les séries ;
   // un clic s'y limite, un second revient à l'ensemble. La liste attend de connaître la famille.
   // label : sa famille de la même façon (« Toolroom » réunit « Toolroom Records », « Toolroom Trax »…)
@@ -88,12 +91,14 @@ function detail(container, kind, params) {
       g.first && kind !== 'years' ? line(tr('Années'), g.first === g.last ? String(g.first) : `${g.first} – ${g.last}`) : null));
     const group = (label, route, rows) => (rows.length ? [el('p', {}, label), el('div', {}, rows.map((r) => el('a', { class: 'chip',
       href: `#/${route}/${encodeURIComponent(r.name)}` }, route === 'artists' ? artistLabel(r.name) : r.name, el('small', {}, String(r.releases)))))] : []);
+    if (g.discogs && left) left.append(el('button', { type: 'button', class: 'chip keep', 'aria-expanded': 'false',
+      onclick: (e) => labelGaps(gaps, name, e.currentTarget) }, tr('Ce qui manque')));
     found.replaceChildren(...group(tr('Artistes'), 'artists', g.artists), ...group(tr('Genres'), 'genres', g.genres),
       ...(kind === 'labels' ? group(tr('Groupes'), 'groups', g.others) : group(tr('Labels'), 'labels', g.others)));
   }).catch(() => {}); // facultatif
   container.replaceChildren(
     el('h1', { class: 'grp-title' }, el('a', { href: `#/${kind}` + qs({ genre: params.genre, year: params.year }) }, tr(tab)), ' › ', kind === 'artists' ? artistLabel(name) : name, ' ', kind === 'artists' || info ? null : total),
-    ...(family ? [blocks] : []), ...(kind === 'artists' ? [head] : []), ...(info ? [info] : []), ...(kind === 'artists' && !other ? [years] : []), list);
+    ...(family ? [blocks] : []), ...(kind === 'artists' ? [head] : []), ...(info ? [info, gaps] : []), ...(kind === 'artists' && !other ? [years] : []), list);
   // chronologie : une pastille par année avec son nombre de releases ; un clic filtre la liste sur cette année
   if (kind === 'artists' && !other) api('/groups?' + new URLSearchParams({ by: 'year', artist: name })).then((rows) => {
     if (rows.length < 2) return;
@@ -135,6 +140,26 @@ function detail(container, kind, params) {
     .then(([g]) => { total.textContent = g ? `${count(g.releases)} · ${fmtSize(g.size)}` : ''; }).catch(() => {});
   if (family) return () => { dead = true; disposeList?.(); };
   return releases.render(list, { ...params, q: '', pin: appears ? { key: other, value: name, base, extra: { in: params.in } } : { key: pin, value: name, base } });
+}
+
+// Sorties d'un label sur Discogs absentes de la bibliothèque, les plus récentes d'abord ; un second clic referme
+function labelGaps(box, name, btn) {
+  const open = box.hidden;
+  box.hidden = !open;
+  btn.setAttribute('aria-expanded', String(open));
+  if (!open || box.childElementCount) return;
+  const status = el('p', { class: 'status', role: 'status' }, tr('Recherche sur Discogs…'));
+  box.replaceChildren(status);
+  api('/label-gaps?' + new URLSearchParams({ name })).then((r) => {
+    const ext = (href, text) => el('a', { href, target: '_blank', rel: 'noopener noreferrer' }, text);
+    status.replaceChildren(tr('Discogs : {0} sorties, {1} dans la bibliothèque, {2} manquantes', r.total, r.owned, r.missing.length),
+      r.truncated ? ` ${tr('(les {0} plus récentes)', r.total)}` : '', r.url ? ' · ' : '', r.url ? ext(r.url, tr('Voir sur Discogs')) : '');
+    box.append(el('ul', { class: 'rel-list' }, r.missing.map((m) => el('li', { class: 'rel' },
+      el('img', { class: 'rel-thumb', src: m.thumb || NO_COVER, alt: '', loading: 'lazy', width: 40, height: 40, referrerPolicy: 'no-referrer', onerror: noCover }),
+      el('span', { class: 'rel-name' }, m.url ? ext(m.url, `${m.artist} - ${m.title}`) : `${m.artist} - ${m.title}`),
+      el('span', { class: 'rel-info' }, el('span', { class: 'mid' }, m.year ? String(m.year) : ''),
+        el('span', { class: 'mid' }, m.catno || ''), el('span', { class: 'mid', title: m.format || null }, m.format || ''))))));
+  }).catch((err) => { status.textContent = err.message; box.replaceChildren(status); });
 }
 
 // Carte des collaborations : l'artiste au centre, ses partenaires en cercle (taille selon les pistes en commun), un

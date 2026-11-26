@@ -668,7 +668,7 @@ def _artist_lives(conn, name: str) -> list[dict]:
 
 
 @router.get("/api/group-info")
-def group_info(by: Literal["label", "grp", "genre", "year"], name: str = Query(min_length=1, max_length=200),
+def group_info(request: Request, by: Literal["label", "grp", "genre", "year"], name: str = Query(min_length=1, max_length=200),
                sub: str | None = Query(None, max_length=200), conn=Depends(get_conn)):
     """En-tête de la page d'un label, d'un groupe ou d'un genre : nombre, poids, années couvertes, et ce qu'on y
     trouve le plus (artistes, genres, puis les groupes d'un label ou les labels d'un groupe ou d'un genre).
@@ -702,7 +702,50 @@ def group_info(by: Literal["label", "grp", "genre", "year"], name: str = Query(m
                                           f" WHERE {mine} GROUP BY r.category ORDER BY releases DESC", names)]
     return {**total, "categories": cats, "artists": top(art, f"lower({art}) NOT IN ('va', 'various', 'various artists')"),
             "genres": [] if by == "genre" else top("r.genre"), "members": members if len(members) > 1 else [],
-            "others": top("r.grp" if by == "label" else "NULLIF(r.label, '')")}
+            "others": top("r.grp" if by == "label" else "NULLIF(r.label, '')"),
+            "discogs": by == "label" and bool(request.app.state.settings.discogs_token)}
+
+
+_GAPS: dict = {}  # {clé du label: (heure, réponse de Discogs)}
+GAPS_TTL = 86400  # ponytail: cache en mémoire d'un jour, perdu au redémarrage ; en base si Discogs limite trop
+
+
+@router.get("/api/label-gaps")
+def label_gaps(request: Request, name: str = Query(min_length=1, max_length=200), conn=Depends(get_conn)):
+    """Ce qui manque d'un label : ses sorties sur Discogs (jeton DISCOGS_TOKEN), moins celles de la bibliothèque,
+    reconnues à leur numéro de catalogue, à leur artiste et titre, ou à leur titre seul parmi les releases du label."""
+    token = request.app.state.settings.discogs_token
+    if not token:
+        raise HTTPException(404, "Discogs n'est pas configuré.")
+    lkey = nfo.label_key(name)
+    hit = _GAPS.get(lkey)
+    if not hit or time.time() - hit[0] > GAPS_TTL:
+        try:
+            hit = _GAPS[lkey] = (time.time(), coversearch.label_releases(name, token, nfo.label_key))
+        except (OSError, ValueError, KeyError, TypeError) as e:
+            raise HTTPException(502, f"Discogs ne répond pas ({e.__class__.__name__}).")
+    found = hit[1]
+    if found is None:
+        raise HTTPException(404, "Label introuvable sur Discogs.")
+    k = coversearch._key
+    cats, pairs, titles = set(), set(), set()
+    for r in conn.execute("SELECT name, artist, tag_artist, title, catalog, label FROM releases WHERE hidden=0"):
+        for c in (r["catalog"], (m := coversearch._CATNO.search(r["name"])) and m[1]):
+            if c and k(c):
+                cats.add(k(c))
+        title = k(coversearch.clean_title(r["title"]))
+        pairs.update((k(a), title) for a in (r["artist"], r["tag_artist"]) if a)
+        if r["label"] and nfo.label_key(r["label"]) == lkey:
+            titles.add(title)
+    va = {"va", "various", "variousartists"}
+    owned = lambda d: (any(k(c) in cats for c in d["catnos"]) or k(d["title"]) in titles
+                       or (k(d["artist"]) in va and any((v, k(d["title"])) in pairs for v in va))
+                       or (k(d["artist"]), k(d["title"])) in pairs)
+    missing = [d for d in found["releases"] if not owned(d)]
+    return {"name": found["name"], "url": found["url"], "total": len(found["releases"]), "truncated": found["truncated"],
+            "owned": len(found["releases"]) - len(missing),
+            "missing": [{**{x: d[x] for x in ("artist", "title", "year", "format", "thumb", "url")}, "catno": (d["catnos"] or [None])[0]}
+                        for d in missing]}
 
 
 PHOTO_KINDS = Literal["artist", "label", "event"]  # event : festival ou émission de radio

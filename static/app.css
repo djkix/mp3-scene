@@ -549,6 +549,9 @@ thead th { color: var(--muted); background: var(--panel); padding-block: 8px; wh
 .art-chips div { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-bottom: 8px; }
 .art-chips small { margin-left: 5px; opacity: .6; }
 @media (max-width: 700px) { .art-head { grid-template-columns: minmax(0, 1fr); } }
+.gaps { padding: 0 12px 12px; border-bottom: 1px solid var(--line); }
+.gaps .status a { text-decoration: underline; }
+.gaps .rel-name a:hover { text-decoration: underline; }
 .grp-kinds.direct { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
 .grp-kinds.direct small, .rate .bpm { margin-left: 5px; opacity: .6; }
 .rate .bpm { display: block; margin: 0; font-size: 11px; }

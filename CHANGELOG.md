@@ -4,6 +4,19 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.84.0](https://github.com/djkix/mp3-scene/compare/v1.83.1...v1.84.0) (2026-11-26)
+
+### Résumé
+
+**Ce qui manque d'un label, d'après Discogs.**
+
+- Page d'un label : un bouton « Ce qui manque » liste ses sorties sur Discogs absentes de la bibliothèque, les plus
+  récentes d'abord, avec l'année, la référence, le format et un lien vers la fiche Discogs.
+- Une sortie est reconnue à son numéro de catalogue (NFO ou nom du dossier), à son artiste et son titre, ou à son
+  titre parmi les releases du label ; les éditions d'un même disque (vinyle, CD, fichier) n'en font qu'une.
+- Le bouton n'apparaît qu'avec un jeton `DISCOGS_TOKEN`. Les 500 sorties les plus récentes au plus ; la réponse de
+  Discogs est gardée un jour.
+
 ## [1.83.1](https://github.com/djkix/mp3-scene/compare/v1.83.0...v1.83.1) (2026-11-25)
 
 ### Résumé
