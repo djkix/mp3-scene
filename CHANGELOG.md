@@ -4,6 +4,17 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.85.5](https://github.com/djkix/mp3-scene/compare/v1.85.4...v1.85.5) (2026-11-26)
+
+### Résumé
+
+**Lecteur plein écran sans débordement, lien 1001Tracklists.**
+
+- Lecteur plein écran sur téléphone : tout tient dans l'écran (la pochette s'ajuste à la hauteur, jusqu'aux petits
+  téléphones), la page ne bouge plus.
+- Fiche d'une release : picto 1001Tracklists après Beatport, qui cherche la tracklist du mix avec l'artiste, le titre
+  et l'année, sans soulignés.
+
 ## [1.85.4](https://github.com/djkix/mp3-scene/compare/v1.85.3...v1.85.4) (2026-11-26)
 
 ### Résumé

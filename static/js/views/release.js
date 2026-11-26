@@ -117,11 +117,15 @@ function header(rel) {
       el('div', { class: 'detail-tools bar-group' },
         // logos dessinés dans la feuille de style (aucune image chargée depuis ces sites)
         ...[['Discogs', 'https://www.discogs.com/search/?type=release&q='], ['Beatport', 'https://www.beatport.com/search?q='],
-          ['YouTube', 'https://www.youtube.com/results?search_query=']].map(([site, url]) => el('a', { class: `round site site-${site.toLowerCase()}`,
+          // 1001Tracklists : la tracklist d'un mix, cherchée avec l'artiste, le titre et l'année
+          ['1001Tracklists', 'https://www.1001tracklists.com/search/result.php?main_search=', true],
+          ['YouTube', 'https://www.youtube.com/results?search_query=']].map(([site, url, withYear]) => el('a', { class: `round site site-${site.toLowerCase()}`,
           target: '_blank', rel: 'noopener noreferrer', title: t('Chercher sur {0}', site), 'aria-label': t('Chercher sur {0}', site),
-          // titre sans le nombre de disques collé à la fin (« Mystery Land 2010-2CD »), comme la recherche de pochettes
+          // titre sans le nombre de disques collé à la fin (« Mystery Land 2010-2CD »), comme la recherche de pochettes ;
+          // sans soulignés (« Essential_Mix » -> « Essential Mix »)
           href: url + encodeURIComponent([/^(va|various( artists)?)$/i.test(rel.artist || '') ? '' : rel.artist,
-            (rel.title || '').replace(/[-_ ]+\(?\d*x?(?:CD|DVD)\d*\)?\s*$/i, '')].filter(Boolean).join(' ')) })),
+            (rel.title || '').replace(/[-_ ]+\(?\d*x?(?:CD|DVD)\d*\)?\s*$/i, ''), withYear && !String(rel.title).includes(rel.year) && rel.year]
+            .filter(Boolean).join(' ').replace(/_/g, ' ').replace(/\s+/g, ' ').trim()) })),
         // emplacement du dossier (à copier pour l'ouvrir sur le NAS) : dans une fenêtre
         el('button', { type: 'button', class: 'round', 'data-ico': 'folder', title: t('Emplacement du dossier'), 'aria-label': t('Emplacement du dossier'),
           onclick: () => showPath(rel.path) }),
