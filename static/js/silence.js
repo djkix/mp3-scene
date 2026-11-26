@@ -1,4 +1,4 @@
-// Silences d'une piste, lus sur sa forme d'onde (crêtes de 0 à 255, la plus forte de la piste valant 255).
+// Silences d'une piste, lus sur sa forme d'onde (volume moyen de 0 à 255, le plus fort de la piste valant 255).
 // [[début, fin]] en secondes : en tête ou en queue à partir de `edge` secondes, au milieu à partir de `middle`
 // (la piste cachée après trois minutes de vide). Une fin égale à `duration` : silence jusqu'au bout.
 // ponytail: 800 crêtes par piste, donc ~9 s par crête sur un mix de 2 h ; assez pour les blancs, pas pour couper net

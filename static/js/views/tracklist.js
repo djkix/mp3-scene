@@ -96,7 +96,7 @@ export function trackList(container, { path, empty, history = false, remove = nu
     el('img', { class: 'rel-thumb', src: `/api/releases/${t.release_id}/thumb`, alt: '', loading: 'lazy', width: 40, height: 40,
       onerror: noCover }),
     el('span', { class: 'rel-name' }, t.title ? (t.artist ? `${t.artist} - ${t.title}` : t.title) : t.filename,
-      t.chapter ? el('small', { class: 'trk-chapter' }, `↳ ${fmtDuration(t.chapter.start)} · ${[t.chapter.artist, t.chapter.title].filter(Boolean).join(' - ')}`) : null),
+      t.chapter ? el('small', { class: 'trk-chapter' }, `↳ ${[t.chapter.artist, t.chapter.title].filter(Boolean).join(' - ')} · ${fmtDuration(t.chapter.start)}`) : null),
     el('span', { class: 'rel-info' },
       el('span', { class: 'mid' }, t.genre ? el('span', { class: 'chip' }, t.genre) : ''),
       el('span', { class: 'mid' }, history

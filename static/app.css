@@ -174,7 +174,7 @@ a.icon:hover { background: var(--hover); }
 .pl-rel:hover { color: var(--fg); text-decoration: underline; }
 .pl-controls { grid-area: controls; display: flex; align-items: center; justify-content: center; gap: 4px; }
 .pl-tools { grid-area: tools; display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
-.pl-top, .pl-progress, .pl-meta, .pl-fav, .pl-hint { display: none; } /* mobile uniquement */
+.pl-top, .pl-progress, .pl-meta, .pl-tags, .pl-fav, .pl-hint { display: none; } /* mobile uniquement */
 #player .pl-play { background: var(--accent); color: var(--on-accent); border-radius: 8px; min-width: 38px; height: 38px; }
 #player .icon { color: var(--fg); }
 #player .pl-play:hover { background: var(--accent); filter: brightness(1.08); }
@@ -433,6 +433,9 @@ google-cast-launcher:hover { background: var(--hover); }
   #player.expanded .pl-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 8px;
     color: var(--muted); font: 600 10px var(--mono); letter-spacing: .05em; }
   .pl-meta .sep { color: var(--muted); font-weight: 400; }
+  #player.expanded .pl-tags:not(:empty) { display: flex; justify-content: center; gap: 8px; }
+  .pl-tags .chip { font-size: 12px; padding: 2px 10px; }
+  .pl-tags .chip:hover { text-decoration: underline; }
   .pl-meta .chip { letter-spacing: .08em; }
   .pl-meta .chip.src { color: var(--accent-text); }
   #player.expanded { background: var(--bg); background: color-mix(in srgb, var(--cover-tint, var(--bg)) 30%, var(--bg)); } /* teinte de la pochette */
@@ -521,6 +524,15 @@ a.pill:hover { filter: brightness(1.12); }
 /* même cœur que sur une ligne de piste : police et taille du texte courant, pas celles des libellés de la barre */
 .detail-actions .fav { font: 400 16px/1 var(--sans); letter-spacing: 0; text-transform: none; }
 .detail-actions :is(button, .btn):not(.icon) { padding: 8px 14px; }
+.detail-actions.acts { flex-wrap: nowrap; justify-content: center; gap: 6px; }
+/* fiche : actions en pictos ronds, le texte reste pour les lecteurs d'écran (taille 0) */
+.detail-actions.acts > :is(button, .btn) { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px;
+  min-width: 0; min-height: 0; padding: 0; border-radius: 50%; font-size: 0; gap: 0; }
+.detail-actions.acts > :is(button, .btn)::before { width: 20px; height: 20px; }
+.detail-actions.acts > .primary { width: 48px; height: 48px; }
+.detail-actions.acts > .primary::before { width: 24px; height: 24px; margin-left: 3px; }
+.detail-actions.acts > .fav { font-size: 20px; }
+@media (max-width: 380px) { .detail-actions.acts { gap: 3px; } .detail-actions.acts > :is(button, .btn):not(.primary) { width: 36px; height: 36px; } }
 .btn { display: inline-block; padding: 5px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); }
 .btn:hover { background: var(--hover); }
 .table-wrap { overflow-x: auto; max-width: 100%; }

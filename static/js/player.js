@@ -3,7 +3,7 @@
 // Toutes les commandes passent par les méthodes de `player`. Pendant un cast, `backend` (fourni par cast.js via
 // attach/detach) remplace l'<audio> local pour le transport et l'état lu (lecture, position, durée, volume).
 import { api, fmtDuration } from './api.js';
-import { t as tr } from './i18n.js';
+import { t as tr, catLabel } from './i18n.js';
 import { el, relName, relHref } from './dom.js';
 import { gaps } from './silence.js';
 import { Queue } from './queue.js';
@@ -985,8 +985,8 @@ function waveMask(peaks, bars = 160) {
   const g = c.getContext('2d');
   for (let i = 0; i < bars; i++) {
     const part = peaks.slice(Math.floor(i * peaks.length / bars), Math.max(Math.floor((i + 1) * peaks.length / bars), Math.floor(i * peaks.length / bars) + 1));
-    // puissance 2,5 : creuse le relief des musiques très compressées, dont les crêtes restent entre 60 et 100 %
-    const h = Math.max(2, (Math.max(0, ...part) / 255) ** 2.5 * c.height);
+    // volume moyen de 0 à 255 ; puissance 1,5 : un peu plus de relief entre un break et le reste du morceau
+    const h = Math.max(2, (Math.max(0, ...part) / 255) ** 1.5 * c.height);
     g.fillRect(i * 4, (c.height - h) / 2, 3, h);
   }
   return c.toDataURL();
@@ -1057,6 +1057,10 @@ function update() {
       d?.sample_rate && el('span', { 'data-ico': 'sine' }, `${(d.sample_rate / 1000).toLocaleString()} KHZ`),
       /\.\w+$/.test(t.filename || '') && el('span', { 'data-ico': 'note' }, t.filename.split('.').pop().toUpperCase())].filter(Boolean);
     ui.meta.replaceChildren(...meta.flatMap((x, i) => (i ? [el('span', { class: 'sep', 'aria-hidden': 'true' }, '·'), x] : [x])));
+    // dessous, centrés : genre et catégorie de la release, chacun mène à sa page (et referme le plein écran)
+    const go = () => expand(false);
+    ui.tags.replaceChildren(...[d?.genre && el('a', { class: 'chip', href: `#/genres/${encodeURIComponent(d.genre)}`, onclick: go }, d.genre),
+      d?.category && el('a', { class: 'chip', href: `#/categories?category=${encodeURIComponent(d.category)}`, onclick: go }, catLabel(d.category))].filter(Boolean));
     ui.fav.hidden = !!t?.nd; // pas de favori pour une piste de Navidrome
     ui.fav.textContent = t?.favorite ? '♥︎' : '♡︎';
     ui.fav.setAttribute('aria-pressed', !!t?.favorite);
@@ -1133,6 +1137,7 @@ export function initPlayer(footer) {
   // plein écran : fiche de la release (NFO), source · débit · groupe, favori de la piste en cours
   ui.doc = el('a', { class: 'icon pl-doc', href: '#/', title: tr('Détail de la release'), 'aria-label': tr('Détail de la release') });
   ui.meta = el('div', { class: 'pl-meta' });
+  ui.tags = el('div', { class: 'pl-tags' });
   ui.rate = el('span', { class: 'pl-rate' }); // débit de la piste, barre du bureau large
   ui.fav = iconBtn('pl-fav', '♡︎', tr('Ajouter aux favoris'), async () => {
     const t = q().current();
@@ -1216,7 +1221,7 @@ export function initPlayer(footer) {
   footer.replaceChildren(ui.panel, ui.msg, progress,
     el('div', { class: 'pl-bar' },
       el('div', { class: 'pl-top' }, ui.collapse, el('span', { class: 'pl-now' }, tr('En cours de lecture')), ui.doc),
-      el('div', { class: 'pl-info' }, ui.cover, ui.stage, ui.title, ui.artist, ui.rel, ui.meta, ui.cast),
+      el('div', { class: 'pl-info' }, ui.cover, ui.stage, ui.title, ui.artist, ui.rel, ui.meta, ui.tags, ui.cast),
       el('div', { class: 'pl-controls' },
         ui.shuffle,
         iconBtn('pl-prev', '', tr('Précédent'), () => player.prev(), 'prev'),

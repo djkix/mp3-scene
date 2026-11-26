@@ -41,6 +41,11 @@ def init(data_dir: Path) -> None:
             conn.execute("UPDATE tracks SET tags_read=0 WHERE release_id IN (SELECT id FROM releases WHERE year IS NULL)")
             conn.execute("UPDATE releases SET tags_done=0 WHERE year IS NULL")
             conn.execute("UPDATE releases SET has_cover=NULL WHERE has_cover=0")  # image cherchée aussi dans les pistes suivantes
+        # 1.84.5 : forme d'onde en volume moyen (RMS) au lieu des crêtes ; les formes d'onde gardées sont recalculées
+        # à la prochaine écoute de chaque piste
+        if "wave_rms" not in {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}:
+            conn.execute("ALTER TABLE scan_state ADD COLUMN wave_rms INTEGER")
+            conn.execute("DELETE FROM waveforms")
         if "txt_nfo" not in {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}:
             conn.execute("ALTER TABLE scan_state ADD COLUMN txt_nfo INTEGER")
             conn.execute("UPDATE releases SET mtime=0 WHERE has_nfo=0")

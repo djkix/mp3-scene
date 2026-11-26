@@ -307,9 +307,10 @@ _MODES = {0: "Stéréo", 1: "Stéréo jointe", 2: "Deux canaux", 3: "Mono"}
 
 @router.get("/api/tracks/{track_id}/tech")
 def tech(track_id: Id, request: Request, conn=Depends(get_conn)):
-    """Détails techniques lus dans le fichier : format, débit et son mode, fréquence, canaux, encodeur, BPM, tonalité."""
-    row = conn.execute("SELECT r.path, t.relpath, t.size FROM tracks t JOIN releases r ON r.id=t.release_id WHERE t.id=?",
-                       (track_id,)).fetchone()
+    """Détails techniques lus dans le fichier : format, débit et son mode, fréquence, canaux, encodeur, BPM, tonalité ;
+    plus le genre et la catégorie de la release."""
+    row = conn.execute("SELECT r.path, t.relpath, t.size, COALESCE(r.genre, t.genre) AS genre, r.category FROM tracks t"
+                       " JOIN releases r ON r.id=t.release_id WHERE t.id=?", (track_id,)).fetchone()
     if row is None:
         raise HTTPException(404, "Piste introuvable.")
     path = request.app.state.settings.roots.safe(row["path"], row["relpath"])
@@ -330,7 +331,8 @@ def tech(track_id: Id, request: Request, conn=Depends(get_conn)):
          "encoder": (getattr(info, "encoder_info", "") or "").strip() or tag("TSSE"),
          "duration": getattr(info, "length", None),
          "tags": ".".join(map(str, tags.version)) and "ID3v" + ".".join(map(str, tags.version[:2])) if hasattr(tags, "version") else None,
-         "bpm": tag("TBPM"), "key": tag("TKEY")}
+         "bpm": tag("TBPM"), "key": tag("TKEY"),
+         "genre": row["genre"], "category": row["category"]}  # de la release : liens du lecteur plein écran
     if d["bitrate_mode"] == "UNKNOWN":
         d["bitrate_mode"] = None
     return {k: v for k, v in d.items() if v not in (None, "", "0")}
@@ -352,7 +354,7 @@ def _decode_cmd(path) -> list[str] | None:
 
 
 def reduce_peaks(peaks: list[int], points: int = WAVE_POINTS) -> bytes:
-    """Ramène une suite de crêtes à `points` valeurs au plus, de 0 à 255 (255 = crête la plus forte de la piste)."""
+    """Ramène une suite de niveaux à `points` valeurs au plus, de 0 à 255 (255 = le plus fort de la piste)."""
     if not peaks:
         return b""
     n = min(points, len(peaks))
@@ -362,13 +364,15 @@ def reduce_peaks(peaks: list[int], points: int = WAVE_POINTS) -> bytes:
 
 
 def compute_waveform(path) -> tuple[bytes, float | None] | None:
-    """(crêtes, volume moyen en dBFS) de la piste, lus d'un seul décodage ; None si elle ne se décode pas."""
+    """(niveaux, volume moyen en dBFS) de la piste, lus d'un seul décodage ; None si elle ne se décode pas.
+    Niveau d'une fenêtre de 0,1 s : son volume moyen (RMS), pas sa crête. Une musique compressée au mastering touche
+    le maximum presque partout : en crêtes, toutes les barres seraient pleines ; en RMS, intro, break et montée se voient."""
     cmd = _decode_cmd(path)
     if cmd is None:
         return None
     peaks, deadline = [], time.monotonic() + WAVE_TIMEOUT
-    # volume moyen (RMS) pour égaliser le volume d'une piste à l'autre
-    # ponytail: un échantillon sur 8, sans pondération K du LUFS ; l'écart entre un vieux rip et un master récent suffit
+    # volume moyen (RMS) de toute la piste pour égaliser le volume d'une piste à l'autre
+    # ponytail: un échantillon sur 4, sans pondération K du LUFS ; l'écart entre un vieux rip et un master récent suffit
     energy = count = 0
     proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=SAFE_ENV)
     try:
@@ -377,9 +381,10 @@ def compute_waveform(path) -> tuple[bytes, float | None] | None:
                 return None
             samples = array("h", chunk[:len(chunk) & ~1])  # ordre des octets natif : petit-boutiste sur x86 et ARM
             if samples:
-                peaks.append(max(max(samples), -min(samples)))
-                sub = samples[::8]
-                energy += sum(v * v for v in sub)
+                sub = samples[::4]
+                e = sum(v * v for v in sub)
+                peaks.append(int(math.sqrt(e / len(sub))))
+                energy += e
                 count += len(sub)
     finally:
         proc.kill()

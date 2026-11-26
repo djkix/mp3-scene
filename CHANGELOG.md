@@ -4,6 +4,20 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.84.5](https://github.com/djkix/mp3-scene/compare/v1.84.4...v1.84.5) (2026-11-26)
+
+### Résumé
+
+**Forme d'onde lisible, genre et catégorie dans le lecteur, actions de la fiche en pictos.**
+
+- Forme d'onde : volume moyen de chaque instant au lieu de sa crête. Une musique compressée au mastering touchait le
+  maximum presque partout et toutes les barres semblaient pleines ; intro, break et montée se voient maintenant. Les
+  formes d'onde déjà calculées le sont de nouveau à la prochaine écoute.
+- Lecteur plein écran : genre et catégorie de la release, centrés sous les informations, chacun mène à sa page.
+- Mix découpé en chapitres : « artiste - titre · heure » au lieu de « heure · artiste - titre ».
+- Fiche d'une release : les huit actions (lire, file, playlist, radio, favori, hors ligne, zip, partager) sur une
+  seule ligne de pictos ronds, lecture en grand rond vert ; le nom de chaque action en bulle.
+
 ## [1.84.4](https://github.com/djkix/mp3-scene/compare/v1.84.3...v1.84.4) (2026-11-26)
 
 ### Résumé

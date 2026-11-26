@@ -119,16 +119,23 @@ function header(rel) {
         href: url + encodeURIComponent([/^(va|various( artists)?)$/i.test(rel.artist || '') ? '' : rel.artist,
           (rel.title || '').replace(/[-_ ]+\(?\d*x?(?:CD|DVD)\d*\)?\s*$/i, '')].filter(Boolean).join(' ')) })),
       ...(session.user?.role === 'admin' ? [el('span', { class: 'tools-sep', 'aria-hidden': 'true' }), ...coverTools(rel)] : [])),
-    el('div', { class: 'detail-actions' },
+    // une ligne de pictos ronds (lecture en grand rond plein) ; le nom de chaque action en bulle et pour les lecteurs d'écran
+    named(el('div', { class: 'detail-actions acts' },
       el('button', { type: 'button', class: 'primary', 'data-ico': 'play', disabled: !rel.tracks.length, onclick: play }, t('Lire')),
       el('button', { type: 'button', 'data-ico': 'queue', onclick: () => emit('queue-release', { releaseId: rel.id }) }, t('Ajouter à la file')),
       addButton({ release_id: rel.id }, t('Ajouter à une playlist')),
       el('button', { type: 'button', 'data-ico': 'radio', disabled: !rel.tracks.length, title: t('Lire cette release, puis sans fin des pistes proches'),
         onclick: () => player.radio(rel.id, rel.tracks) }, t('Radio')),
-      offlineButton(rel),
       fav,
+      offlineButton(rel),
       el('a', { class: 'btn', 'data-ico': 'download', href: `/api/releases/${rel.id}/zip`, download: '' }, t('Télécharger (zip)')),
-      shareButton('release', rel.id)));
+      shareButton('release', rel.id))));
+}
+
+// bulle de chaque picto : son texte (masqué à l'écran, lu par les lecteurs d'écran), ou sa bulle s'il en a déjà une
+function named(bar) {
+  for (const b of bar.children) if (!b.title) b.title = b.textContent;
+  return bar;
 }
 
 // Administrateur : déposer une pochette pour cette release (gardée dans les données de l'application, jamais dans le
