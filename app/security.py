@@ -175,6 +175,16 @@ def regular_names(folder, suffixes: tuple[str, ...]) -> list[str]:
         return sorted(e.name for e in it if e.name.lower().endswith(suffixes) and e.is_file(follow_symlinks=False))
 
 
+# extensions des fichiers audio lus par le scan
+AUDIO_EXT = (".mp3", ".flac", ".wav", ".m4a", ".mp4", ".wma", ".ogg", ".opus", ".aiff", ".aif", ".ape", ".wv")
+
+
+def file_release(rel: str) -> bool:
+    """Vrai pour une release d'un seul fichier, un set d'un dossier aux sets en vrac (« -= Tomorrowland 2013 =- »,
+    « Essential Mix Collection 2005 ») : son chemin est celui du fichier, son dossier celui qui le contient."""
+    return rel.rsplit("/", 1)[-1].lower().endswith(AUDIO_EXT)
+
+
 class Roots:
     """Dossiers de musique : le principal (MUSIC_ROOT) et des dossiers supplémentaires, chacun sous un nom de dossier
     racine virtuel (« 05.Web Albums » -> /extra/albums). Les chemins en base restent relatifs (« 05.Web Albums/X »)
@@ -184,7 +194,10 @@ class Roots:
         self.main, self.extra = Path(main), {k: Path(v) for k, v in (extra or {}).items()}
 
     def split(self, rel: str) -> tuple[Path, str]:
-        """(racine sur le disque, chemin sous elle) d'un chemin relatif de la bibliothèque."""
+        """(racine sur le disque, chemin sous elle) d'un chemin relatif de la bibliothèque. Une release d'un seul
+        fichier se lit dans le dossier qui le contient : sa piste (le fichier) s'y joint comme toute autre."""
+        if file_release(rel):
+            rel = rel.rpartition("/")[0]
         first, _, rest = rel.partition("/")
         return (self.extra[first], rest) if first in self.extra else (self.main, rel)
 

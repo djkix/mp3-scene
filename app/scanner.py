@@ -16,7 +16,7 @@ from mutagen.easyid3 import EasyID3
 from mutagen.id3 import ID3
 
 from app import artists, backup, cue, db, genres, nfo, security
-from app.naming import parse_release_name, unwrap
+from app.naming import ORNAMENT, parse_release_name, unwrap
 
 # sous-dossier de disque : « CD1 », « Disc 2 », ou un simple numéro (« 1 », « 02 »)
 # sous-dossier disque : « CD2 », « Disc 3 », « 02 », ou nommé après son numéro (« CD3 - Mixed by Axwell »,
@@ -26,7 +26,7 @@ BATCH = 500
 TAG_BATCH = 200
 # pistes indexées ; tout ce qui n'est pas du MP3 est converti à l'écoute (routes_media)
 NFO_SUFFIXES = nfo.SUFFIXES  # copie : `nfo` est aussi une variable locale de _files
-AUDIO = {".mp3", ".flac", ".wav", ".m4a", ".mp4", ".wma", ".ogg", ".opus", ".aiff", ".aif", ".ape", ".wv"}
+AUDIO = set(security.AUDIO_EXT)
 IMAGES = (".jpg", ".jpeg", ".png")  # mêmes types que routes_media.IMAGE_TYPES
 log = logging.getLogger(__name__)
 
@@ -98,6 +98,22 @@ def _files(entries, prefix="", disc=1):
 
 def _name(rel):
     return rel.rpartition("/")[2]
+
+
+def _stem(rel: str) -> str | None:
+    """Nom sans extension d'un set d'un dossier aux sets en vrac (son .txt porte le même), sinon None."""
+    return os.path.splitext(rel.rpartition("/")[2])[0] if security.file_release(rel) else None
+
+
+_BULK = re.compile(r"(?i)collection")
+
+
+def _bulk(rel: str, tracks: list) -> bool:
+    """Dossier de Live & Radio aux sets en vrac, un fichier chacun (« -= Tomorrowland 2013 =- », « Essential Mix
+    Collection 2005 ») : chaque fichier est une release à part."""
+    name = rel.rpartition("/")[2]
+    return len(tracks) > 1 and re.search(r"live|radio", rel.split("/", 1)[0], re.I) is not None \
+        and all("/" not in t[0] for t in tracks) and bool(ORNAMENT.search(name) or _BULK.search(name))
 
 
 def _drop(conn, loser, survivor=None):
@@ -194,7 +210,11 @@ def _scan_structure(conn, root, now):
             tracks = [t for t in tracks if (t[0], t[2]) not in old]
         else:
             parent, _, name = rel.rpartition("/")
+            if security.file_release(rel):  # set d'un dossier aux sets en vrac : son nom, sans l'extension
+                name = os.path.splitext(name)[0]
             f = parse_release_name(name)
+            if security.file_release(rel) and not f["year"] and (y := re.search(r"(?<!\d)(?:19|20)\d\d(?!\d)", parent.rpartition("/")[2])):
+                f["year"] = int(y[0])  # l'année de son dossier (« -= Tomorrowland 2013 =- »)
             rid = conn.execute(
                 "INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo,"
                 " artist, title, source, year, grp) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -261,6 +281,21 @@ def _scan_structure(conn, root, now):
             unreadable_dir(path, rel, err)
             continue
         skipped += n_skip
+        if tracks and _bulk(rel, tracks):
+            # dossier aux sets en vrac : une release par fichier (le dossier lui-même n'en est pas une)
+            files = {n: e for e in entries if e.is_file(follow_symlinks=False) and (n := _decode(e))}
+            for t in tracks:
+                frel = f"{rel}/{t[0]}"
+                try:
+                    fmtime = files[t[0]].stat(follow_symlinks=False).st_mtime
+                except (KeyError, OSError):
+                    continue
+                if frel in known and known[frel][1] == fmtime:
+                    seen.add(frel)
+                else:
+                    pending.append((frel, fmtime, [t], t[2], nfo))
+                    retrieved = retrieved or frel in known
+            tracks = []
         if tracks:
             pending.append((rel, mtime, tracks, size, nfo))
             retrieved = retrieved or rel in known or rel.rpartition("/")[2] in known_names
@@ -467,7 +502,7 @@ def _nfo_info(root, path):
     in_name = re.search(r"-\(([^()]{2,30})\)-", _name(path))
     cat = in_name and in_name.group(1).replace("_", " ")
     roots = security.as_roots(root)
-    text = nfo.read(roots.path(path), roots.base(path), 1024 * 1024)
+    text = nfo.read(roots.path(path), roots.base(path), 1024 * 1024, _stem(path))
     if text is None:
         return 0, "", cat
     label, nfo_cat = nfo.label(text)
@@ -546,7 +581,7 @@ def _scan_nfo_text(conn, root, should_stop):
         for r in rows:
             try:
                 roots = security.as_roots(root)
-                done.append((r["id"], nfo.read(roots.path(r["path"]), roots.base(r["path"]), 200 * 1024) or ""))
+                done.append((r["id"], nfo.read(roots.path(r["path"]), roots.base(r["path"]), 200 * 1024, _stem(r["path"])) or ""))
             except OSError as e:
                 log.warning("NFO illisible, indexé au prochain scan : %s (%s)", r["path"], e)
         for rid, text in done:

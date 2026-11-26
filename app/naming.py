@@ -198,6 +198,10 @@ def parse_release_name(name: str, legacy: bool = False) -> dict:
         artist, title = "VA", f"{artist.strip(' _')} - {title.strip(' _')}"
     if adorned:
         artist, title = "", name
+    # année entre parenthèses en fin de nom, sans groupe (« Paul Van Dyk - Live At Homelands (2000) ») : l'année, hors du titre
+    if not legacy and year is None and (m := re.search(r"[ _]*[(\[]((?:19|20)\d\d)[)\]][ _]*$", title)) \
+            and 1950 <= int(m[1]) <= datetime.date.today().year:
+        year, title = int(m[1]), title[:m.start()]
     return dict(artist=_clean(artist), title=_clean(title), source=source, year=year, grp=grp)
 
 

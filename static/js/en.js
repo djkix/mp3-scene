@@ -248,6 +248,7 @@ export const EN = {
   'Aucune famille réglée à la main.': 'No family set by hand.',
   'À part': 'Apart',
   '{0} séries': '{0} series',
+  'Emplacement du dossier': 'Folder location',
   'Copier le chemin': 'Copy the path',
   'Chemin copié.': 'Path copied.',
   'Comparer': 'Compare',

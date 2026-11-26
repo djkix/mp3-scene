@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
 from PIL import Image
 
-from . import artists, coversearch, db, lyrics, naming, nfo
+from . import artists, coversearch, db, lyrics, naming, nfo, security
 from .naming import complete_title, festival, festival_key, radio as radio_show
 from .routes_media import DECODE, IMAGE_ERRORS
 from .deps import MAX_INT, Id, current_user, get_conn
@@ -894,11 +894,15 @@ def release_by_name(name: str = Query(max_length=1024), user=Depends(current_use
 @router.get("/api/releases/{rid}")
 def release_detail(rid: Id, user=Depends(current_user), conn=Depends(get_conn)):
     d = _release(_release_row(conn, user["id"], rid))
-    d["series"] = _series(d["title"])  # la fiche demande les autres volumes à /api/series
+    # la fiche demande les autres volumes à /api/series ; un live n'est pas un volume (« Live at INOX 2012 »)
+    d["series"] = None if re.search(r"live|radio", d["category"] or "", re.I) else _series(d["title"])
     seen = conn.execute("SELECT COUNT(*), MAX(p.played_at) FROM plays p JOIN tracks t ON t.id=p.track_id"
                         " WHERE t.release_id=? AND p.user_id=?", (rid, user["id"])).fetchone()
     d["plays"], d["last_played"] = seen[0], seen[1]  # écoutes de l'utilisateur : pistes lancées, dernière fois
     d["custom_cover"] = conn.execute("SELECT 1 FROM overrides WHERE path=? AND cover=1", (d["path"],)).fetchone() is not None
+    # set d'un festival ou épisode d'une émission : son titre mène à sa page de Live & Radio
+    d["live"] = next(({"type": t, "name": _live_name(g)} for t in ("festival", "radio") if re.search(r"live|radio", d["category"] or "", re.I)
+                      for g in _live_sets(conn, t).values() if any(x[0] == rid for x in g["sets"])), None)
     d["tracks"] = [_track(r) for r in conn.execute(
         f"SELECT {TRACK_COLS} FROM {TRACK_FROM} WHERE t.release_id=? ORDER BY t.disc, t.relpath",
         (user["id"], rid))]
@@ -1081,10 +1085,16 @@ def _live_sets(conn, kind: str) -> dict:
     reste à son artiste."""
     # ponytail: relu à chaque appel (quelques milliers de noms, quelques ms) ; mettre en cache si la liste grossit
     rows = []
-    for r in conn.execute(f"SELECT r.id, r.name, r.year, r.size, r.has_cover, r.track_count, COALESCE(r.tag_artist, r.artist) AS who "
+    for r in conn.execute(f"SELECT r.id, r.name, r.path, r.year, r.size, r.has_cover, r.track_count, COALESCE(r.tag_artist, r.artist) AS who "
                           f"FROM releases r WHERE r.hidden=0 AND {_LIVE_CAT}"):
         f = festival(r["name"])
         g = None if f else radio_show(r["name"])
+        # set d'un dossier aux sets en vrac : son nom (souvent l'artiste seul) ne dit pas où, son dossier si
+        # (« -= Tomorrowland 2013 =- », « Essential Mix Collection 2005 »)
+        if not (f or g) and security.file_release(r["path"]):
+            folder = r["path"].rsplit("/", 2)[-2]
+            f = festival(folder)
+            g = None if f else radio_show(folder)
         rows.append((r, "festival" if f else "radio" if g else "artist", f or g))
     episodes = Counter(festival_key(x[0]) for _, t, x in rows if t == "radio")
     out = {}
@@ -1204,12 +1214,17 @@ def similar(rid: Id, user=Depends(current_user), conn=Depends(get_conn)):
 
 @router.get("/api/releases/{rid}/versions")
 def versions(rid: Id, user=Depends(current_user), conn=Depends(get_conn)):
-    """Autres sorties du même titre : même artiste et même titre dans le nom (autre groupe, autre source, réédition)."""
+    """Autres sorties du même titre : même artiste et même titre dans le nom (autre groupe, autre source, réédition).
+    Un live ou une émission d'une autre année ou d'un autre jour est un autre set, pas une autre version (deux
+    « Darren_Emerson-Essential_Mix », 1994 et 1999)."""
     # ponytail: rapprochement sur le nom seul, à la casse près ; « Title » et « Title_(Remixes) » sont réunis exprès
     return [_release(x) for x in conn.execute(
         f"SELECT {RELEASE_COLS} FROM {RELEASE_FROM} JOIN releases o ON o.id=? AND r.id!=o.id"
-        " AND lower(r.artist)=lower(o.artist) AND lower(r.title)=lower(o.title) ORDER BY r.name COLLATE NOCASE LIMIT 50",
-        (user["id"], rid))]
+        " AND lower(r.artist)=lower(o.artist) AND lower(r.title)=lower(o.title)"
+        " AND NOT ((o.category LIKE '%live%' OR o.category LIKE '%radio%') AND (COALESCE(r.year, -1)!=COALESCE(o.year, -1)"
+        "   OR (COALESCE(r.released_at, 0)>0 AND COALESCE(o.released_at, 0)>0"
+        "       AND date(r.released_at, 'unixepoch')!=date(o.released_at, 'unixepoch'))))"
+        " ORDER BY r.name COLLATE NOCASE LIMIT 50", (user["id"], rid))]
 
 
 @router.get("/api/releases/{rid}/nfo")
@@ -1219,7 +1234,7 @@ def release_nfo(rid: Id, request: Request, track: int | None = Query(None, ge=1,
     row = conn.execute("SELECT path FROM releases WHERE id=?", (rid,)).fetchone()
     if row is None:
         raise HTTPException(404, "Release introuvable.")
-    stem = None
+    stem = os.path.splitext(row["path"].rpartition("/")[2])[0] if security.file_release(row["path"]) else None
     if track is not None:
         t = conn.execute("SELECT relpath FROM tracks WHERE id=? AND release_id=?", (track, rid)).fetchone()
         if t is None:

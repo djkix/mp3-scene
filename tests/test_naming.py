@@ -102,3 +102,9 @@ def test_numbered_show_with_a_guest_is_a_radio_episode():
     assert radio(n) == ("Bonkers Beats", 2026, True) and kind(n) == "live"  # tag LIVE suivi de WEB : un live
     assert radio("Blink_182-Live_in_Paris-LIVE-WEB-2001-X") is None          # un numéro sans invité : pas une émission
     assert kind("Moby-Almost_Home-LIVE-2CD-2014-X") is None                  # en CD : un album
+
+
+def test_year_in_brackets_at_the_end_of_the_name():
+    from app.naming import parse_release_name as p
+    assert (p("Paul Van Dyk - Live At The Gallery Turnmills (1999)")["year"], p("Paul Van Dyk - Live At The Gallery Turnmills (1999)")["title"]) == (1999, "Live At The Gallery Turnmills")
+    assert p("Artist-Title_(2000_Remix)-WEB-2010-GRP")["year"] == 2010  # année du nom scène, remix gardé dans le titre

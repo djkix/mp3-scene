@@ -31,6 +31,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from . import cue, db
 from .deps import MAX_INT, Id, current_user, get_conn
+from . import security
 from .security import CAST_TTL, check_track_sig, safe_path, sign_track
 
 router = APIRouter(dependencies=[Depends(current_user)])
@@ -490,7 +491,12 @@ def release_zip(rid: Id, request: Request, conn=Depends(get_conn)):
     folder = request.app.state.settings.roots.safe(row["path"])
     if not folder.is_dir():
         raise HTTPException(404, "Dossier introuvable.")
-    return StreamingResponse(_zip_stream(row["name"], _release_files(folder)), media_type="application/zip",
+    # set d'un dossier aux sets en vrac : son fichier (et son .txt), pas tout le dossier
+    files = _release_files(folder)
+    if security.file_release(row["path"]):
+        stem = os.path.splitext(row["path"].rpartition("/")[2])[0]
+        files = [(rel, p) for rel, p in files if "/" not in rel and os.path.splitext(rel)[0] == stem]
+    return StreamingResponse(_zip_stream(row["name"], files), media_type="application/zip",
                              headers={"Content-Disposition": _disposition(f"{row['name']}.zip")})
 
 

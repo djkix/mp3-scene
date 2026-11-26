@@ -4,6 +4,27 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.85.2](https://github.com/djkix/mp3-scene/compare/v1.85.1...v1.85.2) (2026-11-26)
+
+### Résumé
+
+**Un set par release dans les dossiers de sets en vrac, titre des émissions cliquable, épisodes distincts.**
+
+- « Paul Van Dyk - Live At The Gallery Turnmills (1999) » : année 1999, titre sans l'année. Les releases sans année
+  la reprennent de leur nom au démarrage.
+- Dossiers de Live & Radio aux sets en vrac (« -= Tomorrowland 2013 =- », « Essential Mix Collection 2005 ») : chaque
+  fichier est une release à part, nommée d'après lui (« Radio_Soulwax-Essential_Mix-2005-01-02 »), avec l'année du
+  dossier ; le dossier n'apparaît plus dans les listes. Le festival ou l'émission vient du dossier. Lecture, NFO (son
+  .txt) et zip (son seul fichier) se font depuis le dossier. Au premier scan après la mise à jour, ces dossiers sont
+  relus une fois et découpés.
+- Un live n'est plus pris pour le volume d'une série (« Live at INOX 2012 »).
+- Fiche d'une release : une ligne, deux groupes de pictos ronds de même taille, chacun dans sa pastille : écouter et
+  garder, puis autour de la release (Discogs, Beatport, YouTube, dossier, pochette). Le dossier s'ouvre dans une
+  fenêtre avec son chemin et « Copier le chemin ».
+- Fiche d'un set de festival ou d'un épisode d'émission : son titre (« Essential Mix ») mène à sa page de Live & Radio.
+- Autres versions : un live ou une émission d'une autre année ou d'un autre jour n'en est plus une (deux
+  « Darren_Emerson-Essential_Mix », 1994 et 1999, sont deux épisodes).
+
 ## [1.85.1](https://github.com/djkix/mp3-scene/compare/v1.85.0...v1.85.1) (2026-11-26)
 
 ### Résumé

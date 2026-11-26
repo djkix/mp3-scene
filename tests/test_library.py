@@ -1454,6 +1454,14 @@ def test_live_sets_split_into_festivals_radio_shows_and_artists(user_client, set
     assert get("festival") == {"Tomorrowland": (1, None)}
     assert get("radio") == {"A State of Trance": (2, 3), "Vonyc Sessions": (1, None)}  # pochette : le set qui en a une
     assert get("artist") == {"Carl Cox": (3, None)}  # club ou autre : par artiste, casse confondue
+    rid = conn.execute("SELECT id FROM releases WHERE name LIKE 'Ferry-ASOT_900%'").fetchone()[0]
+    assert user_client.get(f"/api/releases/{rid}").json()["live"] == {"type": "radio", "name": "A State of Trance"}  # titre cliquable
+    # même artiste et même titre, autre année : un autre épisode, pas une autre version
+    conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, year, artist, title)"
+                 " VALUES ('em1','Darren_Emerson-Essential_Mix-1994-07-09','','Live And Radio',0,0,1,1,0,1994,'Darren Emerson','Essential Mix'),"
+                 " ('em2','Darren_Emerson-Essential_Mix-1999-07-11','','Live And Radio',0,0,1,1,0,1999,'Darren Emerson','Essential Mix')"); conn.commit()
+    em = conn.execute("SELECT id FROM releases WHERE path='em1'").fetchone()[0]
+    assert user_client.get(f"/api/releases/{em}/versions").json() == []
     # dossier orné sans artiste ni festival reconnu : son nom, jamais un nom vide (page refusée)
     conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, year)"
                  " VALUES ('orn','-= Sosumi Pool Party 2010 =-','','Live And Radio',0,0,10,0,0,2010)"); conn.commit()
@@ -1741,3 +1749,43 @@ def test_disc_subfolders_take_the_release_name_and_their_cd(user_client, setting
     assert got["Bonkers_Beats_2_On_Beat_106_Scotland-With_Scott_Brown-WEB-2021-XTC_iNT"][3] == "03.Various Artists - Live And Radio"
     db.categorize(conn)  # relu sur le dossier : rien ne s'empile
     assert conn.execute("SELECT name FROM releases WHERE path LIKE '%SALSOUL_CD2'").fetchone()[0] == "VA-The_Salsoul_Acapellas-2CD-2005_(CD2)"
+
+
+def test_bulk_live_folders_become_one_release_per_set(app, user_client, settings, make_mp3):
+    import io, zipfile
+    from app.scanner import scan_structure, scan_tags
+    root = settings.music_root
+    bulk = root / "Live And Radio/-= Tomorrowland =-/-= Tomorrowland 2013 =-"
+    em = root / "Live And Radio/-= Essential Mix =-/Essential Mix Collection 2005"
+    single = root / "Singles/B/Bicep-Glue-(NT123)-WEB-2017-PWT"
+    for d in (bulk, em, single):
+        d.mkdir(parents=True)
+    make_mp3(bulk / "Hardwell.mp3", title="Live at Tomorrowland", artist="Hardwell")
+    make_mp3(bulk / "Armin van Buuren.mp3", title="Live at Tomorrowland", artist="Armin van Buuren")
+    (bulk / "Hardwell.txt").write_text("Tracklist :\n1. Hardwell - Spaceman")
+    make_mp3(em / "Essential Mix - 2005-01-02 - Radio Soulwax.mp3")
+    make_mp3(em / "Essential Mix - 2005-01-16 - Jon O Bir.mp3")
+    make_mp3(single / "01-bicep-glue.mp3", title="Glue", artist="Bicep")
+    c = db.connect(settings.data_dir)
+    scan_structure(c, root, now=1000.0); scan_tags(c, root)
+    rows = {r["path"]: r for r in c.execute("SELECT * FROM releases")}
+    assert "Live And Radio/-= Tomorrowland =-/-= Tomorrowland 2013 =-" not in rows       # le dossier n'est pas une release
+    h = rows["Live And Radio/-= Tomorrowland =-/-= Tomorrowland 2013 =-/Hardwell.mp3"]
+    assert (h["name"], h["track_count"], h["year"]) == ("Hardwell", 1, 2013)  # année de son dossier
+    names = {r["name"] for r in rows.values()}
+    assert {"Radio_Soulwax-Essential_Mix-2005-01-02", "Jon_O_Bir-Essential_Mix-2005-01-16"} <= names
+    # festival et émission retrouvés par le dossier ; un set par release
+    fest = {f["name"]: f["sets"] for f in user_client.get("/api/festivals").json()}
+    assert fest == {"Tomorrowland": 2}
+    assert {f["name"]: f["sets"] for f in user_client.get("/api/festivals", params={"type": "radio"}).json()} == {"Essential Mix": 2}
+    # lecture, NFO (son .txt), zip (son seul fichier)
+    tid = c.execute("SELECT id FROM tracks WHERE release_id=?", (h["id"],)).fetchone()[0]
+    assert user_client.get(f"/api/tracks/{tid}/stream", params={"original": 1}).status_code == 200
+    assert "Spaceman" in user_client.get(f"/api/releases/{h['id']}/nfo").text
+    z = zipfile.ZipFile(io.BytesIO(user_client.get(f"/api/releases/{h['id']}/zip").content))
+    assert sorted(n.split("/", 1)[1] for n in z.namelist()) == ["Hardwell.mp3", "Hardwell.txt"]
+    # second scan : rien ne bouge (sets inchangés)
+    before = {r["id"] for r in c.execute("SELECT id FROM releases")}
+    scan_structure(c, root, now=2000.0)
+    assert {r["id"] for r in c.execute("SELECT id FROM releases")} == before
+    c.close()

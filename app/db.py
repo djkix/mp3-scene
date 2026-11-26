@@ -41,6 +41,12 @@ def init(data_dir: Path) -> None:
             conn.execute("UPDATE tracks SET tags_read=0 WHERE release_id IN (SELECT id FROM releases WHERE year IS NULL)")
             conn.execute("UPDATE releases SET tags_done=0 WHERE year IS NULL")
             conn.execute("UPDATE releases SET has_cover=NULL WHERE has_cover=0")  # image cherchée aussi dans les pistes suivantes
+        # 1.85.2 : dossiers de Live & Radio aux sets en vrac relistés une fois au prochain scan, pour qu'il en fasse
+        # une release par fichier (favoris et écoutes de ces dossiers repartent de zéro)
+        if "bulk_split" not in {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}:
+            conn.execute("ALTER TABLE scan_state ADD COLUMN bulk_split INTEGER")
+            conn.execute("UPDATE releases SET mtime=0 WHERE track_count>1 AND (lower(path) LIKE '%live%' OR lower(path) LIKE '%radio%')"
+                         " AND (name LIKE '%=-' OR name LIKE '-=%' OR lower(name) LIKE '%collection%')")
         # 1.85.1 : les photos d'artistes et de festivals restées vides (souvent une panne passagère de Deezer) sont
         # cherchées de nouveau à la prochaine visite de leur page
         if "photo_retry" not in {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}:
@@ -86,8 +92,10 @@ def classify(conn) -> None:
                 conn.execute(f"UPDATE {table} SET {col}=? WHERE {col}=?", (unwrap(a), a))
     # artiste et titre lus du nom par une version antérieure : relus, s'ils n'ont pas été corrigés depuis
     # ponytail: deux analyses par release à chaque passage (~1 s pour 45 000) ; à retirer quand les bases sont à jour
-    for r in conn.execute("SELECT id, name, artist, title FROM releases").fetchall():
+    for r in conn.execute("SELECT id, name, artist, title, year FROM releases").fetchall():
         old, new = parse_release_name(r["name"], legacy=True), parse_release_name(r["name"])
+        if r["year"] is None and new["year"]:  # année lue depuis dans le nom (« … (1999) »)
+            conn.execute("UPDATE releases SET year=? WHERE id=?", (new["year"], r["id"]))
         for col in ("artist", "title"):
             # à la casse près : « ultra dance 03 » est devenu « Ultra Dance 03 » en rejoignant les autres artistes
             if old[col] != new[col] and (r[col] or "").casefold() == (old[col] or "").casefold():
@@ -398,7 +406,9 @@ def essential_mixes(conn) -> None:
         " WHERE lower(replace(r.path, '_', ' ')) LIKE '%essential mix%'").fetchall()
     for r in rows:
         folder = r["path"].rsplit("/", 1)[-1]
-        if re.search(r"(?i)collection", folder):
+        if re.search(r"(?i)\.(?:mp3|flac|m4a|wav|ogg|opus|wma|mp4|aiff?|ape|wv)$", folder):
+            folder = folder.rsplit(".", 1)[0]  # set d'un dossier « Collection » : une release d'un seul fichier
+        elif re.search(r"(?i)collection", folder):
             continue
         got = em_name(folder, r["artist"], r["title"], r["relpath"])
         if not got:

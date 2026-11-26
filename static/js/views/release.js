@@ -101,35 +101,43 @@ function header(rel) {
       el('a', { class: 'cover', href: `/api/releases/${rel.id}/cover`, target: '_blank', rel: 'noopener' },
         el('img', { src: `/api/releases/${rel.id}/cover`, alt: t('Pochette'), onerror: (e) => e.target.parentNode.remove() })),
       info),
-    // emplacement du dossier (à copier pour l'ouvrir sur le NAS), sur une ligne ; le chemin entier en bulle
-    el('p', { class: 'detail-links detail-path' },
-      el('span', { class: 'path-ico', 'data-ico': 'folder', 'aria-hidden': 'true' }),
-      el('code', { title: rel.path }, rel.path),
-      el('button', { type: 'button', class: 'icon', 'data-ico': 'copy', title: t('Copier le chemin'), 'aria-label': t('Copier le chemin'), onclick: async () => {
-        try { await navigator.clipboard.writeText(rel.path); player.flash(t('Chemin copié.')); } catch { player.flash(t('Copie impossible dans ce navigateur.')); }
-      } })),
-    // une rangée de pictos ronds : recherches de cette release sur des sites extérieurs (simples liens, rien n'est
-    // envoyé tant qu'on ne clique pas), puis pour un administrateur les outils de pochette
-    el('div', { class: 'detail-tools' },
-      // logos dessinés dans la feuille de style (aucune image chargée depuis ces sites)
-      ...[['Discogs', 'https://www.discogs.com/search/?type=release&q='], ['Beatport', 'https://www.beatport.com/search?q='],
-        ['YouTube', 'https://www.youtube.com/results?search_query=']].map(([site, url]) => el('a', { class: `round site site-${site.toLowerCase()}`,
-        target: '_blank', rel: 'noopener noreferrer', title: t('Chercher sur {0}', site), 'aria-label': t('Chercher sur {0}', site),
-        // titre sans le nombre de disques collé à la fin (« Mystery Land 2010-2CD »), comme la recherche de pochettes
-        href: url + encodeURIComponent([/^(va|various( artists)?)$/i.test(rel.artist || '') ? '' : rel.artist,
-          (rel.title || '').replace(/[-_ ]+\(?\d*x?(?:CD|DVD)\d*\)?\s*$/i, '')].filter(Boolean).join(' ')) })),
-      ...(session.user?.role === 'admin' ? [el('span', { class: 'tools-sep', 'aria-hidden': 'true' }), ...coverTools(rel)] : [])),
-    // une ligne de pictos ronds (lecture en grand rond plein) ; le nom de chaque action en bulle et pour les lecteurs d'écran
-    named(el('div', { class: 'detail-actions acts' },
-      el('button', { type: 'button', class: 'primary', 'data-ico': 'play', disabled: !rel.tracks.length, onclick: play }, t('Lire')),
-      el('button', { type: 'button', 'data-ico': 'queue', onclick: () => emit('queue-release', { releaseId: rel.id }) }, t('Ajouter à la file')),
-      addButton({ release_id: rel.id }, t('Ajouter à une playlist')),
-      el('button', { type: 'button', 'data-ico': 'radio', disabled: !rel.tracks.length, title: t('Lire cette release, puis sans fin des pistes proches'),
-        onclick: () => player.radio(rel.id, rel.tracks) }, t('Radio')),
-      fav,
-      offlineButton(rel),
-      el('a', { class: 'btn', 'data-ico': 'download', href: `/api/releases/${rel.id}/zip`, download: '' }, t('Télécharger (zip)')),
-      shareButton('release', rel.id))));
+    // une ligne, deux groupes de pictos ronds de même taille : écouter et garder, puis autour de la release (recherches
+    // sur des sites extérieurs, simples liens dont rien n'est envoyé avant le clic ; dossier ; outils de pochette)
+    el('div', { class: 'detail-bar' },
+      named(el('div', { class: 'detail-actions acts bar-group' },
+        el('button', { type: 'button', class: 'primary', 'data-ico': 'play', disabled: !rel.tracks.length, onclick: play }, t('Lire')),
+        el('button', { type: 'button', 'data-ico': 'queue', onclick: () => emit('queue-release', { releaseId: rel.id }) }, t('Ajouter à la file')),
+        addButton({ release_id: rel.id }, t('Ajouter à une playlist')),
+        el('button', { type: 'button', 'data-ico': 'radio', disabled: !rel.tracks.length, title: t('Lire cette release, puis sans fin des pistes proches'),
+          onclick: () => player.radio(rel.id, rel.tracks) }, t('Radio')),
+        fav,
+        offlineButton(rel),
+        el('a', { class: 'btn', 'data-ico': 'download', href: `/api/releases/${rel.id}/zip`, download: '' }, t('Télécharger (zip)')),
+        shareButton('release', rel.id))),
+      el('div', { class: 'detail-tools bar-group' },
+        // logos dessinés dans la feuille de style (aucune image chargée depuis ces sites)
+        ...[['Discogs', 'https://www.discogs.com/search/?type=release&q='], ['Beatport', 'https://www.beatport.com/search?q='],
+          ['YouTube', 'https://www.youtube.com/results?search_query=']].map(([site, url]) => el('a', { class: `round site site-${site.toLowerCase()}`,
+          target: '_blank', rel: 'noopener noreferrer', title: t('Chercher sur {0}', site), 'aria-label': t('Chercher sur {0}', site),
+          // titre sans le nombre de disques collé à la fin (« Mystery Land 2010-2CD »), comme la recherche de pochettes
+          href: url + encodeURIComponent([/^(va|various( artists)?)$/i.test(rel.artist || '') ? '' : rel.artist,
+            (rel.title || '').replace(/[-_ ]+\(?\d*x?(?:CD|DVD)\d*\)?\s*$/i, '')].filter(Boolean).join(' ')) })),
+        // emplacement du dossier (à copier pour l'ouvrir sur le NAS) : dans une fenêtre
+        el('button', { type: 'button', class: 'round', 'data-ico': 'folder', title: t('Emplacement du dossier'), 'aria-label': t('Emplacement du dossier'),
+          onclick: () => showPath(rel.path) }),
+        ...(session.user?.role === 'admin' ? coverTools(rel) : []))));
+}
+
+// Fenêtre de l'emplacement du dossier : le chemin entier et un bouton pour le copier
+function showPath(path) {
+  dlg ??= document.body.appendChild(el('dialog'));
+  dlg.className = 'pl-add path-dlg';
+  const copy = el('button', { type: 'button', class: 'primary', 'data-ico': 'copy', onclick: async () => {
+    try { await navigator.clipboard.writeText(path); player.flash(t('Chemin copié.')); dlg.close(); } catch { player.flash(t('Copie impossible dans ce navigateur.')); }
+  } }, t('Copier le chemin'));
+  dlg.replaceChildren(el('h2', {}, t('Emplacement du dossier')), el('p', { class: 'path-text' }, path),
+    el('div', { class: 'inline-form' }, copy, el('button', { type: 'button', onclick: () => dlg.close() }, t('Fermer'))));
+  if (!dlg.open) dlg.showModal();
 }
 
 // bulle de chaque picto : son texte (masqué à l'écran, lu par les lecteurs d'écran), ou sa bulle s'il en a déjà une

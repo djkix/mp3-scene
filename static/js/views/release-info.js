@@ -9,7 +9,9 @@ const enc = encodeURIComponent;
 // catégorie, genre), `ed` édition (label, catalogue), `num` mesures (date, taille, durée). Le titre reste en texte.
 // Une pastille sans lien est grise : seules les vertes se cliquent.
 export function infoRows(rel, el) {
-  return [[t('Artiste'), rel.artist, (v) => `#/artists/${enc(v)}`, 'cls'], [t('Titre'), rel.title],
+  // titre d'un set de festival ou d'un épisode d'émission : vers sa page de Live & Radio
+  const live = rel.live && (() => `#/festivals/${enc(rel.live.name)}${rel.live.type === 'radio' ? '?type=radio' : ''}`);
+  return [[t('Artiste'), rel.artist, (v) => `#/artists/${enc(v)}`, 'cls'], [t('Titre'), rel.title, live || null, live ? 'cls' : undefined],
     [t('Source'), rel.source, (v) => `#/?source=${enc(v)}`, 'src'], [t('Année'), rel.year, (v) => `#/years/${enc(v)}`, 'cls'],
     [t('Date'), rel.date == null ? null : fmtDate(rel.date), null, 'num'], [t('Groupe'), rel.grp, (v) => `#/groups/${enc(v)}`, 'src'],
     [t('Label'), rel.label, (v) => `#/labels/${enc(v)}`, 'ed'],

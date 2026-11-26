@@ -526,6 +526,13 @@ a.pill:hover { filter: brightness(1.12); }
 .detail-actions .fav { font: 400 16px/1 var(--sans); letter-spacing: 0; text-transform: none; }
 .detail-actions :is(button, .btn):not(.icon) { padding: 8px 14px; }
 .detail-actions.acts { flex-wrap: nowrap; justify-content: center; gap: 6px; }
+/* fiche : une ligne, deux groupes de pictos ronds de même taille, chacun dans sa pastille */
+.detail-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0; }
+.detail-bar .bar-group { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; margin: 0; padding: 5px; border-radius: 999px; background: var(--hover); }
+.detail-bar .detail-actions.acts > .primary { width: 40px; height: 40px; }
+.detail-bar .detail-actions.acts > .primary::before { width: 20px; height: 20px; margin-left: 2px; }
+.detail-bar .round { width: 40px; height: 40px; background: var(--panel); }
+.path-dlg .path-text { font: 13px/1.5 var(--mono); overflow-wrap: anywhere; margin: 8px 0 14px; }
 /* fiche : actions en pictos ronds, le texte reste pour les lecteurs d'écran (taille 0) */
 .detail-actions.acts > :is(button, .btn) { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px;
   min-width: 0; min-height: 0; padding: 0; border-radius: 50%; font-size: 0; gap: 0; }
@@ -617,10 +624,6 @@ thead th { color: var(--muted); background: var(--panel); padding-block: 8px; wh
 .detail-info dd .pill + .pill { margin-left: 4px; }
 .detail-links code { overflow-wrap: anywhere; opacity: .8; }
 .detail-links a.chip:hover { text-decoration: underline; }
-/* chemin du dossier sur une ligne (le chemin entier en bulle), copie au bout */
-.detail-path { flex-wrap: nowrap; }
-.detail-path code { min-width: 0; flex: 0 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
-.detail-path .icon { flex: none; min-width: 32px; height: 32px; min-height: 0; border: 0; background: none; color: var(--muted); }
 /* liens extérieurs et outils de pochette : une rangée de pictos ronds */
 .detail-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 12px; }
 .round { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; min-width: 0; min-height: 0;
@@ -631,7 +634,6 @@ thead th { color: var(--muted); background: var(--panel); padding-block: 8px; wh
 .site-discogs::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%23333'/%3E%3Ccircle cx='12' cy='12' r='8.5' fill='none' stroke='%23fff' stroke-width='.8' opacity='.55'/%3E%3Ccircle cx='12' cy='12' r='6.5' fill='none' stroke='%23fff' stroke-width='.8' opacity='.55'/%3E%3Ccircle cx='12' cy='12' r='4.5' fill='none' stroke='%23fff' stroke-width='.8' opacity='.55'/%3E%3Ccircle cx='12' cy='12' r='2.2' fill='%23fff'/%3E%3C/svg%3E"); }
 .site-beatport::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%2301ff95'/%3E%3Cpath d='M8.5 5.5v8.2a4.3 4.3 0 1 0 4.3-4.3H11' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E"); }
 .site-youtube::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='1.5' y='5' width='21' height='14' rx='4.5' fill='%23f00'/%3E%3Cpath d='M10 8.8v6.4l5.6-3.2z' fill='%23fff'/%3E%3C/svg%3E"); }
-.tools-sep { width: 1px; height: 24px; margin: 0 4px; background: var(--line); }
 [data-ico="copy"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='9' y='9' width='11' height='11' rx='2'/%3E%3Cpath d='M5 15V5a1 1 0 0 1 1-1h10'/%3E%3C/svg%3E"); }
 [data-ico="img-up"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 13v6H4V5h8'/%3E%3Cpath d='M4 17l5-5 4 4 2-2 5 5'/%3E%3Cpath d='M18 3v6M15 6l3-3 3 3'/%3E%3C/svg%3E"); }
 [data-ico="img-find"] { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 19H4V5h16v6'/%3E%3Cpath d='M4 16l5-5 4 4'/%3E%3Ccircle cx='17.5' cy='17.5' r='2.5'/%3E%3Cpath d='M19.5 19.5L22 22'/%3E%3C/svg%3E"); }
