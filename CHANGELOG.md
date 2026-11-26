@@ -4,6 +4,18 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.85.6](https://github.com/djkix/mp3-scene/compare/v1.85.5...v1.85.6) (2026-11-26)
+
+### Résumé
+
+**Lien 1001Tracklists réparé, biographie à côté de la photo.**
+
+- 1001Tracklists ne lit pas une recherche passée dans son adresse (« At least 2 characters are required ») : le picto
+  ouvre une recherche Google limitée à 1001tracklists.com. Mots cherchés : l'artiste, le festival ou l'émission et
+  l'année pour un set (« Sub Focus Tomorrowland 2025 »), sinon l'artiste, le titre sans dates ni redites et l'année.
+- Page d'un artiste : en bandeau, sa photo et sa biographie côte à côte ; dessous, le tableau des listes et les
+  pastilles, plus aérés. La biographie est dans la langue de l'application (l'autre à défaut), sans bouton FR / EN.
+
 ## [1.85.5](https://github.com/djkix/mp3-scene/compare/v1.85.4...v1.85.5) (2026-11-26)
 
 ### Résumé

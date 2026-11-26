@@ -61,7 +61,9 @@ function detail(container, kind, params) {
   const photo = photoKind && el('img', { class: photoKind === 'label' ? 'art-photo logo' : 'art-photo', alt: '', src: '/api/photo?' + new URLSearchParams({ kind: photoKind, name }), onerror: (e) => e.target.remove() });
   const photoBtn = photoKind && session.user?.role === 'admin'
     && el('button', { type: 'button', class: 'chip keep photo-btn', 'data-ico': 'photo', title: tr('Chercher une photo'), 'aria-label': tr('Chercher une photo'), onclick: () => findPhoto(photoKind, name).catch(() => {}) });
-  const head = el('div', { class: 'art-head' }, el('div', {}, photo, table, photoBtn), chips);
+  // artiste : en bandeau, la photo et sa biographie ; dessous, le tableau des listes et les pastilles
+  const top = kind === 'artists' && el('div', { class: 'art-top' }, el('div', { class: 'art-top-photo' }, photo, photoBtn), artistBio(name));
+  const head = el('div', { class: 'art-head' }, kind === 'artists' ? el('div', {}, table) : el('div', {}, photo, table, photoBtn), chips);
   // label ou groupe : le même bloc en deux colonnes, résumé à gauche, ce qu'on y trouve le plus à droite
   const facts = el('table', { class: 'art-sum' }), found = el('div', { class: 'art-chips' });
   const left = kind === 'labels' && el('div', {}, photo, facts, photoBtn);
@@ -106,7 +108,7 @@ function detail(container, kind, params) {
   }).catch(() => {}); // facultatif
   container.replaceChildren(
     el('h1', { class: 'grp-title' }, el('a', { href: `#/${kind}` + qs({ genre: params.genre, year: params.year }) }, tr(tab)), ' › ', kind === 'artists' ? artistLabel(name) : name, ' ', kind === 'artists' || info ? null : total),
-    ...(family ? [blocks] : []), ...(kind === 'artists' ? [head, artistBio(name)] : []), ...(info ? [info, gaps] : []), ...(kind === 'artists' && !other ? [years] : []), list);
+    ...(family ? [blocks] : []), ...(kind === 'artists' ? [top, head] : []), ...(info ? [info, gaps] : []), ...(kind === 'artists' && !other ? [years] : []), list);
   // chronologie : une pastille par année avec son nombre de releases ; un clic filtre la liste sur cette année
   if (kind === 'artists' && !other) api('/groups?' + new URLSearchParams({ by: 'year', artist: name })).then((rows) => {
     if (rows.length < 2) return;
@@ -170,33 +172,22 @@ function labelGaps(box, name, btn) {
   }).catch((err) => { status.textContent = err.message; box.replaceChildren(status); });
 }
 
-// Biographie d'un artiste : anglais (Discogs) et français (Wikipédia), la langue de l'interface d'abord ; quatre lignes,
-// « Lire la suite » pour le reste. Rien ne s'affiche sans biographie (ou sans jeton Discogs sur le serveur).
+// Biographie d'un artiste dans la langue de l'application : anglais (Discogs) ou français (Wikipédia), l'autre à
+// défaut ; quatre lignes, « Lire la suite » pour le reste. Rien ne s'affiche sans biographie (ou sans jeton Discogs).
 function artistBio(name) {
   const box = el('section', { class: 'art-bio', hidden: true });
   api('/artist-bio?' + new URLSearchParams({ name })).then((b) => {
-    const langs = ['fr', 'en'].filter((l) => b[l]).sort((x, y) => (y === lang) - (x === lang));
-    if (!langs.length) return;
-    const text = el('p', { class: 'bio-text clamp' });
+    const l = b[lang] ? lang : ['fr', 'en'].find((x) => b[x]);
+    if (!l) return;
+    const text = el('p', { class: 'bio-text clamp' }, b[l]);
     const more = el('button', { type: 'button', class: 'chip keep', onclick: () => {
-      const open = text.classList.toggle('clamp');
-      more.textContent = open ? tr('Lire la suite') : tr('Réduire');
+      more.textContent = text.classList.toggle('clamp') ? tr('Lire la suite') : tr('Réduire');
     } }, tr('Lire la suite'));
-    const src = el('span', { class: 'muted' });
-    const show = (l) => {
-      text.textContent = b[l];
-      text.classList.add('clamp');
-      more.textContent = tr('Lire la suite');
-      requestAnimationFrame(() => { more.hidden = text.scrollHeight <= text.clientHeight + 2; });
-      const url = l === 'fr' ? b.wiki_fr : b.discogs;
-      src.replaceChildren(tr('Source :') + ' ', url ? el('a', { href: url, target: '_blank', rel: 'noopener noreferrer' }, l === 'fr' ? 'Wikipédia' : 'Discogs') : (l === 'fr' ? 'Wikipédia' : 'Discogs'));
-      for (const x of tabs.children) x.setAttribute('aria-pressed', String(x.dataset.l === l));
-    };
-    const tabs = el('span', { class: 'bio-langs', role: 'group', 'aria-label': tr('Langue') },
-      langs.length > 1 ? langs.map((l) => el('button', { type: 'button', class: 'chip keep', 'data-l': l, onclick: () => show(l) }, l.toUpperCase())) : []);
-    box.replaceChildren(el('div', { class: 'bio-head' }, el('h2', { class: 'nfo-h' }, tr('Biographie')), tabs), text, el('p', { class: 'bio-foot' }, more, src));
+    const url = l === 'fr' ? b.wiki_fr : b.discogs, site = l === 'fr' ? 'Wikipédia' : 'Discogs';
+    box.replaceChildren(text, el('p', { class: 'bio-foot' }, more,
+      el('span', { class: 'muted' }, tr('Source :') + ' ', url ? el('a', { href: url, target: '_blank', rel: 'noopener noreferrer' }, site) : site)));
     box.hidden = false;
-    show(langs[0]);
+    requestAnimationFrame(() => { more.hidden = text.scrollHeight <= text.clientHeight + 2; });
   }).catch(() => {}); // facultatif
   return box;
 }

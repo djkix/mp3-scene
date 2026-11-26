@@ -116,20 +116,31 @@ function header(rel) {
         shareButton('release', rel.id))),
       el('div', { class: 'detail-tools bar-group' },
         // logos dessinés dans la feuille de style (aucune image chargée depuis ces sites)
-        ...[['Discogs', 'https://www.discogs.com/search/?type=release&q='], ['Beatport', 'https://www.beatport.com/search?q='],
-          // 1001Tracklists : la tracklist d'un mix, cherchée avec l'artiste, le titre et l'année
-          ['1001Tracklists', 'https://www.1001tracklists.com/search/result.php?main_search=', true],
-          ['YouTube', 'https://www.youtube.com/results?search_query=']].map(([site, url, withYear]) => el('a', { class: `round site site-${site.toLowerCase()}`,
+        ...[['Discogs', 'https://www.discogs.com/search/?type=release&q=', query(rel)], ['Beatport', 'https://www.beatport.com/search?q=', query(rel)],
+          // 1001Tracklists ne lit pas une recherche passée dans l'adresse : Google, limité à son site
+          ['1001Tracklists', 'https://www.google.com/search?q=site%3A1001tracklists.com+', mixQuery(rel)],
+          ['YouTube', 'https://www.youtube.com/results?search_query=', query(rel)]].map(([site, url, q]) => el('a', { class: `round site site-${site.toLowerCase()}`,
           target: '_blank', rel: 'noopener noreferrer', title: t('Chercher sur {0}', site), 'aria-label': t('Chercher sur {0}', site),
-          // titre sans le nombre de disques collé à la fin (« Mystery Land 2010-2CD »), comme la recherche de pochettes ;
-          // sans soulignés (« Essential_Mix » -> « Essential Mix »)
-          href: url + encodeURIComponent([/^(va|various( artists)?)$/i.test(rel.artist || '') ? '' : rel.artist,
-            (rel.title || '').replace(/[-_ ]+\(?\d*x?(?:CD|DVD)\d*\)?\s*$/i, ''), withYear && !String(rel.title).includes(rel.year) && rel.year]
-            .filter(Boolean).join(' ').replace(/_/g, ' ').replace(/\s+/g, ' ').trim()) })),
+          href: url + encodeURIComponent(q) })),
         // emplacement du dossier (à copier pour l'ouvrir sur le NAS) : dans une fenêtre
         el('button', { type: 'button', class: 'round', 'data-ico': 'folder', title: t('Emplacement du dossier'), 'aria-label': t('Emplacement du dossier'),
           onclick: () => showPath(rel.path) }),
         ...(session.user?.role === 'admin' ? coverTools(rel) : []))));
+}
+
+// Recherche d'une release sur un site : artiste et titre, sans le nombre de disques collé à la fin (« Mystery Land
+// 2010-2CD ») ni soulignés ; une compilation sans « VA »
+const tidy = (s) => String(s).replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+const query = (rel) => tidy([/^(va|various( artists)?)$/i.test(rel.artist || '') ? '' : rel.artist,
+  (rel.title || '').replace(/[-_ ]+\(?\d*x?(?:CD|DVD)\d*\)?\s*$/i, '')].filter(Boolean).join(' '));
+// Tracklist d'un mix : artiste, festival ou émission, année (« Sub Focus Tomorrowland 2025 ») ; sinon artiste, titre
+// sans dates ni redites de l'artiste, année
+function mixQuery(rel) {
+  const artist = /^(va|various( artists)?)$/i.test(rel.artist || '') ? '' : tidy(rel.artist || '');
+  let what = rel.live?.name || tidy(rel.title || '').replace(/\b\d{1,4}[-./]\d{1,2}(?:[-./]\d{2,4})?\b/g, ' ');
+  if (artist) what = what.replace(new RegExp(artist.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), ' ');
+  what = tidy(what.replace(/\b(?:live|set|dj set|at|au|from)\b/gi, ' ').replace(/[-–@]+/g, ' '));
+  return tidy([artist, what, rel.year && !what.includes(String(rel.year)) ? rel.year : ''].filter(Boolean).join(' '));
 }
 
 // Fenêtre de l'emplacement du dossier : le chemin entier et un bouton pour le copier

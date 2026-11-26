@@ -600,11 +600,13 @@ thead th { color: var(--muted); background: var(--panel); padding-block: 8px; wh
 .label-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .label-card small { opacity: .75; }
 @media (max-width: 699px) { .label-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } .label-card { gap: 8px; padding: 6px; } .label-logo { width: 32px; height: 32px; } }
-.art-bio { padding: 4px 12px 12px; }
-.bio-head { display: flex; align-items: center; gap: 10px; }
-.bio-head .nfo-h { margin: 8px 0; }
-.bio-langs { display: flex; gap: 4px; }
-.bio-langs [aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+/* artiste : bandeau photo et biographie, puis le tableau et les pastilles, plus aérés */
+.art-top { display: flex; align-items: flex-start; gap: 16px 28px; padding: 16px 12px 8px; }
+.art-top-photo { flex: none; display: flex; flex-direction: column; align-items: center; }
+.art-top .art-photo { width: 120px; height: 120px; margin: 0 0 8px; }
+.art-bio { flex: 1; min-width: 0; padding: 4px 0 0; }
+.art-top + .art-head { margin-top: 12px; gap: 12px 40px; }
+@media (max-width: 699px) { .art-top { gap: 14px; } .art-top .art-photo { width: 88px; height: 88px; } }
 .bio-text { margin: 0; font-size: 14px; line-height: 1.6; white-space: pre-line; max-width: 72ch; }
 .bio-text.clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; }
 .bio-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 6px 0 0; font-size: 12px; }
