@@ -1789,3 +1789,14 @@ def test_bulk_live_folders_become_one_release_per_set(app, user_client, settings
     scan_structure(c, root, now=2000.0)
     assert {r["id"] for r in c.execute("SELECT id FROM releases")} == before
     c.close()
+
+
+def test_defected_in_the_house_spellings_are_one_label(conn):
+    c = conn
+    for i, lab in enumerate(["ITH Ltd.", "In The House/Defected", "Defected/ITH", "Defected (In The House)", "Sex In The House Digital", "Defected"]):
+        c.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, label)"
+                  " VALUES (?,?,'','Singles',0,0,1,1,0,?)", (f"p{i}", f"p{i}", lab))
+    db.merge_labels(c)
+    got = {r[0]: r[1] for r in c.execute("SELECT name, label FROM releases")}
+    assert {got[f"p{i}"] for i in range(4)} == {"Defected In The House"}
+    assert (got["p4"], got["p5"]) == ("Sex In The House Digital", "Defected")

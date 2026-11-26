@@ -527,7 +527,8 @@ a.pill:hover { filter: brightness(1.12); }
 .detail-actions :is(button, .btn):not(.icon) { padding: 8px 14px; }
 .detail-actions.acts { flex-wrap: nowrap; justify-content: center; gap: 6px; }
 /* fiche : une ligne, deux groupes de pictos ronds de même taille, chacun dans sa pastille */
-.detail-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0; }
+.detail-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; margin: 12px 0; }
+@media (min-width: 700px) { .detail-bar { gap: 20px; margin: 24px 0 28px; } .detail-bar .bar-group { gap: 8px; padding: 6px; } }
 .detail-bar .bar-group { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; margin: 0; padding: 5px; border-radius: 999px; background: var(--hover); }
 .detail-bar .detail-actions.acts > .primary { width: 40px; height: 40px; }
 .detail-bar .detail-actions.acts > .primary::before { width: 20px; height: 20px; margin-left: 2px; }

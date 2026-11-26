@@ -100,6 +100,15 @@ def _name(rel):
     return rel.rpartition("/")[2]
 
 
+def relist(conn, ids: set) -> None:
+    """Releases dont une piste connue a disparu du disque (doublon supprimé dans CD1/…, que le mtime du dossier de la
+    release ne signale pas) : relistées au prochain scan, qui retire les pistes manquantes."""
+    if ids:
+        log.info("%d release(s) aux pistes disparues, relues au prochain scan", len(ids))
+        conn.executemany("UPDATE releases SET mtime=0 WHERE id=?", [(i,) for i in ids])
+        ids.clear()
+
+
 def _stem(rel: str) -> str | None:
     """Nom sans extension d'un set d'un dossier aux sets en vrac (son .txt porte le même), sinon None."""
     return os.path.splitext(rel.rpartition("/")[2])[0] if security.file_release(rel) else None
@@ -162,6 +171,12 @@ def _scan_structure(conn, root, now):
     if not top:
         raise ScanError(f"bibliothèque vide : {root}")
 
+    if not conn.execute("SELECT dupes_checked FROM scan_state WHERE id=1").fetchone()[0]:
+        # une fois : doublons « (1) » supprimés à la main dans des sous-dossiers CD1/… que la base connaît encore
+        relist(conn, {r["release_id"] for r in conn.execute("SELECT t.release_id, r.path, t.relpath FROM tracks t JOIN releases r"
+                      " ON r.id=t.release_id WHERE t.relpath LIKE '%(1).%'") if not roots.path(r["path"], r["relpath"]).exists()})
+        conn.execute("UPDATE scan_state SET dupes_checked=1 WHERE id=1")
+        conn.commit()  # aucune écriture ne reste ouverte pendant le parcours du disque
     known = {r["path"]: (r["id"], r["mtime"]) for r in conn.execute("SELECT id, path, mtime FROM releases")}
     known_names = {p.rpartition("/")[2] for p in known}
     ordered = sorted(known)
@@ -471,13 +486,17 @@ def _scan_tags(conn, root, should_stop):
             break
         last = rows[-1]["id"]
         done = []  # lot lu entièrement avant d'écrire : pas de verrou d'écriture pendant les lectures NFS
+        gone = set()
         for t in rows:
             try:
                 done.append((*_read_tags(security.as_roots(root).path(t["path"], t["relpath"])), t["id"]))
+            except FileNotFoundError:  # fichier retiré du disque (dans un sous-dossier CD1/…) : release relue au prochain scan
+                gone.add(t["release_id"])
             except OSError as e:
                 log.warning("piste illisible, relue au prochain scan : %s/%s (%s)", t["path"], t["relpath"], e)
         conn.executemany("UPDATE tracks SET title=?, artist=?, genre=?, duration=?, bitrate=?, bpm=?, key=?, year=?, tags_read=1"
                          " WHERE id=?", done)
+        relist(conn, gone)
         read += len(done)
         _aggregate(conn, {t["release_id"] for t in rows})
         conn.commit()
@@ -654,12 +673,16 @@ def _scan_covers(conn, root, should_stop):
             break
         last = rows[-1]["id"]
         done = []  # lot lu avant d'écrire, comme pour les tags
+        gone = set()
         for r in rows:
             try:
                 done.append((_has_cover(root, r["path"], (r["firsts"] or "").split("\x1f") if r["firsts"] else []), r["id"]))
+            except FileNotFoundError:  # une piste connue a disparu du disque : release relue au prochain scan
+                gone.add(r["id"])
             except OSError as e:
                 log.warning("pochette non vérifiée, à refaire au prochain scan : %s (%s)", r["path"], e)
         conn.executemany("UPDATE releases SET has_cover=? WHERE id=?", done)
+        relist(conn, gone)
         conn.commit()
 
 

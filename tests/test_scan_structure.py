@@ -419,3 +419,21 @@ def test_dated_radio_episodes_are_named_artist_show_date(conn, music):
     assert got["2002-04-21_Essential_Mix"]["name"] == "Essential_Mix-2002-04-21"  # sans artiste : rien à sa place
     assert got["2002-01-13_-_Essential_Mix_-_H-Foundation"]["name"] == "H-Foundation-Essential_Mix-2002-01-13"
     assert got["2002-01-13_-_Random_Show_-_Bob"]["name"] == "2002-01-13_-_Random_Show_-_Bob"  # émission inconnue : intact
+
+
+def test_file_removed_from_a_disc_subfolder_is_dropped_at_the_next_scan(conn, music, make_mp3):
+    from app.scanner import _scan_covers
+    rel = music / "Compilations/VA-Big-2CD-2014-GRP"
+    (rel / "CD1").mkdir(parents=True)
+    make_mp3(rel / "CD1/01-a.mp3"); make_mp3(rel / "CD1/01-a(1).mp3"); make_mp3(rel / "CD1/02-b.mp3")
+    os.utime(rel, (1, 1))
+    scan_structure(conn, music, now=1.0)
+    rid = conn.execute("SELECT id FROM releases").fetchone()[0]
+    (rel / "CD1/01-a(1).mp3").unlink()  # le dossier de la release ne change pas : son mtime non plus
+    os.utime(rel, (1, 1)); scan_structure(conn, music, now=2.0)
+    assert conn.execute("SELECT COUNT(*) FROM tracks").fetchone()[0] == 3  # pas vu par le scan
+    conn.execute("UPDATE releases SET has_cover=NULL"); conn.commit()
+    _scan_covers(conn, music, lambda: False)                       # la pochette cherchée dans un fichier disparu…
+    assert conn.execute("SELECT mtime FROM releases WHERE id=?", (rid,)).fetchone()[0] == 0  # … release relue
+    scan_structure(conn, music, now=3.0)
+    assert sorted(r[0] for r in conn.execute("SELECT relpath FROM tracks")) == ["CD1/01-a.mp3", "CD1/02-b.mp3"]

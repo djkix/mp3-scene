@@ -4,6 +4,20 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.85.3](https://github.com/djkix/mp3-scene/compare/v1.85.2...v1.85.3) (2026-11-26)
+
+### Résumé
+
+**Pistes disparues retirées, Defected In The House réuni.**
+
+- Un fichier supprimé dans un sous-dossier de disque (CD1/…) n'est plus gardé par la base : quand la lecture de ses
+  tags ou de sa pochette le trouve absent, la release est relue au scan suivant, qui le retire. Au premier scan après
+  la mise à jour, les doublons « (1) » supprimés à la main sont vérifiés une fois (fin du message « pochette non
+  vérifiée … No such file or directory »).
+- Labels : « ITH Ltd. », « In The House/Defected », « ITH/Defected », « Defected/ITH », « Defected (In The House) »,
+  « ITH Music Services »… réunis sous « Defected In The House », dans la famille Defected.
+- Fiche d'une release : les deux groupes de pictos centrés ; sur ordinateur, plus d'espace autour d'eux et entre eux.
+
 ## [1.85.2](https://github.com/djkix/mp3-scene/compare/v1.85.1...v1.85.2) (2026-11-26)
 
 ### Résumé

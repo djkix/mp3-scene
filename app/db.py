@@ -41,6 +41,8 @@ def init(data_dir: Path) -> None:
             conn.execute("UPDATE tracks SET tags_read=0 WHERE release_id IN (SELECT id FROM releases WHERE year IS NULL)")
             conn.execute("UPDATE releases SET tags_done=0 WHERE year IS NULL")
             conn.execute("UPDATE releases SET has_cover=NULL WHERE has_cover=0")  # image cherchée aussi dans les pistes suivantes
+        if "dupes_checked" not in {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}:  # 1.85.3, voir scanner
+            conn.execute("ALTER TABLE scan_state ADD COLUMN dupes_checked INTEGER")
         # 1.85.2 : dossiers de Live & Radio aux sets en vrac relistés une fois au prochain scan, pour qu'il en fasse
         # une release par fichier (favoris et écoutes de ces dossiers repartent de zéro)
         if "bulk_split" not in {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}:
@@ -147,6 +149,10 @@ def log(conn, user: str, action: str, detail: str = "") -> None:
     conn.execute("DELETE FROM activity WHERE rowid <= (SELECT MAX(rowid) FROM activity) - 20000")
 
 
+# Defected In The House et ses graphies (clés de label_key) : ITH, In The House, avec ou sans Defected, Ltd., Music Services
+_ITH = re.compile(r"(?:defected)?(?:ith|inthehouse)(?:ltd|musicservices|defected(?:inthehouse)?)?|defected(?:ith|inthehouse)")
+
+
 def merge_labels(conn) -> None:
     """Nettoie les labels (restes de mise en forme du NFO) et réunit ceux qui ne diffèrent que par la casse, les
     espaces, la ponctuation ou un « Records » final, sous la graphie la plus répandue. Sans effet au second passage."""
@@ -155,6 +161,8 @@ def merge_labels(conn) -> None:
 
     def clean(label):
         c = nfo.clean_label(label)
+        if c and _ITH.fullmatch(nfo.label_key(c)):
+            return "Defected In The House"  # « ITH Ltd. », « In The House/Defected », « Defected/ITH »… : un seul label
         return aliases.get(nfo.label_key(c), c) if c else ""
 
     groups = {}  # clé -> {graphie nettoyée: nombre de releases}
