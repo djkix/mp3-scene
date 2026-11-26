@@ -66,23 +66,26 @@ export function row(rel, pick = null, onPick = () => {}) {
     onclick: (e) => { if (!e.target.closest('button, a, input')) open(); },
     onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) open(); },
   },
-  // vignette : chargée seulement quand la ligne approche de l'écran ; sans pochette, la place reste vide
-  el('img', { class: 'rel-thumb', src: `/api/releases/${rel.id}/thumb`, alt: '', loading: 'lazy', width: 40, height: 40,
-    onerror: noCover }),
+  // vignette (chargée quand la ligne approche de l'écran) avec le badge « nouveau » posé dessus, puis le picto lecture
+  el('span', { class: 'rel-cover' },
+    el('img', { class: 'rel-thumb', src: `/api/releases/${rel.id}/thumb`, alt: '', loading: 'lazy', width: 40, height: 40,
+      onerror: noCover }),
+    since() && rel.added_at > since() ? el('span', { class: 'new' }, tr('nouveau')) : null,
+    el('button', { type: 'button', class: 'icon rel-play', 'data-ico': 'play', title: tr('Lire'), 'aria-label': tr('Lire {0}', relName(rel.name)),
+      onclick: play })),
   el('span', { class: 'rel-name' },
     pick && el('input', { type: 'checkbox', class: 'rel-pick', value: rel.id, checked: pick.has(rel.id), 'aria-label': tr('Sélectionner {0}', rel.name),
       onchange: (e) => { if (e.target.checked) pick.add(rel.id); else pick.delete(rel.id); onPick(); } }),
-    since() && rel.added_at > since() ? el('span', { class: 'new' }, tr('nouveau')) : null,
     rel.hidden ? el('span', { class: 'new' }, tr('masquée')) : null,
-    // badge « nouveau » puis le picto lecture, collés au nom
-    el('button', { type: 'button', class: 'icon rel-play', 'data-ico': 'play', title: tr('Lire'), 'aria-label': tr('Lire {0}', relName(rel.name)),
-      onclick: play }), relName(rel.name),
+    el('span', { class: 'rel-title' }, relName(rel.name)),
     // apparitions d'un artiste : ses pistes dans cette release (trois au plus), comme le chapitre d'un mix
     rel.by?.length ? el('small', { class: 'trk-chapter' }, `↳ ${rel.by.slice(0, 3).map((x) => `${rel.by_artist} - ${x}`).join(' · ')}${rel.by.length > 3 ? ' …' : ''}`) : null),
   // même ordre que HEAD ; sur mobile, .rel-info devient une ligne de détails sous le nom
   el('span', { class: 'rel-info' },
     el('span', { class: 'mid' }, rel.genre ? el('span', { class: 'chip' }, rel.genre) : ''),
-    el('span', { class: 'mid' }, fmtDate(rel.date)),
+    // date sur ordinateur ; l'année seule sur téléphone, en fin de ligne
+    el('span', { class: 'mid rel-when' }, el('span', { class: 'd-full' }, fmtDate(rel.date)),
+      el('span', { class: 'd-year' }, String(rel.year || new Date(rel.date * 1000).getFullYear()))),
     el('span', { class: 'mid' }, String(rel.track_count), el('span', { class: 'unit' }, ' ' + (rel.track_count > 1 ? tr('pistes') : tr('piste')))),
     el('span', { class: 'mid rate' }, rel.bitrate ? `${Math.round(rel.bitrate / 1000)} kbit/s` : ''),
     el('span', { class: 'num' }, fmtSize(rel.size)),

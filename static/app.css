@@ -99,7 +99,12 @@ button:disabled { opacity: .6; cursor: default; }
 .rel-list, .sub-list { list-style: none; margin: 0; padding: 0; }
 .rel-head { margin-top: 12px; background: var(--panel); border-top: 1px solid var(--line); }
 .rel, .rel-head { display: grid; align-items: center; gap: 0 14px; padding: 6px 12px; border-bottom: 1px solid var(--line);
-  grid-template-columns: 40px minmax(0, 1fr) 7rem 5rem 3rem 5.25rem 4.5rem 6.25rem 100px; } /* colonnes séparées par l'espace seul */
+  grid-template-columns: var(--c1, 40px) minmax(0, 1fr) 7rem 5rem 3rem 5.25rem 4.5rem 6.25rem 100px; } /* colonnes séparées par l'espace seul */
+/* release : pochette (badge « nouveau » posé dessus) et picto lecture dans la première colonne */
+.rel:has(> .rel-cover), .rel-head:not(.trk) { --c1: 68px; }
+.rel-cover { align-self: center; position: relative; display: flex; align-items: center; gap: 6px; }
+.rel-cover .new { position: absolute; top: -5px; left: -5px; margin: 0; padding: 1px 4px; font-size: 9px; background: var(--accent); color: var(--on-accent); pointer-events: none; }
+.d-year { display: none; }
 .rel { cursor: pointer; }
 .rel-thumb { display: block; width: 40px; height: 40px; object-fit: cover; border-radius: 4px; background: var(--hover); }
 .rel-head { color: var(--muted); }
@@ -302,9 +307,9 @@ google-cast-launcher:hover { background: var(--hover); }
 /* Mobile : onglets en bas (à portée de pouce), lecteur réduit au-dessus, lecteur plein écran au toucher du titre */
 @media (max-width: 699px) {
   :root { --nav-h: calc(52px + env(safe-area-inset-bottom)); }
-  .rel { grid-template-columns: 40px minmax(0, 1fr) auto; gap: 4px 10px; grid-template-areas: "thumb name act" "thumb info act";
+  .rel { grid-template-columns: var(--c1, 40px) minmax(0, 1fr) auto; gap: 4px 10px; grid-template-areas: "thumb name act" "thumb info act";
     margin: 8px 12px; padding: 10px 2px 10px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
-  .rel-thumb { grid-area: thumb; align-self: start; }
+  .rel-thumb, .rel-cover { grid-area: thumb; align-self: start; }
   .rel-head { display: none; }
   .filters { margin: 8px 12px 0; padding: 8px; }
   .rel-info { display: flex; flex-wrap: wrap; gap: 0 10px; grid-area: info; }
@@ -329,7 +334,7 @@ google-cast-launcher:hover { background: var(--hover); }
   /* nom et informations centrés en hauteur face à la colonne des boutons : une rangée libre au-dessus, une au-dessous */
   .rel, .detail li.rel { grid-template-rows: 1fr auto auto 1fr; row-gap: 0; grid-template-areas: "thumb . act" "thumb name act" "thumb info act" "thumb . act"; }
   .rel-info { align-self: start; margin-top: 4px; }
-  .rel-thumb { align-self: center; }
+  .rel-thumb, .rel-cover { align-self: center; }
   .rel-date { grid-area: date; }
   .rel-cat { grid-area: cat; max-width: 7rem; }
   .rel-meta { grid-area: meta; white-space: normal; }
@@ -733,8 +738,8 @@ td.num { text-align: right; white-space: nowrap; font: 12px var(--mono); font-va
 tr.disc th { background: var(--hover); color: var(--fg); padding-block: 8px; }
 .nfo-h { margin: 28px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line); color: var(--muted); }
 /* releases similaires de la fiche : lignes compactes (nom, détails dessous), comme sur mobile, quelle que soit la largeur */
-.detail .rel { grid-template-columns: 40px minmax(0, 1fr) auto; gap: 2px 10px; grid-template-areas: "thumb name act" "thumb info act"; }
-.detail .rel-thumb { grid-area: thumb; }
+.detail .rel { grid-template-columns: var(--c1, 40px) minmax(0, 1fr) auto; gap: 2px 10px; grid-template-areas: "thumb name act" "thumb info act"; }
+.detail .rel-thumb, .detail .rel-cover { grid-area: thumb; }
 .detail .rel-name { grid-area: name; }
 .detail .rel-actions { grid-area: act; }
 .detail .rel-info { display: flex; flex-wrap: wrap; gap: 0 10px; grid-area: info; }
@@ -953,9 +958,17 @@ body.party-on #view { max-width: none; padding: 0; margin: 0; }
 .nd-notes { margin: 0 12px 12px; padding: 12px; border: 1px solid var(--line); border-radius: 6px; white-space: pre-wrap; font: 13px/1.5 var(--mono); overflow-wrap: anywhere; }
 .nd-path { margin: 12px; font: 12px var(--mono); overflow-wrap: anywhere; }
 #view .rel-play { display: inline-flex; vertical-align: -5px; width: 22px; height: 22px; min-width: 0; margin-right: 6px; border: 0; background: none; color: var(--accent); }
+#view .rel-cover .rel-play { margin: 0; }
 /* téléphone : badge et picto plus serrés, pour laisser la place au nom */
 @media (max-width: 699px) {
   .rel-name .new { margin-right: 4px; padding: 1px 4px; font-size: 9px; vertical-align: 1px; }
-  #view .rel-play { width: 18px; height: 18px; min-width: 0; margin-right: 3px; padding: 0; vertical-align: -4px; }
+  /* picto lecture assez grand pour le doigt ; nom sur deux lignes au plus, le nom complet est sur la fiche */
+  .rel:has(> .rel-cover) { --c1: 76px; }
+  #view .rel-cover .rel-play { width: 30px; height: 30px; margin: 0; padding: 0; }
+  .rel-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+  /* informations : genre, pistes, débit, poids, catégorie, année */
+  .rel-info > :nth-child(1) { order: 1; } .rel-info > :nth-child(3) { order: 2; } .rel-info > :nth-child(4) { order: 3; }
+  .rel-info > :nth-child(5) { order: 4; } .rel-info > :nth-child(6) { order: 5; } .rel-info > :nth-child(2) { order: 6; }
+  .d-full { display: none; } .d-year { display: inline; }
 }
 .rel-play:hover { color: var(--accent-text); }

@@ -4,6 +4,16 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.84.1](https://github.com/djkix/mp3-scene/compare/v1.84.0...v1.84.1) (2026-11-26)
+
+### Résumé
+
+**Lignes de releases plus claires sur téléphone.**
+
+- Le badge « nouveau » est posé sur la pochette, et le picto lecture se place juste à côté, plus grand pour le doigt.
+- Sur téléphone, le nom tient sur deux lignes au plus (le nom complet reste sur la fiche). Dessous, dans l'ordre :
+  genre, pistes, débit, poids, catégorie, année.
+
 ## [1.84.0](https://github.com/djkix/mp3-scene/compare/v1.83.1...v1.84.0) (2026-11-26)
 
 ### Résumé
