@@ -4,6 +4,20 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.85.7](https://github.com/djkix/mp3-scene/compare/v1.85.6...v1.85.7) (2026-11-27)
+
+### Résumé
+
+**Séries de compilations : chaque sous-dossier avec des pistes est un disque ; P2P pour les releases sans groupe.**
+
+- Dans une série du dossier Compilations (« -=DMC Commercial=- »), tout sous-dossier d'une release qui a des pistes
+  est un de ses disques, quel que soit son nom (« Mixes 1 », « International », « CD.2 », « New Folder ») : il prend
+  le nom de la release suivi de son disque (« Dmc_Commercial_Collection_047_(CD3_-_Previews_December_1986) »). Le
+  numéro vient du nom quand il y en a un, sinon c'est le premier libre dans l'ordre des noms. Un disque seul prend le
+  nom de la release, sauf s'il a déjà un nom de release. Les dossiers de pochettes, sans pistes, restent ignorés.
+- Un disque garde son année quand le dossier de la release n'en indique pas.
+- Une release sans groupe dans son nom (2 040 aujourd'hui) est rangée dans le groupe P2P.
+
 ## [1.85.6](https://github.com/djkix/mp3-scene/compare/v1.85.5...v1.85.6) (2026-11-26)
 
 ### Résumé

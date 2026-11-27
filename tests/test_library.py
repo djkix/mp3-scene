@@ -1717,6 +1717,10 @@ def test_disc_subfolders_take_the_release_name_and_their_cd(user_client, setting
               f"{C}/L-Z/VA-Sunshine_Live_House_Edition_Vol._1-3CD-2006-JiM/Axer-123__321-Promo_Vinyl-2006-TGX",
               f"{C}/L-Z/VA-Les_pianos_en_Or-2001-FSP/Matt-RB_2_Rue-2001-FSP",
               "01.Singles/A/Ignored_Letter_Folder_Child",
+              *(f"{C}/-=DMC Commercial=-/Dmc Commercial Collection 047/DMC 047 - {k} (December 1986)" for k in ("Mixes 1", "Previews", "Mixes 2")),
+              f"{C}/-=DMC Commercial=-/Dmc Commercial Collection 050/DMC 050 [1987-03] Mixes 2", f"{C}/-=DMC Commercial=-/Dmc Commercial Collection 050/Mixes 1",
+              f"{C}/-=DMC Commercial=-/Dmc Commercial Collection 040/International", f"{C}/-=DMC Commercial=-/Dmc Commercial Collection 040/Mixes 1",
+              f"{C}/-=DMC Commercial=-/DMC Commercial Collection 444/DMC Commercial Collection Vol. 444",
               "01.Singles/J/Jean_Michel_Jarre-Discography_1976-2007-CD-2013/Jean Michel Jarre/Albums/(1997) - Oxygene 7-13", "01.Singles/J/Jean_Michel_Jarre-Discography_1976-2007-CD-2013/Jean Michel Jarre/Concerts/(1994) - Hong Kong", "01.Singles/J/Jean_Michel_Jarre-Discography_1976-2007-CD-2013/Jean Michel Jarre/Singles, Maxis, Promos/(1997) - Oxygene 8",
               "01.Singles/A/Alcazar - Dancefloor Deluxe/Dancefloor Deluxe Disc 2", "01.Singles/D/DJMAX Portable 2 Audio Trinity O.S.T/-Black-",
               "03.Various Artists - Live And Radio/x", "03.Various Artists - Live And Radio/Toni_Braxton-Make_My_Heart_(Part_1)_(MuthaFunkaz_Remixes)-(CODE47)-WEB-2010-HFT",
@@ -1724,10 +1728,20 @@ def test_disc_subfolders_take_the_release_name_and_their_cd(user_client, setting
     for i, p in enumerate(paths):
         conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo)"
                      " VALUES (?,?,'',?,0,0,10,2,0)", (p, p.rsplit("/", 1)[1], p.split("/")[0]))
+    conn.execute("UPDATE releases SET year=1986 WHERE path LIKE '%DMC 047%'")
     conn.commit()
     db.categorize(conn)
     conn.commit()
     got = {r["path"].rsplit("/", 1)[1]: (r["name"], r["artist"], r["year"], r["category"]) for r in conn.execute("SELECT * FROM releases")}
+    # série de compilations : tout sous-dossier est un disque, numéroté par son nom sinon dans l'ordre ; seul, il prend le nom
+    dmc = {k: v[0] for k, v in got.items() if "DMC" in k or k in ("International", "Mixes 1")}
+    assert dmc["DMC 047 - Mixes 1 (December 1986)"] == "Dmc_Commercial_Collection_047_(CD1_-_Mixes_1_December_1986)"
+    assert dmc["DMC 047 - Mixes 2 (December 1986)"].startswith("Dmc_Commercial_Collection_047_(CD2")
+    assert dmc["DMC 047 - Previews (December 1986)"] == "Dmc_Commercial_Collection_047_(CD3_-_Previews_December_1986)"
+    assert got["DMC 047 - Previews (December 1986)"][2] == 1986  # année gardée : le dossier parent n'en a pas
+    assert dmc["DMC 050 [1987-03] Mixes 2"].startswith("Dmc_Commercial_Collection_050_(CD2")
+    assert dmc["International"] == "Dmc_Commercial_Collection_040_(CD2_-_International)"
+    assert dmc["DMC Commercial Collection Vol. 444"] == "DMC_Commercial_Collection_444"
     assert got["25 Avant Nova - 1956"][:3] == ("VA-La_Boite_Noire_Radio_Nova_(1956-1980)-25CD-2010_(CD1_-_1956)", "VA", 2010)
     assert got["25 Avant Nova - 1957"][0].endswith("_(CD2_-_1957)")
     assert got["Als Mixe CD1"][0] == "VA-Kontor_Top_of_The_Clubs_Vol_41-3CD-2008_(CD1_-_Als_Mixe)"
@@ -1740,6 +1754,7 @@ def test_disc_subfolders_take_the_release_name_and_their_cd(user_client, setting
     conn.execute("UPDATE releases SET track_count=13 WHERE name='Matt-RB_2_Rue-2001-FSP'"); db.categorize(conn)
     assert conn.execute("SELECT category FROM releases WHERE name='Matt-RB_2_Rue-2001-FSP'").fetchone()[0] == "Albums"  # ou un album
     assert got["Ignored_Letter_Folder_Child"][0] == "Ignored_Letter_Folder_Child"
+    assert conn.execute("SELECT grp FROM releases WHERE path LIKE '%Ignored_Letter_Folder_Child'").fetchone()[0] == "P2P"  # sans groupe
     assert {v[3] for k, v in got.items() if "Avant" in k or "Mix" in k} == {C}
     assert got["(1997) - Oxygene 7-13"] == ("Jean_Michel_Jarre-Oxygene_7-13-1997", "Jean Michel Jarre", 1997, "Albums")  # 7 pistes : le dossier décide
     assert got["(1994) - Hong Kong"][3] == "03.Various Artists - Live And Radio" and got["(1997) - Oxygene 8"][3] == "01.Singles"

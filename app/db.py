@@ -363,7 +363,7 @@ def disc_children(conn) -> None:
     et de ce que leur nom ajoute (« …_(CD1_-_Als_Mixe) », « …_(Mix_Cut) »). Sans numéro, des dossiers tous datés sont
     numérotés dans l'ordre de leurs années (« …-25CD-2010_(CD1_-_1956) »). Artiste, titre, année et groupe sont ceux
     de la release parente. Seul le nom en base change, relu sur le dossier à chaque fois."""
-    groups = {}
+    groups, forced = {}, set()
     for r in conn.execute("SELECT id, path FROM releases WHERE path LIKE '%/%/%'"):
         *up, parent, child = r["path"].split("/")
         # parent sans nom de release (« Alcazar - Dancefloor Deluxe ») : seulement pour des disques (« Disc 1 », « -Black- »),
@@ -371,9 +371,16 @@ def disc_children(conn) -> None:
         loose = up[1:] and len(parent) > 3 and not re.match(r"^-=|=-$", parent) and not _DISCO_GROUPS.get(parent.lower()) \
             and (_DISC_NO.search(child) or re.fullmatch(r"-[^-]+-", child)) and not _DISCO_ITEM.match(child) \
             and not re.search(r"(?<!\d)(?:19|20)\d\d(?!\d)|\d\d-\d\d", child)  # daté : une release à part (dossier de collection)
-        if not _SCENE_END.search(child) and (_SCENE_END.search(parent) or _DATED_DIR.match(parent) or _MULTI_CD.search(parent) or loose):
-            groups.setdefault("/".join([*up, parent]), []).append((r["id"], child))
+        # release d'une série de compilations (« -=DMC Commercial=-/DMC Commercial Collection 047 ») : tout sous-dossier
+        # qui a des pistes est un disque, quel que soit son nom (« Mixes 1 », « International », « CD.2 »)
+        series_disc = up and "compil" in up[0].lower() and re.match(r"^-=.*=-$", up[-1]) and not re.match(r"^[!-]", parent)
+        if series_disc or not _SCENE_END.search(child) and (_SCENE_END.search(parent) or _DATED_DIR.match(parent) or _MULTI_CD.search(parent) or loose):
+            key = "/".join([*up, parent])
+            groups.setdefault(key, []).append((r["id"], child))
+            if series_disc:
+                forced.add(key)
     for ppath, kids in groups.items():
+        force = ppath in forced
         base = ppath.rsplit("/", 1)[-1]
         p = conn.execute("SELECT name, artist, title, year, grp, label FROM releases WHERE path=?", (ppath,)).fetchone()
         series = _dated(_DATED.match(base)) if _DATED_DIR.match(base) else None  # dossier daté sans pistes à lui
@@ -381,22 +388,29 @@ def disc_children(conn) -> None:
             else {**parse_release_name(base.replace(" ", "_")), "name": base, "label": None}
         pwords = _WORDS(info["name"] + " " + (info["title"] or ""))
         kids.sort(key=lambda k: k[1].lower())
-        dated = len(kids) > 1 and all(re.search(r"\b(?:19|20)\d\d\b", c) and not _DISC_NO.search(c) for _, c in kids)
+        dated = not force and len(kids) > 1 and all(re.search(r"\b(?:19|20)\d\d\b", c) and not _DISC_NO.search(c) for _, c in kids)
+        nos = [(m := _DISC_NO.search(c)) and int(m[1] or m[2]) for _, c in kids]
+        free = (i for i in range(1, 100) if i not in nos)  # disque sans numéro : le premier libre, dans l'ordre des noms
         for rank, (rid, child) in enumerate(kids, 1):
             m = _DISC_NO.search(child)
-            n = int(m[1] or m[2]) if m else rank if dated else None
+            n = int(m[1] or m[2]) if m else rank if dated else next(free) if force and len(kids) > 1 else None
             rest = re.search(r"\b(?:19|20)\d\d\b", child)[0] if dated else (child[:m.start()] + " " + child[m.end():] if m else child)
             rest = " ".join(re.sub(r"[\[\]()_.]+", " ", rest).split()).strip(" -")
             if not dated:  # début qui répète la release (« Gatecrasher Forever - The Folio ») : retiré
-                while (w := re.match(r"([A-Za-z0-9']+)[\s,-]*", rest)) and (len(w[1]) < 2 or w[1].lower() in pwords) and w.end() < len(rest):
+                while (w := re.match(r"([A-Za-z0-9']+)[\s,-]*", rest)) and (len(w[1]) < 2 or w[1].lower().lstrip("0") in {x.lstrip("0") for x in pwords}) and w.end() < len(rest):
                     rest = rest[w.end():]
             if rest and not dated and len(_WORDS(rest) - pwords) <= len(_WORDS(rest)) // 3:
                 rest = ""  # le nom répète la release (« Ministry of Sound - Chillout Sessions X - CD1 ») : rien à ajouter
             part = " - ".join(x for x in (f"CD{n}" if n else "", rest) if x)
-            if not part:
+            if force and len(kids) == 1 and _SCENE_END.search(child):
+                continue  # seul disque au nom de release (« VA-DMC_Commercial_Collection_309-2CD-2008-WRE ») : gardé
+            if force and len(kids) == 1 and not m:
+                part = ""  # seul disque sans numéro : le nom de la release (« DMC Commercial Collection Vol. 444 », « CD »)
+            elif not part:
                 continue
-            conn.execute("UPDATE releases SET name=?, artist=?, tag_artist=NULL, title=?, year=?, grp=?, label=COALESCE(label, ?) WHERE id=?",
-                         (f"{info['name']} ({part})".replace(" ", "_"), info["artist"], f"{info['title'] or base} ({part})",
+            suffix = f" ({part})" if part else ""
+            conn.execute("UPDATE releases SET name=?, artist=?, tag_artist=NULL, title=?, year=COALESCE(?, year), grp=?, label=COALESCE(label, ?) WHERE id=?",
+                         (f"{info['name']}{suffix}".replace(" ", "_"), info["artist"], f"{info['title'] or base}{suffix}",
                           info["year"], info["grp"], info["label"], rid))
 
 
@@ -495,6 +509,7 @@ def categorize(conn) -> None:
 
     conn.executemany("UPDATE releases SET category=? WHERE id=?",
                      [(want, r["id"]) for r in rows if (want := category(r)) != r["category"]])
+    conn.execute("UPDATE releases SET grp='P2P' WHERE COALESCE(grp, '')=''")  # sans groupe dans son nom : P2P
     apply_overrides(conn)
 
 
