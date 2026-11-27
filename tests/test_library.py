@@ -1834,3 +1834,14 @@ def test_essential_mix_artists_are_split_spelled_and_named_with_their_group(user
     assert user_client.get("/api/releases/8").json()["artists"] == ["Cass and Slide"]  # duo : pas coupé
     with_tong = user_client.get("/api/releases", params={"collab": "Axwell"}).json()
     assert 5 in [r["id"] for r in (with_tong["items"] if isinstance(with_tong, dict) else with_tong)]
+
+
+def test_numbered_set_files_lose_their_track_number(conn):
+    L = "03.Various Artists - Live And Radio/-= White Sensation =-/-= White Sensation 2008 - Prague =-"
+    for i, n in enumerate(("01.Michael_Burian_-_Sensation_White_Prague_31-05-2008", "01-dave_clarke_-_live_at_inox-sat-05-16-2009-talion")):
+        conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, artist)"
+                     " VALUES (?,?,'',?,0,0,10,1,0,?)", (f"{L}/{n}.mp3", n, L.split("/")[0], n.split("_")[0]))
+    db.categorize(conn)
+    got = {r["name"]: r["artist"] for r in conn.execute("SELECT name, artist FROM releases")}
+    assert got == {"Michael_Burian_-_Sensation_White_Prague_31-05-2008": "Michael Burian",
+                   "dave_clarke_-_live_at_inox-sat-05-16-2009-talion": "Dave Clarke"}

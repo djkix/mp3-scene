@@ -4,6 +4,16 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.85.11](https://github.com/djkix/mp3-scene/compare/v1.85.10...v1.85.11) (2026-11-27)
+
+### Résumé
+
+**Sets d'un dossier en vrac : sans numéro de piste dans le nom et l'artiste.**
+
+- Un set nommé d'après son fichier perd son numéro de piste : « 01.Michael_Burian_-_Sensation_White_Prague_31-05-2008 »
+  devient « Michael_Burian_-_Sensation_White_Prague_31-05-2008 », artiste Michael Burian (et non « 01.Michael
+  Burian ») ; idem pour les sets INOX 2009 (« 01-dave_clarke_-_live_at_inox… »).
+
 ## [1.85.10](https://github.com/djkix/mp3-scene/compare/v1.85.9...v1.85.10) (2026-11-27)
 
 ### Résumé

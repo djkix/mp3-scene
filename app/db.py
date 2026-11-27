@@ -471,6 +471,20 @@ def essential_mixes(conn) -> None:
                      (name, artist, title, year, grp, aired, r["id"]))
 
 
+def numbered_sets(conn) -> None:
+    """Set d'un dossier aux sets en vrac nommé d'après son fichier, numéro de piste compris
+    (« 01.Michael_Burian_-_Sensation_White_Prague_31-05-2008 », « 01-dave_clarke_-_live_at_inox… ») : nom et artiste
+    sans ce numéro. Le fichier sur le disque ne change pas."""
+    for r in conn.execute("SELECT id, path, name, artist FROM releases WHERE name GLOB '[0-9]*'").fetchall():
+        m = re.match(r"\d{1,3}[._-]+(?=[^\W\d])", r["name"])
+        if not m or not re.search(r"(?i)\.(?:mp3|flac|m4a|wav|ogg|opus|wma|mp4|aiff?|ape|wv)$", r["path"]):
+            continue
+        name = r["name"][m.end():]
+        artist = parse_release_name(name)["artist"]
+        conn.execute("UPDATE releases SET name=?, artist=? WHERE id=?",
+                     (name, artists.capitalize(artist) if artist else r["artist"], r["id"]))
+
+
 def spellings(conn) -> None:
     """Artistes écrits par les renommages ci-dessus (Essential Mix, épisodes, disques), après le regroupement : ils
     prennent la graphie la plus répandue de leur artiste (« deadmau5 », « Armin van Buuren » -> « Deadmau5 », « Armin
@@ -496,6 +510,7 @@ def categorize(conn) -> None:
     dated_series(conn)
     dated_episodes(conn)
     discographies(conn)
+    numbered_sets(conn)
     disc_children(conn)
     series_names(conn)
     essential_mixes(conn)
