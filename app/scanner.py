@@ -275,6 +275,7 @@ def _scan_structure(conn, root, now):
         try:
             tracks, size, nfo, n_skip = _files(entries)
             others = []
+            series = db.series_release(rel)  # tout sous-dossier qui a des pistes est un disque, quel que soit son nom
             for e in entries:
                 if not e.is_dir(follow_symlinks=False):
                     continue
@@ -286,6 +287,9 @@ def _scan_structure(conn, root, now):
                 t = None
                 if m:
                     t, s, _, n = _files(_list(e.path), name + "/", int(m.group(1) or m.group(2)))
+                elif series:
+                    d = db._DISC_NO.search(name)  # « Mixes 2 », « Disk 1 » ; sans numéro : 0, numéroté plus bas
+                    t, s, _, n = _files(_list(e.path), name + "/", int(d[1] or d[2]) if d else 0)
                 if t:
                     tracks += t
                     size += s
@@ -296,6 +300,11 @@ def _scan_structure(conn, root, now):
             unreadable_dir(path, rel, err)
             continue
         skipped += n_skip
+        if series and any(t[1] == 0 for t in tracks):  # disque sans numéro : le premier libre, dans l'ordre des noms
+            used = {t[1] for t in tracks}
+            free = (i for i in range(1, 1000) if i not in used)
+            nos = {d: next(free) for d in sorted({t[0].split("/")[0] for t in tracks if t[1] == 0}, key=str.lower)}
+            tracks = [(t[0], nos[t[0].split("/")[0]], t[2]) if t[1] == 0 else t for t in tracks]
         if tracks and _bulk(rel, tracks):
             # dossier aux sets en vrac : une release par fichier (le dossier lui-même n'en est pas une)
             files = {n: e for e in entries if e.is_file(follow_symlinks=False) and (n := _decode(e))}

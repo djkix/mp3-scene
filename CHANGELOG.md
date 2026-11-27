@@ -4,6 +4,23 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.85.8](https://github.com/djkix/mp3-scene/compare/v1.85.7...v1.85.8) (2026-11-27)
+
+### Résumé
+
+**Séries de compilations : une seule release avec ses disques, nommée « Titre-année-P2P ».**
+
+- Dans une série du dossier Compilations (« -=DMC Commercial=- », « -=Ministry Of Sound=- »…), les sous-dossiers
+  d'une release qui ont des pistes sont ses disques, quel que soit leur nom : « Dmc Commercial Collection 047 » est
+  une release de 3 CD (« Mixes 1 », « Mixes 2 », « Previews »), plus trois releases à part. Le numéro du disque vient
+  de son nom quand il y en a un, sinon c'est le premier libre dans l'ordre des noms. Les dossiers de pochettes, sans
+  pistes, restent ignorés ; les dossiers de collection (« !Hed Kandi - Collection… ») ne changent pas.
+- Une release de série dont le dossier n'a pas un nom de release est nommée « Titre-année-P2P »
+  (« DMC_Commercial_Collection_339-2011-P2P ») : année du dossier, sinon des tags. Artiste : VA. Les mots de la série gardent
+  sa graphie : « Dmc Commercial Collection 047 » devient « DMC_Commercial_Collection_047-1986-P2P ».
+- Au prochain scan, ces releases sont relues une fois ; les anciennes releases par disque disparaissent (leurs
+  favoris et écoutes repartent de zéro).
+
 ## [1.85.7](https://github.com/djkix/mp3-scene/compare/v1.85.6...v1.85.7) (2026-11-27)
 
 ### Résumé

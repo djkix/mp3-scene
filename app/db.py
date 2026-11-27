@@ -43,6 +43,10 @@ def init(data_dir: Path) -> None:
             conn.execute("UPDATE releases SET has_cover=NULL WHERE has_cover=0")  # image cherchée aussi dans les pistes suivantes
         if "dupes_checked" not in {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}:  # 1.85.3, voir scanner
             conn.execute("ALTER TABLE scan_state ADD COLUMN dupes_checked INTEGER")
+        # 1.85.7 : releases des séries de compilations relistées une fois, pour que leurs sous-dossiers deviennent leurs disques
+        if "series_discs" not in {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}:
+            conn.execute("ALTER TABLE scan_state ADD COLUMN series_discs INTEGER")
+            conn.execute("UPDATE releases SET mtime=0 WHERE path LIKE '%/-=%=-/%' AND path NOT LIKE '%/%/%/%'")
         # 1.85.2 : dossiers de Live & Radio aux sets en vrac relistés une fois au prochain scan, pour qu'il en fasse
         # une release par fichier (favoris et écoutes de ces dossiers repartent de zéro)
         if "bulk_split" not in {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}:
@@ -357,13 +361,39 @@ _DISC_NO = re.compile(r"(?i)(?<![a-z])(?:cd|disc|disk)[ _\-.]*(\d{1,2})(?!\d)|[ 
 _WORDS = lambda s: set(re.findall(r"[a-z0-9]{2,}", s.lower()))  # sans les lettres seules (« M.O.S »)
 
 
+def series_release(path: str) -> bool:
+    """Release d'une série de compilations (« Compilations/-=DMC Commercial=-/DMC Commercial Collection 047 »), hors
+    dossier de collection (« !Hed Kandi - Collection… ») : chacun de ses sous-dossiers qui a des pistes est un disque."""
+    s = path.split("/")
+    return len(s) == 3 and "compil" in s[0].lower() and bool(re.match(r"^-=.*=-$", s[1])) and not re.match(r"^[!-]", s[2])
+
+
+def series_names(conn) -> None:
+    """Release d'une série dont le dossier n'a pas un nom de release (« Dmc Commercial Collection 047 ») : nommée
+    comme une release P2P de compilation, « DMC_Commercial_Collection_047-1986-P2P » (année du dossier, sinon des
+    tags), artiste VA. Seul le nom en base change, relu sur le dossier à chaque fois."""
+    for r in conn.execute("SELECT id, path, year FROM releases WHERE path LIKE '%/-=%=-/%' AND path NOT LIKE '%/%/%/%'").fetchall():
+        folder = r["path"].rsplit("/", 1)[-1]
+        if not series_release(r["path"]) or "-" in folder:
+            continue
+        m = re.search(r"\s*[(\[]((?:19|20)\d\d)[)\]]$", folder)  # « DMC Commercial Collection 001 (2020) »
+        title = folder[:m.start()] if m else folder
+        # graphie de la série pour ses mots (« Dmc Commercial… » dans « -=DMC Commercial=- » : « DMC Commercial… »)
+        spell = {w.lower(): w for w in re.findall(r"\w+", r["path"].split("/")[1])}
+        title = re.sub(r"\w+", lambda w: spell.get(w[0].lower(), w[0]), title)
+        year = int(m[1]) if m else r["year"]
+        name = "-".join(str(x) for x in (title, year, "P2P") if x).replace(" ", "_")
+        conn.execute("UPDATE releases SET name=?, artist='VA', tag_artist=NULL, title=?, year=?, grp='P2P' WHERE id=?",
+                     (name, title, year, r["id"]))
+
+
 def disc_children(conn) -> None:
     """Sous-dossiers d'une release (son dossier a un nom de release ou de compilation datée) dont le nom n'en est pas
     un : ils prennent le nom de la release parente, suivi de leur disque (« VA-The_Salsoul_Acapellas-2CD-2005_(CD1) »)
     et de ce que leur nom ajoute (« …_(CD1_-_Als_Mixe) », « …_(Mix_Cut) »). Sans numéro, des dossiers tous datés sont
     numérotés dans l'ordre de leurs années (« …-25CD-2010_(CD1_-_1956) »). Artiste, titre, année et groupe sont ceux
     de la release parente. Seul le nom en base change, relu sur le dossier à chaque fois."""
-    groups, forced = {}, set()
+    groups = {}
     for r in conn.execute("SELECT id, path FROM releases WHERE path LIKE '%/%/%'"):
         *up, parent, child = r["path"].split("/")
         # parent sans nom de release (« Alcazar - Dancefloor Deluxe ») : seulement pour des disques (« Disc 1 », « -Black- »),
@@ -371,16 +401,9 @@ def disc_children(conn) -> None:
         loose = up[1:] and len(parent) > 3 and not re.match(r"^-=|=-$", parent) and not _DISCO_GROUPS.get(parent.lower()) \
             and (_DISC_NO.search(child) or re.fullmatch(r"-[^-]+-", child)) and not _DISCO_ITEM.match(child) \
             and not re.search(r"(?<!\d)(?:19|20)\d\d(?!\d)|\d\d-\d\d", child)  # daté : une release à part (dossier de collection)
-        # release d'une série de compilations (« -=DMC Commercial=-/DMC Commercial Collection 047 ») : tout sous-dossier
-        # qui a des pistes est un disque, quel que soit son nom (« Mixes 1 », « International », « CD.2 »)
-        series_disc = up and "compil" in up[0].lower() and re.match(r"^-=.*=-$", up[-1]) and not re.match(r"^[!-]", parent)
-        if series_disc or not _SCENE_END.search(child) and (_SCENE_END.search(parent) or _DATED_DIR.match(parent) or _MULTI_CD.search(parent) or loose):
-            key = "/".join([*up, parent])
-            groups.setdefault(key, []).append((r["id"], child))
-            if series_disc:
-                forced.add(key)
+        if not _SCENE_END.search(child) and (_SCENE_END.search(parent) or _DATED_DIR.match(parent) or _MULTI_CD.search(parent) or loose):
+            groups.setdefault("/".join([*up, parent]), []).append((r["id"], child))
     for ppath, kids in groups.items():
-        force = ppath in forced
         base = ppath.rsplit("/", 1)[-1]
         p = conn.execute("SELECT name, artist, title, year, grp, label FROM releases WHERE path=?", (ppath,)).fetchone()
         series = _dated(_DATED.match(base)) if _DATED_DIR.match(base) else None  # dossier daté sans pistes à lui
@@ -388,12 +411,10 @@ def disc_children(conn) -> None:
             else {**parse_release_name(base.replace(" ", "_")), "name": base, "label": None}
         pwords = _WORDS(info["name"] + " " + (info["title"] or ""))
         kids.sort(key=lambda k: k[1].lower())
-        dated = not force and len(kids) > 1 and all(re.search(r"\b(?:19|20)\d\d\b", c) and not _DISC_NO.search(c) for _, c in kids)
-        nos = [(m := _DISC_NO.search(c)) and int(m[1] or m[2]) for _, c in kids]
-        free = (i for i in range(1, 100) if i not in nos)  # disque sans numéro : le premier libre, dans l'ordre des noms
+        dated = len(kids) > 1 and all(re.search(r"\b(?:19|20)\d\d\b", c) and not _DISC_NO.search(c) for _, c in kids)
         for rank, (rid, child) in enumerate(kids, 1):
             m = _DISC_NO.search(child)
-            n = int(m[1] or m[2]) if m else rank if dated else next(free) if force and len(kids) > 1 else None
+            n = int(m[1] or m[2]) if m else rank if dated else None
             rest = re.search(r"\b(?:19|20)\d\d\b", child)[0] if dated else (child[:m.start()] + " " + child[m.end():] if m else child)
             rest = " ".join(re.sub(r"[\[\]()_.]+", " ", rest).split()).strip(" -")
             if not dated:  # début qui répète la release (« Gatecrasher Forever - The Folio ») : retiré
@@ -402,15 +423,10 @@ def disc_children(conn) -> None:
             if rest and not dated and len(_WORDS(rest) - pwords) <= len(_WORDS(rest)) // 3:
                 rest = ""  # le nom répète la release (« Ministry of Sound - Chillout Sessions X - CD1 ») : rien à ajouter
             part = " - ".join(x for x in (f"CD{n}" if n else "", rest) if x)
-            if force and len(kids) == 1 and _SCENE_END.search(child):
-                continue  # seul disque au nom de release (« VA-DMC_Commercial_Collection_309-2CD-2008-WRE ») : gardé
-            if force and len(kids) == 1 and not m:
-                part = ""  # seul disque sans numéro : le nom de la release (« DMC Commercial Collection Vol. 444 », « CD »)
-            elif not part:
+            if not part:
                 continue
-            suffix = f" ({part})" if part else ""
             conn.execute("UPDATE releases SET name=?, artist=?, tag_artist=NULL, title=?, year=COALESCE(?, year), grp=?, label=COALESCE(label, ?) WHERE id=?",
-                         (f"{info['name']}{suffix}".replace(" ", "_"), info["artist"], f"{info['title'] or base}{suffix}",
+                         (f"{info['name']} ({part})".replace(" ", "_"), info["artist"], f"{info['title'] or base} ({part})",
                           info["year"], info["grp"], info["label"], rid))
 
 
@@ -460,6 +476,7 @@ def categorize(conn) -> None:
     dated_episodes(conn)
     discographies(conn)
     disc_children(conn)
+    series_names(conn)
     essential_mixes(conn)
     rows = conn.execute("SELECT id, name, path, category, track_count FROM releases").fetchall()
     tops = sorted({r["path"].split("/", 1)[0] for r in rows})

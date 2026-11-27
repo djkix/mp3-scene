@@ -80,6 +80,18 @@ def test_multi_disc_merged(conn, music):
     assert [(t["disc"], t["relpath"]) for t in conn.execute("SELECT disc, relpath FROM tracks ORDER BY disc")] == [(1, "CD1/01-a.mp3"), (2, "cd2/01-b.mp3")]
 
 
+def test_series_subfolders_with_tracks_are_discs_whatever_their_name(conn, music):
+    base = "Compilations/-=DMC Commercial=-/Dmc Commercial Collection 047"
+    mk(music, f"{base}/DMC 047 - Previews (December 1986)", ["01-c.mp3"]); mk(music, f"{base}/DMC 047 - Mixes 2", ["01-b.mp3"])
+    mk(music, f"{base}/International", ["01-a.mp3"]); mk(music, f"{base}/Covers", ["front.jpg"])
+    mk(music, "Compilations/-=DMC Commercial=-/!Collection/Some Release", ["01-d.mp3"])  # dossier de collection : à part
+    scan_structure(conn, music, now=1.0)
+    assert {r["path"] for r in conn.execute("SELECT path FROM releases")} == {base, "Compilations/-=DMC Commercial=-/!Collection/Some Release"}
+    assert [(t["disc"], t["relpath"]) for t in conn.execute("SELECT disc, relpath FROM tracks t JOIN releases r ON r.id=t.release_id"
+            " WHERE r.path=? ORDER BY disc", (base,))] == [(1, "DMC 047 - Previews (December 1986)/01-c.mp3"),
+                                                        (2, "DMC 047 - Mixes 2/01-b.mp3"), (3, "International/01-a.mp3")]
+
+
 def test_release_with_sub_release(conn, music):
     mk(music, "X/Parent-Rel-WEB-2010-GRP", ["01-a.mp3"]); mk(music, "X/Parent-Rel-WEB-2010-GRP/Child-Rel-WEB-2011-GRP", ["01-b.mp3"])
     assert scan_structure(conn, music, now=1.0)["found"] == 2
