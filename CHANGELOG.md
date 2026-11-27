@@ -4,6 +4,16 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.85.12](https://github.com/djkix/mp3-scene/compare/v1.85.11...v1.85.12) (2026-11-27)
+
+### Résumé
+
+**Navidrome : « Artiste - Album » dans les listes de morceaux.**
+
+- Recherche, derniers ajouts, morceaux au hasard ou les plus écoutés, page d'un artiste : chaque morceau s'affiche
+  « Artiste - Album » (le titre seul ne distingue pas plusieurs versions d'« I Follow Rivers ») ; le titre reste en
+  infobulle, et dans la page d'un album.
+
 ## [1.85.11](https://github.com/djkix/mp3-scene/compare/v1.85.10...v1.85.11) (2026-11-27)
 
 ### Résumé

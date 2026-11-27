@@ -28,7 +28,8 @@ function trackRows(list, tracks, loose = false, append = false) {
     onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) play(t); } },
   loose ? el('img', { class: 'rel-thumb', src: t.cover ? `${t.cover}?size=80` : NO_COVER, alt: '', loading: 'lazy', width: 40, height: 40,
     onerror: noCover }) : el('span', { class: 'nd-no' }, String(t.track || i + 1)),
-  el('span', { class: 'rel-name' }, t.artist ? `${t.artist} - ${t.title}` : t.title),
+  // à l'unité : « Artiste - Album » (le titre seul ne distingue pas trois « I Follow Rivers ») ; dans un album : le titre
+  el('span', { class: 'rel-name', title: t.title }, [t.artist, (loose && t.release_name) || t.title].filter(Boolean).join(' - ')),
   el('span', { class: 'rel-info' }, el('span', { class: 'mid' }, loose && t.year ? String(t.year) : ''),
     el('span', { class: 'mid' }, t.duration ? fmtDuration(t.duration) : '—'),
     el('span', { class: 'mid rate' }, t.bitrate ? `${Math.round(t.bitrate / 1000)} kbit/s` : ''),
