@@ -4,6 +4,16 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.85.18](https://github.com/djkix/mp3-scene/compare/v1.85.17...v1.85.18) (2026-11-27)
+
+### Résumé
+
+**« Artiste-Titre » aussi devant une date ou un sous-titre.**
+
+- Release P2P nommée « Artiste_-_Titre » : le séparateur devient « - » même quand une date ou un sous-titre suit
+  (« Carl_Cox_-_Inox_…_(11-05-2013)-P2P » -> « Carl_Cox-Inox_…_(11-05-2013)-P2P »). 869 releases renommées au prochain
+  scan ; « VA-… », qui a déjà son séparateur, garde son nom.
+
 ## [1.85.17](https://github.com/djkix/mp3-scene/compare/v1.85.16...v1.85.17) (2026-11-27)
 
 ### Résumé

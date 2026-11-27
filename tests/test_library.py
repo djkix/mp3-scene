@@ -1843,7 +1843,7 @@ def test_numbered_set_files_lose_their_track_number(conn):
                      " VALUES (?,?,'',?,0,0,10,1,0,?)", (f"{L}/{n}.mp3", n, L.split("/")[0], n.split("_")[0]))
     db.categorize(conn)
     got = {r["name"]: r["artist"] for r in conn.execute("SELECT name, artist FROM releases")}
-    assert got == {"Michael_Burian_-_Sensation_White_Prague_31-05-2008-P2P": "Michael Burian",
+    assert got == {"Michael_Burian-Sensation_White_Prague_31-05-2008-P2P": "Michael Burian",
                    "dave_clarke_-_live_at_inox-sat-05-16-2009-talion": "Dave Clarke"}
 
 
@@ -1861,14 +1861,18 @@ def test_release_without_genre_takes_its_artist_most_common_genre(conn):
 
 
 def test_release_without_group_or_year_is_named_like_a_p2p_release(conn):
-    rows = [("Albums/Air_-_Moon_Safari", 1998), ("Albums/Air_-_Talkie_Walkie", None), ("Singles/A/Axer-One-WEB-2006-TGX", 2006)]
+    rows = [("Albums/Air_-_Moon_Safari", 1998), ("Albums/Air_-_Talkie_Walkie", None), ("Singles/A/Axer-One-WEB-2006-TGX", 2006),
+            ("Live/Carl_Cox_-_Inox_Festival_2013_(11-05-2013)", 2013), ("Compils/VA-Hed_Kandi_Miami_-_America-WEB-2011", 2011)]
     for p, y in rows:
         conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, year)"
                      " VALUES (?,?,'',?,0,0,10,1,0,?)", (p, p.rsplit("/", 1)[1], p.split("/")[0], y))
     db.categorize(conn)
     names = lambda: {r[0] for r in conn.execute("SELECT name FROM releases")}
-    assert names() == {"Air-Moon_Safari-1998-P2P", "Air-Talkie_Walkie-P2P", "Axer-One-WEB-2006-TGX"}
+    # tiret d'une date ou d'un sous-titre après « Artiste_-_ » ; « VA- » a déjà son séparateur
+    assert names() == {"Air-Moon_Safari-1998-P2P", "Air-Talkie_Walkie-P2P", "Axer-One-WEB-2006-TGX",
+                       "Carl_Cox-Inox_Festival_2013_(11-05-2013)-P2P", "VA-Hed_Kandi_Miami_-_America-WEB-2011-P2P"}
     conn.execute("UPDATE releases SET year=2004 WHERE name='Air-Talkie_Walkie-P2P'")  # année connue plus tard (tags)
     db.categorize(conn)
     db.categorize(conn)  # rien ne s'empile
-    assert names() == {"Air-Moon_Safari-1998-P2P", "Air-Talkie_Walkie-2004-P2P", "Axer-One-WEB-2006-TGX"}
+    assert names() == {"Air-Moon_Safari-1998-P2P", "Air-Talkie_Walkie-2004-P2P", "Axer-One-WEB-2006-TGX",
+                       "Carl_Cox-Inox_Festival_2013_(11-05-2013)-P2P", "VA-Hed_Kandi_Miami_-_America-WEB-2011-P2P"}

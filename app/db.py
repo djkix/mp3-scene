@@ -524,8 +524,9 @@ def p2p_names(conn) -> None:
         n = (name[:-4] if name.endswith("-P2P") else name).replace(" ", "_")
         if "-P2P" in n or parse_release_name(n)["grp"] not in (None, "P2P"):
             continue  # groupe dans le nom (« …-2006-TGX », « …-sat-05-16-2009-talion ») : le nom reste tel quel
-        if "-" not in n.replace("_-_", "") and (f := parse_release_name(n))["artist"] and f["title"]:
-            n = f"{f['artist']}-{f['title']}".replace(" ", "_")  # « Air_-_Moon_Safari » -> « Air-Moon_Safari »
+        head, sep, rest = n.partition("_-_")
+        if sep and head and rest and "-" not in head:  # « Air_-_Moon_Safari » -> « Air-Moon_Safari », même suivi
+            n = f"{head}-{rest}"  # d'une date « (11-05-2013) » ; « VA-…_-_… » a déjà son séparateur
         new = "-".join(x for x in (n, None if _YEAR_IN.search(n) else year and str(year), "P2P") if x)
         if new != name:
             out.append((new, r["id"]))
