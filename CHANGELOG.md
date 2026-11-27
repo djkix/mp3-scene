@@ -4,6 +4,15 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.85.17](https://github.com/djkix/mp3-scene/compare/v1.85.16...v1.85.17) (2026-11-27)
+
+### Résumé
+
+**Chapitre en cours surligné.**
+
+- Fiche d'un long mix à chapitres (fichier .cue) : le chapitre en cours de lecture est surligné en vert dans la liste
+  des chapitres, et le surlignage suit l'écoute, un saut de chapitre ou un déplacement dans la piste.
+
 ## [1.85.16](https://github.com/djkix/mp3-scene/compare/v1.85.15...v1.85.16) (2026-11-27)
 
 ### Résumé

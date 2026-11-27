@@ -42,7 +42,7 @@ export function render(container, params) {
         const parts = byTrack[tk.id];
         if (!parts) return [];
         return [el('h2', { class: 'nfo-h' }, rel.tracks.length > 1 ? `${t('Chapitres')} · ${tk.title || tk.filename}` : t('Chapitres')),
-          el('ol', { class: 'chapters' }, parts.map((c) => el('li', {}, el('button', { type: 'button',
+          el('ol', { class: 'chapters', 'data-track': tk.id }, parts.map((c) => el('li', {}, el('button', { type: 'button',
             onclick: () => player.playTracks(rel.tracks, i, c.start) },
           el('span', { class: 'ch-time' }, fmtDuration(c.start)),
           el('span', {}, c.artist && c.title ? `${c.artist} - ${c.title}` : c.title || c.artist || '—')))))];

@@ -915,6 +915,10 @@ function paintChapter() {
   if (!ui) return;
   ui.chap.hidden = !chapters.length;
   const i = chapters.length ? chapterAt(position()) : -1;
+  // fiche de la release ouverte : surligne le chapitre en cours dans sa liste
+  const cur = i < 0 ? null : document.querySelector(`.chapters[data-track="${chaptersFor}"]`)?.children[i] ?? null;
+  for (const x of document.querySelectorAll('.chapters .playing')) if (x !== cur) x.classList.remove('playing');
+  cur?.classList.add('playing');
   if (i === shownChapter) return;
   shownChapter = i;
   const c = chapters[i];

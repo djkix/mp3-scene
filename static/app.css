@@ -512,6 +512,7 @@ a.pill:hover { filter: brightness(1.12); }
 .chapters button { display: flex; gap: 12px; width: 100%; min-height: 0; padding: 6px 8px; border: 0; border-bottom: 1px solid var(--line);
   border-radius: 0; background: none; color: var(--fg); font: 13px var(--sans); text-align: left; text-transform: none; letter-spacing: 0; }
 .chapters button:hover { background: var(--hover); }
+.chapters li.playing button { background: var(--tint); color: var(--accent-text); font-weight: 600; }
 .ch-time { flex: none; min-width: 3.5rem; color: var(--info); font: 12px var(--mono); font-variant-numeric: tabular-nums; }
 .tech { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; margin: 0; font: 13px var(--mono); }
 .tech dt { color: var(--muted); }
