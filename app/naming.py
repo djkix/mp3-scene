@@ -275,7 +275,7 @@ def festival_key(name: str) -> str:
 # --- Émissions de radio (Live & Radio) ----------------------------------------------------------------------------
 # Émissions connues (abréviation -> nom affiché) ; une release de source radio (SAT, FM…) sans émission connue prend
 # le titre lu dans son nom, sans numéro d'épisode ni date.
-_SHOWS = {"essential mix": "Essential Mix", "a state of trance": "A State of Trance", "asot": "A State of Trance",
+_SHOWS = {"essential mix": "Essential Mix", "(?:the )?essential selection": "The Essential Selection", "a state of trance": "A State of Trance", "asot": "A State of Trance",
           "global dj broadcast": "Global DJ Broadcast", "group therapy": "Group Therapy", "club ?life": "Club Life",
           "hardwell on air": "Hardwell On Air", "corsten'?s countdown": "Corsten's Countdown",
           "trance around the world": "Trance Around The World", "tatw": "Trance Around The World",

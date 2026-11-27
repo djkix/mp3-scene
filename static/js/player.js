@@ -1022,16 +1022,19 @@ function update() {
   positionState();
   if (ui) {
     ui.footer.classList.toggle('is-empty', !t);
-    const name = !t ? '' : t.title && t.artist ? `${t.artist} - ${t.title}` : title(t);
+    // morceau Navidrome : « Artiste - Album », le titre sur la ligne du dessous (à la place de la release)
+    const album = t?.nd && t.release_name;
+    const head = album || t?.title;
+    const name = !t ? '' : head && t.artist ? `${t.artist} - ${head}` : title(t);
     if (ui.title.title !== name) { // seulement quand la piste change : le défilement ne repart pas à chaque rafraîchissement
       // « Artiste - » dans son propre élément : la barre du téléphone le masque et montre l'artiste sur la ligne du dessous
-      const split = !!(t && t.title && t.artist);
-      ui.title.replaceChildren(el('span', {}, split ? el('span', { class: 'pl-t-artist' }, `${t.artist} - `) : null, split ? t.title : name));
+      const split = !!(t && head && t.artist);
+      ui.title.replaceChildren(el('span', {}, split ? el('span', { class: 'pl-t-artist' }, `${t.artist} - `) : null, split ? head : name));
       ui.artist.textContent = split ? t.artist : '';
       ui.title.title = name;
       fitTitle();
     }
-    const rel = relName(t?.release_name);
+    const rel = album ? t.title || '' : relName(t?.release_name);
     if (ui.rel.textContent !== rel) { ui.rel.replaceChildren(el('span', {}, rel)); fitTitle(); }
     loadWave(t);
     const cover = t ? coverOf(t) : '';

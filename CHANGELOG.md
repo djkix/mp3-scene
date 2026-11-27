@@ -4,6 +4,21 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.85.13](https://github.com/djkix/mp3-scene/compare/v1.85.12...v1.85.13) (2026-11-27)
+
+### Résumé
+
+**Navidrome : lecteur, page d'un album et favori ; séries triées par nombre de releases ; The Essential Selection.**
+
+- Lecteur, morceau Navidrome : « Artiste - Album » en titre, le titre du morceau en dessous.
+- Page d'un album Navidrome : « Artiste - Album » en en-tête (l'artiste mène à sa page), aligné à gauche avec les
+  boutons ; un bouton Favori met l'album en favori dans Navidrome ; le bloc « Infos » (commentaire des tags) est retiré.
+- Onglet Navidrome : contour vert quand il n'est pas sélectionné, pour le repérer.
+- Séries : triées par nombre de releases décroissant par défaut ; le nombre de séries d'une famille a sa colonne,
+  avant les releases.
+- « The Essential Selection » (Pete Tong) est une émission de radio : ses épisodes ont leur page dans Live & Radio. Les
+  sets et épisodes de Live & Radio ne forment plus de séries (« The Essential » mélangeait l'émission et des albums).
+
 ## [1.85.12](https://github.com/djkix/mp3-scene/compare/v1.85.11...v1.85.12) (2026-11-27)
 
 ### Résumé

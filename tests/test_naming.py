@@ -108,3 +108,9 @@ def test_year_in_brackets_at_the_end_of_the_name():
     from app.naming import parse_release_name as p
     assert (p("Paul Van Dyk - Live At The Gallery Turnmills (1999)")["year"], p("Paul Van Dyk - Live At The Gallery Turnmills (1999)")["title"]) == (1999, "Live At The Gallery Turnmills")
     assert p("Artist-Title_(2000_Remix)-WEB-2010-GRP")["year"] == 2010  # année du nom scène, remix gardé dans le titre
+
+
+def test_essential_selection_is_a_radio_show():
+    from app.naming import radio
+    assert radio("Pete_tong_-_the_essential_selection-sat-01-01-2009") == ("The Essential Selection", 2009, True)
+    assert radio("Pete_Tong-Essential_Selection-SAT-05-03-2004-TALiON")[0] == "The Essential Selection"

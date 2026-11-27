@@ -23,7 +23,7 @@ export const tabs = (current, genre = '', year = '') => {
     TABS.map(([k, label]) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(k === current),
       onclick: () => { location.hash = `#/${k}` + qs({ genre: k === 'genres' ? '' : genre, year }); } }, tr(label))));
   (navidromeOn ??= api('/navidrome/status').then((s) => s.enabled).catch(() => false)).then((on) => {
-    if (on) bar.append(el('button', { type: 'button', role: 'tab', 'aria-selected': String(current === 'navidrome'),
+    if (on) bar.append(el('button', { type: 'button', role: 'tab', class: 'tab-nd', 'aria-selected': String(current === 'navidrome'),
       onclick: () => { location.hash = '#/navidrome'; } }, 'Navidrome'));
   });
   return bar;
@@ -575,9 +575,12 @@ export function render(container, params) {
   const category = kind === 'titles' || kind === 'years' ? params.category || '' : ''; // titres, années : filtre Catégories en plus
   const setFilter = (name, value) => { location.hash = `#/${kind}` + qs({ genre, year, category, [name]: value }); };
   // [libellé, clé, sens au premier clic] ; un titre compte des pistes (ses versions), les autres des releases
-  const HEAD = [[tr(label), 'name', 1], [kind === 'titles' ? tr('Pistes') : tr('Releases'), 'releases', -1], [tr('Poids'), 'size', -1]];
-  // années : la plus récente d'abord ; labels : les plus fournis d'abord
-  let rows = [], key = kind === 'labels' ? 'releases' : 'name', dir = kind === 'years' || kind === 'labels' ? -1 : 1, dead = false;
+  // séries : leur nombre dans une famille en colonne, avant les releases
+  const HEAD = [[tr(label), 'name', 1], ...(kind === 'series' ? [[tr('Séries'), 'series', -1]] : []),
+    [kind === 'titles' ? tr('Pistes') : tr('Releases'), 'releases', -1], [tr('Poids'), 'size', -1]];
+  // années : la plus récente d'abord ; labels et séries : les plus fournis d'abord
+  const most = kind === 'labels' || kind === 'series';
+  let rows = [], key = most ? 'releases' : 'name', dir = kind === 'years' || most ? -1 : 1, dead = false;
   // Lettres sous les filtres : « # » réunit ce qui ne commence pas par une lettre. La lettre choisie est dans
   // l'adresse (sans recharger la liste) pour la retrouver au retour d'une fiche.
   let letter = /^([A-Z]|#)$/.test(params.letter || '') ? params.letter : '';
@@ -630,12 +633,13 @@ export function render(container, params) {
     HEAD.forEach(([text, k], i) => { heads[i].firstChild.textContent = k === key ? `${text} ${dir > 0 ? '▲' : '▼'}` : text; });
     const needle = find.value.trim().toLowerCase();
     const shown = rows.filter((g) => String(g.name).toLowerCase().includes(needle) && (!letter || initial(g.name) === letter))
-      .sort((a, b) => dir * (key === 'name' ? String(a.name).localeCompare(String(b.name), undefined, { numeric: true }) : a[key] - b[key])
+      .sort((a, b) => dir * (key === 'name' ? String(a.name).localeCompare(String(b.name), undefined, { numeric: true }) : (a[key] ?? 1) - (b[key] ?? 1))
         || String(a.name).localeCompare(String(b.name)));
     body.replaceChildren(...shown.slice(0, MAX_ROWS).map((g) => el('tr', {},
-      el('td', {}, el('a', { href: href(g.name) }, kind === 'artists' ? artistLabel(g.name) : g.name), g.series > 1 ? el('small', { class: 'muted' }, ' ' + tr('{0} séries', g.series)) : null,
+      el('td', {}, el('a', { href: href(g.name) }, kind === 'artists' ? artistLabel(g.name) : g.name), g.series > 1 && kind !== 'series' ? el('small', { class: 'muted' }, ' ' + tr('{0} séries', g.series)) : null,
         g.genres > 1 ? el('small', { class: 'muted' }, ' ' + tr('{0} genres', g.genres)) : null,
         g.labels > 1 ? el('small', { class: 'muted' }, ' ' + tr('{0} labels', g.labels)) : null),
+      kind === 'series' ? el('td', { class: 'num' }, String(g.series || 1)) : null,
       el('td', { class: 'num' }, String(g.releases)), el('td', { class: 'num' }, fmtSize(g.size)))));
     status.textContent = !shown.length ? tr('Aucun résultat')
       : tr('{0} lignes · {1} · {2}', shown.length, kind === 'titles' ? tr('{0} pistes', shown.reduce((n, g) => n + g.releases, 0))

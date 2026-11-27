@@ -287,7 +287,6 @@ export const EN = {
   'Carte': 'Map',
   'Lire {0}': 'Play {0}',
   "À propos de l'album": 'About the album',
-  'Infos': 'Info',
   'Autres au hasard': 'More at random',
   'Voir plus': 'Show more',
   'Derniers ajouts': 'Recently added',

@@ -6,6 +6,7 @@ import { el, noCover, NO_COVER } from '../dom.js';
 import { t as tr } from '../i18n.js';
 import { player, watchPlaying } from '../player.js';
 import { tabs } from './groups.js';
+import { favButton } from './releases.js';
 
 const VIEWS = [['newest', 'Derniers ajouts'], ['random', 'Au hasard'], ['frequent', 'Les plus écoutés'], ['artists', 'Artistes']];
 const enc = encodeURIComponent;
@@ -65,17 +66,18 @@ export function render(container, params) {
       if (dead) return;
       const list = el('ul', { class: 'rel-list' });
       trackRows(list, a.tracks);
+      const fav = favButton({ id: a.id, favorite: a.starred }, 'album', `/navidrome/star/${enc(a.id)}`);
+      fav.classList.remove('icon'); // dans la barre d'actions, comme sur la fiche d'une release
+      const artist = a.artist_id ? el('a', { href: `#/navidrome/artist/${enc(a.artist_id)}` }, a.artist) : a.artist;
       body.replaceChildren(el('div', { class: 'fest-head nd-head' },
         a.cover ? el('img', { class: 'art-photo logo', src: `${a.cover}?size=300`, alt: '', onerror: (e) => e.target.remove() }) : null,
-        el('div', {}, el('h1', { class: 'grp-title' }, a.name),
-          el('p', { class: 'fest-facts' }, a.artist_id ? el('a', { href: `#/navidrome/artist/${enc(a.artist_id)}` }, a.artist) : a.artist || '',
-            [a.year, a.genre, tr('{0} pistes', a.tracks.length), a.duration ? fmtDuration(a.duration) : ''].filter(Boolean).map((x) => ` · ${x}`).join('')),
+        el('div', {}, el('h1', { class: 'grp-title' }, ...(a.artist ? [artist, ' - '] : []), a.name),
+          el('p', { class: 'fest-facts' },
+            [a.year, a.genre, tr('{0} pistes', a.tracks.length), a.duration ? fmtDuration(a.duration) : ''].filter(Boolean).join(' · ')),
           el('p', { class: 'detail-actions' },
             el('button', { type: 'button', class: 'primary', onclick: () => player.playTracks(a.tracks.slice(), 0) }, tr('Lire')),
-            el('button', { type: 'button', onclick: () => player.enqueue(a.tracks.slice()) }, tr('Ajouter à la file'))))), list,
-      // commentaire des tags de chaque piste (souvent la tracklist d'un mix), puis les notes de l'album
-      ...a.tracks.filter((t) => t.comment).flatMap((t) => [el('h2', { class: 'nfo-h nd-h' }, a.tracks.length > 1 ? `${tr('Infos')} · ${t.title}` : tr('Infos')),
-        el('pre', { class: 'nd-notes' }, t.comment)]),
+            el('button', { type: 'button', onclick: () => player.enqueue(a.tracks.slice()) }, tr('Ajouter à la file')), fav))), list,
+      // notes de l'album si Navidrome en a (le commentaire des tags n'est plus montré)
       ...(a.notes ? [el('h2', { class: 'nfo-h nd-h' }, tr("À propos de l'album")), el('p', { class: 'nd-notes' }, a.notes)] : []),
       a.tracks[0]?.path ? el('p', { class: 'nd-path muted' }, a.tracks[0].path.replace(/[^/]*$/, '')) : '');
       done();

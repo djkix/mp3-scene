@@ -955,9 +955,10 @@ def _all_series(conn, conds=("hidden=0",), params=()):
     début de titre commun (voir _series), calculé ici et non en SQL."""
     # ponytail: tous les titres relus à chaque appel (~0,1 s pour 45 000) ; colonne releases.series si trop lent
     found = {}
-    for title, size in conn.execute("SELECT title, size FROM releases WHERE " + " AND ".join(conds), list(params)):
-        # « Live at Electric Zoo (New York » : coupé dans une parenthèse, ce n'est pas un nom de série
-        if (name := _series(title)) and name.count("(") == name.count(")"):
+    for title, size, cat in conn.execute("SELECT title, size, category FROM releases WHERE " + " AND ".join(conds), list(params)):
+        # « Live at Electric Zoo (New York » : coupé dans une parenthèse, ce n'est pas un nom de série ; un set ou un
+        # épisode de radio n'est pas un volume (« The Essential Selection » : une émission, page de Live & Radio)
+        if (name := _series(title)) and name.count("(") == name.count(")") and not re.search(r"live|radio", cat or "", re.I):
             g = found.setdefault(name.casefold(), {"name": name, "releases": 0, "size": 0, "volumes": set()})
             g["releases"] += 1
             g["size"] += size or 0

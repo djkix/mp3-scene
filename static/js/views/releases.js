@@ -29,7 +29,8 @@ const HEAD = [[tr('Nom'), 'name', 'asc'], [tr('Genre'), 'genre', 'asc'], [tr('Da
   // sans colonne dans les lignes : l'en-tête au-dessus des actions trie par nombre d'écoutes
   [tr('Écoutes'), 'plays', 'desc']];
 
-export function favButton(rel, kind = 'release') {
+// `path` : adresse du favori ailleurs que dans la bibliothèque (album Navidrome)
+export function favButton(rel, kind = 'release', path = `/favorites/${kind}/${rel.id}`) {
   const btn = el('button', { type: 'button', class: 'icon fav' });
   const paint = () => {
     btn.textContent = HEART[+rel.favorite];
@@ -42,7 +43,7 @@ export function favButton(rel, kind = 'release') {
     rel.favorite = !rel.favorite; // optimiste
     paint();
     try {
-      await api(`/favorites/${kind}/${rel.id}`, { method: rel.favorite ? 'PUT' : 'DELETE' });
+      await api(path, { method: rel.favorite ? 'PUT' : 'DELETE' });
     } catch {
       rel.favorite = !rel.favorite; // retour arrière
       paint();

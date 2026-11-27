@@ -149,8 +149,23 @@ def album(aid: str, request: Request):
         notes = (call(s, "getAlbumInfo2", id=aid).get("albumInfo") or {}).get("notes")
     except HTTPException:
         notes = None
-    return {**_album({"id": aid, **a}), "tracks": [_song(x) for x in a.get("song", [])],
+    return {**_album({"id": aid, **a}), "starred": bool(a.get("starred")), "tracks": [_song(x) for x in a.get("song", [])],
             "notes": re.sub(r"<[^>]+>", "", notes or "").strip() or None}  # texte seul : jamais de HTML venu d'ailleurs
+
+
+@router.put("/star/{aid}", status_code=204)
+def star(aid: str, request: Request):
+    """Album mis en favori dans Navidrome (Subsonic « star »)."""
+    if not re.match(ND_ID, aid):
+        raise HTTPException(404, "Album introuvable.")
+    call(_settings(request), "star", albumId=aid)
+
+
+@router.delete("/star/{aid}", status_code=204)
+def unstar(aid: str, request: Request):
+    if not re.match(ND_ID, aid):
+        raise HTTPException(404, "Album introuvable.")
+    call(_settings(request), "unstar", albumId=aid)
 
 
 @router.get("/search")

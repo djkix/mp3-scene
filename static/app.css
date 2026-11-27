@@ -825,6 +825,8 @@ tr.disc th { background: var(--hover); color: var(--fg); padding-block: 8px; }
 .cats { justify-content: center; padding-bottom: 0; } /* blocs des catégories, centrés au-dessus des filtres */
 /* :not(:disabled) : passe devant le fond de survol des boutons, sinon l'onglet actif survolé est illisible */
 .tabs button[aria-selected="true"]:not(:disabled) { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+/* Navidrome non sélectionné : contour vert, pour le repérer parmi les onglets */
+.tabs .tab-nd[aria-selected="false"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 /* liste de pistes, comme les releases : vignette | artiste - titre | genre | durée ou date | débit | release | actions */
 /* bureau seulement : sur téléphone, la ligne garde la disposition en carte des releases */
 @media (min-width: 700px) { .trk { grid-template-columns: 40px minmax(0, 3fr) 7rem var(--when, 5rem) 5.25rem minmax(0, 2fr) var(--acts, 72px); } }
@@ -1024,7 +1026,8 @@ body.party-on #view { max-width: none; padding: 0; margin: 0; }
 .nd-no { grid-area: thumb; color: var(--muted); font: 12px var(--mono); text-align: right; }
 @media (min-width: 700px) { .nd-no { grid-area: auto; } }
 .nd-head { margin: 12px; }
-.nd-head .grp-title { margin: 0 0 4px; }
+.nd-head .grp-title { margin: 0 0 4px; padding: 0; }
+.nd-head .detail-actions { justify-content: flex-start; }  /* aligné sur le titre et l'artiste */
 .nd-title { margin: 12px; }
 .nd-artists { margin: 12px; line-height: 2.2; }
 .nd-find input { flex: 1 1 320px; max-width: 520px; }
