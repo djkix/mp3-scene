@@ -114,3 +114,10 @@ def test_essential_selection_is_a_radio_show():
     from app.naming import radio
     assert radio("Pete_tong_-_the_essential_selection-sat-01-01-2009") == ("The Essential Selection", 2009, True)
     assert radio("Pete_Tong-Essential_Selection-SAT-05-03-2004-TALiON")[0] == "The Essential Selection"
+
+
+def test_a_catalog_number_means_a_commercial_release_not_a_live():
+    from app.naming import looks_live
+    assert not looks_live("Mark_Knight-Untold_Business-(TOOL104201Z)-WEB-2021-AOV")
+    assert not looks_live("Mario_Ochoa-Mayday-(PUREDV030)-WEB-2013-wWs")
+    assert looks_live("Hardwell_-_Live_at_Untold_Festival-SAT-08-05-2021-TALiON")

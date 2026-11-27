@@ -4,6 +4,16 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.85.15](https://github.com/djkix/mp3-scene/compare/v1.85.14...v1.85.15) (2026-11-27)
+
+### Résumé
+
+**Une release au numéro de catalogue n'est pas un live.**
+
+- Un nom avec un numéro de catalogue (« Mark_Knight-Untold_Business-(TOOL104201Z)-WEB-2021-AOV ») est une sortie
+  commerciale, même s'il cite un festival (Untold, Mayday, Sensation, Tomorrowland…) ou si son groupe est ASOT : il
+  reste un single, ou un album à partir de dix pistes, au lieu de Live & Radio. 20 releases concernées.
+
 ## [1.85.14](https://github.com/djkix/mp3-scene/compare/v1.85.13...v1.85.14) (2026-11-27)
 
 ### Résumé

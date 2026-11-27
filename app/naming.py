@@ -131,10 +131,17 @@ def kind(name: str) -> str | None:
 _SET_AT = re.compile(r"(?:^|[-_ (])(?:live|dj[-_ ]?set|set)[-_ ]+(?:at|au|@|from|à)[-_ ]", re.I)
 
 
+_CATALOG = re.compile(r"-\((?=[A-Za-z0-9]*[A-Za-z]{2})(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{3,}\)-")
+
+
 def looks_live(name: str) -> bool:
     """Un nom rangé parmi les singles qui est en fait un live : il cite un festival, une émission de radio connue, ou
     dit « Live at… » (sans CD : un « Live at Wembley » en 2CD est un album)."""
     if _CD.search(name):
+        return False
+    # numéro de catalogue (« -(TOOL104201Z)- ») : une sortie commerciale, même si elle cite un festival ou une
+    # émission (« Mark_Knight-Untold_Business », « Mario_Ochoa-Mayday », groupe « ASOT »)
+    if _CATALOG.search(name):
         return False
     if _SET_AT.search(name):
         return True
