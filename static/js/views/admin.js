@@ -235,7 +235,16 @@ export function render(container, params = {}) {
       const suggest = () => api('/admin/suggestions').then((s) => {
         if (dead) return;
         const list = s[kind] || []; // pas de rapprochement proposé pour les titres
-        hints.replaceChildren(...(list.length ? [el('p', { class: 'hint' }, t('Rapprochements suggérés :')),
+        // tout rattacher : les propositions une à une, dans l'ordre
+        const all = el('button', { type: 'button', onclick: async () => {
+          all.disabled = true;
+          for (const x of list) {
+            try { await api(path, { method: 'PUT', body: { alias: x.alias, target: x.target } }); } catch (err) { msg.textContent = err.message; }
+          }
+          load();
+          suggest();
+        } }, t('Tout rattacher'));
+        hints.replaceChildren(...(list.length ? [el('p', { class: 'hint' }, t('Rapprochements suggérés :'), ' ', all),
           ...list.map((x) => el('p', {}, `${x.alias} (${x.releases}) → ${x.target} (${x.target_releases}) `,
             el('button', { type: 'button', onclick: async (e) => {
               e.target.disabled = true;

@@ -903,6 +903,9 @@ def release_detail(rid: Id, user=Depends(current_user), conn=Depends(get_conn)):
     # set d'un festival ou épisode d'une émission : son titre mène à sa page de Live & Radio
     d["live"] = next(({"type": t, "name": _live_name(g)} for t in ("festival", "radio") if re.search(r"live|radio", d["category"] or "", re.I)
                       for g in _live_sets(conn, t).values() if any(x[0] == rid for x in g["sets"])), None)
+    # crédit à plusieurs : une pastille par artiste (« Axwell, Pete Tong and David Guetta »)
+    d["artists"] = artists.split(d["artist"], lambda n: conn.execute(
+        "SELECT 1 FROM releases WHERE COALESCE(tag_artist, artist)=? COLLATE NOCASE LIMIT 1", (n,)).fetchone() is not None)
     d["tracks"] = [_track(r) for r in conn.execute(
         f"SELECT {TRACK_COLS} FROM {TRACK_FROM} WHERE t.release_id=? ORDER BY t.disc, t.relpath",
         (user["id"], rid))]

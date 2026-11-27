@@ -30,3 +30,9 @@ test('relHref : le lien porte l’identifiant, un nom tout en chiffres ou en dou
   assert.equal(relHref('A B/C?-2024', 7), '#/release/A%20B%2FC%3F-2024?id=7');
   assert.equal(relHref('Nom'), '#/release/Nom');
 });
+
+test('infoRows : une pastille par artiste d’un crédit à plusieurs', () => {
+  const rows = infoRows({ artist: 'Axwell, Pete Tong and David Guetta', artists: ['Axwell', 'Pete Tong', 'David Guetta'] }, el);
+  const pills = rows[1].children;
+  assert.deepEqual(pills.map((p) => p.children[0].text), ['Axwell', 'Pete Tong', 'David Guetta']);
+});

@@ -439,7 +439,7 @@ def essential_mixes(conn) -> None:
     relu sur le dossier à chaque fois ; le dossier sur le disque ne change pas. Un dossier « Collection » qui réunit
     plusieurs mixes garde son nom : ses fichiers sont des sets à part (pages de Live & Radio)."""
     rows = conn.execute(
-        "SELECT r.id, r.path, t.artist, t.title, t.relpath FROM releases r LEFT JOIN tracks t ON t.id="
+        "SELECT r.id, r.path, r.grp, t.artist, t.title, t.relpath FROM releases r LEFT JOIN tracks t ON t.id="
         "(SELECT id FROM tracks WHERE release_id=r.id ORDER BY disc, relpath LIMIT 1)"
         " WHERE lower(replace(r.path, '_', ' ')) LIKE '%essential mix%'").fetchall()
     for r in rows:
@@ -452,6 +452,9 @@ def essential_mixes(conn) -> None:
         if not got:
             continue
         name, artist, title, date = got
+        # groupe d'un nom de scène (« …-SAT-10-09-1994-TALiON ») ; sinon P2P (« 2008-07-19 - Essential Mix - deadmau5 »)
+        grp = r["grp"] if r["grp"] and re.search(r"-(?:19|20)\d\d-[^-]+$", folder) else "P2P"
+        name += "-" + grp
         year = int(date[:4])
         aired = None
         if len(date) == 10:
@@ -459,9 +462,23 @@ def essential_mixes(conn) -> None:
                 aired = datetime.datetime(year, int(date[5:7]), int(date[8:10]), 12, tzinfo=datetime.timezone.utc).timestamp()
             except ValueError:
                 pass
-        conn.execute("UPDATE releases SET name=?, artist=?, tag_artist=NULL, title=?, year=?,"
+        conn.execute("UPDATE releases SET name=?, artist=?, tag_artist=NULL, title=?, year=?, grp=?,"
                      " released_at=CASE WHEN COALESCE(released_at, 0)=0 THEN ? ELSE released_at END WHERE id=?",
-                     (name, artist, title, year, aired, r["id"]))
+                     (name, artist, title, year, grp, aired, r["id"]))
+
+
+def spellings(conn) -> None:
+    """Artistes écrits par les renommages ci-dessus (Essential Mix, épisodes, disques), après le regroupement : ils
+    prennent la graphie la plus répandue de leur artiste (« deadmau5 », « Armin van Buuren » -> « Deadmau5 », « Armin
+    Van Buuren »), comme artists.apply le ferait, sans relire toute la bibliothèque."""
+    keep = frozenset(artists.norm(n) for (n,) in conn.execute("SELECT name FROM artist_separate"))
+    best, rows = {}, conn.execute("SELECT COALESCE(tag_artist, artist) AS a, COUNT(*) FROM releases"
+                                  " WHERE COALESCE(tag_artist, artist) IS NOT NULL GROUP BY 1 ORDER BY 2 DESC, 1").fetchall()
+    for a, _ in rows:
+        if artists.norm(a) not in keep:
+            best.setdefault(artists.fold(a), a)
+    conn.executemany("UPDATE releases SET artist=? WHERE tag_artist IS NULL AND artist=?",
+                     [(b, a) for a, _ in rows if artists.norm(a) not in keep and (b := best[artists.fold(a)]) != a])
 
 
 def categorize(conn) -> None:
@@ -478,6 +495,7 @@ def categorize(conn) -> None:
     disc_children(conn)
     series_names(conn)
     essential_mixes(conn)
+    spellings(conn)
     rows = conn.execute("SELECT id, name, path, category, track_count FROM releases").fetchall()
     tops = sorted({r["path"].split("/", 1)[0] for r in rows})
     target = {k: next((t for t in tops if re.search(p, t, re.I)), None) for k, p in _KIND_FOLDER.items()}

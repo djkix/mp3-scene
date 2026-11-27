@@ -1779,7 +1779,7 @@ def test_bulk_live_folders_become_one_release_per_set(app, user_client, settings
     h = rows["Live And Radio/-= Tomorrowland =-/-= Tomorrowland 2013 =-/Hardwell.mp3"]
     assert (h["name"], h["track_count"], h["year"]) == ("Hardwell", 1, 2013)  # année de son dossier
     names = {r["name"] for r in rows.values()}
-    assert {"Radio_Soulwax-Essential_Mix-2005-01-02", "Jon_O_Bir-Essential_Mix-2005-01-16"} <= names
+    assert {"Radio_Soulwax-Essential_Mix-2005-01-02-P2P", "Jon_O_Bir-Essential_Mix-2005-01-16-P2P"} <= names
     # festival et émission retrouvés par le dossier ; un set par release
     fest = {f["name"]: f["sets"] for f in user_client.get("/api/festivals").json()}
     assert fest == {"Tomorrowland": 2}
@@ -1806,3 +1806,30 @@ def test_defected_in_the_house_spellings_are_one_label(conn):
     got = {r[0]: r[1] for r in c.execute("SELECT name, label FROM releases")}
     assert {got[f"p{i}"] for i in range(4)} == {"Defected In The House"}
     assert (got["p4"], got["p5"]) == ("Sex In The House Digital", "Defected")
+
+
+def test_essential_mix_artists_are_split_spelled_and_named_with_their_group(user_client, settings):
+    conn = db.connect(settings.data_dir)
+    L = "03.Various Artists - Live And Radio/-= Essential Mix =-"
+    rows = [(f"{L}/2008-07-19 - Essential Mix - deadmau5", 1), ("01.Singles/D/Deadmau5-Ghosts-WEB-2008-GRP", 2),
+            ("01.Singles/D/Deadmau5-Strobe-WEB-2009-GRP", 3), (f"{L}/Carl_Cox_-_Essential_Mix-SAT-10-09-1994-TALiON", 4),
+            (f"{L}/2007-12-29 - Essential Mix - Axwell, Pete Tong and David Guetta, The Warehouse Project", 5),
+            ("01.Singles/P/Pete_Tong-X-WEB-2007-GRP", 6), ("01.Singles/D/David_Guetta-Y-WEB-2007-GRP", 7),
+            ("01.Singles/C/Cass_and_Slide-Z-WEB-2007-GRP", 8)]
+    for p, i in rows:
+        name = p.rsplit("/", 1)[1]
+        from app.naming import parse_release_name
+        f = parse_release_name(name)
+        conn.execute("INSERT INTO releases(id, path, name, parent, category, mtime, added_at, size, track_count, has_nfo, artist, grp)"
+                     " VALUES (?,?,?,'',?,0,0,10,1,0,?,?)", (i, p, name, p.split("/")[0], f["artist"], f["grp"]))
+    conn.commit()
+    db.categorize(conn)
+    conn.commit()
+    got = {r["id"]: (r["name"], r["artist"]) for r in conn.execute("SELECT * FROM releases")}
+    assert got[1] == ("deadmau5-Essential_Mix-2008-07-19-P2P", "Deadmau5")  # graphie la plus répandue, groupe P2P
+    assert got[4][0] == "Carl_Cox-Essential_Mix-1994-10-09-TALiON"
+    d = user_client.get("/api/releases/5").json()
+    assert d["artists"] == ["Axwell", "Pete Tong", "David Guetta", "The Warehouse Project"]
+    assert user_client.get("/api/releases/8").json()["artists"] == ["Cass and Slide"]  # duo : pas coupé
+    with_tong = user_client.get("/api/releases", params={"collab": "Axwell"}).json()
+    assert 5 in [r["id"] for r in (with_tong["items"] if isinstance(with_tong, dict) else with_tong)]

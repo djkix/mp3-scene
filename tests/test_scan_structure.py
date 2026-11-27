@@ -415,7 +415,7 @@ def test_dated_radio_episodes_are_named_artist_show_date(conn, music):
     db.categorize(conn)
     got = {r["path"].rsplit("/", 1)[1]: r for r in conn.execute("SELECT * FROM releases")}
     m = got["2002-06-09_-_Essential_Mix_-_Michel_de_Hey"]
-    assert (m["name"], m["artist"], m["title"], m["year"]) == ("Michel_de_Hey-Essential_Mix-2002-06-09", "Michel de Hey", "Essential Mix", 2002)
+    assert (m["name"], m["artist"], m["title"], m["year"]) == ("Michel_de_Hey-Essential_Mix-2002-06-09-P2P", "Michel de Hey", "Essential Mix", 2002)
     assert m["released_at"] == 1023624000  # 9 juin 2002, midi UTC
     # Essential Mix : toujours « Artiste-Essential_Mix-date », quel que soit le format
     from app.db import em_name
@@ -427,9 +427,9 @@ def test_dated_radio_episodes_are_named_artist_show_date(conn, music):
     assert em_name("Pete_Tong_-_Live_at_Circus_Liverpool_(500th_Essential_Mix)-SAT-04-23-2010-TALiON", None, None, None)[0] == "Pete_Tong-Essential_Mix_Live_at_Circus_Liverpool_(500th)-2010-04-23"
     assert em_name("BBC Radio 1s Essential Mix 2021 Week 50 - Alan Fitpatrick", None, None, None)[0] == "Alan_Fitpatrick-Essential_Mix-2021-S50"
     assert em_name("Mauro Picotto - BBC Radio1 Essential Mix", None, None, None) is None  # sans date : nom gardé
-    assert got["2002-05-05_Essential_Mix_-_Pete_Tong_&_BT_@_Coachella_Festival"]["name"] == "Pete_Tong_&_BT-Essential_Mix_@_Coachella_Festival-2002-05-05"
-    assert got["2002-04-21_Essential_Mix"]["name"] == "Essential_Mix-2002-04-21"  # sans artiste : rien à sa place
-    assert got["2002-01-13_-_Essential_Mix_-_H-Foundation"]["name"] == "H-Foundation-Essential_Mix-2002-01-13"
+    assert got["2002-05-05_Essential_Mix_-_Pete_Tong_&_BT_@_Coachella_Festival"]["name"] == "Pete_Tong_&_BT-Essential_Mix_@_Coachella_Festival-2002-05-05-P2P"
+    assert got["2002-04-21_Essential_Mix"]["name"] == "Essential_Mix-2002-04-21-P2P"  # sans artiste : rien à sa place
+    assert got["2002-01-13_-_Essential_Mix_-_H-Foundation"]["name"] == "H-Foundation-Essential_Mix-2002-01-13-P2P"
     assert got["2002-01-13_-_Random_Show_-_Bob"]["name"] == "2002-01-13_-_Random_Show_-_Bob"  # émission inconnue : intact
 
 

@@ -124,13 +124,14 @@ def reset(conn, artist: str) -> None:
             {"r": r["id"], "a": parse_release_name(r["name"])["artist"]})
 
 
-_GUEST = r"(?:feat|ft|featuring|vs|versus|and|with|&|\+)"
+_GUEST = r"(?:feat|ft|featuring|vs|versus|and|with|b2b|&|\+)"
 
 
 @lru_cache(maxsize=64)
 def _collab_re(artist):
     a = r"[\W_]+".join(map(re.escape, [w for w in re.split(r"[\W_]+", artist.strip()) if w]))
-    return re.compile(rf"(?<![^\W_]){_GUEST}[\W_]+{a}(?![^\W_])|(?<![^\W_]){a}[\W_]+{_GUEST}(?![^\W_])", re.I)
+    return re.compile(rf"(?<![^\W_]){_GUEST}[\W_]+{a}(?![^\W_])|(?<![^\W_]){a}[\W_]+{_GUEST}(?![^\W_])"
+                      rf"|,[\W_]*{a}(?![^\W_])|(?<![^\W_]){a}[ _]*,", re.I)  # liste « A,_B_and_C »
 
 
 _WORD = re.compile(r"[^\W_]")  # au moins une lettre ou un chiffre : sinon le motif ne contiendrait aucun nom
@@ -147,6 +148,21 @@ def remixed(title: str | None, artist: str) -> bool:
     """Vrai si le titre de la piste crédite l'artiste d'une version : « Crazy (Axwell Remix) », « Crazy [Axwell & X
     Dub] ». Le nom doit être entre parenthèses ou crochets, suivi du mot qui dit la version."""
     return bool(title and _WORD.search(artist)) and _remix_re(artist).search(title) is not None
+
+
+_LIST = re.compile(r"\s*,\s*")
+_PAIR = re.compile(r"\s+(?:&|and|\+|vs\.?|versus|b2b|feat\.?|ft\.?|featuring|with)\s+", re.I)
+
+
+def split(artist: str | None, known) -> list[str]:
+    """Artistes d'un crédit à plusieurs : « Axwell, Pete Tong and David Guetta » -> Axwell, Pete Tong, David Guetta.
+    Toujours coupé aux virgules ; à « and », « & », « vs », « b2b »… seulement si chaque partie est un artiste de la
+    bibliothèque (`known(nom)`), pour garder les duos (« Cass and Slide », « Above & Beyond »)."""
+    out = []
+    for part in _LIST.split(" ".join((artist or "").replace("_", " ").split())):
+        pieces = [p for p in _PAIR.split(part) if p]
+        out += pieces if len(pieces) > 1 and all(known(p) for p in pieces) else [part] if part else []
+    return out
 
 
 def collab(name: str, artist: str) -> bool:

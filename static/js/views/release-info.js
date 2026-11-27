@@ -34,7 +34,10 @@ export function infoRows(rel, el) {
       // série : volume précédent et suivant de part et d'autre de son nom
       const step = (x, text, label) => x && el('a', { class: 'pill pill-num', href: `#/release/${enc(String(x.name).replace(/ /g, '_'))}?id=${x.id}`,
         title: t(label, x.volume), 'aria-label': t(label, x.volume) }, text);
-      return [el('dt', {}, k), el('dd', {}, ...(extra === 'series'
-        ? [step(rel.series_prev, '‹', 'Volume {0}'), pill, step(rel.series_next, '›', 'Volume {0}')].filter(Boolean) : [pill]))];
+      // crédit à plusieurs (« Axwell, Pete Tong and David Guetta ») : une pastille par artiste
+      const many = k === t('Artiste') && rel.artists?.length > 1
+        && rel.artists.map((a) => el('a', { class: 'pill pill-cls', href: href(a) }, artistLabel(a)));
+      return [el('dt', {}, k), el('dd', {}, ...(many || (extra === 'series'
+        ? [step(rel.series_prev, '‹', 'Volume {0}'), pill, step(rel.series_next, '›', 'Volume {0}')].filter(Boolean) : [pill])))];
     });
 }

@@ -4,6 +4,24 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.85.9](https://github.com/djkix/mp3-scene/compare/v1.85.8...v1.85.9) (2026-11-27)
+
+### Résumé
+
+**Essential Mix en P2P, une pastille par artiste, « Tout rattacher ».**
+
+- Essential Mix : le nom finit par son groupe, « Carl_Cox-Essential_Mix-1994-10-09-TALiON », sinon par P2P
+  (« Laurent_Garnier-Essential_Mix-2000-01-30-P2P »). Seul un nom de scène (« …-1994-TALiON ») donne un groupe :
+  « Fergie », « Sasha »… lus à la fin d'un nom de dossier ne sont plus des groupes.
+- Crédit à plusieurs (« Axwell, Pete Tong and David Guetta ») : une pastille par artiste sur la fiche, chacune vers
+  sa page. Coupé aux virgules, et à « and », « & », « vs », « b2b »… seulement si chaque partie est un artiste de la
+  bibliothèque : « Cass and Slide » reste un duo. Sur la page d'un artiste, l'onglet « Avec » trouve aussi les mixes
+  où il est cité dans une liste (« Axwell,_Pete_Tong… »).
+- Les artistes écrits par le renommage des Essential Mix, des épisodes et des disques prennent la graphie la plus
+  répandue (« deadmau5 », « Armin van Buuren » -> « Deadmau5 », « Armin Van Buuren ») : ces rapprochements ne sont
+  plus proposés.
+- Admin › Règles : un bouton « Tout rattacher » accepte d'un coup les rapprochements suggérés.
+
 ## [1.85.8](https://github.com/djkix/mp3-scene/compare/v1.85.7...v1.85.8) (2026-11-27)
 
 ### Résumé

@@ -406,6 +406,7 @@ export const EN = {
   'Labels rattachés': 'Attached labels',
   'Détacher rend son label d’origine à chaque release au prochain scan.': 'Detach gives each release its original label back on the next scan.',
   'Rattacher': 'Attach',
+  'Tout rattacher': 'Attach all',
   'Aucun label rattaché à la main.': 'No manually attached label.',
   'Labels': 'Labels',
   'Catalogue': 'Catalogue',
