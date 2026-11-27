@@ -21,6 +21,7 @@ from app.naming import ORNAMENT, parse_release_name, unwrap
 # sous-dossier de disque : « CD1 », « Disc 2 », ou un simple numéro (« 1 », « 02 »)
 # sous-dossier disque : « CD2 », « Disc 3 », « 02 », ou nommé après son numéro (« CD3 - Mixed by Axwell »,
 # « CD1 [Sunshine Disc] », « Disc1-V-Rock », « Cd 2 (DJ Kost Mix) ») ; « CDM » n'en est pas un
+BONUS_RE = re.compile(r"^(?:bonus|extras?)(?:[ _-]*(?:cd|disc|tracks?|\d{1,2}))*$", re.IGNORECASE)
 DISC_RE = re.compile(r"^(?:(?:cd|disc|disk)[ _-]?(\d+)(?:[ _\-:(\[].*)?|(\d{1,2}))$", re.IGNORECASE)
 BATCH = 500
 TAG_BATCH = 200
@@ -299,8 +300,12 @@ def _scan_structure(conn, root, now):
                     continue
                 m = DISC_RE.match(name)
                 t = None
-                if m:
+                if m and series:  # « Disk 1/title/… » : les pistes des sous-dossiers du disque aussi
+                    t, s, n = _deep(e.path, name + "/", int(m.group(1) or m.group(2)))
+                elif m:
                     t, s, _, n = _files(_list(e.path), name + "/", int(m.group(1) or m.group(2)))
+                elif BONUS_RE.match(name):  # « Bonus », « Extras » : le disque suivant de la release
+                    t, s, n = _deep(e.path, name + "/", 0)
                 elif series:
                     d = db._DISC_NO.search(name)  # « Mixes 2 », « Disk 1 » ; sans numéro : 0, numéroté plus bas
                     t, s, n = _deep(e.path, name + "/", int(d[1] or d[2]) if d else 0)
@@ -314,7 +319,7 @@ def _scan_structure(conn, root, now):
             unreadable_dir(path, rel, err)
             continue
         skipped += n_skip
-        if series and any(t[1] == 0 for t in tracks):  # disque sans numéro : le premier libre, dans l'ordre des noms
+        if any(t[1] == 0 for t in tracks):  # disque sans numéro (série, bonus) : le premier libre, dans l'ordre des noms
             used = {t[1] for t in tracks}
             free = (i for i in range(1, 1000) if i not in used)
             nos = {d: next(free) for d in sorted({t[0].split("/")[0] for t in tracks if t[1] == 0}, key=str.lower)}

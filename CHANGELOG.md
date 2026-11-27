@@ -4,6 +4,25 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.85.16](https://github.com/djkix/mp3-scene/compare/v1.85.15...v1.85.16) (2026-11-27)
+
+### Résumé
+
+**Disques imbriqués et « Bonus » rattachés, genre de l'artiste, « Artiste-Titre-année-P2P » pour toutes les releases.**
+
+- « Dmc Commercial Collection 203/Disk 1/title/… » : un sous-dossier au nom de disque (« Disk 1 », « CD2 ») n'était
+  lu qu'à son premier niveau ; vide, son sous-dossier « title » devenait une release à part (« title-P2P »). Ses
+  pistes, à toute profondeur, sont désormais celles du disque : 9 DMC (203 à 218) réunies au prochain scan.
+- Un sous-dossier « Bonus » (ou « Extras », « Bonus CD »…) d'une release est son disque suivant, et non une release à
+  part nommée « Bonus » : « VA-Club Addiction (Bootleg) », les Essential Mix Classic de Daft Punk et de Massive Attack.
+  Ces releases sont relues une fois au prochain scan.
+- Release sans genre (tags vides, souvent un set) : le genre le plus fréquent de son artiste dans la bibliothèque
+  (Axwell -> Progressive House). 576 releases en reçoivent un ; un genre lu dans les tags ou corrigé à la main l'emporte.
+- Toute release sans groupe ou sans année dans son nom est nommée comme une release P2P, « Artiste-Titre-année-P2P » :
+  « Air_-_Moon_Safari » -> « Air-Moon_Safari-1998-P2P », « Mano Solo - Dehors » -> « Mano_Solo-Dehors-2000-P2P ».
+  L'année est celle de la release (tags, NFO) et s'ajoute dès qu'elle est connue ; un nom au groupe de scène
+  (« …-2006-TGX ») ne change pas. Remplace la règle des compilations de la 1.85.10 ; environ 3 600 releases renommées.
+
 ## [1.85.15](https://github.com/djkix/mp3-scene/compare/v1.85.14...v1.85.15) (2026-11-27)
 
 ### Résumé

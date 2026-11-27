@@ -59,7 +59,7 @@ def test_numbered_subfolders_are_discs_and_a_former_disc_release_is_absorbed(con
     mk(music, "Albums/VA-Other-2CD-2003-GRP/2003", ["01-d.mp3"])                     # quatre chiffres : pas un disque
     scan_structure(conn, music, now=1.0)
     names = lambda: {r["name"] for r in conn.execute("SELECT name FROM releases")}
-    assert names() == {"VA-Annual-3CD-2018-P2P", "Two-Song-WEB-2015-GRP", "2003"}
+    assert names() == {"VA-Annual-3CD-2018-P2P", "Two-Song-WEB-2015-GRP", "2003-P2P"}
     assert [(t["disc"], t["relpath"]) for t in conn.execute(
         "SELECT disc, relpath FROM tracks t JOIN releases r ON r.id=t.release_id WHERE r.name LIKE 'VA-Annual%' ORDER BY disc")] == [(1, "1/01-a.mp3"), (2, "02/01-b.mp3")]
     # indexé avant cette règle : chaque disque était une release à part ; le scan suivant les réunit
@@ -70,7 +70,16 @@ def test_numbered_subfolders_are_discs_and_a_former_disc_release_is_absorbed(con
                      " VALUES (?,?,?,?,0,0,0,1,0)", (f"Albums/VA-Annual-3CD-2018-P2P/{d}", d, "Albums/VA-Annual-3CD-2018-P2P", "Albums"))
     conn.commit()
     scan_structure(conn, music, now=2.0)
-    assert names() == {"VA-Annual-3CD-2018-P2P", "Two-Song-WEB-2015-GRP", "2003"}
+    assert names() == {"VA-Annual-3CD-2018-P2P", "Two-Song-WEB-2015-GRP", "2003-P2P"}
+
+
+def test_bonus_subfolder_is_the_next_disc_of_its_release(conn, music):
+    mk(music, "Comp/VA-Club_Addiction-2CD-2005-GRP/CD1", ["01-a.mp3"]); mk(music, "Comp/VA-Club_Addiction-2CD-2005-GRP/CD2", ["01-b.mp3"])
+    mk(music, "Comp/VA-Club_Addiction-2CD-2005-GRP/Bonus", ["17-c.mp3"])
+    scan_structure(conn, music, now=1.0)
+    assert [r[0] for r in conn.execute("SELECT path FROM releases")] == ["Comp/VA-Club_Addiction-2CD-2005-GRP"]
+    assert [(t["disc"], t["relpath"]) for t in conn.execute("SELECT disc, relpath FROM tracks ORDER BY disc")] == [
+        (1, "CD1/01-a.mp3"), (2, "CD2/01-b.mp3"), (3, "Bonus/17-c.mp3")]
 
 
 def test_multi_disc_merged(conn, music):
@@ -85,9 +94,13 @@ def test_series_subfolders_with_tracks_are_discs_whatever_their_name(conn, music
     mk(music, f"{base}/DMC 047 - Previews (December 1986)", ["01-c.mp3"]); mk(music, f"{base}/DMC 047 - Mixes 2", ["01-b.mp3"])
     mk(music, f"{base}/International", ["01-a.mp3"]); mk(music, f"{base}/Covers", ["front.jpg"])
     mk(music, f"{base}/International/title", ["02-a.mp3"])  # sous-dossier d'un disque : le même disque
+    deep = "Compilations/-=DMC Commercial=-/Dmc Commercial Collection 203"
+    mk(music, f"{deep}/Disk 1/title", ["01-a.mp3"]); mk(music, f"{deep}/Disk2/title", ["01-b.mp3"])  # nom de disque, pistes plus bas
     mk(music, "Compilations/-=DMC Commercial=-/!Collection/Some Release", ["01-d.mp3"])  # dossier de collection : à part
     scan_structure(conn, music, now=1.0)
-    assert {r["path"] for r in conn.execute("SELECT path FROM releases")} == {base, "Compilations/-=DMC Commercial=-/!Collection/Some Release"}
+    assert {r["path"] for r in conn.execute("SELECT path FROM releases")} == {base, deep, "Compilations/-=DMC Commercial=-/!Collection/Some Release"}
+    assert [(t["disc"], t["relpath"]) for t in conn.execute("SELECT disc, relpath FROM tracks t JOIN releases r ON r.id=t.release_id"
+            " WHERE r.path=? ORDER BY disc", (deep,))] == [(1, "Disk 1/title/01-a.mp3"), (2, "Disk2/title/01-b.mp3")]
     assert [(t["disc"], t["relpath"]) for t in conn.execute("SELECT disc, relpath FROM tracks t JOIN releases r ON r.id=t.release_id"
             " WHERE r.path=? ORDER BY disc", (base,))] == [(1, "DMC 047 - Previews (December 1986)/01-c.mp3"),
                                                         (2, "DMC 047 - Mixes 2/01-b.mp3"), (3, "International/01-a.mp3"),
@@ -401,10 +414,10 @@ def test_named_disc_folders_join_their_album(conn, music):
     assert set(rels) == {"2010 - Ministry of Sound - Clubbers Guide 2010 [3CD]", "VA-Old_Skool-WEB-2016-P2P", "CDM"}
     mos = rels["2010 - Ministry of Sound - Clubbers Guide 2010 [3CD]"]
     assert [t["disc"] for t in conn.execute("SELECT disc FROM tracks WHERE release_id=? ORDER BY disc", (mos["id"],))] == [1, 2, 3]
-    assert (mos["name"], mos["title"], mos["year"]) == ("Ministry_of_Sound_-_Clubbers_Guide_2010-P2P", "Ministry of Sound Clubbers Guide 2010", 2010)
+    assert (mos["name"], mos["title"], mos["year"]) == ("Ministry_of_Sound-Clubbers_Guide_2010-P2P", "Ministry of Sound Clubbers Guide 2010", 2010)
     conn.execute("UPDATE releases SET name='VA-Ministry_of_Sound_Clubbers_Guide_2010-3CD-2010' WHERE id=?", (mos["id"],))
     db.categorize(conn)  # nom donné par une version antérieure : relu sur le dossier
-    assert conn.execute("SELECT name FROM releases WHERE id=?", (mos["id"],)).fetchone()[0] == "Ministry_of_Sound_-_Clubbers_Guide_2010-P2P"
+    assert conn.execute("SELECT name FROM releases WHERE id=?", (mos["id"],)).fetchone()[0] == "Ministry_of_Sound-Clubbers_Guide_2010-P2P"
 
 
 def test_dated_radio_episodes_are_named_artist_show_date(conn, music):

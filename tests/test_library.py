@@ -1745,10 +1745,10 @@ def test_disc_subfolders_take_the_release_name_and_their_cd(user_client, setting
     assert got["Axer-123__321-Promo_Vinyl-2006-TGX"][3] == "01.Singles"                            # release d'artiste : un single
     conn.execute("UPDATE releases SET track_count=13 WHERE name='Matt-RB_2_Rue-2001-FSP'"); db.categorize(conn)
     assert conn.execute("SELECT category FROM releases WHERE name='Matt-RB_2_Rue-2001-FSP'").fetchone()[0] == "Albums"  # ou un album
-    assert got["Ignored_Letter_Folder_Child"][0] == "Ignored_Letter_Folder_Child"
+    assert got["Ignored_Letter_Folder_Child"][0] == "Ignored_Letter_Folder_Child-P2P"
     assert conn.execute("SELECT grp FROM releases WHERE path LIKE '%Ignored_Letter_Folder_Child'").fetchone()[0] == "P2P"  # sans groupe
     assert {v[3] for k, v in got.items() if "Avant" in k or "Mix" in k} == {C}
-    assert got["(1997) - Oxygene 7-13"] == ("Jean_Michel_Jarre-Oxygene_7-13-1997", "Jean Michel Jarre", 1997, "Albums")  # 7 pistes : le dossier décide
+    assert got["(1997) - Oxygene 7-13"] == ("Jean_Michel_Jarre-Oxygene_7-13-1997-P2P", "Jean Michel Jarre", 1997, "Albums")  # 7 pistes : le dossier décide
     assert got["(1994) - Hong Kong"][3] == "03.Various Artists - Live And Radio" and got["(1997) - Oxygene 8"][3] == "01.Singles"
     assert got["Dancefloor Deluxe Disc 2"][0] == "Alcazar_-_Dancefloor_Deluxe_(CD2)"
     assert got["-Black-"][0] == "DJMAX_Portable_2_Audio_Trinity_O.S.T_(Black)"
@@ -1778,7 +1778,7 @@ def test_bulk_live_folders_become_one_release_per_set(app, user_client, settings
     rows = {r["path"]: r for r in c.execute("SELECT * FROM releases")}
     assert "Live And Radio/-= Tomorrowland =-/-= Tomorrowland 2013 =-" not in rows       # le dossier n'est pas une release
     h = rows["Live And Radio/-= Tomorrowland =-/-= Tomorrowland 2013 =-/Hardwell.mp3"]
-    assert (h["name"], h["track_count"], h["year"]) == ("Hardwell", 1, 2013)  # année de son dossier
+    assert (h["name"], h["track_count"], h["year"]) == ("Hardwell-2013-P2P", 1, 2013)  # année de son dossier
     names = {r["name"] for r in rows.values()}
     assert {"Radio_Soulwax-Essential_Mix-2005-01-02-P2P", "Jon_O_Bir-Essential_Mix-2005-01-16-P2P"} <= names
     # festival et émission retrouvés par le dossier ; un set par release
@@ -1843,5 +1843,32 @@ def test_numbered_set_files_lose_their_track_number(conn):
                      " VALUES (?,?,'',?,0,0,10,1,0,?)", (f"{L}/{n}.mp3", n, L.split("/")[0], n.split("_")[0]))
     db.categorize(conn)
     got = {r["name"]: r["artist"] for r in conn.execute("SELECT name, artist FROM releases")}
-    assert got == {"Michael_Burian_-_Sensation_White_Prague_31-05-2008": "Michael Burian",
+    assert got == {"Michael_Burian_-_Sensation_White_Prague_31-05-2008-P2P": "Michael Burian",
                    "dave_clarke_-_live_at_inox-sat-05-16-2009-talion": "Dave Clarke"}
+
+
+def test_release_without_genre_takes_its_artist_most_common_genre(conn):
+    rows = [("01.Singles/A/Axwell-One-WEB-2010-GRP", "Axwell", "Progressive House"), ("01.Singles/A/Axwell-Two-WEB-2011-GRP", "Axwell", "Progressive House"),
+            ("01.Singles/A/Axwell-Three-WEB-2012-GRP", "Axwell", "House"), ("03.Live/Axwell_@_Tomorrowland_2018.mp3", "axwell", None),
+            ("03.Live/Nobody_@_Tomorrowland_2018.mp3", "Nobody", None), ("02.Compilations/VA-X-2010-GRP", "VA", None)]
+    for p, a, g in rows:
+        conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, artist, genre)"
+                     " VALUES (?,?,'',?,0,0,10,1,0,?,?)", (p, p.rsplit("/", 1)[1], p.split("/")[0], a, g))
+    db.categorize(conn)
+    got = {r["path"].rsplit("/", 1)[1]: r["genre"] for r in conn.execute("SELECT path, genre FROM releases")}
+    assert got["Axwell_@_Tomorrowland_2018.mp3"] == "Progressive House"
+    assert got["Nobody_@_Tomorrowland_2018.mp3"] is None and got["VA-X-2010-GRP"] is None
+
+
+def test_release_without_group_or_year_is_named_like_a_p2p_release(conn):
+    rows = [("Albums/Air_-_Moon_Safari", 1998), ("Albums/Air_-_Talkie_Walkie", None), ("Singles/A/Axer-One-WEB-2006-TGX", 2006)]
+    for p, y in rows:
+        conn.execute("INSERT INTO releases(path, name, parent, category, mtime, added_at, size, track_count, has_nfo, year)"
+                     " VALUES (?,?,'',?,0,0,10,1,0,?)", (p, p.rsplit("/", 1)[1], p.split("/")[0], y))
+    db.categorize(conn)
+    names = lambda: {r[0] for r in conn.execute("SELECT name FROM releases")}
+    assert names() == {"Air-Moon_Safari-1998-P2P", "Air-Talkie_Walkie-P2P", "Axer-One-WEB-2006-TGX"}
+    conn.execute("UPDATE releases SET year=2004 WHERE name='Air-Talkie_Walkie-P2P'")  # année connue plus tard (tags)
+    db.categorize(conn)
+    db.categorize(conn)  # rien ne s'empile
+    assert names() == {"Air-Moon_Safari-1998-P2P", "Air-Talkie_Walkie-2004-P2P", "Axer-One-WEB-2006-TGX"}

@@ -43,6 +43,11 @@ def init(data_dir: Path) -> None:
             conn.execute("UPDATE releases SET has_cover=NULL WHERE has_cover=0")  # image cherchée aussi dans les pistes suivantes
         if "dupes_checked" not in {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}:  # 1.85.3, voir scanner
             conn.execute("ALTER TABLE scan_state ADD COLUMN dupes_checked INTEGER")
+        # 1.85.16 : release qui a un sous-dossier « Bonus » relistée une fois, pour qu'il devienne son disque suivant
+        if "bonus_discs" not in {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}:
+            conn.execute("ALTER TABLE scan_state ADD COLUMN bonus_discs INTEGER")
+            for (p,) in conn.execute("SELECT path FROM releases WHERE lower(path) LIKE '%/bonus%' OR lower(path) LIKE '%/extra%'").fetchall():
+                conn.execute("UPDATE releases SET mtime=0 WHERE path=?", (p.rsplit("/", 1)[0],))
         # 1.85.10 : de nouveau, pour les pistes des sous-dossiers d'un disque (« Dmc Commercial Collection 204/Disk2/title »)
         if "series_deep" not in {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}:
             conn.execute("ALTER TABLE scan_state ADD COLUMN series_deep INTEGER")
@@ -485,6 +490,48 @@ def numbered_sets(conn) -> None:
                      (name, artists.capitalize(artist) if artist else r["artist"], r["id"]))
 
 
+def artist_genres(conn) -> None:
+    """Release sans genre (tags vides, souvent un set) : le genre le plus fréquent de son artiste dans la bibliothèque
+    (Axwell -> Progressive House). Recalculé à chaque passage ; un genre lu dans les tags ou corrigé à la main l'emporte."""
+    best = {}
+    for a, g, _ in conn.execute("SELECT COALESCE(tag_artist, artist) AS a, genre, COUNT(*) FROM releases"
+                                " WHERE NULLIF(genre, '') IS NOT NULL AND COALESCE(tag_artist, artist) IS NOT NULL"
+                                " GROUP BY 1, 2 ORDER BY 3 DESC, 2"):
+        best.setdefault(a.casefold(), g)
+    for k in ("va", "various", "various artists"):
+        best.pop(k, None)
+    conn.executemany("UPDATE releases SET genre=? WHERE id=?", [
+        (best[a.casefold()], i) for i, a in conn.execute(
+            "SELECT id, COALESCE(tag_artist, artist) FROM releases WHERE NULLIF(genre, '') IS NULL AND COALESCE(tag_artist, artist) IS NOT NULL")
+        if a.casefold() in best])
+
+
+_YEAR_IN = re.compile(r"(?<!\d)(?:19|20)\d\d(?!\d)")
+
+
+def p2p_names(conn) -> None:
+    """Release sans groupe ou sans année dans son nom : nommée comme une release P2P, « Artiste-Titre-année-P2P »
+    (« Air_-_Moon_Safari » -> « Air-Moon_Safari-1998-P2P », « VA-Kontor_…-2CD-1998 » -> « …-2CD-1998-P2P »). L'année
+    est celle de la release (tags, NFO) ; un nom en « -P2P » sans année la reçoit dès qu'elle est connue. Pas pour un
+    disque nommé d'après sa release (« …_(CD2) »)."""
+    out = []
+    for r in conn.execute("SELECT id, path, name, year FROM releases WHERE grp='P2P'").fetchall():
+        name, year = r["name"], r["year"]
+        parent = r["path"].rsplit("/", 2)[-2].replace(" ", "_") if r["path"].count("/") > 1 else ""
+        if parent and name.startswith(parent + "_("):
+            continue  # disque nommé d'après sa release (« VA-The_Salsoul_Acapellas-2CD-2005_(CD2) », « …_(Mix_Cut) »)
+        # refait à chaque passage depuis le nom sans « -P2P » : l'année s'ajoute dès qu'elle est connue
+        n = (name[:-4] if name.endswith("-P2P") else name).replace(" ", "_")
+        if "-P2P" in n or parse_release_name(n)["grp"] not in (None, "P2P"):
+            continue  # groupe dans le nom (« …-2006-TGX », « …-sat-05-16-2009-talion ») : le nom reste tel quel
+        if "-" not in n.replace("_-_", "") and (f := parse_release_name(n))["artist"] and f["title"]:
+            n = f"{f['artist']}-{f['title']}".replace(" ", "_")  # « Air_-_Moon_Safari » -> « Air-Moon_Safari »
+        new = "-".join(x for x in (n, None if _YEAR_IN.search(n) else year and str(year), "P2P") if x)
+        if new != name:
+            out.append((new, r["id"]))
+    conn.executemany("UPDATE releases SET name=? WHERE id=?", out)
+
+
 def spellings(conn) -> None:
     """Artistes écrits par les renommages ci-dessus (Essential Mix, épisodes, disques), après le regroupement : ils
     prennent la graphie la plus répandue de leur artiste (« deadmau5 », « Armin van Buuren » -> « Deadmau5 », « Armin
@@ -564,10 +611,8 @@ def categorize(conn) -> None:
     conn.executemany("UPDATE releases SET category=? WHERE id=?",
                      [(want, r["id"]) for r in rows if (want := category(r)) != r["category"]])
     conn.execute("UPDATE releases SET grp='P2P' WHERE COALESCE(grp, '')=''")  # sans groupe dans son nom : P2P
-    # compilation sans groupe à la fin de son nom (« VA-Kontor_Top_of_The_Clubs_Vol_01-2CD-1998 ») : « …-P2P » ;
-    # pas un disque nommé d'après sa release (« …_(CD2) »)
-    conn.execute("UPDATE releases SET name=name || '-P2P' WHERE grp='P2P' AND lower(category) LIKE '%compil%'"
-                 " AND name NOT LIKE '%-P2P%' AND name NOT LIKE '%)'")
+    artist_genres(conn)
+    p2p_names(conn)
     apply_overrides(conn)
 
 
