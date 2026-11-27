@@ -451,3 +451,22 @@ def test_file_removed_from_a_disc_subfolder_is_dropped_at_the_next_scan(conn, mu
     assert conn.execute("SELECT mtime FROM releases WHERE id=?", (rid,)).fetchone()[0] == 0  # … release relue
     scan_structure(conn, music, now=3.0)
     assert sorted(r[0] for r in conn.execute("SELECT relpath FROM tracks")) == ["CD1/01-a.mp3", "CD1/02-b.mp3"]
+
+
+
+def test_write_after_a_read_does_not_fail_when_another_connection_wrote_meanwhile(settings, conn):
+    # écriture vide (merge_track_artists sans rien à changer), lecture (artists.apply), écriture d'une autre connexion
+    # (position du lecteur), puis écriture : sans verrou pris d'avance, « database is locked » immédiat
+    from app import db
+    other = db.connect(settings.data_dir)
+    other.execute("PRAGMA busy_timeout=100")  # attend son tour, puis renonce : la transaction de `conn` tient le verrou
+    conn.executemany("UPDATE releases SET name=? WHERE name=?", [])
+    conn.execute("SELECT COUNT(*) FROM releases").fetchone()
+    try:
+        other.execute("UPDATE scan_state SET daily_at=NULL WHERE id=1")
+        other.commit()
+    except sqlite3.OperationalError:
+        pass  # verrou tenu par `conn` : l'autre attend, c'est voulu
+    conn.execute("UPDATE scan_state SET daily_at=NULL WHERE id=1")  # ne lève pas
+    conn.commit()
+    other.close()

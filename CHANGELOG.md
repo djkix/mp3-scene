@@ -4,6 +4,18 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.85.14](https://github.com/djkix/mp3-scene/compare/v1.85.13...v1.85.14) (2026-11-27)
+
+### Résumé
+
+**Lecture des tags sans « database is locked », colonne Labels.**
+
+- Lecture des tags : « database is locked » quand la position du lecteur était enregistrée pendant le regroupement
+  des artistes (une lecture dans une transaction déjà ouverte, puis une écriture d'une autre connexion, faisait
+  échouer l'écriture suivante sans attendre). Chaque transaction prend désormais le verrou d'écriture dès son début,
+  en attendant son tour.
+- Labels : le nombre de labels d'une famille a sa colonne, avant les releases, comme pour les séries.
+
 ## [1.85.13](https://github.com/djkix/mp3-scene/compare/v1.85.12...v1.85.13) (2026-11-27)
 
 ### Résumé

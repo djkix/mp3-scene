@@ -600,7 +600,10 @@ def year_from_nfo(conn) -> None:
 
 def connect(data_dir: Path) -> sqlite3.Connection:
     # une connexion par requête, utilisée séquentiellement mais depuis plusieurs threads du pool FastAPI
-    conn = sqlite3.connect(data_dir / "mp3scene.db", check_same_thread=False)
+    # IMMEDIATE : une transaction prend le verrou d'écriture dès son début (en attendant son tour). En DEFERRED, une
+    # lecture faite dans une transaction déjà ouverte, puis une écriture d'une autre connexion (position du lecteur),
+    # faisait échouer l'écriture suivante sans attendre : « database is locked » pendant la lecture des tags
+    conn = sqlite3.connect(data_dir / "mp3scene.db", check_same_thread=False, isolation_level="IMMEDIATE")
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys=ON")
     conn.execute("PRAGMA busy_timeout=5000")
