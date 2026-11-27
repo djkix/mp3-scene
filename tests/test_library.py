@@ -1731,11 +1731,12 @@ def test_disc_subfolders_take_the_release_name_and_their_cd(user_client, setting
     conn.commit()
     got = {r["path"].rsplit("/", 1)[1]: (r["name"], r["artist"], r["year"], r["category"]) for r in conn.execute("SELECT * FROM releases")}
     # release d'une série sans nom de release : « Titre-année-P2P », artiste VA (année du dossier, sinon des tags)
-    assert got["Dmc Commercial Collection 047"][:3] == ("DMC_Commercial_Collection_047-1986-P2P", "VA", 1986)  # graphie de la série
-    assert got["DMC Commercial Collection 001 (2020)"][:3] == ("DMC_Commercial_Collection_001-2020-P2P", "VA", 2020)
+    assert got["Dmc Commercial Collection 047"][:3] == ("VA-DMC_Commercial_Collection_047-1986-P2P", "VA", 1986)  # graphie de la série
+    assert got["DMC Commercial Collection 001 (2020)"][:3] == ("VA-DMC_Commercial_Collection_001-2020-P2P", "VA", 2020)
     assert got["25 Avant Nova - 1956"][:3] == ("VA-La_Boite_Noire_Radio_Nova_(1956-1980)-25CD-2010_(CD1_-_1956)", "VA", 2010)
     assert got["25 Avant Nova - 1957"][0].endswith("_(CD2_-_1957)")
     assert got["Als Mixe CD1"][0] == "VA-Kontor_Top_of_The_Clubs_Vol_41-3CD-2008_(CD1_-_Als_Mixe)"
+    assert got["VA-Kontor_Top_of_The_Clubs_Vol_41-3CD-2008"][0] == "VA-Kontor_Top_of_The_Clubs_Vol_41-3CD-2008-P2P"  # sans groupe
     assert got["SALSOUL_CD2"][0] == "VA-The_Salsoul_Acapellas-2CD-2005_(CD2)"
     assert got["Uncovered_1"][0] == "VA-Ministry_Of_Sound_Uncovered-2CD-Unimixed-2009_(CD1)"
     assert got["Mix_Cut"][0] == "VA-God_Save_The_Groove_Vol.1_(Presented_by_Kryder)-WEB-2018-P2P_(Mix_Cut)"

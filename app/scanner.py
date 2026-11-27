@@ -76,6 +76,20 @@ def _decode(e):
     return None
 
 
+def _deep(path, prefix, disc):
+    """Pistes d'un disque et de ses sous-dossiers (« Disk2/title/… ») : (pistes, taille, ignorés), comme _files."""
+    entries = _list(path)
+    tracks, size, _, skipped = _files(entries, prefix, disc)
+    for e in entries:
+        if e.is_dir(follow_symlinks=False):
+            if (name := _decode(e)) is None:
+                skipped += 1
+                continue
+            t, s, n = _deep(e.path, f"{prefix}{name}/", disc)
+            tracks, size, skipped = tracks + t, size + s, skipped + n
+    return tracks, size, skipped
+
+
 def _files(entries, prefix="", disc=1):
     """Fichiers directs : ([(relpath, disc, taille)] des pistes audio, taille totale, présence d'un .nfo, ignorés)."""
     tracks, size, nfo, skipped = [], 0, False, 0
@@ -289,7 +303,7 @@ def _scan_structure(conn, root, now):
                     t, s, _, n = _files(_list(e.path), name + "/", int(m.group(1) or m.group(2)))
                 elif series:
                     d = db._DISC_NO.search(name)  # « Mixes 2 », « Disk 1 » ; sans numéro : 0, numéroté plus bas
-                    t, s, _, n = _files(_list(e.path), name + "/", int(d[1] or d[2]) if d else 0)
+                    t, s, n = _deep(e.path, name + "/", int(d[1] or d[2]) if d else 0)
                 if t:
                     tracks += t
                     size += s

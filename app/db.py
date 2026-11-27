@@ -43,6 +43,10 @@ def init(data_dir: Path) -> None:
             conn.execute("UPDATE releases SET has_cover=NULL WHERE has_cover=0")  # image cherchée aussi dans les pistes suivantes
         if "dupes_checked" not in {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}:  # 1.85.3, voir scanner
             conn.execute("ALTER TABLE scan_state ADD COLUMN dupes_checked INTEGER")
+        # 1.85.10 : de nouveau, pour les pistes des sous-dossiers d'un disque (« Dmc Commercial Collection 204/Disk2/title »)
+        if "series_deep" not in {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}:
+            conn.execute("ALTER TABLE scan_state ADD COLUMN series_deep INTEGER")
+            conn.execute("UPDATE releases SET mtime=0 WHERE path LIKE '%/-=%=-/%' AND path NOT LIKE '%/%/%/%'")
         # 1.85.7 : releases des séries de compilations relistées une fois, pour que leurs sous-dossiers deviennent leurs disques
         if "series_discs" not in {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}:
             conn.execute("ALTER TABLE scan_state ADD COLUMN series_discs INTEGER")
@@ -370,7 +374,7 @@ def series_release(path: str) -> bool:
 
 def series_names(conn) -> None:
     """Release d'une série dont le dossier n'a pas un nom de release (« Dmc Commercial Collection 047 ») : nommée
-    comme une release P2P de compilation, « DMC_Commercial_Collection_047-1986-P2P » (année du dossier, sinon des
+    comme une release P2P de compilation, « VA-DMC_Commercial_Collection_047-1986-P2P » (année du dossier, sinon des
     tags), artiste VA. Seul le nom en base change, relu sur le dossier à chaque fois."""
     for r in conn.execute("SELECT id, path, year FROM releases WHERE path LIKE '%/-=%=-/%' AND path NOT LIKE '%/%/%/%'").fetchall():
         folder = r["path"].rsplit("/", 1)[-1]
@@ -382,7 +386,7 @@ def series_names(conn) -> None:
         spell = {w.lower(): w for w in re.findall(r"\w+", r["path"].split("/")[1])}
         title = re.sub(r"\w+", lambda w: spell.get(w[0].lower(), w[0]), title)
         year = int(m[1]) if m else r["year"]
-        name = "-".join(str(x) for x in (title, year, "P2P") if x).replace(" ", "_")
+        name = "-".join(str(x) for x in ("VA", title, year, "P2P") if x).replace(" ", "_")
         conn.execute("UPDATE releases SET name=?, artist='VA', tag_artist=NULL, title=?, year=?, grp='P2P' WHERE id=?",
                      (name, title, year, r["id"]))
 
@@ -545,6 +549,10 @@ def categorize(conn) -> None:
     conn.executemany("UPDATE releases SET category=? WHERE id=?",
                      [(want, r["id"]) for r in rows if (want := category(r)) != r["category"]])
     conn.execute("UPDATE releases SET grp='P2P' WHERE COALESCE(grp, '')=''")  # sans groupe dans son nom : P2P
+    # compilation sans groupe à la fin de son nom (« VA-Kontor_Top_of_The_Clubs_Vol_01-2CD-1998 ») : « …-P2P » ;
+    # pas un disque nommé d'après sa release (« …_(CD2) »)
+    conn.execute("UPDATE releases SET name=name || '-P2P' WHERE grp='P2P' AND lower(category) LIKE '%compil%'"
+                 " AND name NOT LIKE '%-P2P%' AND name NOT LIKE '%)'")
     apply_overrides(conn)
 
 

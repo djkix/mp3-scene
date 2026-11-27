@@ -84,12 +84,14 @@ def test_series_subfolders_with_tracks_are_discs_whatever_their_name(conn, music
     base = "Compilations/-=DMC Commercial=-/Dmc Commercial Collection 047"
     mk(music, f"{base}/DMC 047 - Previews (December 1986)", ["01-c.mp3"]); mk(music, f"{base}/DMC 047 - Mixes 2", ["01-b.mp3"])
     mk(music, f"{base}/International", ["01-a.mp3"]); mk(music, f"{base}/Covers", ["front.jpg"])
+    mk(music, f"{base}/International/title", ["02-a.mp3"])  # sous-dossier d'un disque : le même disque
     mk(music, "Compilations/-=DMC Commercial=-/!Collection/Some Release", ["01-d.mp3"])  # dossier de collection : à part
     scan_structure(conn, music, now=1.0)
     assert {r["path"] for r in conn.execute("SELECT path FROM releases")} == {base, "Compilations/-=DMC Commercial=-/!Collection/Some Release"}
     assert [(t["disc"], t["relpath"]) for t in conn.execute("SELECT disc, relpath FROM tracks t JOIN releases r ON r.id=t.release_id"
             " WHERE r.path=? ORDER BY disc", (base,))] == [(1, "DMC 047 - Previews (December 1986)/01-c.mp3"),
-                                                        (2, "DMC 047 - Mixes 2/01-b.mp3"), (3, "International/01-a.mp3")]
+                                                        (2, "DMC 047 - Mixes 2/01-b.mp3"), (3, "International/01-a.mp3"),
+                                                        (3, "International/title/02-a.mp3")]
 
 
 def test_release_with_sub_release(conn, music):
@@ -399,10 +401,10 @@ def test_named_disc_folders_join_their_album(conn, music):
     assert set(rels) == {"2010 - Ministry of Sound - Clubbers Guide 2010 [3CD]", "VA-Old_Skool-WEB-2016-P2P", "CDM"}
     mos = rels["2010 - Ministry of Sound - Clubbers Guide 2010 [3CD]"]
     assert [t["disc"] for t in conn.execute("SELECT disc FROM tracks WHERE release_id=? ORDER BY disc", (mos["id"],))] == [1, 2, 3]
-    assert (mos["name"], mos["title"], mos["year"]) == ("Ministry_of_Sound_-_Clubbers_Guide_2010", "Ministry of Sound Clubbers Guide 2010", 2010)
+    assert (mos["name"], mos["title"], mos["year"]) == ("Ministry_of_Sound_-_Clubbers_Guide_2010-P2P", "Ministry of Sound Clubbers Guide 2010", 2010)
     conn.execute("UPDATE releases SET name='VA-Ministry_of_Sound_Clubbers_Guide_2010-3CD-2010' WHERE id=?", (mos["id"],))
     db.categorize(conn)  # nom donné par une version antérieure : relu sur le dossier
-    assert conn.execute("SELECT name FROM releases WHERE id=?", (mos["id"],)).fetchone()[0] == "Ministry_of_Sound_-_Clubbers_Guide_2010"
+    assert conn.execute("SELECT name FROM releases WHERE id=?", (mos["id"],)).fetchone()[0] == "Ministry_of_Sound_-_Clubbers_Guide_2010-P2P"
 
 
 def test_dated_radio_episodes_are_named_artist_show_date(conn, music):

@@ -4,6 +4,18 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.85.10](https://github.com/djkix/mp3-scene/compare/v1.85.9...v1.85.10) (2026-11-27)
+
+### Résumé
+
+**P2P à la fin des compilations sans groupe, VA devant les DMC, disques imbriqués.**
+
+- Compilation sans groupe à la fin de son nom : « -P2P » ajouté (« VA-Kontor_Top_of_The_Clubs_Vol_01-2CD-1998-P2P »,
+  « Ministry_of_Sound_-_Clubbers_Guide_2010-P2P »). Pas pour un disque nommé d'après sa release (« …_(CD2) »).
+- Release d'une série sans nom de release : VA en tête, « VA-DMC_Commercial_Collection_054-P2P ».
+- Série de compilations : les pistes des sous-dossiers d'un disque en font partie (« Dmc Commercial Collection
+  204/Disk2/title » : disque 2 de la 204). Ces releases sont relues une fois au prochain scan.
+
 ## [1.85.9](https://github.com/djkix/mp3-scene/compare/v1.85.8...v1.85.9) (2026-11-27)
 
 ### Résumé
