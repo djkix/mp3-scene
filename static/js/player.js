@@ -264,7 +264,7 @@ function stopFade() {
 }
 
 function prime() {
-  if (backend || fade || sleepAtEnd || audio.paused) return;
+  if (backend || airplay || fade || sleepAtEnd || audio.paused) return;
   const d = audio.duration, left = d - audio.currentTime;
   if (!(left < 20)) return; // faux aussi tant que la durée est inconnue
   const t = player.queue.peekNext();
@@ -864,6 +864,26 @@ function iconBtn(cls, glyph, label, onclick, ico = null) {
   return el('button', { type: 'button', class: 'icon ' + cls, title: label, 'aria-label': label, 'data-ico': ico, onclick }, glyph);
 }
 
+// AirPlay (Safari, iPhone) : bouton du sélecteur d'appareils, dans l'emplacement du bouton cast, visible quand un
+// appareil est disponible. Pendant la diffusion, un seul élément <audio> joue : passer au second à chaque enchaînement
+// ramènerait le son sur l'iPhone (pas d'enchaînement sans blanc ni de fondu en AirPlay).
+let airplay = false;
+function initAirPlay() {
+  if (!window.WebKitPlaybackTargetAvailabilityEvent) return;
+  const btn = iconBtn('pl-airplay', '', tr('Diffuser avec AirPlay'), () => audio.webkitShowPlaybackTargetPicker(), 'airplay');
+  btn.hidden = true;
+  document.getElementById('cast-slot')?.append(btn);
+  for (const a of els) {
+    a.addEventListener('webkitplaybacktargetavailabilitychanged', (e) => { if (a === audio) btn.hidden = e.availability !== 'available'; });
+    a.addEventListener('webkitcurrentplaybacktargetiswirelesschanged', () => {
+      if (a !== audio) return;
+      airplay = a.webkitCurrentPlaybackTargetIsWireless;
+      if (airplay) unprime();
+      update();
+    });
+  }
+}
+
 // Titre (et nom de la release) trop long pour sa place : il défile d'un bout à l'autre (CSS) au lieu d'être coupé.
 function fitTitle() {
   for (const box of ui ? [ui.title, ui.rel] : []) {
@@ -1078,7 +1098,7 @@ function update() {
     ui.rate.replaceChildren(...[fmt && el('b', {}, fmt), t?.bitrate && el('span', {}, `${Math.round(t.bitrate / 1000)} kbps`)].filter(Boolean));
     ui.play.dataset.ico = on ? 'pause' : 'play'; // icônes dessinées (CSS) : ces caractères deviennent des emoji orange sur Android
     label(ui.play, on ? tr('Pause') : tr('Lecture'));
-    ui.cast.textContent = backend ? tr('Diffusion sur {0}', backend.name) : '';
+    ui.cast.textContent = backend ? tr('Diffusion sur {0}', backend.name) : airplay ? tr('Diffusion AirPlay') : '';
     volUI();
     ui.shuffle.setAttribute('aria-pressed', q.shuffle);
     const [glyph, text] = REPEAT[q.repeat];
@@ -1210,14 +1230,15 @@ export function initPlayer(footer) {
   el('option', { value: '' }, tr('Minuterie')), [15, 30, 60].map((m) => el('option', { value: m }, tr('{0} min', m))),
   el('option', { value: 'end' }, tr('Fin de la piste')));
   ui.list = el('ol');
-  ui.close = iconBtn('pl-close', '×', tr("Fermer la file d'attente"), () => { openPanel(false); ui.qbtn.focus(); });
+  ui.close = el('button', { type: 'button', class: 'pl-close', 'data-ico': 'back', title: tr("Fermer la file d'attente"),
+    onclick: () => { openPanel(false); ui.qbtn.focus(); } }, tr('Retour'));
   ui.panel = el('section', { class: 'pl-queue', hidden: true, 'aria-label': tr("File d'attente") },
-    el('div', { class: 'pl-q-head' }, el('h2', {}, tr("File d'attente")), ui.count, ui.sleep,
+    el('div', { class: 'pl-q-head' }, ui.close, el('h2', {}, tr("File d'attente")), ui.count, ui.sleep,
       el('button', { type: 'button', onclick: async () => { // import à la demande : playlist-add.js importe ce module
         const ids = q().tracks.slice(0, 1000).map((t) => t.id);
         if (ids.length) (await import('./playlist-add.js')).openDialog({ track_ids: ids });
       } }, tr('Enregistrer')),
-      el('button', { type: 'button', onclick: () => player.clear() }, tr('Vider la file')), ui.close),
+      el('button', { type: 'button', onclick: () => player.clear() }, tr('Vider la file'))),
     ui.list);
 
   // lecteur réduit (mobile) : barre de progression au-dessus de la ligne du titre ; un appui déplace la lecture à cet endroit
@@ -1239,6 +1260,8 @@ export function initPlayer(footer) {
       el('div', { class: 'pl-tools' }, ui.chap, ui.rate, volwrap, ui.lyrbtn, ui.vizbtn, ui.tvbtn, ui.fx, ui.fav, ui.qbtn,
         el('span', { id: 'cast-slot' })), // emplacement du bouton cast (cast.js)
       el('p', { class: 'pl-hint' }, tr('Balayez pour changer de piste'))));
+
+  initAirPlay();
 
   // Plein écran : balayage vers la gauche = piste suivante, vers la droite = précédente.
   // Ignoré s'il part de la barre de progression ou de la file, ou s'il est plutôt vertical (défilement).

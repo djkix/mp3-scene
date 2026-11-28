@@ -4,6 +4,18 @@ Toutes les modifications notables de Mp3 Scene sont consignées ici, la plus ré
 Le projet suit le [versionnage sémantique](https://semver.org/lang/fr/). Ce journal est repris dans le
 [README](README.md#historique-des-versions).
 
+## [1.85.19](https://github.com/djkix/mp3-scene/compare/v1.85.18...v1.85.19) (2026-11-28)
+
+### Résumé
+
+**AirPlay sur iPhone et Safari, bouton « Retour » de la file d'attente.**
+
+- Lecteur : un bouton AirPlay (iPhone, iPad, Safari sur Mac) ouvre le sélecteur d'appareils quand une Apple TV, un
+  HomePod ou une enceinte AirPlay est disponible ; « Diffusion AirPlay » s'affiche pendant la diffusion. Le Chromecast
+  reste impossible depuis une page web sur iOS. Pendant AirPlay, un seul élément audio joue : les pistes s'enchaînent
+  avec un court blanc, sans fondu, mais le son reste sur l'appareil.
+- File d'attente : la croix de fermeture devient un bouton « ← Retour », en haut à gauche.
+
 ## [1.85.18](https://github.com/djkix/mp3-scene/compare/v1.85.17...v1.85.18) (2026-11-27)
 
 ### Résumé
